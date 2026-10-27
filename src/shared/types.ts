@@ -505,6 +505,12 @@ export interface WorkspaceInfo {
    * repo where it is noise along with it.
    */
   explorerShowHidden?: boolean;
+  /**
+   * remotea: the remote session group (shared workspace) this workspace stands
+   * for on each host — hostId → groupId. Set when its first remote terminal
+   * is created or a foreign session is placed here; arrangement stays local.
+   */
+  remoteGroups?: Record<string, string>;
 }
 
 // Surface
@@ -648,6 +654,7 @@ export interface SavedSession {
     explorerWidth?: number;
     explorerExpanded?: Record<string, string[]>;
     explorerShowHidden?: boolean;
+    remoteGroups?: Record<string, string>;
     pinned?: boolean;
   }>;
   sidebarWidth: number;
@@ -708,6 +715,12 @@ export const IPC_CHANNELS = {
   RHOST_STATUS: 'rhost:status',
   RSESS_VIEWS: 'rsess:views',
   RSESS_REGISTRY: 'rsess:registry',
+  RSESS_REPORT: 'rsess:report',
+  RSESS_HIDE: 'rsess:hide',
+  RSESS_UNHIDE: 'rsess:unhide',
+  RSESS_CLOSE: 'rsess:close',
+  RSESS_GROUP_UPSERT: 'rsess:group-upsert',
+  RSESS_GROUP_CLOSE: 'rsess:group-close',
   // Remote file upload (ssh panes) — main resolves the whole paste/drop
   REMOTE_RESOLVE_PASTE: 'remote:resolve-paste',
   REMOTE_RESOLVE_DROP: 'remote:resolve-drop',

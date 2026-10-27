@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { setFocusedPaneReader, markRemoteLayoutReady } from './remote-sessions/sync';
+import { remoteSessionsWillPopulate } from './remote-sessions/startup';
 import { startGpuProbe } from './utils/gpu-watchdog';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
@@ -589,6 +591,10 @@ export default function App() {
   const t = useT();
 
   const [focusedPaneId, setFocusedPaneId] = useState<PaneId | null>(null);
+  // remotea: sessions opened on another device land in the pane the user is in.
+  const focusedPaneIdRef = useRef<PaneId | null>(null);
+  focusedPaneIdRef.current = focusedPaneId;
+  useEffect(() => setFocusedPaneReader(() => focusedPaneIdRef.current), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Which tab Settings opens on. Only "Manage layouts…" sets one; every other
   // opener clears it, so they keep opening on the default tab.
@@ -784,6 +790,10 @@ export default function App() {
       // 'fresh' means main deliberately wants this window empty — a named
       // session must not be cloned into it (issue #143).
       if (outcome !== 'fresh' && await restoreNamedSession(t, setSidebarWidth)) return;
+      // remotea: a fresh device whose default shell is remote gets its
+      // workspaces from the server (sync places them); a default workspace
+      // here would only start new, empty sessions next to them.
+      if (outcome !== 'fresh' && await remoteSessionsWillPopulate()) return;
       // Nothing to restore — create the default workspace. No splitTree here on
       // purpose: createWorkspace resolves it, and since #212 that resolution is
       // the SAME one every other entry point gets (the default layout if one is
@@ -792,7 +802,11 @@ export default function App() {
       if (useStore.getState().workspaces.length === 0) {
         createWorkspace(undefined, t);
       }
-    })();
+    })().finally(() => {
+      // remotea: only now may remote sessions be placed — earlier, they would
+      // be added a second time on top of the layout being restored.
+      markRemoteLayoutReady();
+    });
   }, []);
 
   // Expose helpers for main process queries + pipe bridge
@@ -1208,6 +1222,7 @@ export default function App() {
             explorerWidth: ws.explorerWidth,
             explorerExpanded: ws.explorerExpanded,
             explorerShowHidden: ws.explorerShowHidden,
+            remoteGroups: ws.remoteGroups,
             worktree: ws.worktree,
           })),
         }],
@@ -1396,6 +1411,7 @@ export default function App() {
         explorerWidth: ws.explorerWidth,
         explorerExpanded: ws.explorerExpanded,
         explorerShowHidden: ws.explorerShowHidden,
+        remoteGroups: ws.remoteGroups,
         // The worktree binding survives a named save like every other field
         // (#366): dropping it turned a live checkout into an anonymous folder.
         worktree: ws.worktree,

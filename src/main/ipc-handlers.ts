@@ -8,7 +8,7 @@ import { clearAgentState, noteHumanInput, listAgentStates } from './agent-state'
 import { PtyManager } from './pty-manager';
 import { TerminalRouter } from './terminal-router';
 import { RemoteHosts } from './remote-hosts';
-import { isRemoteShellSpec, parseRemoteShellSpec } from '../shared/remote-shell-spec';
+import { isRemoteShellSpec, parseRemoteShellSpec, remoteShellSpec } from '../shared/remote-shell-spec';
 import type { HostSaveRequest } from '../shared/remote-hosts-types';
 import { PtyLedger, reapOrphans } from './pty-ledger';
 import { SshDetector } from './ssh-detect';
@@ -114,6 +114,8 @@ const cdpBridge = new CDPBridge();
 const agentManager = new AgentManager(localPty);
 const insertionQueue = new SurfaceInsertionQueue();
 const surfaceOwners = new Map<SurfaceId, number>();
+// remotea: renderer windows that report their remote tabs (see remote-hosts report()).
+const reportingWindows = new Set<number>();
 const observedWebContents = new Set<number>();
 
 const CUSTOM_NOTIFICATION_SOUND_EXTENSIONS = ['aac', 'flac', 'm4a', 'mp3', 'oga', 'ogg', 'opus', 'wav', 'webm'] as const;
@@ -778,6 +780,37 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(IPC_CHANNELS.RHOST_TEST, (_event, req: { url: string; token?: string; id?: string }) => remoteHosts.test(req));
   ipcMain.on(IPC_CHANNELS.RHOST_RECONNECT, () => remoteHosts.wakeAll());
   ipcMain.handle(IPC_CHANNELS.RSESS_VIEWS, () => remoteHosts.views());
+  ipcMain.on(IPC_CHANNELS.RSESS_REPORT, (event, r: { ready?: unknown; surfaceIds?: unknown }) => {
+    const wc = event.sender;
+    const ids = Array.isArray(r?.surfaceIds) ? (r.surfaceIds as unknown[]).filter((x): x is string => typeof x === 'string') : [];
+    remoteHosts.report(wc.id, (payload) => {
+      if (!wc.isDestroyed()) wc.send(IPC_CHANNELS.RSESS_REGISTRY, payload);
+    }, { ready: r?.ready === true, surfaceIds: ids });
+    if (!reportingWindows.has(wc.id)) {
+      reportingWindows.add(wc.id);
+      wc.once('destroyed', () => {
+        reportingWindows.delete(wc.id);
+        remoteHosts.forgetWindow(wc.id);
+      });
+    }
+  });
+  ipcMain.on(IPC_CHANNELS.RSESS_HIDE, (_e, hostId: unknown, id: unknown) => {
+    if (typeof hostId === 'string' && typeof id === 'string') remoteHosts.hide(hostId, id);
+  });
+  ipcMain.on(IPC_CHANNELS.RSESS_UNHIDE, (_e, hostId: unknown, id: unknown) => {
+    if (typeof hostId === 'string' && typeof id === 'string') remoteHosts.unhide(hostId, id);
+  });
+  ipcMain.on(IPC_CHANNELS.RSESS_CLOSE, (_e, hostId: unknown, id: unknown) => {
+    if (typeof hostId === 'string' && typeof id === 'string' && /^surf-[A-Za-z0-9_-]{1,96}$/.test(id)) {
+      ptyManager.kill(id as SurfaceId, remoteShellSpec(hostId));
+    }
+  });
+  ipcMain.on(IPC_CHANNELS.RSESS_GROUP_UPSERT, (_e, hostId: unknown, group: { id: string; name: string; color?: string }) => {
+    if (typeof hostId === 'string' && group && typeof group === 'object') remoteHosts.groupUpsert(hostId, group);
+  });
+  ipcMain.on(IPC_CHANNELS.RSESS_GROUP_CLOSE, (_e, hostId: unknown, groupId: unknown) => {
+    if (typeof hostId === 'string' && typeof groupId === 'string') remoteHosts.groupClose(hostId, groupId);
+  });
 
   ipcMain.handle(IPC_CHANNELS.PTY_HAS, (_event, id: SurfaceId) => {
     return ptyManager.has(id);

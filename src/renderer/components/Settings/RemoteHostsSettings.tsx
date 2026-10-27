@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { refreshRemoteHosts, startRemoteHostStatus, useRemoteHosts } from '../../remote-sessions/status';
 import { parseRemoteShellSpec, remoteShellSpec } from '../../../shared/remote-shell-spec';
-import type { HostConnState, HostDTO, HostSaveRequest, HostTestResult } from '../../../shared/remote-hosts-types';
+import type { HostConnState, HostDTO, HostSaveRequest, HostTestResult, RemoteRegistryView } from '../../../shared/remote-hosts-types';
+import { closeRemoteSession, unhideRemoteSession } from '../../remote-sessions/sync';
 import '../../styles/remote-hosts.css';
 
 /**
@@ -104,6 +105,45 @@ function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: b
   );
 }
 
+/** Sessions this device chose to hide: still running, still on other devices. */
+function HiddenSessions() {
+  const [views, setViews] = useState<RemoteRegistryView[]>([]);
+  const load = async () => {
+    const api = (window as unknown as { wmux?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).wmux?.remoteSessions;
+    if (api) setViews(await api.views());
+  };
+  useEffect(() => {
+    void load();
+    const t = setInterval(() => void load(), 3000);
+    return () => clearInterval(t);
+  }, []);
+  const rows = views.flatMap((v) => v.sessions
+    .filter((s) => s.hiddenBy.includes(v.deviceId))
+    .map((s) => ({ hostId: v.hostId, session: s, group: v.groups.find((g) => g.id === s.groupId)?.name })));
+  if (!rows.length) return null;
+  return (
+    <>
+      <div className="settings-divider" />
+      <h3 className="settings-section-title">Hidden on this device</h3>
+      <p className="settings-hint">Still running, and still open on your other devices.</p>
+      {rows.map(({ hostId, session, group }) => (
+        <div key={session.id} className="settings-row">
+          <label className="settings-label">
+            {session.title || session.agent?.provider || session.cmd || 'shell'}
+            <span className="remote-host-card__url"> · {group ?? 'Inbox'} · {session.lastCwd ?? session.cwd}</span>
+          </label>
+          <button className="settings-button" onClick={() => { unhideRemoteSession(hostId, session.id); setTimeout(() => void load(), 400); }}>Show here</button>
+          <button className="settings-button" onClick={() => {
+            if (!window.confirm('Close this session on every device? Its process ends.')) return;
+            closeRemoteSession(hostId, session.id);
+            setTimeout(() => void load(), 400);
+          }}>Close everywhere</button>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function RemoteHostsSettings() {
   useEffect(() => {
     startRemoteHostStatus();
@@ -179,6 +219,7 @@ export default function RemoteHostsSettings() {
       {editing === 'new'
         ? <HostEditor initial={EMPTY} hasToken={false} onDone={() => setEditing(null)} />
         : <button className="settings-button" onClick={() => setEditing('new')}>Add remote host</button>}
+      <HiddenSessions />
     </div>
   );
 }

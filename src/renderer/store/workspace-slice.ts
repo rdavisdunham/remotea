@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid';
 import { WorkspaceId, WorkspaceInfo, SplitNode, SavedLayout } from '../../shared/types';
 import { isPosixPath } from '../../shared/paths';
 import { buildWorkspaceTree, WorkspaceLayout, instantiateLayout, freezeSurfaceCwds, dropEphemeralSurfaces, dropCodeContent, mergeStartupCommands } from './split-utils';
-import { killDroppedSurfaces, killTreeTerminalPtys } from './pty-teardown';
+import { closeRemoteGroups, killDroppedSurfaces, killTreeTerminalPtys } from './pty-teardown';
 // The one module that owns every tab-label rule. It is pure (no React), so the
 // store importing it pulls in nothing but the label helpers.
 import { deriveWorkspaceTitle } from '../components/SplitPane/surface-label';
@@ -214,6 +214,7 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
       notificationText: options.notificationText,
       shellState: options.shellState,
       worktree: options.worktree,
+      remoteGroups: options.remoteGroups,
     };
 
     set((state) => {
@@ -245,6 +246,10 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
     // to discard the entire split tree WITHOUT killing any of its PTYs, orphaning
     // every pane's wrapper shell for the life of the app.
     const closing = get().workspaces.find((w) => w.id === id);
+    // remotea: a workspace bound to a shared group closes that group on every
+    // device — including sessions some device had hidden. The per-tab kills
+    // below then find them already closed (idempotent on the server).
+    if (closing?.remoteGroups) closeRemoteGroups(closing.remoteGroups);
     if (closing) killTreeTerminalPtys(closing.splitTree);
 
     set((state) => {
@@ -366,6 +371,7 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
       explorerExpanded: config.explorerExpanded,
       explorerShowHidden: config.explorerShowHidden,
       worktree: config.worktree,
+      remoteGroups: config.remoteGroups,
     }));
 
     // IDs are regenerated above, so a saved activeWorkspaceId is meaningless —

@@ -344,6 +344,7 @@ export class RemoteHostClient {
   // ── Ready / down ─────────────────────────────────────────────────────────
 
   private onReady(): void {
+    this.probed.clear();
     for (const intent of this.deps.intents.take(this.hostId)) this.sendIntent(intent);
     for (const surf of this.surfs.values()) {
       if (surf.wanted && surf.state !== 'closed') this.sendOpen(surf);
@@ -435,6 +436,17 @@ export class RemoteHostClient {
       case 'meta':
         this.deps.onMeta?.(msg.id, { cwd: msg.cwd, agent: msg.agent });
         return;
+      case 'probed': {
+        let changed = false;
+        for (const [id, st] of Object.entries(msg.status)) {
+          if (st === 'closed' && !this.closedIds.has(id)) {
+            this.closedIds.add(id);
+            changed = true;
+          }
+        }
+        if (changed) this.deps.onRegistry?.();
+        return;
+      }
       case 'sessionAdded':
       case 'sessionUpdated':
         this.sessions.set(msg.session.id, msg.session);
@@ -714,6 +726,28 @@ export class RemoteHostClient {
     if (!s) return () => {};
     s.resync.add(cb);
     return () => s.resync.delete(cb);
+  }
+
+  /** Ids already asked about on this connection. */
+  private probed = new Set<string>();
+
+  /**
+   * Ask the server about tabs this device shows that the registry does not
+   * list: a session closed on another device while this one was offline is
+   * not in the welcome at all, only in the server's tombstones.
+   */
+  probeUnknown(ids: Iterable<string>): void {
+    if (!this.ready) return;
+    const ask: string[] = [];
+    for (const id of ids) {
+      if (this.sessions.has(id) || this.closedIds.has(id) || this.probed.has(id)) continue;
+      if (!/^surf-[A-Za-z0-9_-]{1,96}$/.test(id)) continue;
+      this.probed.add(id);
+      ask.push(id);
+    }
+    for (let i = 0; i < ask.length; i += 256) {
+      this.sendJson({ t: 'probe', rid: this.nextRid++, ids: ask.slice(i, i + 256) as RemoteSurfaceId[] });
+    }
   }
 
   /** Request/response helper for registry operations (phase 2 sync). */

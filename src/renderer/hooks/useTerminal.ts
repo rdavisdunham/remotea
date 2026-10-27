@@ -66,6 +66,7 @@ import {
 import { withClaudeResume } from './claude-resume-command';
 import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
 import { installRemoteQuerySwallow } from '../../shared/remote-query-swallow';
+import { ensureRemoteGroup } from '../remote-sessions/sync';
 import type { PtyExitInfo, TerminalSnapshot } from '../../shared/remote-hosts-types';
 import '@xterm/xterm/css/xterm.css';
 
@@ -1900,7 +1901,9 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
             ompEnabled: useStore.getState().workspacePrefs.restoreOmpSessions,
             shell: effectiveShell,
           });
-          window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, surfaceId, startupCommands: spawnCommands, cols: initialCols, rows: initialRows })
+          // remotea: a remote session is filed under this workspace's shared group (created on first use).
+          const remoteGroup = remoteSpec ? ensureRemoteGroup(surfaceId, remoteSpec.hostId) : null;
+          window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, surfaceId, startupCommands: spawnCommands, cols: initialCols, rows: initialRows, ...(remoteGroup ? { remote: remoteGroup } : {}) })
             .then((created: { id: string; shell: string; reused: boolean; shellFallbackFrom?: string; snapshot?: TerminalSnapshot; unavailable?: PtyExitInfo; remote?: boolean }) => {
               // PTY persists (keep-alive); a remount re-attaches via pty.has.
               if (disposed) return;

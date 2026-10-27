@@ -5,9 +5,9 @@
  */
 import path from 'path';
 import WebSocket from 'ws';
-import { PROTO, parseServerMsg } from '../../shared/remote-host-protocol';
+import { GROUP_ID_RE, PROTO, SURFACE_ID_RE, parseServerMsg } from '../../shared/remote-host-protocol';
 import { IPC_CHANNELS } from '../../shared/types';
-import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, RemoteRegistryView } from '../../shared/remote-hosts-types';
+import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, RegistryPayload, RemoteRegistryView } from '../../shared/remote-hosts-types';
 import { HostStore, loadDevice, PendingIntents, validateHostUrl, type SecretBox, type StoredHost } from './host-config';
 import { RemoteHostClient, type SocketFactory } from './host-client';
 
@@ -30,6 +30,8 @@ export class RemoteHosts {
   private readonly clients = new Map<string, RemoteHostClient>();
   private readonly log: (msg: string) => void;
   private registryTimer: NodeJS.Timeout | null = null;
+  /** Per renderer window: whether its layout is restored, and the remote tabs it shows. */
+  private readonly windows = new Map<number, { ready: boolean; ids: Set<string>; send: (payload: RegistryPayload) => void }>();
 
   constructor(private readonly deps: RemoteHostsDeps) {
     this.log = deps.log ?? (() => {});
@@ -189,7 +191,67 @@ export class RemoteHosts {
     if (this.registryTimer) return;
     this.registryTimer = setTimeout(() => {
       this.registryTimer = null;
-      this.deps.broadcast(IPC_CHANNELS.RSESS_REGISTRY, this.views());
+      this.pushAll();
     }, 100);
+  }
+
+  /**
+   * Exactly one window places sessions this device does not show yet — the
+   * oldest ready one — or two windows would each add the same tab. Every
+   * window learns which remote tabs the OTHER windows already show.
+   */
+  private payloadFor(windowId: number): RegistryPayload {
+    let placer = Infinity;
+    for (const [id, w] of this.windows) if (w.ready && id < placer) placer = id;
+    const elsewhere: string[] = [];
+    for (const [id, w] of this.windows) if (id !== windowId) elsewhere.push(...w.ids);
+    return { views: this.views(), placer: windowId === placer, elsewhere };
+  }
+
+  private pushAll(): void {
+    const shown = new Set<string>();
+    for (const w of this.windows.values()) for (const id of w.ids) shown.add(id);
+    for (const c of this.clients.values()) c.probeUnknown(shown);
+    for (const [id, w] of this.windows) if (w.ready) w.send(this.payloadFor(id));
+  }
+
+  /** A renderer reports its remote tabs (and, once restored, that it is ready). */
+  report(windowId: number, send: (payload: RegistryPayload) => void, r: { ready: boolean; surfaceIds: string[] }): void {
+    const prev = this.windows.get(windowId);
+    const ids = new Set(r.surfaceIds.filter((x) => typeof x === 'string'));
+    this.windows.set(windowId, { ready: !!r.ready, ids, send });
+    if (r.ready && !prev?.ready) send(this.payloadFor(windowId));
+    const changed = !prev || prev.ids.size !== ids.size || [...ids].some((id) => !prev.ids.has(id));
+    if (changed) this.registryChanged();
+  }
+
+  forgetWindow(windowId: number): void {
+    if (this.windows.delete(windowId)) this.registryChanged();
+  }
+
+  // ── Registry operations from the renderer ────────────────────────────────
+
+  /** "Hide on this device": stop streaming here and record it on the server (queued if offline). */
+  hide(hostId: string, surfaceId: string): void {
+    const c = this.clients.get(hostId);
+    if (!c || !SURFACE_ID_RE.test(surfaceId)) return;
+    c.release(surfaceId);
+    c.intent({ t: 'hide', id: surfaceId });
+  }
+
+  unhide(hostId: string, surfaceId: string): void {
+    const c = this.clients.get(hostId);
+    if (c && SURFACE_ID_RE.test(surfaceId)) c.intent({ t: 'unhide', id: surfaceId });
+  }
+
+  groupUpsert(hostId: string, group: { id: string; name: string; color?: string }): void {
+    const c = this.clients.get(hostId);
+    if (!c || !GROUP_ID_RE.test(group?.id ?? '') || typeof group.name !== 'string') return;
+    c.intent({ t: 'groupUpsert', id: group.id, name: group.name.slice(0, 120), color: typeof group.color === 'string' ? group.color : undefined });
+  }
+
+  groupClose(hostId: string, groupId: string): void {
+    const c = this.clients.get(hostId);
+    if (c && GROUP_ID_RE.test(groupId)) c.intent({ t: 'groupClose', id: groupId });
   }
 }

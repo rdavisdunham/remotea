@@ -2,7 +2,7 @@ import { StateCreator } from 'zustand';
 import { v4 as uuid } from 'uuid';
 import { WorkspaceId, PaneId, SurfaceId, SurfaceRef, SurfaceType } from '../../shared/types';
 import { findLeaf, removeLeaf, splitNode, getAllPaneIds } from './split-utils';
-import { killSurfacePty } from './pty-teardown';
+import { forgetSurfaceLocally, killSurfacePty } from './pty-teardown';
 import { WorkspaceSlice } from './workspace-slice';
 
 // ─── PR badge teardown (issue #4, continued) ──────────────────────────────────
@@ -198,6 +198,22 @@ export interface SurfaceSlice {
    * above; it pins a `remote:<host>` session to its host across default changes.
    */
   pinSurfaceShell: (workspaceId: WorkspaceId, paneId: PaneId, surfaceId: SurfaceId, shell: string) => void;
+
+  /**
+   * remotea: add remote sessions that exist on the server but not on this
+   * device as tabs of a pane, keeping their session ids (PTY id = surface id).
+   * Never activates them — a tab appearing because the desktop opened one must
+   * not steal the laptop's focus. Ids already present anywhere are skipped.
+   */
+  insertRemoteSurfaces: (workspaceId: WorkspaceId, paneId: PaneId, seeds: Array<{ id: SurfaceId; shell: string; cwd?: string; customTitle?: string }>) => void;
+
+  /**
+   * remotea: remove tabs from THIS device without killing anything — their
+   * remote session was closed on another device, or hidden here. Emptied
+   * panes collapse and an emptied workspace is discarded, again without
+   * closing any session.
+   */
+  dropSurfacesLocal: (surfaceIds: readonly string[]) => void;
 
   /**
    * Set rendered markdown content on a surface, found by id across all
@@ -767,6 +783,70 @@ export const createSurfaceSlice: StateCreator<SliceState, [], [], SurfaceSlice> 
     updateSplitTree(workspaceId, patchLeaf(ws.splitTree, paneId, { surfaces: newSurfaces }));
   },
 
+  insertRemoteSurfaces(workspaceId, paneId, seeds) {
+    const { workspaces, updateSplitTree } = get();
+    const ws = workspaces.find((w) => w.id === workspaceId);
+    if (!ws) return;
+    const leaf = findLeaf(ws.splitTree, paneId);
+    if (!leaf) return;
+    const present = new Set<string>();
+    for (const w of workspaces) collectIds(w.splitTree, present);
+    const added: SurfaceRef[] = seeds
+      .filter((seed) => !present.has(seed.id))
+      .map((seed) => ({
+        id: seed.id,
+        type: 'terminal' as const,
+        shell: seed.shell,
+        ...(seed.cwd ? { cwd: seed.cwd } : {}),
+        ...(seed.customTitle ? { customTitle: seed.customTitle } : {}),
+      }));
+    if (!added.length) return;
+    updateSplitTree(workspaceId, patchLeaf(ws.splitTree, paneId, { surfaces: [...leaf.surfaces, ...added] }));
+  },
+
+  dropSurfacesLocal(surfaceIds) {
+    const drop = new Set(surfaceIds);
+    if (!drop.size) return;
+    const state = get();
+    const touched: Array<{ id: WorkspaceId; tree: SplitNode | null; removed: SurfaceId[] }> = [];
+    for (const ws of state.workspaces) {
+      let tree: SplitNode | null = ws.splitTree;
+      const removed: SurfaceId[] = [];
+      for (const paneId of getAllPaneIds(ws.splitTree)) {
+        const leaf: Extract<SplitNode, { type: 'leaf' }> | null | undefined = tree ? findLeaf(tree, paneId) : null;
+        if (!leaf || !leaf.surfaces.some((s: SurfaceRef) => drop.has(s.id))) continue;
+        const keep: SurfaceRef[] = leaf.surfaces.filter((s: SurfaceRef) => !drop.has(s.id));
+        removed.push(...leaf.surfaces.filter((s: SurfaceRef) => drop.has(s.id)).map((s: SurfaceRef) => s.id));
+        tree = keep.length
+          ? patchLeaf(tree!, paneId, { surfaces: keep, activeSurfaceIndex: Math.min(leaf.activeSurfaceIndex, keep.length - 1) })
+          : removeLeaf(tree!, paneId);
+        if (!tree) break;
+      }
+      if (removed.length) touched.push({ id: ws.id, tree, removed });
+    }
+    if (!touched.length) return;
+    for (const t of touched) {
+      for (const id of t.removed) forgetSurfaceLocally(id);
+      clearPrIfOwner(get, t.id, t.removed);
+    }
+    for (const t of touched) {
+      if (t.tree) {
+        get().updateSplitTree(t.id, t.tree);
+        continue;
+      }
+      // Emptied: discard the workspace here only. Every session in it is
+      // already gone from this device, so there is nothing left to close.
+      const current = get();
+      const idx = current.workspaces.findIndex((w) => w.id === t.id);
+      if (idx === -1) continue;
+      const next = current.workspaces.filter((w) => w.id !== t.id);
+      const active = current.activeWorkspaceId === t.id
+        ? (next.length ? next[Math.min(idx, next.length - 1)].id : null)
+        : current.activeWorkspaceId;
+      set({ workspaces: next, activeWorkspaceId: active } as Partial<SliceState>);
+    }
+  },
+
   setMarkdownContent(surfaceId, content, options) {
     const { workspaces, updateSurface } = get();
     const opts = typeof options === 'string' ? { fileName: options } : (options ?? {});
@@ -867,4 +947,14 @@ function swapSplitChildren(tree: SplitNode, paneIdA: PaneId, paneIdB: PaneId): S
 function containsPane(node: SplitNode, paneId: PaneId): boolean {
   if (node.type === 'leaf') return node.paneId === paneId;
   return containsPane(node.children[0], paneId) || containsPane(node.children[1], paneId);
+}
+
+/** Every surface id in a split tree. */
+function collectIds(tree: SplitNode, into: Set<string>): void {
+  if (tree.type === 'leaf') {
+    for (const s of tree.surfaces) into.add(s.id);
+    return;
+  }
+  collectIds(tree.children[0], into);
+  collectIds(tree.children[1], into);
 }

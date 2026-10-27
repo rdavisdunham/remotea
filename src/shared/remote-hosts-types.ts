@@ -76,3 +76,12 @@ export interface RemoteRegistryView {
   closedIds: string[];
   lost: Record<string, LostInfo>;
 }
+
+/** What each window receives: the registries, plus its role in placing sessions. */
+export interface RegistryPayload {
+  views: RemoteRegistryView[];
+  /** This window adds sessions the device does not show yet (exactly one window is). */
+  placer: boolean;
+  /** Remote tabs the device's OTHER windows already show. */
+  elsewhere: string[];
+}

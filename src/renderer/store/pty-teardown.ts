@@ -17,7 +17,7 @@
  * stays testable in Node.
  */
 import { SplitNode, SurfaceRef } from '../../shared/types';
-import { isRemoteShellSpec } from '../../shared/remote-shell-spec';
+import { isRemoteShellSpec, parseRemoteShellSpec } from '../../shared/remote-shell-spec';
 
 /**
  * Announced for every surface that is destructively closed.
@@ -49,6 +49,16 @@ export function killSurfacePty(surface: Pick<SurfaceRef, 'id' | 'type'> & { shel
   } catch {
     /* preload/window unavailable (tests) — nothing to reap */
   }
+}
+
+/**
+ * remotea: a tab removed from THIS device only — its remote session was closed
+ * on another device, or hidden here. Per-surface state is dropped exactly as
+ * for a close; the PTY is not touched (there is nothing local to kill, and
+ * killing would close the session everywhere).
+ */
+export function forgetSurfaceLocally(surfaceId: string): void {
+  announceSurfaceClosed(surfaceId);
 }
 
 /** Fired for every surface type: a browser or markdown tab has no PTY but may
@@ -94,11 +104,40 @@ export function killDroppedSurfaces(outgoing: SplitNode[], incoming: SplitNode[]
   for (const tree of incoming) collectSurfaceIds(tree, kept);
   const visit = (tree: SplitNode): void => {
     if (tree.type === 'leaf') {
-      for (const surface of tree.surfaces) if (!kept.has(surface.id)) killSurfacePty(surface);
+      for (const surface of tree.surfaces) {
+        if (kept.has(surface.id)) continue;
+        // remotea: loading a layout on one device must not end sessions other
+        // devices are using — a remote tab it drops is hidden here instead
+        // (Settings → Remote hosts lists hidden sessions to bring back).
+        const remote = parseRemoteShellSpec(surface.shell);
+        if (remote && surface.type === 'terminal') {
+          announceSurfaceClosed(surface.id);
+          remoteSessions()?.hide?.(remote.hostId, surface.id);
+          continue;
+        }
+        killSurfacePty(surface);
+      }
       return;
     }
     visit(tree.children[0]);
     visit(tree.children[1]);
   };
   for (const tree of outgoing) visit(tree);
+}
+
+type RemoteSessionsBridge = { groupClose?: (hostId: string, groupId: string) => void; hide?: (hostId: string, surfaceId: string) => void };
+
+function remoteSessions(): RemoteSessionsBridge | undefined {
+  try {
+    return (globalThis as { window?: { wmux?: { remoteSessions?: RemoteSessionsBridge } } }).window?.wmux?.remoteSessions;
+  } catch {
+    return undefined;
+  }
+}
+
+/** remotea: close the shared groups a workspace stands for (the inbox is shared by everyone and never closed whole). */
+export function closeRemoteGroups(remoteGroups: Record<string, string>): void {
+  for (const [hostId, groupId] of Object.entries(remoteGroups)) {
+    if (groupId !== 'grp-inbox') remoteSessions()?.groupClose?.(hostId, groupId);
+  }
 }

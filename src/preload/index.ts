@@ -5,7 +5,7 @@ import { IPC_CHANNELS, type InsertionResult, type NotificationSoundPickResult, t
   type WorktreeCloseMode, type WorktreeInspectResult, type WorktreeRemoveResult,
 } from '../shared/types';
 import type { BrowserHistory } from '../shared/browser-history';
-import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, PtyExitInfo, RemoteRegistryView, TerminalSnapshot } from '../shared/remote-hosts-types';
+import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, PtyExitInfo, RegistryPayload, RemoteRegistryView, TerminalSnapshot } from '../shared/remote-hosts-types';
 import type {
   RemoteConsoleBridge,
   RemoteConsoleStatus,
@@ -88,11 +88,17 @@ contextBridge.exposeInMainWorld('wmux', {
   },
   remoteSessions: {
     views: () => ipcRenderer.invoke(IPC_CHANNELS.RSESS_VIEWS) as Promise<RemoteRegistryView[]>,
-    onRegistry: (callback: (views: RemoteRegistryView[]) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, views: RemoteRegistryView[]) => callback(views);
+    onRegistry: (callback: (payload: RegistryPayload) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: RegistryPayload) => callback(payload);
       ipcRenderer.on(IPC_CHANNELS.RSESS_REGISTRY, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.RSESS_REGISTRY, handler);
     },
+    report: (r: { ready: boolean; surfaceIds: string[] }) => ipcRenderer.send(IPC_CHANNELS.RSESS_REPORT, r),
+    hide: (hostId: string, surfaceId: string) => ipcRenderer.send(IPC_CHANNELS.RSESS_HIDE, hostId, surfaceId),
+    unhide: (hostId: string, surfaceId: string) => ipcRenderer.send(IPC_CHANNELS.RSESS_UNHIDE, hostId, surfaceId),
+    close: (hostId: string, surfaceId: string) => ipcRenderer.send(IPC_CHANNELS.RSESS_CLOSE, hostId, surfaceId),
+    groupUpsert: (hostId: string, group: { id: string; name: string; color?: string }) => ipcRenderer.send(IPC_CHANNELS.RSESS_GROUP_UPSERT, hostId, group),
+    groupClose: (hostId: string, groupId: string) => ipcRenderer.send(IPC_CHANNELS.RSESS_GROUP_CLOSE, hostId, groupId),
   },
   system: {
     platform: 'win32' as const,

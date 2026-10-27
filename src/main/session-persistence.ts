@@ -45,6 +45,7 @@ export interface SessionData {
       explorerWidth?: number;
       explorerExpanded?: Record<string, string[]>;
       explorerShowHidden?: boolean;
+      remoteGroups?: Record<string, string>;
       // Which wmux-created worktree this workspace is (#366). Carried through
       // EVERY copy — auto-session, the version-change Auto-backup, named
       // sessions, snapshots — because a restore that drops it turns a live
@@ -174,6 +175,7 @@ function backupAutoSession(previousVersion: string): void {
         explorerWidth: w.explorerWidth,
         explorerExpanded: w.explorerExpanded,
         explorerShowHidden: w.explorerShowHidden,
+        remoteGroups: w.remoteGroups,
         worktree: w.worktree,
       })),
       sidebarWidth: windows[0]?.sidebarWidth ?? 260,
@@ -477,6 +479,7 @@ export function writeSessionSnapshot(data: SessionData, at: number = Date.now())
         explorerWidth: w.explorerWidth,
         explorerExpanded: w.explorerExpanded,
         explorerShowHidden: w.explorerShowHidden,
+        remoteGroups: w.remoteGroups,
         worktree: w.worktree,
       })),
       sidebarWidth: windows[0]?.sidebarWidth ?? 260,

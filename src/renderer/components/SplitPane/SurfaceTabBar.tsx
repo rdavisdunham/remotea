@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { hideRemoteSurface, isRemoteSurface } from '../../remote-sessions/sync';
 import { createPortal } from 'react-dom';
 import { SurfaceRef, SurfaceId, PaneId, QuickLaunchProfile, ShellInfo } from '../../../shared/types';
 import { useStore } from '../../store';
@@ -656,13 +657,23 @@ export default function SurfaceTabBar({
               {t('surfaceTab.startupCommand', 'Startup command…')}
             </div>
           )}
+          {isRemoteSurface(ctxMenu.surfaceId) && (
+            <div
+              className="ctx-menu__item"
+              role="menuitem"
+              title="Remove this tab from this device only. The session keeps running and stays open on your other devices."
+              onClick={() => { hideRemoteSurface(ctxMenu.surfaceId); setCtxMenu(null); }}
+            >
+              Hide on this device
+            </div>
+          )}
           <div className="ctx-menu__separator" />
           <div
             className="ctx-menu__item ctx-menu__item--danger"
             role="menuitem"
             onClick={() => { onClose(ctxMenu.surfaceId); setCtxMenu(null); }}
           >
-            {t('surfaceTab.close', 'Close')}
+            {t('surfaceTab.close', 'Close')}{isRemoteSurface(ctxMenu.surfaceId) ? ' (on all devices)' : ''}
           </div>
           {surfaces.length > 1 && (
             <div
