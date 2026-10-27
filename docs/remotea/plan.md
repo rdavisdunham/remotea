@@ -472,3 +472,19 @@ Each of these is a default the user can override when reviewing:
 4. **xterm parity.** The headless and renderer xterm versions must stay locked together. The swallow-superset test guards against double replies.
 5. **The token gives a shell in WSL** (and, through interop, on the desktop's Windows side). It is encrypted with `safeStorage`, and a Tailscale ACL should limit who can reach the port.
 6. **Windows-only side panels don't work for remote cwds.** Explorer, git, diff and file drop in bound workspaces read the local filesystem until phase 3.
+
+---
+
+## Eridani session ledger integration
+
+The [Eridani](https://app.eridani.app) ledger indexes every agent session by `(tool, session id)` and files each one under a client, project or issue. These four additions let it link a session to the live remotea workspace and terminal it is running in. None of them blocks phase 1.
+
+1. **Codex in `agent-probe`.** For a `codex` descendant process, look for something direct first: an environment variable, or an open rollout file under `/proc/<pid>/fd`. If there's nothing, match the thread in `~/.codex/state_5.sqlite` (opened read-only) that has the same cwd and the `created_at_ms` closest to the process start time. Leave `agent` unset when the match is ambiguous.
+2. **`remotea status --json`** (done; server CLI). This is a stable, read-only contract, versioned with a top-level `version`. For each session it reports:
+   - id, `groupId`/`groupName`, state
+   - `cwd`/`lastCwd`, title, cmd
+   - `agent{provider, sessionId}`
+   - `createdAt`, `lastActivityAt`
+   - the creating device
+3. **`remotea open --group <name> [--cwd] [--title] [--id] -- <cmd…>`** (done; server CLI). It creates the group if it's missing and types the command once the shell is ready, using the server's startup gate. It is idempotent when `--id` is passed. The ledger's resume commands become `remotea open --group "<client>" --cwd … -- claude --resume <id>`.
+4. **One shared Claude `SessionStart` hook** (phase 4 relay). It reports `session_id` and `$REMOTEA_SESSION` to remotea, and prints the ledger line (`~/jarvis/scripts/session_collector/session_hook.py`). herdr's existing hook entries stay untouched.

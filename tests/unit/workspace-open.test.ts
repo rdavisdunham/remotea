@@ -154,7 +154,7 @@ describe('trust (#284)', () => {
     writeManifest(BASIC);
     const f = fake('run');
     await openManifest({ path: repo }, f.deps);
-    expect(fs.existsSync(path.join(tmp, 'appdata', 'wmux', 'workspace-trust.json'))).toBe(true);
+    expect(fs.existsSync(path.join(tmp, 'appdata', 'remotea', 'workspace-trust.json'))).toBe(true);
     expect(fs.readdirSync(repo).sort()).toEqual(['apps', 'wmux.workspace.json']);
   });
 });

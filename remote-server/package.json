@@ -1,0 +1,35 @@
+{
+  "name": "remotea-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "remotea session server: owns terminals in WSL so remotea apps can detach and reattach",
+  "license": "MIT",
+  "main": "dist/remote-server/src/main.js",
+  "bin": {
+    "remotea-server": "dist/remote-server/src/main.js",
+    "remotea": "dist/remote-server/src/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "e2e": "node scripts/e2e.mjs",
+    "start": "node dist/remote-server/src/main.js"
+  },
+  "dependencies": {
+    "@xterm/addon-serialize": "0.14.0",
+    "@xterm/addon-unicode11": "0.9.0",
+    "@xterm/headless": "6.0.0",
+    "node-pty": "1.1.0",
+    "ws": "8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "8.18.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.9"
+  }
+}

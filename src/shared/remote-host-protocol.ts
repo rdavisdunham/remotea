@@ -1,0 +1,378 @@
+/**
+ * remotea remote-host wire protocol: app main <-> remote-server (WSL).
+ *
+ * One WebSocket per (app instance, host). Control messages are JSON text
+ * frames; terminal bytes travel as binary frames so a busy agent's output is
+ * not base64-inflated.
+ *
+ * Binary frame layout (big-endian):
+ *   OUTPUT  [u8 kind=1][u8 idLen][id ascii][f64 seq][utf8 data]   server -> client
+ *   INPUT   [u8 kind=2][u8 idLen][id ascii][utf8 data]            client -> server
+ *
+ * The session id rides in every frame instead of a per-connection channel
+ * number: a reconnect then has no channel table that could drift out of sync.
+ *
+ * `seq` numbers every PTY chunk of a session within one server boot. A client
+ * remembers the last seq it applied and passes it back as `open.sinceSeq`
+ * with the server's `bootId`; when the server's ring still covers the gap it
+ * replays just those chunks (mode 'delta'), otherwise it sends a serialized
+ * screen + scrollback snapshot taken exactly at a known seq (mode 'snapshot').
+ *
+ * Pure: no Node or DOM imports — compiled into both the Electron main bundle
+ * and the server.
+ */
+
+export const PROTO = 1;
+
+export type RemoteSurfaceId = `surf-${string}`;
+export type GroupId = `grp-${string}`;
+export type DeviceId = string;
+
+export const SURFACE_ID_RE = /^surf-[A-Za-z0-9_-]{1,96}$/;
+export const GROUP_ID_RE = /^grp-[A-Za-z0-9_-]{1,96}$/;
+export const DEVICE_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+/** The fallback group for sessions whose own group is unknown or gone. */
+export const INBOX_GROUP_ID: GroupId = 'grp-inbox';
+
+export const LIMITS = Object.freeze({
+  maxCommandLength: 4096,
+  maxStartupCommands: 16,
+  maxEnvEntries: 64,
+  maxEnvValue: 8192,
+  maxTitle: 200,
+  maxName: 120,
+  maxPath: 4096,
+  maxIdsPerMessage: 512,
+  maxCols: 1000,
+  maxRows: 500,
+  maxInputBytes: 1024 * 1024,
+});
+
+export const TIMING = Object.freeze({
+  /** Client heartbeat interval. */
+  pingMs: 10_000,
+  /** No inbound frame for this long = the connection is dead (half-open after sleep). */
+  deadMs: 25_000,
+  backoffMinMs: 250,
+  backoffMaxMs: 15_000,
+});
+
+// ── Records ────────────────────────────────────────────────────────────────
+
+export type SessionState = 'live' | 'exited' | 'lost';
+export type AgentProvider = 'claude' | 'codex' | 'opencode' | 'qwen' | 'agy' | 'omp';
+
+export interface AgentHandle {
+  provider: AgentProvider;
+  sessionId: string;
+  seenAt: number;
+}
+
+export interface GroupRecord {
+  id: GroupId;
+  name: string;
+  color?: string;
+  createdBy: DeviceId;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SessionRecord {
+  id: RemoteSurfaceId;
+  groupId: GroupId | null;
+  title?: string;
+  /** Directory the session was created in. */
+  cwd: string;
+  /** Last foreground cwd the server observed. */
+  lastCwd?: string;
+  /** Command the session runs instead of a login shell, if any. */
+  cmd?: string;
+  createdBy: DeviceId;
+  createdAt: number;
+  /** Boot of the server that spawned the current process. */
+  bootId: string;
+  state: SessionState;
+  exitCode?: number;
+  exitedAt?: number;
+  agent?: AgentHandle;
+  /** Last PTY output or input, persisted at most every ~30 s. */
+  lastActivityAt?: number;
+  /** Devices that chose "Hide on this device" for this session. */
+  hiddenBy: DeviceId[];
+}
+
+export interface Tombstone {
+  kind: 'session' | 'group';
+  at: number;
+  by: DeviceId;
+  reason: 'closed' | 'group-closed';
+}
+
+/** What a client needs to respawn a session the server lost (restart). */
+export interface LostInfo {
+  cwd?: string;
+  title?: string;
+  cmd?: string;
+  agent?: AgentHandle;
+}
+
+export type ProbeStatus = 'live' | 'exited' | 'lost' | 'closed' | 'unknown';
+
+export interface CreateSpec {
+  /** Command line to run through the login shell; omitted = interactive login shell. */
+  cmd?: string;
+  cwd?: string;
+  env?: Record<string, string>;
+  startupCommands?: string[];
+  groupId?: GroupId | null;
+  group?: { name: string; color?: string };
+  title?: string;
+}
+
+// ── Messages ───────────────────────────────────────────────────────────────
+
+export type ClientMsg =
+  | { t: 'hello'; proto: number; device: { id: DeviceId; name: string }; app: { name: string; version: string } }
+  | { t: 'open'; rid: number; id: RemoteSurfaceId; cols: number; rows: number; sinceSeq?: number; bootId?: string; create?: CreateSpec }
+  | { t: 'detach'; ids: RemoteSurfaceId[] }
+  | { t: 'close'; rid: number; id: RemoteSurfaceId }
+  | { t: 'resize'; id: RemoteSurfaceId; cols: number; rows: number }
+  | { t: 'claim'; id: RemoteSurfaceId }
+  | { t: 'deliver'; id: RemoteSurfaceId; commands: string[] }
+  | { t: 'probe'; rid: number; ids: RemoteSurfaceId[]; groups?: GroupId[] }
+  | { t: 'groupUpsert'; rid: number; group: { id: GroupId; name: string; color?: string } }
+  | { t: 'groupClose'; rid: number; id: GroupId }
+  | { t: 'sessionUpdate'; rid: number; id: RemoteSurfaceId; groupId?: GroupId | null; group?: { name: string; color?: string }; title?: string | null }
+  | { t: 'hide'; rid: number; id: RemoteSurfaceId }
+  | { t: 'unhide'; rid: number; id: RemoteSurfaceId }
+  | { t: 'theme'; fg: string; bg: string; cursor: string }
+  | { t: 'ping'; n: number };
+
+export type OpenMode = 'fresh' | 'delta' | 'snapshot';
+
+export type ServerMsg =
+  | {
+      t: 'welcome'; proto: number; serverId: string; bootId: string; epoch: string;
+      hostname: string; you: DeviceId; groups: GroupRecord[]; sessions: SessionRecord[];
+    }
+  | {
+      t: 'opened'; rid?: number; id: RemoteSurfaceId; mode: OpenMode; seq: number; fromSeq?: number;
+      cols: number; rows: number; snapshot?: string; created: boolean; wasLost?: boolean;
+      state: SessionState; exitCode?: number; owner: boolean;
+    }
+  | { t: 'openError'; rid: number; id: RemoteSurfaceId; code: 'closed' | 'lost' | 'bad-request' | 'spawn-failed' | 'hidden'; last?: LostInfo; by?: DeviceId; message: string }
+  | { t: 'probed'; rid: number; status: Record<string, ProbeStatus>; last: Record<string, LostInfo>; groupStatus?: Record<string, 'live' | 'closed' | 'unknown'> }
+  | { t: 'ack'; rid: number; ok: boolean; error?: string }
+  | { t: 'exit'; id: RemoteSurfaceId; code: number; signal?: number }
+  | { t: 'size'; id: RemoteSurfaceId; cols: number; rows: number; owner: boolean }
+  | { t: 'meta'; id: RemoteSurfaceId; cwd?: string; fg?: string; agent?: AgentHandle | null }
+  | { t: 'sessionAdded'; session: SessionRecord }
+  | { t: 'sessionUpdated'; session: SessionRecord }
+  | { t: 'sessionClosed'; id: RemoteSurfaceId; by: DeviceId; reason: 'closed' | 'group-closed' }
+  | { t: 'groupUpserted'; group: GroupRecord }
+  | { t: 'groupClosed'; id: GroupId; sessionIds: RemoteSurfaceId[]; by: DeviceId }
+  | { t: 'goingAway' }
+  | { t: 'pong'; n: number; serverAt: number }
+  | { t: 'error'; code: string; message: string };
+
+// ── Binary frames ──────────────────────────────────────────────────────────
+
+export const BIN_OUTPUT = 1;
+export const BIN_INPUT = 2;
+
+const utf8Encoder = new TextEncoder();
+const utf8Decoder = new TextDecoder('utf-8');
+
+function idBytes(id: string): Uint8Array {
+  // Ids are validated ASCII (SURFACE_ID_RE), so one byte per char.
+  const out = new Uint8Array(id.length);
+  for (let i = 0; i < id.length; i++) out[i] = id.charCodeAt(i) & 0x7f;
+  return out;
+}
+
+export function encodeOutput(id: string, seq: number, data: string): Uint8Array {
+  const idb = idBytes(id);
+  const payload = utf8Encoder.encode(data);
+  const out = new Uint8Array(2 + idb.length + 8 + payload.length);
+  const view = new DataView(out.buffer);
+  out[0] = BIN_OUTPUT;
+  out[1] = idb.length;
+  out.set(idb, 2);
+  view.setFloat64(2 + idb.length, seq);
+  out.set(payload, 2 + idb.length + 8);
+  return out;
+}
+
+export function encodeInput(id: string, data: string): Uint8Array {
+  const idb = idBytes(id);
+  const payload = utf8Encoder.encode(data);
+  const out = new Uint8Array(2 + idb.length + payload.length);
+  out[0] = BIN_INPUT;
+  out[1] = idb.length;
+  out.set(idb, 2);
+  out.set(payload, 2 + idb.length);
+  return out;
+}
+
+export interface DecodedFrame {
+  kind: typeof BIN_OUTPUT | typeof BIN_INPUT;
+  id: RemoteSurfaceId;
+  seq?: number;
+  data: string;
+}
+
+export function decodeFrame(buf: Uint8Array): DecodedFrame | null {
+  if (buf.length < 2) return null;
+  const kind = buf[0];
+  if (kind !== BIN_OUTPUT && kind !== BIN_INPUT) return null;
+  const idLen = buf[1];
+  const headerLen = 2 + idLen + (kind === BIN_OUTPUT ? 8 : 0);
+  if (buf.length < headerLen) return null;
+  let id = '';
+  for (let i = 0; i < idLen; i++) id += String.fromCharCode(buf[2 + i]);
+  if (!SURFACE_ID_RE.test(id)) return null;
+  let seq: number | undefined;
+  if (kind === BIN_OUTPUT) {
+    seq = new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getFloat64(2 + idLen);
+    if (!Number.isFinite(seq)) return null;
+  }
+  const data = utf8Decoder.decode(buf.subarray(headerLen));
+  return { kind, id: id as RemoteSurfaceId, seq, data };
+}
+
+// ── Guards ─────────────────────────────────────────────────────────────────
+
+type Obj = Record<string, unknown>;
+
+const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isStr = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
+const isInt = (v: unknown, min: number, max: number): v is number =>
+  typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max;
+const isSurfaceId = (v: unknown): v is RemoteSurfaceId => typeof v === 'string' && SURFACE_ID_RE.test(v);
+const isGroupId = (v: unknown): v is GroupId => typeof v === 'string' && GROUP_ID_RE.test(v);
+const isRid = (v: unknown): v is number => isInt(v, 0, Number.MAX_SAFE_INTEGER);
+const isOptStr = (v: unknown, max: number) => v === undefined || isStr(v, max);
+const noNewline = (s: string) => !/[\r\n]/.test(s);
+const isColor = (v: unknown) => v === undefined || (typeof v === 'string' && /^#?[0-9A-Za-z]{1,32}$/.test(v));
+const isGroupMeta = (v: unknown): v is { name: string; color?: string } =>
+  isObj(v) && isStr(v.name, LIMITS.maxName) && isColor(v.color);
+
+function isSurfaceIdList(v: unknown): v is RemoteSurfaceId[] {
+  return Array.isArray(v) && v.length <= LIMITS.maxIdsPerMessage && v.every(isSurfaceId);
+}
+
+function isCreateSpec(v: unknown): v is CreateSpec {
+  if (!isObj(v)) return false;
+  if (v.cmd !== undefined && !(isStr(v.cmd, LIMITS.maxCommandLength) && noNewline(v.cmd))) return false;
+  if (!isOptStr(v.cwd, LIMITS.maxPath)) return false;
+  if (!isOptStr(v.title, LIMITS.maxTitle)) return false;
+  if (v.groupId !== undefined && v.groupId !== null && !isGroupId(v.groupId)) return false;
+  if (v.group !== undefined && !isGroupMeta(v.group)) return false;
+  if (v.startupCommands !== undefined) {
+    if (!Array.isArray(v.startupCommands) || v.startupCommands.length > LIMITS.maxStartupCommands) return false;
+    if (!v.startupCommands.every((c) => isStr(c, LIMITS.maxCommandLength) && noNewline(c))) return false;
+  }
+  if (v.env !== undefined) {
+    if (!isObj(v.env)) return false;
+    const entries = Object.entries(v.env);
+    if (entries.length > LIMITS.maxEnvEntries) return false;
+    for (const [k, val] of entries) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(k) || !isStr(val, LIMITS.maxEnvValue)) return false;
+    }
+  }
+  return true;
+}
+
+/** Strict guard for everything a client may send. Unknown or malformed = null. */
+export function parseClientMsg(raw: unknown): ClientMsg | null {
+  if (!isObj(raw) || typeof raw.t !== 'string') return null;
+  const m = raw;
+  switch (m.t) {
+    case 'hello':
+      return isInt(m.proto, 0, 1_000_000)
+        && isObj(m.device) && typeof m.device.id === 'string' && DEVICE_ID_RE.test(m.device.id)
+        && isStr(m.device.name, LIMITS.maxName)
+        && isObj(m.app) && isStr(m.app.name, 64) && isStr(m.app.version, 64)
+        ? (m as unknown as ClientMsg) : null;
+    case 'open':
+      return isRid(m.rid) && isSurfaceId(m.id)
+        && isInt(m.cols, 1, LIMITS.maxCols) && isInt(m.rows, 1, LIMITS.maxRows)
+        && (m.sinceSeq === undefined || isInt(m.sinceSeq, 0, Number.MAX_SAFE_INTEGER))
+        && isOptStr(m.bootId, 64)
+        && (m.create === undefined || isCreateSpec(m.create))
+        ? (m as unknown as ClientMsg) : null;
+    case 'detach':
+      return isSurfaceIdList(m.ids) ? (m as unknown as ClientMsg) : null;
+    case 'close':
+    case 'hide':
+    case 'unhide':
+      return isRid(m.rid) && isSurfaceId(m.id) ? (m as unknown as ClientMsg) : null;
+    case 'resize':
+      return isSurfaceId(m.id) && isInt(m.cols, 1, LIMITS.maxCols) && isInt(m.rows, 1, LIMITS.maxRows)
+        ? (m as unknown as ClientMsg) : null;
+    case 'claim':
+      return isSurfaceId(m.id) ? (m as unknown as ClientMsg) : null;
+    case 'deliver':
+      return isSurfaceId(m.id) && Array.isArray(m.commands) && m.commands.length <= LIMITS.maxStartupCommands
+        && m.commands.every((c) => isStr(c, LIMITS.maxCommandLength) && noNewline(c))
+        ? (m as unknown as ClientMsg) : null;
+    case 'probe':
+      return isRid(m.rid) && isSurfaceIdList(m.ids)
+        && (m.groups === undefined || (Array.isArray(m.groups) && m.groups.length <= LIMITS.maxIdsPerMessage && m.groups.every(isGroupId)))
+        ? (m as unknown as ClientMsg) : null;
+    case 'groupUpsert':
+      return isRid(m.rid) && isObj(m.group) && isGroupId(m.group.id) && isGroupMeta(m.group)
+        ? (m as unknown as ClientMsg) : null;
+    case 'groupClose':
+      return isRid(m.rid) && isGroupId(m.id) ? (m as unknown as ClientMsg) : null;
+    case 'sessionUpdate':
+      return isRid(m.rid) && isSurfaceId(m.id)
+        && (m.groupId === undefined || m.groupId === null || isGroupId(m.groupId))
+        && (m.group === undefined || isGroupMeta(m.group))
+        && (m.title === undefined || m.title === null || isStr(m.title, LIMITS.maxTitle))
+        ? (m as unknown as ClientMsg) : null;
+    case 'theme':
+      return isStr(m.fg, 64) && isStr(m.bg, 64) && isStr(m.cursor, 64) ? (m as unknown as ClientMsg) : null;
+    case 'ping':
+      return isInt(m.n, 0, Number.MAX_SAFE_INTEGER) ? (m as unknown as ClientMsg) : null;
+    default:
+      return null;
+  }
+}
+
+const SERVER_TYPES = new Set([
+  'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
+  'sessionAdded', 'sessionUpdated', 'sessionClosed', 'groupUpserted', 'groupClosed',
+  'goingAway', 'pong', 'error',
+]);
+
+/**
+ * Light guard for server messages. The server is authenticated and pinned by
+ * serverId, so this checks the shape the client dispatches on, not every field.
+ */
+export function parseServerMsg(raw: unknown): ServerMsg | null {
+  if (!isObj(raw) || typeof raw.t !== 'string' || !SERVER_TYPES.has(raw.t)) return null;
+  const m = raw;
+  switch (m.t) {
+    case 'welcome':
+      return isInt(m.proto, 0, 1_000_000) && typeof m.bootId === 'string' && typeof m.serverId === 'string'
+        && Array.isArray(m.sessions) && Array.isArray(m.groups) ? (m as unknown as ServerMsg) : null;
+    case 'opened':
+      return isSurfaceId(m.id) && typeof m.mode === 'string' && typeof m.seq === 'number' ? (m as unknown as ServerMsg) : null;
+    case 'openError':
+    case 'exit':
+    case 'size':
+    case 'meta':
+    case 'sessionClosed':
+      return isSurfaceId(m.id) ? (m as unknown as ServerMsg) : null;
+    case 'sessionAdded':
+    case 'sessionUpdated':
+      return isObj(m.session) && isSurfaceId(m.session.id) ? (m as unknown as ServerMsg) : null;
+    case 'groupUpserted':
+      return isObj(m.group) && isGroupId(m.group.id) ? (m as unknown as ServerMsg) : null;
+    case 'groupClosed':
+      return isGroupId(m.id) && isSurfaceIdList(m.sessionIds) ? (m as unknown as ServerMsg) : null;
+    default:
+      return m as unknown as ServerMsg;
+  }
+}

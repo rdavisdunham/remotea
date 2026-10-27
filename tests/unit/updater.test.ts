@@ -481,7 +481,7 @@ describe('portable zip install that cannot run (#3)', () => {
     await expect(u.requestUpdateNow()).resolves.toEqual({
       handled: false,
       reason: 'install_failed',
-      url: 'https://github.com/amirlehmam/wmux/releases/tag/v9.9.9',
+      url: 'https://github.com/rdavisdunham/remotea/releases/tag/v9.9.9',
     });
     await flush();
     expect(zipMocks.applyStagedPortableUpdate).toHaveBeenCalledTimes(2);

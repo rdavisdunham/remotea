@@ -1,0 +1,23 @@
+[Unit]
+Description=remotea session server (keeps terminals alive for remotea apps)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@WORKDIR@
+ExecStart=@NODE@ @WORKDIR@/dist/remote-server/src/main.js
+Restart=always
+RestartSec=2
+# Sessions are children of the server: stopping the service hangs them up.
+# (They come back as "lost" and are respawned/resumed by the apps.)
+KillMode=control-group
+TimeoutStopSec=15
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+Environment=PATH=@PATH@
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target
