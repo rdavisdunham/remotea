@@ -43,6 +43,16 @@ const providerIndex = argv.indexOf('--provider');
 const provider = providerIndex === -1 ? '' : (argv[providerIndex + 1] ?? '');
 const isQwen = provider === 'qwen';
 /**
+ * Codex CLI runs this helper from ~/.codex/hooks.json, registered with
+ * `--provider codex` (remotea installs it inside WSL). Its payloads are
+ * Claude-shaped — session_id, tool_name, prompt — with one event of its own:
+ * PermissionRequest, which is the permission prompt Claude reports as a
+ * Notification of type permission_prompt.
+ */
+const isCodex = provider === 'codex';
+if (isCodex && event === 'PermissionRequest')
+    event = 'Notification';
+/**
  * When Claude Code fired this hook, near enough (issue #151).
  *
  * Taken at process start rather than at send time because the interesting delay
@@ -104,6 +114,11 @@ const remote = (() => {
         : { host: spec, port: 9787 };
 })();
 const token = (remote ? process.env.WMUX_REMOTE_TOKEN : process.env.WMUX_PIPE_TOKEN) || '';
+// Off Windows the default named pipe does not exist. With no bridge and no
+// explicit pipe either — a Claude or Codex session outside remotea, running
+// the same global hooks — there is nothing to report to: leave before reading stdin.
+if (process.platform !== 'win32' && !remote && !process.env.WMUX_PIPE)
+    process.exit(0);
 let stdinData = '';
 let sent = false;
 /**
@@ -447,6 +462,11 @@ function parsePayload(raw) {
     readPayloadFields(data, out);
     if (isQwen)
         adaptQwenFields(data, out);
+    if (isCodex && event === 'Notification') {
+        out.notificationType = 'permission_prompt';
+        if (!out.message && out.toolName)
+            out.message = `Codex wants to run ${out.toolName}`;
+    }
     return out;
 }
 /** Every field wmux forwards, read off a parsed payload into `out`. */
@@ -551,7 +571,7 @@ function hookParams(fields) {
         sessionId: process.env.GROK_HOOK_EVENT ? '' : sessionId,
         // Whose session id that is: main files it under this provider and restores
         // it with that agent's resume command. Absent means Claude.
-        provider: isQwen ? 'qwen' : '',
+        provider: isQwen ? 'qwen' : isCodex ? 'codex' : '',
     };
     for (const [key, value] of Object.entries(optional)) {
         if (value)

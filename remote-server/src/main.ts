@@ -6,11 +6,13 @@
 import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
-import { configDir, ensureServerId, ensureToken, loadConfig, resolveBind } from './config';
+import { configDir, ensureHookSecret, ensureServerId, ensureToken, loadConfig, resolveBind } from './config';
 import { Registry } from './registry';
 import { Hub } from './hub';
 import { RemoteaServer } from './server';
 import { spawnPty } from './pty-spawn';
+import { HookBridge, hookEnv } from './hook-bridge';
+import { DiagLog, diagDir } from './diag-log';
 
 const DAY = 24 * 60 * 60 * 1000;
 const BIND_RETRY_MS = 5_000;
@@ -33,6 +35,8 @@ async function main(): Promise<void> {
     exitedRetentionMs: config.exitedRetentionDays * DAY,
     tombstoneRetentionMs: config.tombstoneDays * DAY,
   });
+  const hookSecret = ensureHookSecret(dir);
+  const diag = new DiagLog(diagDir());
   const hub = new Hub({
     registry,
     spawn: spawnPty,
@@ -41,7 +45,17 @@ async function main(): Promise<void> {
     hostname: os.hostname(),
     config: { resumeAgents: config.resumeAgents, scrollback: config.scrollback, snapshotScrollback: config.snapshotScrollback, ringBytes: config.ringBytes },
     log,
+    sessionEnv: config.hookPort ? (id) => hookEnv(hookSecret, config.hookPort, id) : undefined,
+    diag: (device, events) => diag.write(device, events),
   });
+  const bridge = new HookBridge({ secret: hookSecret, relay: (id, method, params) => hub.relayRpc(id, method, params), log });
+  if (config.hookPort) {
+    // Loopback only. Sessions started before the bridge came up still report once it does.
+    bridge.listen(config.hookPort).then(
+      (port) => log(`hook bridge on 127.0.0.1:${port}`),
+      (err) => log(`hook bridge unavailable on 127.0.0.1:${config.hookPort}: ${(err as Error).message}`),
+    );
+  }
   // Re-read the token on every handshake so `remotea rotate-token` takes effect without a restart.
   const server = new RemoteaServer({
     hub,
@@ -94,7 +108,7 @@ async function main(): Promise<void> {
     clearInterval(probeTimer);
     clearInterval(pruneTimer);
     hub.shutdown();
-    await server.close();
+    await Promise.all([server.close(), bridge.close()]);
     process.exit(0);
   };
   process.on('SIGTERM', () => void stop('SIGTERM'));

@@ -11,6 +11,7 @@ import {
   PROTO,
   type AgentHandle,
   type ClientMsg,
+  type DiagEvent,
   type GroupId,
   type LostInfo,
   type ProbeStatus,
@@ -69,6 +70,10 @@ export interface HubDeps {
   log?: (msg: string) => void;
   /** Injectable for tests; defaults to reading /proc. */
   probe?: (pid: number, index: Map<number, number[]>) => ProbeResult;
+  /** Extra environment for every spawned session (the hook bridge's address and token). */
+  sessionEnv?: (id: string) => Record<string, string>;
+  /** Where app diagnostics go; absent = the server does not offer 'diag'. */
+  diag?: (device: { id: string; name: string }, events: DiagEvent[]) => void;
 }
 
 export interface HubConn extends ConnLike {
@@ -146,7 +151,28 @@ export class Hub {
       case 'ping':
         conn.sendJson({ t: 'pong', n: msg.n, serverAt: this.now() });
         return;
+      case 'diag':
+        this.deps.diag?.(conn.device, msg.events);
+        return;
     }
+  }
+
+  /**
+   * An agent in session `id` reported status through the hook bridge: relay it
+   * to every app showing that session, and keep it for apps that attach later.
+   * Returns false when there is no such live session.
+   */
+  relayRpc(id: string, method: string, params: Record<string, unknown>): boolean {
+    const session = this.sessions.get(id);
+    if (!session || session.state !== 'live') return false;
+    session.relayRpc(method, params);
+    // A hook's session id is the agent's own word for which conversation this
+    // is — better than the /proc probe's inference, and it arrives at once.
+    if (method === 'hook.event' && typeof params.sessionId === 'string' && params.event !== 'SessionEnd') {
+      const provider = params.provider === 'codex' ? 'codex' : params.provider ? null : 'claude';
+      if (provider) this.noteAgent(id, { provider, sessionId: params.sessionId, seenAt: this.now() });
+    }
+    return true;
   }
 
   private hello(conn: HubConn, msg: Extract<ClientMsg, { t: 'hello' }>): void {
@@ -167,6 +193,7 @@ export class Hub {
       you: msg.device.id,
       groups: this.registry.groups(),
       sessions: this.registry.sessions(),
+      features: this.deps.diag ? ['rpc', 'diag'] : ['rpc'],
     });
     this.log(`hello from ${msg.device.name} (${msg.device.id}) ${msg.app.name} ${msg.app.version}`);
   }
@@ -260,7 +287,7 @@ export class Hub {
       snapshotScrollback: this.cfg.snapshotScrollback,
       ringBytes: this.cfg.ringBytes,
       spawn,
-      spawnRequest: { cmd, cwd: rec.cwd },
+      spawnRequest: { cmd, cwd: rec.cwd, env: this.deps.sessionEnv?.(rec.id) },
       startupCommands,
       theme: () => this.theme,
       timers: this.deps.timers,
@@ -403,6 +430,13 @@ export class Hub {
       });
       this.broadcast({ t: 'meta', id: s.id as RemoteSurfaceId, cwd: res.cwd, fg: res.fg, agent: agentChanged ? res.agent : undefined });
     }
+  }
+
+  private noteAgent(id: string, agent: AgentHandle): void {
+    const rec = this.registry.session(id);
+    if (!rec || (rec.agent?.sessionId === agent.sessionId && rec.agent.provider === agent.provider)) return;
+    this.registry.updateSession(id, { agent });
+    this.broadcast({ t: 'meta', id: id as RemoteSurfaceId, agent });
   }
 
   prune(): void {

@@ -1046,8 +1046,12 @@ export default function App() {
     const unsub = window.wmux.hook.onEvent((event: any) => {
       // Agent lifecycle (issue #53): Notification = agent needs input/permission,
       // Stop = agent finished its turn. These have no `tool`, so handle first.
+      // remotea: `replay` is a remote session's latest state, restated when this
+      // app attached to it. It updates what the pane shows, but it already
+      // happened: no second notification, prompt-log entry or diff tab.
+      const replay = event?.replay === true;
       if (event?.event === 'Notification' || event?.event === 'Stop') {
-        handleAgentLifecycleEvent(event, addNotification, t);
+        if (!replay) handleAgentLifecycleEvent(event, addNotification, t);
         if (event.event === 'Stop') markSessionIdleOnStop(event.surfaceId, setHookActivity);
         return;
       }
@@ -1059,7 +1063,7 @@ export default function App() {
       // no tool and would otherwise be dropped like every other body-carrying
       // event.
       if (event?.event === 'UserPromptSubmit') {
-        recordPromptSubmission(event);
+        if (!replay) recordPromptSubmission(event);
         return;
       }
       if (!event?.tool) return;
@@ -1083,12 +1087,12 @@ export default function App() {
           ...prev,
           [key]: {
             lastTool: event.tool,
-            toolCount: existing.toolCount + (starting ? 0 : 1),
-            lastSeen: Date.now(),
+            toolCount: existing.toolCount + (starting || replay ? 0 : 1),
+            lastSeen: replay && Number.isFinite(event.at) ? Number(event.at) : Date.now(),
           },
         };
       });
-      if (starting) return;
+      if (starting || replay) return;
 
       // Diff tab opens in the workspace that OWNS the pane (issue #63). A
       // surfaceId that doesn't resolve here belongs to another window —

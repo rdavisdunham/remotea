@@ -102,7 +102,22 @@ remotea status [--json]                              # sessions, workspaces, age
 remotea open --group "Acme" --cwd ~/acme -- claude   # open a session in a workspace on every device
 remotea close <surf-id>                              # end a session everywhere
 remotea token | rotate-token
+remotea hooks install | remove | status              # agent status hooks for Claude Code and Codex (see below)
+remotea logs [-f] [--device laptop] [--since 10m]    # what the apps reported: connections, reattaches, agent state
+remotea screen <surf-id>                             # what a session's screen shows right now
 ```
+
+### Agent status (hooks)
+
+Agents in remotea terminals report their state (working, needs you, done) the same way they do in wmux: through wmux's hook helper, registered in Claude Code's and Codex's hook settings. In WSL the helper can't reach the app's named pipe, so it reports to the server instead, on `127.0.0.1:7718` (`hookPort` in `config.json`). The server relays it to every app showing that session and replays the latest state to an app that connects later, for example a laptop waking up after the turn ended.
+
+- `remotea hooks install` (run by `install.sh`) adds these entries next to any other hooks you have, and `remotea hooks remove` takes only its own back out. The first change to each file keeps a `.remotea-backup` copy.
+- Each session gets its own token (`WMUX_REMOTE_TOKEN`), which can only report status for that session. The main token never enters a session's environment.
+- Outside a remotea terminal the helper exits immediately.
+
+### Diagnostics
+
+Each app sends the server a stream of what happened: connection state, how each pane reattached (delta or snapshot), resyncs, sequence gaps, and agent-state verdicts. It never includes terminal content, keystrokes or prompts. It lands in `~/.local/state/remotea/diag/<device>.jsonl`, capped and rotated, and `remotea logs` reads it.
 
 ## Development
 

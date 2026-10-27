@@ -94,6 +94,7 @@ import type { V1Command } from './pipe-server';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { RELAYED_RPC_METHODS } from '../shared/remote-host-protocol';
 
 // ─── browser.get_engine / browser.set_engine ────────────────────────────────
 //
@@ -1308,7 +1309,8 @@ function handleHookEvent(params: any): void {
   if (params?.surfaceId && params?.sessionId && hookEvent !== 'SessionEnd') {
     reportAgentSession(params.surfaceId as SurfaceId, {
       sessionId: String(params.sessionId),
-      provider: params.provider === 'qwen' ? 'qwen' : undefined,
+      // Codex reports through the same helper when remotea installs it in WSL.
+      provider: params.provider === 'qwen' || params.provider === 'codex' ? params.provider : undefined,
     });
   }
 
@@ -1316,6 +1318,9 @@ function handleHookEvent(params: any): void {
   // once the write has happened. PreToolUse carries the same tool name and fires
   // BEFORE it, so refreshing on that would render the diff as it was (issue #151).
   const isPost = !params?.event || params.event === 'PostToolUse';
+  // remotea: a replay restates an earlier event for an app that just attached;
+  // the diff it would refresh is long since written.
+  if (params?.replay) return;
   if (isPost && (params?.tool === 'Edit' || params?.tool === 'Write')) pushDiffUpdate(params.file || '');
 }
 
@@ -1553,11 +1558,21 @@ app.whenReady().then(() => {
   remoteHosts.setMetaListener((surfaceId, meta) => {
     if (meta.cwd) broadcastMetadataUpdate({ command: 'report_pwd', surfaceId, args: [meta.cwd] });
   });
+  // Agent status from a remote session — the server's hook bridge relays
+  // what wmux-hook.js (and the wmux plugins) would have sent to the named pipe
+  // had the agent run here. The bridge authenticated it per session and the
+  // WebSocket authenticated the server, so it goes to the same handlers the
+  // pipe feeds, pinned to the session it came from. Only status methods.
+  remoteHosts.setRpcListener((surfaceId, method, params, replay) => {
+    if (!RELAYED_RPC_METHODS.has(method)) return;
+    const request = { method, params: { ...params, surfaceId, ...(replay ? { replay: true } : {}) } };
+    pipeServer.emit('v2', request, () => {}, () => {});
+  });
   remoteHosts.start();
   powerMonitor.on('suspend', () => remoteHosts.suspendAll());
-  powerMonitor.on('resume', () => remoteHosts.wakeAll());
-  powerMonitor.on('unlock-screen', () => remoteHosts.wakeAll());
-  app.on('browser-window-focus', () => remoteHosts.wakeAll());
+  powerMonitor.on('resume', () => remoteHosts.wakeAll('resume'));
+  powerMonitor.on('unlock-screen', () => remoteHosts.wakeAll('unlock'));
+  app.on('browser-window-focus', () => remoteHosts.wakeAll('focus'));
 
   // Keep Windows awake dynamically when coding agents are working
   const awakeManager = getAwakeManager();

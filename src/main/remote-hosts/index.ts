@@ -5,11 +5,14 @@
  */
 import path from 'path';
 import WebSocket from 'ws';
-import { GROUP_ID_RE, PROTO, SURFACE_ID_RE, parseServerMsg } from '../../shared/remote-host-protocol';
+import { GROUP_ID_RE, LIMITS, PROTO, SURFACE_ID_RE, parseServerMsg } from '../../shared/remote-host-protocol';
 import { IPC_CHANNELS } from '../../shared/types';
 import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, RegistryPayload, RemoteRegistryView } from '../../shared/remote-hosts-types';
 import { HostStore, loadDevice, PendingIntents, validateHostUrl, type SecretBox, type StoredHost } from './host-config';
 import { RemoteHostClient, type SocketFactory } from './host-client';
+import { diag, diagQueued, requeueDiag, takeDiag } from './diag';
+
+const DIAG_FLUSH_MS = 2000;
 
 export interface RemoteHostsDeps {
   dataDir: string;
@@ -29,7 +32,9 @@ export class RemoteHosts {
   private readonly clients = new Map<string, RemoteHostClient>();
   private readonly log: (msg: string) => void;
   private registryTimer: NodeJS.Timeout | null = null;
+  private diagTimer: NodeJS.Timeout | null = null;
   private metaListener: ((surfaceId: string, meta: { cwd?: string }) => void) | undefined;
+  private rpcListener: ((surfaceId: string, method: string, params: Record<string, unknown>, replay: boolean) => void) | undefined;
   /** Per renderer window: whether its layout is restored, and the remote tabs it shows. */
   private readonly windows = new Map<number, { ready: boolean; ids: Set<string>; send: (payload: RegistryPayload) => void }>();
 
@@ -45,8 +50,17 @@ export class RemoteHosts {
     this.metaListener = fn;
   }
 
+  /** Where agent status relayed from a remote session goes (the same handlers the named pipe feeds). */
+  setRpcListener(fn: (surfaceId: string, method: string, params: Record<string, unknown>, replay: boolean) => void): void {
+    this.rpcListener = fn;
+  }
+
   start(): void {
     for (const host of this.store.list()) this.ensureClient(host);
+    if (!this.diagTimer) {
+      this.diagTimer = setInterval(() => this.flushDiag(), DIAG_FLUSH_MS);
+      this.diagTimer.unref?.();
+    }
   }
 
   private ensureClient(host: StoredHost): RemoteHostClient {
@@ -64,6 +78,7 @@ export class RemoteHosts {
         onStatus: (status) => this.deps.broadcast(IPC_CHANNELS.RHOST_STATUS, status),
         onRegistry: () => this.registryChanged(),
         onMeta: (id, meta) => this.metaListener?.(id, meta),
+        onRpc: (id, method, params, replay) => this.rpcListener?.(id, method, params, replay),
         socket: this.deps.socket,
         log: this.log,
       });
@@ -143,11 +158,32 @@ export class RemoteHosts {
   // ── Power & lifecycle ────────────────────────────────────────────────────
 
   suspendAll(): void {
+    diag('power.suspend');
+    this.flushDiag();
     for (const c of this.clients.values()) c.suspend();
   }
 
-  wakeAll(): void {
+  /** `why`: what woke us (power resume, unlock, window focus, a Retry click). */
+  wakeAll(why = 'wake'): void {
+    if (why !== 'focus') diag('power.wake', { why });
     for (const c of this.clients.values()) c.wake();
+  }
+
+  /**
+   * Ship queued diagnostics to the first connected host that accepts them
+   * (see ./diag). Runs on a timer from start(); cheap when nothing is queued.
+   */
+  flushDiag(): void {
+    if (!diagQueued()) return;
+    const client = [...this.clients.values()].find((c) => c.acceptsDiag);
+    if (!client) return;
+    for (let i = 0; i < 10 && diagQueued(); i++) {
+      const batch = takeDiag(LIMITS.maxDiagEvents);
+      if (!client.sendDiag(batch)) {
+        requeueDiag(batch);
+        return;
+      }
+    }
   }
 
   /** Quit / session end: drop every socket synchronously. The server treats that as a detach. */

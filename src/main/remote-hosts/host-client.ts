@@ -24,6 +24,7 @@ import {
   TIMING,
   type ClientMsg,
   type CreateSpec,
+  type DiagEvent,
   type GroupRecord,
   type RemoteSurfaceId,
   type ServerMsg,
@@ -32,6 +33,7 @@ import {
 import type { HostStatus, PtyExitInfo, TerminalSnapshot } from '../../shared/remote-hosts-types';
 import { initialFsm, publicState, step, type Fsm, type FsmEvent } from './connection-fsm';
 import type { PendingIntent, PendingIntents } from './host-config';
+import { diag } from './diag';
 
 export interface SocketLike {
   readonly readyState: number;
@@ -40,7 +42,7 @@ export interface SocketLike {
   terminate(): void;
   on(event: 'open', cb: () => void): unknown;
   on(event: 'message', cb: (data: unknown, isBinary: boolean) => void): unknown;
-  on(event: 'close', cb: (code: number) => void): unknown;
+  on(event: 'close', cb: (code: number, reason?: unknown) => void): unknown;
   on(event: 'error', cb: (err: Error) => void): unknown;
   on(event: 'unexpected-response', cb: (req: unknown, res: { statusCode?: number }) => void): unknown;
 }
@@ -79,6 +81,8 @@ export interface HostClientDeps {
   /** The registry mirror changed (welcome or any broadcast). */
   onRegistry?: () => void;
   onMeta?: (id: RemoteSurfaceId, meta: { cwd?: string; agent?: SessionRecord['agent'] | null }) => void;
+  /** An agent in a session attached here reported status (the server's hook bridge). */
+  onRpc?: (id: RemoteSurfaceId, method: string, params: Record<string, unknown>, replay: boolean) => void;
   socket?: SocketFactory;
   timers?: ClientTimers;
   now?: () => number;
@@ -159,6 +163,8 @@ export class RemoteHostClient {
   readonly sessions = new Map<string, SessionRecord>();
   /** Ids learned to be closed (tombstoned) while this device was away. */
   readonly closedIds = new Set<string>();
+  /** What the connected server offers (welcome.features); empty until welcome, and for older servers. */
+  private features = new Set<string>();
 
   constructor(private readonly deps: HostClientDeps) {
     this.hostId = deps.hostId;
@@ -246,7 +252,10 @@ export class RemoteHostClient {
         case 'down': this.onDown(); break;
       }
     }
-    if (before !== this.fsm.state || ev.type === 'closed') this.deps.onStatus(this.status());
+    if (before !== this.fsm.state || ev.type === 'closed') {
+      diag('conn.state', { host: this.hostId, from: before, to: this.fsm.state, ev: ev.type, error: 'error' in ev ? ev.error : undefined });
+      this.deps.onStatus(this.status());
+    }
   }
 
   private cancelRetry(): void {
@@ -311,8 +320,9 @@ export class RemoteHostClient {
       if (this.ws !== ws || refused) return;
       this.log(`${this.hostId}: socket error ${err.message}`);
     });
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
       if (this.ws !== ws || refused) return;
+      diag('conn.close', { host: this.hostId, code, reason: String(reason ?? '') });
       this.ws = null;
       this.dispatch({ type: 'closed', error: this.fsm.state === 'connecting' ? 'Cannot reach the server' : undefined });
     });
@@ -322,6 +332,7 @@ export class RemoteHostClient {
   private beat(): void {
     if (this.now() - this.lastInbound > TIMING.deadMs) {
       this.log(`${this.hostId}: no traffic for ${TIMING.deadMs} ms, reconnecting`);
+      diag('conn.dead', { host: this.hostId, silentMs: this.now() - this.lastInbound });
       const ws = this.ws;
       this.ws = null;
       try {
@@ -386,6 +397,7 @@ export class RemoteHostClient {
     const rid = this.nextRid++;
     surf.openRid = rid;
     const resume = surf.lastSeq !== null && surf.bootId === this.bootId && !surf.healing;
+    diag('surf.open', { host: this.hostId, sinceSeq: resume ? surf.lastSeq : null, healing: surf.healing, waiters: surf.waiters.length }, surf.id);
     this.sendJson({
       t: 'open', rid, id: surf.id, cols: surf.cols, rows: surf.rows,
       sinceSeq: resume ? surf.lastSeq! : undefined,
@@ -435,6 +447,15 @@ export class RemoteHostClient {
       }
       case 'meta':
         this.deps.onMeta?.(msg.id, { cwd: msg.cwd, agent: msg.agent });
+        return;
+      case 'rpc':
+        // Only for a session this app has open; one it is not showing gets the
+        // latest state replayed when (if) it opens it.
+        if (this.surfs.get(msg.id)?.state === 'live') {
+          const event = typeof msg.params.event === 'string' ? msg.params.event : undefined;
+          diag('surf.rpc', { host: this.hostId, method: msg.method, event, tool: typeof msg.params.tool === 'string' ? msg.params.tool : undefined, replay: msg.replay === true }, msg.id);
+          this.deps.onRpc?.(msg.id, msg.method, msg.params, msg.replay === true);
+        }
         return;
       case 'probed': {
         let changed = false;
@@ -500,6 +521,8 @@ export class RemoteHostClient {
     this.bootId = msg.bootId;
     this.epoch = msg.epoch;
     this.serverHostname = msg.hostname;
+    this.features = new Set(msg.features ?? []);
+    diag('conn.welcome', { host: this.hostId, boot: msg.bootId.slice(0, 8), sessions: msg.sessions.length, features: (msg.features ?? []).join(',') });
     this.groups.clear();
     for (const g of msg.groups) this.groups.set(g.id, g);
     this.sessions.clear();
@@ -515,6 +538,10 @@ export class RemoteHostClient {
     surf.openRid = null;
     surf.open = true;
     const firstOpen = surf.waiters.length > 0;
+    diag('surf.opened', {
+      host: this.hostId, mode: msg.mode, seq: msg.seq, fromSeq: msg.fromSeq ?? null, created: msg.created, wasLost: !!msg.wasLost,
+      state: msg.state, firstOpen, waiters: surf.waiters.length, snapshotBytes: msg.snapshot?.length ?? 0, owner: msg.owner,
+    }, msg.id);
     surf.healing = false;
     const snapshot = msg.mode === 'snapshot' ? { data: msg.snapshot ?? '', cols: msg.cols, rows: msg.rows } : undefined;
     const prevState = surf.state;
@@ -565,6 +592,7 @@ export class RemoteHostClient {
       return;
     }
     this.log(`${this.hostId}: open ${msg.id} failed: ${msg.code} ${msg.message}`);
+    diag('surf.openError', { host: this.hostId, code: msg.code }, msg.id);
   }
 
   private onOutput(id: string, seq: number, data: string): void {
@@ -576,6 +604,7 @@ export class RemoteHostClient {
       if (!surf.healing) {
         surf.healing = true;
         this.log(`${this.hostId}: seq gap on ${id} (${surf.lastSeq} -> ${seq}), resnapshotting`);
+        diag('surf.gap', { host: this.hostId, last: surf.lastSeq, got: seq }, id);
         this.sendOpen(surf);
       }
       return;
@@ -593,6 +622,7 @@ export class RemoteHostClient {
   }
 
   private emitExit(surf: Surf, code: number, info: PtyExitInfo): void {
+    diag('surf.exit', { host: this.hostId, code, reason: info.reason, by: info.by ?? null }, surf.id);
     if (surf.exit.size === 0) {
       surf.pendingExit = { code, info };
       return;
@@ -635,8 +665,10 @@ export class RemoteHostClient {
   create(opts: RemoteCreateOptions): Promise<RemoteCreateResult> {
     const existing = this.surfs.get(opts.id);
     if (existing && existing.wanted && existing.state !== 'closed' && existing.waiters.length === 0) {
+      diag('surf.create', { host: this.hostId, result: 'reused' }, opts.id);
       return Promise.resolve({ reused: true, existed: true });
     }
+    diag('surf.create', { host: this.hostId, result: existing ? 'joined' : 'new', waiters: existing?.waiters.length ?? 0 }, opts.id);
     const surf: Surf = existing ?? {
       id: opts.id, spec: opts.spec, cols: opts.cols, rows: opts.rows, wanted: true, open: false,
       lastSeq: null, bootId: null, state: 'live', data: new Set(), exit: new Set(), resync: new Set(),
@@ -676,6 +708,15 @@ export class RemoteHostClient {
     const s = this.surfs.get(id);
     if (!s?.open || s.state !== 'live') return false;
     return this.sendJson({ t: 'deliver', id: s.id, commands });
+  }
+
+  /** Whether diagnostics can go to this server now (connected, and it offers 'diag'). */
+  get acceptsDiag(): boolean {
+    return this.ready && this.features.has('diag');
+  }
+
+  sendDiag(events: DiagEvent[]): boolean {
+    return this.acceptsDiag && this.sendJson({ t: 'diag', events });
   }
 
   /** Close the session everywhere (the user closed the tab). Queued when offline. */

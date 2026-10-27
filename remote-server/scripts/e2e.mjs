@@ -20,13 +20,16 @@ const proto = await import(path.join(root, 'dist/src/shared/remote-host-protocol
 const { decodeFrame, encodeInput } = proto.default ?? proto;
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-e2e-'));
-const port = await new Promise((r) => {
+const freePort = () => new Promise((r) => {
   const s = net.createServer().listen(0, '127.0.0.1', () => {
     const p = s.address().port;
     s.close(() => r(p));
   });
 });
-fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ port, bind: ['127.0.0.1'] }));
+const port = await freePort();
+const hookPort = await freePort();
+fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ port, hookPort, bind: ['127.0.0.1'] }));
+const HOOK_JS = path.resolve(here, '..', '..', 'resources', 'cli', 'wmux-hook.js');
 const env = { ...process.env, REMOTEA_CONFIG_DIR: dir };
 
 let failures = 0;
@@ -129,6 +132,14 @@ try {
   A.input(S1, 'echo E2E_$((40+2))\r');
   await A.waitText(S1, 'E2E_42');
   ok(true, 'typed command runs and its output streams back');
+
+  // 1b. An agent hook fired inside the session reaches the attached app (phase 4).
+  A.input(S1, `echo '{"session_id":"0f8fad5b-d9cb-469f-a165-70867728950e"}' | '${process.execPath}' '${HOOK_JS}' --event Stop; echo HOOK_$?_DONE\r`);
+  await A.waitText(S1, 'HOOK_0_DONE');
+  const rpc = await A.wait((m) => m.t === 'rpc' && m.id === S1, 5000).catch(() => null);
+  ok(rpc?.method === 'hook.event' && rpc.params.event === 'Stop' && rpc.params.surfaceId === S1, 'a hook inside the session reaches the app through the bridge');
+  const metaAgent = await A.wait((m) => m.t === 'meta' && m.id === S1 && m.agent, 5000).catch(() => null);
+  ok(metaAgent?.agent?.sessionId === '0f8fad5b-d9cb-469f-a165-70867728950e', 'the hook\'s session id becomes the session\'s agent');
 
   // 2. A drops; B keeps working; A comes back with sinceSeq -> delta.
   const sinceSeq = A.lastSeq(S1);

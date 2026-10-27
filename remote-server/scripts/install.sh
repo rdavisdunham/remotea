@@ -33,6 +33,9 @@ REMOTEA_CONFIG_DIR="$config_dir" "$node_bin" dist/remote-server/src/cli.js token
 mkdir -p "$HOME/.local/bin"
 ln -sf "$here/dist/remote-server/src/cli.js" "$HOME/.local/bin/remotea"
 
+# Agent status hooks (Claude Code, Codex): beside any hooks already there, never replacing them.
+[[ "${REMOTEA_SKIP_HOOKS:-0}" == 1 ]] || "$node_bin" dist/remote-server/src/cli.js hooks install
+
 unit_dir="$HOME/.config/systemd/user"
 mkdir -p "$unit_dir"
 sed -e "s#@NODE@#$node_bin#g" -e "s#@WORKDIR@#$here#g" -e "s#@PATH@#$(dirname "$node_bin"):/usr/local/bin:/usr/bin:/bin#g" \

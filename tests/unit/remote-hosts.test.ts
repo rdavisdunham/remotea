@@ -5,7 +5,8 @@ import path from 'path';
 import { backoffDelay, initialFsm, step, AUTH_RETRY_MS, type Fsm, type FsmEvent } from '../../src/main/remote-hosts/connection-fsm';
 import { HostStore, loadDevice, PendingIntents, validateHostUrl, type SecretBox } from '../../src/main/remote-hosts/host-config';
 import { hostIdFromName, isRemoteShellSpec, parseRemoteShellSpec, remoteShellSpec } from '../../src/shared/remote-shell-spec';
-import { decodeFrame, encodeInput, encodeOutput, parseClientMsg } from '../../src/shared/remote-host-protocol';
+import { decodeFrame, encodeInput, encodeOutput, parseClientMsg, parseServerMsg, RELAYED_RPC_METHODS } from '../../src/shared/remote-host-protocol';
+import { diag, diagQueued, requeueDiag, takeDiag } from '../../src/main/remote-hosts/diag';
 
 function run(events: FsmEvent[], from: Fsm = initialFsm()) {
   let fsm = from;
@@ -204,5 +205,42 @@ describe('TerminalRouter', () => {
     expect(local.killAll).toHaveBeenCalled();
     expect(remote.detachAllNow).toHaveBeenCalled();
     expect(router.count()).toBe(2);
+  });
+});
+
+describe('relayed agent status (phase 4)', () => {
+  it('the app accepts only agent-status RPCs from a server', () => {
+    const rpc = (method: string) => parseServerMsg({ t: 'rpc', id: 'surf-1', method, params: { event: 'Stop' } });
+    for (const m of RELAYED_RPC_METHODS) expect(rpc(m)).not.toBeNull();
+    expect(rpc('surface.send_text')).toBeNull();
+    expect(rpc('workspace.create')).toBeNull();
+    expect(parseServerMsg({ t: 'rpc', id: 'not-a-surface', method: 'hook.event', params: {} })).toBeNull();
+    expect(parseServerMsg({ t: 'rpc', id: 'surf-1', method: 'hook.event', params: 'x' })).toBeNull();
+  });
+});
+
+describe('diagnostics queue', () => {
+  it('keeps short scalars only, in order, and survives a failed send', () => {
+    takeDiag(10_000);
+    diag('conn.state', { from: 'ready', to: 'backoff', n: 1, ok: true, nested: { a: 1 }, long: 'x'.repeat(500), gone: undefined }, 'surf-1');
+    diag('surf.gap', { last: 4, got: 9 });
+    const batch = takeDiag(1);
+    expect(batch[0]).toMatchObject({ src: 'main', kind: 'conn.state', surf: 'surf-1', data: { from: 'ready', to: 'backoff', n: 1, ok: true, nested: '[object Object]' } });
+    expect((batch[0].data!.long as string).length).toBe(300);
+    expect('gone' in batch[0].data!).toBe(false);
+    // Every event passes the server's validator.
+    expect(parseClientMsg({ t: 'diag', events: batch })).not.toBeNull();
+    requeueDiag(batch);
+    expect(takeDiag(10).map((e) => e.kind)).toEqual(['conn.state', 'surf.gap']);
+    expect(diagQueued()).toBe(0);
+  });
+
+  it('is bounded while no host is connected, and says how much it dropped', () => {
+    takeDiag(10_000);
+    for (let i = 0; i < 2500; i++) diag('spam', { i });
+    expect(diagQueued()).toBe(2000);
+    const first = takeDiag(1)[0];
+    expect(first).toMatchObject({ kind: 'diag.dropped', data: { count: 500 } });
+    takeDiag(10_000);
   });
 });

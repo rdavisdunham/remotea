@@ -4,10 +4,11 @@ import { promises as fsp } from 'fs';
 import { IPC_CHANNELS, SurfaceId, WindowId, WorkspaceId, AgentId, type InsertionResult, type ExplorerListError } from '../shared/types';
 import { observePtyData, clearActivity } from './claude-observer';
 import { createPtyDataBatcher } from './pty-data-batcher';
-import { clearAgentState, noteHumanInput, listAgentStates } from './agent-state';
+import { clearAgentState, noteHumanInput, listAgentStates, observeAgentState } from './agent-state';
 import { PtyManager } from './pty-manager';
 import { TerminalRouter } from './terminal-router';
 import { RemoteHosts } from './remote-hosts';
+import { diag as remoteDiag } from './remote-hosts/diag';
 import { isRemoteShellSpec, parseRemoteShellSpec, remoteShellSpec } from '../shared/remote-shell-spec';
 import type { HostSaveRequest } from '../shared/remote-hosts-types';
 import { PtyLedger, reapOrphans } from './pty-ledger';
@@ -108,6 +109,12 @@ const remoteHosts = new RemoteHosts({
 // Same method names as PtyManager, so every existing call site routes local
 // and remote surfaces alike; see terminal-router.ts for where they differ.
 const ptyManager = new TerminalRouter(localPty, remoteHosts);
+// remotea: declared agent state of remote panes goes to the host's diagnostics log.
+observeAgentState((r) => {
+  if (ptyManager.isRemote(r.surfaceId)) {
+    remoteDiag('agent.state', { state: r.state, depth: r.runDepth, awaiting: r.awaitingHuman, session: r.sessionId ? r.sessionId.slice(0, 8) : null }, r.surfaceId);
+  }
+});
 const notificationManager = new NotificationManager();
 const cdpBridge = new CDPBridge();
 // `wmux agent spawn` panes are always local (they need a synchronous spawn).
@@ -633,6 +640,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
             env: resolveSurfaceEnv(options?.env, process.env),
           };
       const created = await ptyManager.create(resolvedOptions);
+      if (remote) remoteDiag('ipc.create', { reused: created.reused, unavailable: created.unavailable?.reason ?? null, window: _event.sender.id }, created.id ?? options?.surfaceId);
       if (created.unavailable) return created;
       const id = created.id;
       const existingOwner = surfaceOwners.get(id);
@@ -1332,6 +1340,10 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   // far side of an IPC round trip.
   ipcMain.on(IPC_CHANNELS.AGENT_DETECTION, (_event, surfaceId: string, result: any) => {
     if (typeof surfaceId === 'string') setDetection(surfaceId, result ?? null);
+    // remotea: screen-detection verdicts on remote panes, for the host's diagnostics log.
+    if (typeof surfaceId === 'string' && ptyManager.isRemote(surfaceId as SurfaceId)) {
+      remoteDiag('detect.verdict', { state: result?.state ?? null, agent: result?.agent ?? null, rule: result?.ruleId ?? null }, surfaceId, 'renderer');
+    }
   });
 
   // Manifests flow the other way: main owns the config directory, the renderer

@@ -142,6 +142,9 @@ export class TermSession {
   private disposed = false;
   private cancelStartup: (() => void) | null = null;
   private readonly timers: Timers;
+  /** Latest agent-status RPC of each kind (see relayRpc), replayed to apps that attach later. */
+  private readonly rpcState = new Map<string, { n: number; method: string; params: Record<string, unknown> }>();
+  private rpcCounter = 0;
 
   constructor(private readonly opts: SessionOptions) {
     this.id = opts.id;
@@ -249,6 +252,7 @@ export class TermSession {
     this.flush();
     this.alive = false;
     this.exitCode = code;
+    this.rpcState.clear();
     this.cancelStartup?.();
     this.cancelStartup = null;
     if (this.killTimer !== null) {
@@ -288,6 +292,7 @@ export class TermSession {
       this.subs.set(conn.id, sub);
       conn.sendJson({ ...base, mode, seq: this.seq, fromSeq: canDelta ? req.sinceSeq : undefined, cols: this.cols, rows: this.rows, owner: this.sizeOwner === conn.id });
       if (canDelta) for (const [q, c] of this.ring.after(req.sinceSeq!)) this.sendOutput(sub, q, c);
+      this.replayRpcs(conn);
       return;
     }
 
@@ -314,7 +319,31 @@ export class TermSession {
       sub.buf = null;
       sub.phase = 'live';
       for (const [q, c] of buffered) this.sendOutput(sub, q, c);
+      // A lag recovery (no rid) is the same app, which already has the state.
+      if (base.rid !== undefined) this.replayRpcs(sub.conn);
     });
+  }
+
+  /**
+   * An agent in this session reported status (hook bridge). Sent to every app
+   * attached now; the latest of each kind is kept for apps that attach later.
+   * Hook events are kept per event name — the newest Stop, the newest
+   * PreToolUse, … — and replayed in the order they arrived, which rebuilds
+   * the current state (each report carries the time it fired, and the app
+   * drops older ones) without the full history.
+   */
+  relayRpc(method: string, params: Record<string, unknown>): void {
+    const event = method === 'hook.event' ? (typeof params.event === 'string' ? params.event : 'PostToolUse') : '';
+    // A new conversation, or the agent letting go of the pane: what came before no longer describes it.
+    if (event === 'SessionStart' || event === 'SessionEnd' || method === 'pane.release_agent') this.rpcState.clear();
+    this.rpcState.set(event ? `${method}:${event}` : method, { n: ++this.rpcCounter, method, params });
+    const msg = { t: 'rpc' as const, id: this.id, method, params };
+    for (const sub of this.subs.values()) sub.conn.sendJson(msg);
+  }
+
+  private replayRpcs(conn: ConnLike): void {
+    const latest = [...this.rpcState.values()].sort((a, b) => a.n - b.n);
+    for (const r of latest) conn.sendJson({ t: 'rpc', id: this.id, method: r.method, params: r.params, replay: true });
   }
 
   detach(connId: number): void {

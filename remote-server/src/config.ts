@@ -19,6 +19,12 @@ export interface ServerConfig {
   ringBytes: number;
   exitedRetentionDays: number;
   tombstoneDays: number;
+  /**
+   * Loopback port for the hook bridge: agents' hooks (wmux-hook.js and the
+   * wmux plugins) report status here, and the server relays it to the apps.
+   * 0 turns the bridge off.
+   */
+  hookPort: number;
 }
 
 export const DEFAULT_CONFIG: ServerConfig = {
@@ -30,6 +36,7 @@ export const DEFAULT_CONFIG: ServerConfig = {
   ringBytes: 1024 * 1024,
   exitedRetentionDays: 7,
   tombstoneDays: 30,
+  hookPort: 7718,
 };
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {
@@ -83,6 +90,16 @@ export function rotateToken(dir: string): string {
   const token = crypto.randomBytes(32).toString('base64url');
   fs.writeFileSync(path.join(dir, 'token'), token + '\n', { mode: 0o600 });
   return token;
+}
+
+/**
+ * The secret behind per-session hook tokens. Never leaves this directory: a
+ * session sees only HMAC(secret, its own id), which lets it report status for
+ * itself and nothing else — unlike the main token, which is shell access.
+ */
+export function ensureHookSecret(dir: string): string {
+  ensureDir(dir);
+  return readOrCreate(path.join(dir, 'hook-secret'), () => crypto.randomBytes(32).toString('base64url'));
 }
 
 export function ensureServerId(dir: string): string {

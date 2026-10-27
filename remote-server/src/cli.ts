@@ -9,6 +9,12 @@
  *   remotea close <surf-id>        end a session on every device
  *   remotea token                  print the access token for the app's Settings → Remote hosts
  *   remotea rotate-token           issue a new token (connected apps must be given the new one)
+ *   remotea hooks install|remove|status
+ *                                  register wmux's hook helper with Claude Code and Codex in this WSL,
+ *                                  so agents report their status to the apps (see hook-bridge.ts)
+ *   remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
+ *                                  diagnostics the apps sent (connection, reattach, agent state; no content)
+ *   remotea screen <surf-id>       print what a session's screen shows right now
  *
  * `status --json` is a stable contract for other tools (STATUS_VERSION below).
  * Additions are backwards compatible; a breaking change bumps the version.
@@ -20,6 +26,8 @@ import crypto from 'crypto';
 import http from 'http';
 import WebSocket from 'ws';
 import { configDir, ensureToken, loadConfig, rotateToken } from './config';
+import { diagDir } from './diag-log';
+import { hooksStatus, installHooks, removeHooks, type HookTarget } from './hooks-install';
 import type { RegistryData } from './registry';
 import { PROTO, parseServerMsg, type ServerMsg, type SessionRecord } from '../../src/shared/remote-host-protocol';
 
@@ -252,6 +260,132 @@ async function openSession(dir: string, args: OpenArgs): Promise<{ id: string; g
   }
 }
 
+/** What a session's screen shows now: attach read-only, render the snapshot, detach. */
+async function screenOf(dir: string, id: string): Promise<{ lines: string[]; cols: number; rows: number }> {
+  if (!/^surf-[A-Za-z0-9_-]{1,96}$/.test(id)) throw new Error('expected a session id like surf-…');
+  const link = await connectLocal(dir);
+  try {
+    // Attaching never claims the size (only focus or typing in an app does).
+    link.send({ t: 'open', rid: 1, id, cols: 80, rows: 24 });
+    const reply = await link.next((m) => (m.t === 'opened' || m.t === 'openError') && m.id === id);
+    if (reply.t === 'openError') throw new Error(reply.message);
+    if (reply.t !== 'opened') throw new Error('unexpected reply');
+    link.send({ t: 'detach', ids: [id] });
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Terminal } = require('@xterm/headless') as typeof import('@xterm/headless');
+    const term = new Terminal({ cols: reply.cols, rows: reply.rows, scrollback: 0, allowProposedApi: true });
+    await new Promise<void>((r) => term.write(reply.snapshot ?? '', r));
+    const buf = term.buffer.active;
+    const lines: string[] = [];
+    for (let y = 0; y < term.rows; y++) lines.push(buf.getLine(buf.viewportY + y)?.translateToString(true) ?? '');
+    term.dispose();
+    return { lines, cols: reply.cols, rows: reply.rows };
+  } finally {
+    link.close();
+  }
+}
+
+interface LogArgs {
+  follow: boolean;
+  device?: string;
+  surf?: string;
+  kind?: string;
+  sinceMs?: number;
+  json: boolean;
+}
+
+export function parseLogArgs(argv: string[]): LogArgs {
+  const out: LogArgs = { follow: false, json: false };
+  for (let i = 0; i < argv.length; i++) {
+    const f = argv[i];
+    const val = () => {
+      const v = argv[++i];
+      if (v === undefined) throw new Error(`${f} needs a value`);
+      return v;
+    };
+    if (f === '-f' || f === '--follow') out.follow = true;
+    else if (f === '--json') out.json = true;
+    else if (f === '--device') out.device = val().toLowerCase();
+    else if (f === '--surf') out.surf = val();
+    else if (f === '--kind') out.kind = val();
+    else if (f === '--since') {
+      const m = /^(\d+)([smhd])$/.exec(val());
+      if (!m) throw new Error('--since takes a duration like 30s, 10m, 2h or 1d');
+      out.sinceMs = Number(m[1]) * { s: 1e3, m: 6e4, h: 36e5, d: 864e5 }[m[2] as 's' | 'm' | 'h' | 'd'];
+    } else throw new Error(`unknown option ${f}`);
+  }
+  return out;
+}
+
+type LogLine = { at: number; device?: string; src?: string; kind?: string; surf?: string; data?: Record<string, unknown> };
+
+function fmtLog(e: LogLine): string {
+  const t = new Date(e.at);
+  const time = `${t.toTimeString().slice(0, 8)}.${String(t.getMilliseconds()).padStart(3, '0')}`;
+  const fields = Object.entries(e.data ?? {}).filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => `${k}=${String(v)}`).join(' ');
+  const surf = e.surf ? ` ${e.surf.slice(0, 13)}` : '';
+  return `${time} ${(e.device ?? '?').slice(0, 14).padEnd(14)} ${(e.src === 'renderer' ? 'R' : 'M')} ${(e.kind ?? '').padEnd(16)}${surf} ${fields}`;
+}
+
+async function showLogs(args: LogArgs): Promise<void> {
+  const dir = diagDir();
+  const since = args.sinceMs ? Date.now() - args.sinceMs : 0;
+  const keep = (e: LogLine) => e.at >= since
+    && (!args.device || (e.device ?? '').toLowerCase().includes(args.device))
+    && (!args.surf || (e.surf ?? '').startsWith(args.surf))
+    && (!args.kind || (e.kind ?? '').startsWith(args.kind));
+  const print = (e: LogLine) => process.stdout.write((args.json ? JSON.stringify(e) : fmtLog(e)) + '\n');
+  const offsets = new Map<string, number>();
+  const readNew = (): LogLine[] => {
+    let files: string[] = [];
+    try {
+      files = fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl')).map((f) => path.join(dir, f));
+    } catch {
+      return [];
+    }
+    const out: LogLine[] = [];
+    for (const f of files) {
+      const from = offsets.get(f) ?? 0;
+      let text = '';
+      try {
+        const size = fs.statSync(f).size;
+        if (size < from) offsets.set(f, 0); // rotated
+        const fd = fs.openSync(f, 'r');
+        const len = size - (size < from ? 0 : from);
+        const b = Buffer.alloc(Math.max(0, len));
+        fs.readSync(fd, b, 0, b.length, size < from ? 0 : from);
+        fs.closeSync(fd);
+        text = b.toString('utf8');
+        const lastNl = text.lastIndexOf('\n');
+        text = lastNl >= 0 ? text.slice(0, lastNl + 1) : '';
+        offsets.set(f, (size < from ? 0 : from) + Buffer.byteLength(text));
+      } catch {
+        continue;
+      }
+      for (const line of text.split('\n')) {
+        if (!line) continue;
+        try {
+          out.push(JSON.parse(line) as LogLine);
+        } catch {
+          /* torn line */
+        }
+      }
+    }
+    return out.filter(keep).sort((a, b) => a.at - b.at);
+  };
+  const first = readNew();
+  if (!first.length && !args.follow) process.stderr.write(`no diagnostics yet in ${dir}\n`);
+  first.forEach(print);
+  if (!args.follow) return;
+  await new Promise<never>(() => {
+    setInterval(() => readNew().forEach(print), 500);
+  });
+}
+
+function fmtHooks(rows: HookTarget[]): string {
+  return rows.map((r) => `${r.agent.padEnd(7)} ${!r.present ? 'not installed here' : r.entries ? `${r.entries} remotea hook entries` : 'no remotea hooks'}  ${r.file}`).join('\n') + '\n';
+}
+
 function fmtAge(ms: number | null): string {
   if (!ms) return '-';
   const s = Math.round((Date.now() - ms) / 1000);
@@ -266,7 +400,10 @@ const USAGE = `usage:
   remotea open --group <name> [--cwd <dir>] [--title <t>] [--id surf-...] [--json] -- <command...>
   remotea close <surf-id>
   remotea token
-  remotea rotate-token`;
+  remotea rotate-token
+  remotea hooks install|remove|status
+  remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
+  remotea screen <surf-id>`;
 
 export async function main(argv: string[]): Promise<number> {
   const dir = configDir();
@@ -298,6 +435,25 @@ export async function main(argv: string[]): Promise<number> {
     case 'token':
       process.stdout.write(ensureToken(dir) + '\n');
       return 0;
+    case 'hooks': {
+      const sub = rest[0] ?? 'status';
+      if (sub === 'install') {
+        const rows = installHooks();
+        process.stdout.write(fmtHooks(rows));
+        process.stdout.write('new agent sessions in remotea terminals now report their status to the apps\n');
+      } else if (sub === 'remove') process.stdout.write(fmtHooks(removeHooks()));
+      else if (sub === 'status') process.stdout.write(fmtHooks(hooksStatus()));
+      else throw new Error('usage: remotea hooks install|remove|status');
+      return 0;
+    }
+    case 'logs':
+      await showLogs(parseLogArgs(rest));
+      return 0;
+    case 'screen': {
+      const shot = await screenOf(dir, rest[0] ?? '');
+      process.stdout.write(`── ${rest[0]} (${shot.cols}x${shot.rows}) ──\n${shot.lines.join('\n')}\n`);
+      return 0;
+    }
     case 'rotate-token':
       process.stdout.write(rotateToken(dir) + '\n');
       process.stderr.write('token rotated: update it in every app\'s Settings → Remote hosts\n');

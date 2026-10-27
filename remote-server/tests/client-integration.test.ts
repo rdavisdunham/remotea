@@ -13,6 +13,8 @@ import { Hub } from '../src/hub';
 import { Registry } from '../src/registry';
 import { fakeSpawner, waitFor } from './helpers';
 import { RemoteHostClient } from '../../src/main/remote-hosts/host-client';
+import { HookBridge, hookToken } from '../src/hook-bridge';
+import net from 'net';
 import { PendingIntents } from '../../src/main/remote-hosts/host-config';
 import type { HostStatus, PtyExitInfo, TerminalSnapshot } from '../../src/shared/remote-hosts-types';
 
@@ -50,6 +52,7 @@ async function startServer(opts: { port?: number; registryFile?: string; bootId?
 function makeClient(port: number, deviceId: string, token = TOKEN) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-client-'));
   const statuses: HostStatus[] = [];
+  const rpcs: Array<{ id: string; method: string; params: Record<string, unknown>; replay: boolean }> = [];
   let pinned: string | undefined;
   const client = new RemoteHostClient({
     hostId: 'desk',
@@ -63,9 +66,10 @@ function makeClient(port: number, deviceId: string, token = TOKEN) {
     },
     intents: new PendingIntents(path.join(dir, 'pending.json')),
     onStatus: (s) => statuses.push(s),
+    onRpc: (id, method, params, replay) => rpcs.push({ id, method, params, replay }),
   });
   cleanup.push(() => client.stop());
-  return { client, statuses, pin: (id: string | undefined) => (pinned = id) };
+  return { client, statuses, rpcs, pin: (id: string | undefined) => (pinned = id) };
 }
 
 function collect(client: RemoteHostClient, id: string) {
@@ -104,6 +108,36 @@ describe('RemoteHostClient against a real server', () => {
     await waitFor(() => io.text().includes('hello from the server'));
     client.write('surf-int-1', 'ls\r');
     await waitFor(() => rig.sp.last().written.includes('ls\r'));
+  });
+
+  it('agent status from a hook reaches the app live, and is replayed (marked) after a reconnect', async () => {
+    const rig = await startServer();
+    const { client, rpcs } = makeClient(rig.port, 'device-alpha09');
+    client.start();
+    await waitFor(() => client.ready);
+    await client.create({ id: 'surf-int-9', cols: 80, rows: 24, spec: {} });
+    const secret = 'integration-secret';
+    const bridge = new HookBridge({ secret, relay: (id, m, p) => rig.hub.relayRpc(id, m, p) });
+    const bport = await bridge.listen(0);
+    cleanup.push(() => bridge.close());
+    // Exactly what wmux-hook.js sends (see hook-bridge.test.ts for the real script).
+    const send = (params: Record<string, unknown>) => new Promise<string>((resolve, reject) => {
+      const sock = net.connect(bport, '127.0.0.1', () => sock.write(JSON.stringify({ method: 'hook.event', params: { surfaceId: 'surf-int-9', ...params }, id: 1, token: hookToken(secret, 'surf-int-9') }) + '\n'));
+      sock.setEncoding('utf8');
+      sock.on('data', (d) => { sock.destroy(); resolve(String(d)); });
+      sock.on('error', reject);
+    });
+    expect(await send({ event: 'UserPromptSubmit', at: 10 })).toContain('"ok":true');
+    await send({ event: 'PreToolUse', tool: 'Bash', at: 11 });
+    await waitFor(() => rpcs.length === 2);
+    expect(rpcs.map((r) => [r.id, r.params.event, r.replay])).toEqual([['surf-int-9', 'UserPromptSubmit', false], ['surf-int-9', 'PreToolUse', false]]);
+    // The laptop sleeps through the end of the turn.
+    for (const c of rig.hub.conns.values()) c.close(1001, 'test drop');
+    await waitFor(() => !client.ready);
+    await send({ event: 'Stop', at: 12 });
+    await waitFor(() => client.ready, 5000);
+    await waitFor(() => rpcs.some((r) => r.params.event === 'Stop'));
+    expect(rpcs.slice(2).map((r) => [r.params.event, r.replay])).toEqual([['UserPromptSubmit', true], ['PreToolUse', true], ['Stop', true]]);
   });
 
   it('reconnects after a dropped connection and replays only what it missed (no resync)', async () => {

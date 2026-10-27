@@ -6,8 +6,12 @@
 | App: router, host client, reconnect FSM, power hooks, offline intents, settings, overlay, remote panes in `useTerminal` | **done**: unit tests, plus the real client driven against the real server; needs a first run on Windows |
 | Cross-device sync: groups, placement, closes, renames/colours, hide/unhide, Load-session hides, offline closes via probes | **done**: planner and store unit tests; needs a two-device run |
 | Agent resume after server restart (Claude via `~/.claude/sessions`, Codex via rollout file / state db) | **done** |
+| First Windows run (laptop): connects, survives sleep. Fixed: doubled output in remote panes (StrictMode's second `create()` wired a second forwarder) | **done** |
+| Phase 4a: hook bridge. wmux-hook.js (Claude Code, Codex) reports to `127.0.0.1:7718` in WSL with a per-session token; the server relays status to every app showing the session and replays the latest state to apps that attach later. `remotea hooks install` | **done**: unit + real-helper + integration + e2e (hook fired in a real shell) |
+| Diagnostics: apps send connection/reattach/agent-state events (no content) to the server; `remotea logs`, `remotea screen <id>` | **done** |
 | Phase 3: non-owner rendering at owner size, deflate, snapshots persisted across restarts, `\\wsl.localhost` explorer, uploads over WS | open |
-| Phase 4: hook relay (shared Claude SessionStart hook with the Eridani ledger), server-side agent detection | open |
+| Phase 4b: the other wmux plugins in WSL (OpenCode, pi, omp, Qwen, Grok, agy), server-side agent detection | open |
+| Server restarts that keep processes (a PTY holder outliving the server) | proposed |
 
 ---
 

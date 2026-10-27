@@ -976,6 +976,13 @@ function commit(record: AgentStateRecord): AgentStateRecord {
 
 function broadcast(record: AgentStateRecord): void {
   send(snapshot(record));
+  stateObserver?.(record);
+}
+
+let stateObserver: ((record: AgentStateRecord) => void) | null = null;
+/** remotea: one observer of every declared-state change (the remote diagnostics log). */
+export function observeAgentState(fn: ((record: AgentStateRecord) => void) | null): void {
+  stateObserver = fn;
 }
 
 function send(payload: AgentStateSnapshot): void {

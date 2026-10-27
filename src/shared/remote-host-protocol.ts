@@ -46,6 +46,9 @@ export const LIMITS = Object.freeze({
   maxCols: 1000,
   maxRows: 500,
   maxInputBytes: 1024 * 1024,
+  maxDiagEvents: 200,
+  maxDiagFields: 16,
+  maxDiagString: 300,
 });
 
 export const TIMING = Object.freeze({
@@ -146,7 +149,40 @@ export type ClientMsg =
   | { t: 'hide'; rid: number; id: RemoteSurfaceId }
   | { t: 'unhide'; rid: number; id: RemoteSurfaceId }
   | { t: 'theme'; fg: string; bg: string; cursor: string }
-  | { t: 'ping'; n: number };
+  | { t: 'ping'; n: number }
+  /** App diagnostics for the server's log (only when welcome lists 'diag'). No terminal content. */
+  | { t: 'diag'; events: DiagEvent[] };
+
+/**
+ * One diagnostic event from an app: what happened, never what was on screen
+ * or typed. `data` values are short scalars; see parseClientMsg for the caps.
+ */
+export interface DiagEvent {
+  at: number;
+  src: 'main' | 'renderer';
+  kind: string;
+  surf?: string;
+  data?: Record<string, string | number | boolean | null>;
+}
+
+/** Features a server announces in `welcome`; an app uses a feature only when listed. */
+export type ServerFeature = 'rpc' | 'diag';
+
+/**
+ * Agent-status RPCs the server relays from a session's hook bridge to the apps
+ * showing it — the same methods an agent sends to the app's named pipe.
+ * Anything else (workspace control, send-keys, browser automation) stays local.
+ */
+export const RELAYED_RPC_METHODS: ReadonlySet<string> = new Set([
+  'hook.event',
+  'agent.activity',
+  'agent.subagent',
+  'pane.report_agent',
+  'pane.report_agent_session',
+  'pane.release_agent',
+  'pane.report_codex_session',
+  'pane.release_codex_session',
+]);
 
 export type OpenMode = 'fresh' | 'delta' | 'snapshot';
 
@@ -154,6 +190,7 @@ export type ServerMsg =
   | {
       t: 'welcome'; proto: number; serverId: string; bootId: string; epoch: string;
       hostname: string; you: DeviceId; groups: GroupRecord[]; sessions: SessionRecord[];
+      features?: ServerFeature[];
     }
   | {
       t: 'opened'; rid?: number; id: RemoteSurfaceId; mode: OpenMode; seq: number; fromSeq?: number;
@@ -171,6 +208,12 @@ export type ServerMsg =
   | { t: 'sessionClosed'; id: RemoteSurfaceId; by: DeviceId; reason: 'closed' | 'group-closed' }
   | { t: 'groupUpserted'; group: GroupRecord }
   | { t: 'groupClosed'; id: GroupId; sessionIds: RemoteSurfaceId[]; by: DeviceId }
+  /**
+   * An agent in session `id` reported its status through the hook bridge.
+   * `replay`: the latest state, re-sent when an app attaches — apply it, but
+   * do not notify again for something that happened earlier.
+   */
+  | { t: 'rpc'; id: RemoteSurfaceId; method: string; params: Record<string, unknown>; replay?: boolean }
   | { t: 'goingAway' }
   | { t: 'pong'; n: number; serverAt: number }
   | { t: 'error'; code: string; message: string };
@@ -284,6 +327,17 @@ function isCreateSpec(v: unknown): v is CreateSpec {
 }
 
 /** Strict guard for everything a client may send. Unknown or malformed = null. */
+function isDiagEvent(e: unknown): boolean {
+  if (!isObj(e) || !isInt(e.at, 0, Number.MAX_SAFE_INTEGER) || (e.src !== 'main' && e.src !== 'renderer')) return false;
+  if (!isStr(e.kind, 64) || (e.surf !== undefined && !isStr(e.surf, 128))) return false;
+  if (e.data === undefined) return true;
+  if (!isObj(e.data)) return false;
+  const entries = Object.entries(e.data);
+  return entries.length <= LIMITS.maxDiagFields && entries.every(([k, v]) => k.length <= 64
+    && (v === null || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v))
+      || (typeof v === 'string' && v.length <= LIMITS.maxDiagString)));
+}
+
 export function parseClientMsg(raw: unknown): ClientMsg | null {
   if (!isObj(raw) || typeof raw.t !== 'string') return null;
   const m = raw;
@@ -335,6 +389,9 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
       return isStr(m.fg, 64) && isStr(m.bg, 64) && isStr(m.cursor, 64) ? (m as unknown as ClientMsg) : null;
     case 'ping':
       return isInt(m.n, 0, Number.MAX_SAFE_INTEGER) ? (m as unknown as ClientMsg) : null;
+    case 'diag':
+      return Array.isArray(m.events) && m.events.length <= LIMITS.maxDiagEvents && m.events.every(isDiagEvent)
+        ? (m as unknown as ClientMsg) : null;
     default:
       return null;
   }
@@ -343,7 +400,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
 const SERVER_TYPES = new Set([
   'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
   'sessionAdded', 'sessionUpdated', 'sessionClosed', 'groupUpserted', 'groupClosed',
-  'goingAway', 'pong', 'error',
+  'goingAway', 'pong', 'error', 'rpc',
 ]);
 
 /**
@@ -372,6 +429,9 @@ export function parseServerMsg(raw: unknown): ServerMsg | null {
       return isObj(m.group) && isGroupId(m.group.id) ? (m as unknown as ServerMsg) : null;
     case 'groupClosed':
       return isGroupId(m.id) && isSurfaceIdList(m.sessionIds) ? (m as unknown as ServerMsg) : null;
+    case 'rpc':
+      return isSurfaceId(m.id) && typeof m.method === 'string' && RELAYED_RPC_METHODS.has(m.method) && isObj(m.params)
+        ? (m as unknown as ServerMsg) : null;
     default:
       return m as unknown as ServerMsg;
   }
