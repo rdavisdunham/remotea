@@ -17,6 +17,7 @@ import type { Duplex } from 'stream';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import { BIN_INPUT, decodeFrame, parseClientMsg, LIMITS, type ServerMsg } from '../../src/shared/remote-host-protocol';
 import type { Hub, HubConn } from './hub';
+import { receiveUpload } from './upload';
 
 export const MAX_PAYLOAD = 16 * 1024 * 1024;
 const HELLO_TIMEOUT_MS = 10_000;
@@ -102,6 +103,10 @@ export class RemoteaServer {
         res.end('ok\n');
         return;
       }
+      if (req.method === 'POST' && req.url?.startsWith('/upload?')) {
+        void this.onUpload(req, res);
+        return;
+      }
       res.writeHead(426, { 'content-type': 'text/plain' });
       res.end('remotea server: WebSocket only\n');
     });
@@ -121,22 +126,59 @@ export class RemoteaServer {
     return this.servers.has(host);
   }
 
+  /** Who may call: the same rules as the WebSocket handshake (see the header). */
+  private admit(req: http.IncomingMessage): { ok: true } | { ok: false; status: number; text: string } {
+    const ip = req.socket.remoteAddress ?? 'unknown';
+    if (this.failures.banned(ip)) return { ok: false, status: 429, text: 'Too Many Requests' };
+    if (req.headers.origin !== undefined) {
+      this.log(`rejected ${ip}: browser origin ${String(req.headers.origin).slice(0, 80)}`);
+      return { ok: false, status: 403, text: 'Forbidden' };
+    }
+    if (!tokenMatches(req.headers.authorization, this.opts.token())) {
+      this.failures.fail(ip);
+      this.log(`rejected ${ip}: bad token`);
+      return { ok: false, status: 401, text: 'Unauthorized' };
+    }
+    return { ok: true };
+  }
+
+  /** A file pasted or dropped onto a remote pane (see upload.ts). */
+  private async onUpload(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    const reply = (status: number, body: object) => {
+      res.writeHead(status, { 'content-type': 'application/json', connection: 'close' });
+      res.end(JSON.stringify(body));
+    };
+    const admitted = this.admit(req);
+    if (!admitted.ok) {
+      req.resume();
+      return reply(admitted.status, { error: admitted.text });
+    }
+    const q = new URL(req.url ?? '', 'http://x').searchParams;
+    const surf = q.get('surf') ?? '';
+    const name = q.get('name') ?? '';
+    if (!/^surf-[A-Za-z0-9_-]{1,96}$/.test(surf) || !name || name.length > 255) {
+      req.resume();
+      return reply(400, { error: 'surf and name are required' });
+    }
+    // Only for a session that is running here: the file is for the program in it.
+    if (!this.opts.hub.isLive(surf)) {
+      req.resume();
+      return reply(404, { error: 'no such live session' });
+    }
+    const r = await receiveUpload(req, name);
+    if (!r.ok) return reply(r.status, { error: r.error });
+    this.log(`upload: ${r.bytes} bytes for ${surf}`);
+    reply(200, { path: r.path });
+  }
+
   private onUpgrade(req: http.IncomingMessage, socket: Duplex, head: Buffer): void {
     const ip = req.socket.remoteAddress ?? 'unknown';
     const reject = (status: number, text: string) => {
       socket.write(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();
     };
-    if (this.failures.banned(ip)) return reject(429, 'Too Many Requests');
-    if (req.headers.origin !== undefined) {
-      this.log(`rejected ${ip}: browser origin ${String(req.headers.origin).slice(0, 80)}`);
-      return reject(403, 'Forbidden');
-    }
-    if (!tokenMatches(req.headers.authorization, this.opts.token())) {
-      this.failures.fail(ip);
-      this.log(`rejected ${ip}: bad token`);
-      return reject(401, 'Unauthorized');
-    }
+    const admitted = this.admit(req);
+    if (!admitted.ok) return reject(admitted.status, admitted.text);
     this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, ip));
   }
 

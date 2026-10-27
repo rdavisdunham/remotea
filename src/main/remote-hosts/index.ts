@@ -11,6 +11,8 @@ import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, RegistryPayl
 import { HostStore, loadDevice, PendingIntents, validateHostUrl, type SecretBox, type StoredHost } from './host-config';
 import { RemoteHostClient, type SocketFactory } from './host-client';
 import { diag, diagQueued, requeueDiag, takeDiag } from './diag';
+import { remoteInsertionText } from '../remote-insert';
+import type { InsertionResult } from '../../shared/types';
 
 const DIAG_FLUSH_MS = 2000;
 
@@ -134,6 +136,21 @@ export class RemoteHosts {
       client.start();
     }
     return this.dto(host);
+  }
+
+  /**
+   * A paste or drop of local files onto a remote pane: upload them to that
+   * pane's server and answer with the text to type (the server paths, quoted
+   * for a POSIX shell), or the failure to show.
+   */
+  async insertionForFiles(surfaceId: string, localPaths: string[], signal?: AbortSignal): Promise<InsertionResult> {
+    const client = this.clientOwning(surfaceId);
+    if (!client) return { text: null, failure: { destination: 'remote host', detail: 'this pane is not connected to its host' } };
+    const where = this.store.get(client.hostId)?.name ?? client.hostId;
+    const r = await client.uploadFiles(surfaceId, localPaths, signal);
+    if (signal?.aborted) return { text: null };
+    if (!r.ok) return { text: null, failure: { destination: where, detail: r.error } };
+    return { text: remoteInsertionText(r.paths) };
   }
 
   /** The user said yes to the agent-hooks prompt: the server installs them. */

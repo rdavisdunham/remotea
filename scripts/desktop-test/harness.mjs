@@ -24,6 +24,7 @@
  *     shot <file.png>       screenshot of the app window
  *     type '<text>'         insert text into the focused element (a terminal, if one is focused)
  *     key <Enter|Escape|Tab|Backspace|ArrowUp|ArrowDown|ArrowLeft|ArrowRight> [n]
+ *     drop <surfaceId> <C:\\path\\file>...   a real OS-style file drop onto that terminal
  *     screen [surfaceId]    what a terminal in the app shows (default: the active one)
  *     applog                tail of the app's main-process log
  *     diag [args...]        `remotea logs` against the test server
@@ -337,6 +338,32 @@ try {
           await send('Input.dispatchKeyEvent', { type: 'keyUp', key: rest[0], code: rest[0], windowsVirtualKeyCode: code });
         }
       });
+      break;
+    }
+    case 'drop': {
+      // A real drag-and-drop as the OS would deliver it, so the renderer gets
+      // genuine File objects (webUtils.getPathForFile refuses anything else).
+      const [surf, ...files] = rest;
+      const page = await waitForPage();
+      const at = await evaluate(page, `(async () => {
+        // Terminals carry no surface id in the DOM: focus it, then use the one holding focus.
+        window.__wmux_focusSurface(${JSON.stringify(surf)});
+        await new Promise((r) => setTimeout(r, 300));
+        const visible = [...document.querySelectorAll('.xterm-screen')]
+          .map((e) => ({ e, r: e.getBoundingClientRect() }))
+          .filter(({ r }) => r.width > 0 && r.height > 0)
+          .sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height);
+        const el = document.activeElement?.closest('.terminal-pane')?.querySelector('.xterm-screen') ?? visible[0]?.e;
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+      })()`);
+      if (!at) throw new Error(`no terminal on screen for ${surf}`);
+      const data = { items: [], files, dragOperationsMask: 1 };
+      await cdp(page, async (send) => {
+        for (const type of ['dragEnter', 'dragOver', 'drop']) await send('Input.dispatchDragEvent', { type, x: at.x, y: at.y, data });
+      });
+      console.log(`dropped ${files.length} file(s) at ${at.x},${at.y}`);
       break;
     }
     case 'screen': {

@@ -35,6 +35,7 @@ import type { HostStatus, PtyExitInfo, TerminalSnapshot } from '../../shared/rem
 import { initialFsm, publicState, step, type Fsm, type FsmEvent } from './connection-fsm';
 import type { PendingIntent, PendingIntents } from './host-config';
 import { diag } from './diag';
+import { uploadFile } from './upload';
 
 export interface SocketLike {
   readonly readyState: number;
@@ -201,6 +202,26 @@ export class RemoteHostClient {
         prompt: this.ready && !(this.deps.hooksPromptDeclined?.() ?? false) && this.hooks.some((a) => a.present && !a.installed),
       },
     };
+  }
+
+  /**
+   * Put local files on the server for the program in pane `id` (a paste or a
+   * drop). All or nothing: the server paths in order, or the first error.
+   */
+  async uploadFiles(id: string, localPaths: string[], signal?: AbortSignal): Promise<{ ok: true; paths: string[] } | { ok: false; error: string }> {
+    const token = this.deps.token();
+    if (!this.ready || !token) return { ok: false, error: 'not connected' };
+    const paths: string[] = [];
+    for (const localPath of localPaths) {
+      const r = await uploadFile({ hostUrl: this.deps.url(), token, surfaceId: id, localPath, signal });
+      if (!r.ok) {
+        diag('surf.upload', { host: this.hostId, ok: false, error: r.error }, id);
+        return r;
+      }
+      paths.push(r.path);
+    }
+    diag('surf.upload', { host: this.hostId, ok: true, files: paths.length }, id);
+    return { ok: true, paths };
   }
 
   /** Register the status hooks with the server's agents (the user said yes in the app). */

@@ -1196,6 +1196,9 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     if (source.kind !== 'files') return resolveInsertion(source, null, false, signal);
     const mayUpload = !invert && uploadEnabled(loadUserConfig().remote, mode);
     if (!mayUpload) return resolveInsertion(source, null, false, signal);
+    // remotea: a remote pane's program runs on its host, where this machine's
+    // paths mean nothing: the files go there, and their paths there are typed.
+    if (ptyManager.isRemote(surfaceId)) return remoteHosts.insertionForFiles(surfaceId, source.localPaths, signal);
     // Only arm the probe for a pane something already says is remote. `start()`
     // resets the idle counter, so waking it for a local pane would keep a
     // ~550ms process sweep running every 3s for as long as the user keeps

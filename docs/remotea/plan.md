@@ -9,7 +9,8 @@
 | First Windows run (laptop): connects, survives sleep. Fixed: doubled output in remote panes (StrictMode's second `create()` wired a second forwarder) | **done** |
 | Phase 4a: hook bridge. wmux-hook.js (Claude Code, Codex) reports to `127.0.0.1:7718` in WSL with a per-session token; the server relays status to every app showing the session and replays the latest state to apps that attach later. `remotea hooks install` | **done**: unit + real-helper + integration + e2e (hook fired in a real shell) |
 | Diagnostics: apps send connection/reattach/agent-state events (no content) to the server; `remotea logs`, `remotea screen <id>` | **done** |
-| Phase 3: non-owner rendering at owner size, deflate, snapshots persisted across restarts, `\\wsl.localhost` explorer, uploads over WS | open |
+| Paste/drop into remote panes: files and pasted screenshots are uploaded to the host (`POST /upload`, same token, `/tmp/remotea-drop-<uuid>/<name>`) and their paths there typed in | **done**: route + uploader tests; real drop in the desktop test copy |
+| Phase 3 (rest): non-owner rendering at owner size, deflate, snapshots persisted across restarts, `\\wsl.localhost` explorer | open |
 | After connecting, the app shows whether agent hooks are installed on that host's agents and offers to install them through the server (Install / Not now / Don't ask again per host) | **done**: hub + client integration tests; clicked through in the desktop test copy |
 | Phase 4b: the other wmux plugins in WSL (OpenCode, pi, omp, Qwen, Grok, agy), server-side agent detection | open |
 | Server restarts that keep processes | declined: like herdr, a restart (even of the PC) respawns sessions in their directories and resumes their agents |

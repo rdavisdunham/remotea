@@ -93,6 +93,7 @@ remotea uses its own named pipe and app-data folder (`%APPDATA%\remotea`), so it
   - Closing a tab ends that session on every device.
   - Closing a workspace ends all of its sessions everywhere.
   - **Hide on this device** (tab right-click) removes a tab from one device only. Bring it back from Settings → Remote hosts → Hidden on this device.
+- **Pasting and dropping files.** A screenshot pasted into a remote pane, or files dropped on it, are uploaded to the host and their paths there are typed in, so the agent in that pane can open them. They land in a private `/tmp/remotea-drop-…/` folder.
 - **Terminal size.** The device you're typing on, or whose window is focused on that pane, controls the size of a shared terminal.
 
 Server-side CLI (in WSL):

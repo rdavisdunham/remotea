@@ -471,6 +471,11 @@ export class Hub {
     }
   }
 
+  /** A session whose process is running here now. */
+  isLive(id: string): boolean {
+    return this.sessions.get(id)?.state === 'live';
+  }
+
   private noteAgent(id: string, agent: AgentHandle): void {
     const rec = this.registry.session(id);
     if (!rec || (rec.agent?.sessionId === agent.sessionId && rec.agent.provider === agent.provider)) return;
