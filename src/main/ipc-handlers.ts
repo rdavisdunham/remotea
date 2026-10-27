@@ -66,7 +66,7 @@ import {
   writeMarkdownFile,
   MD_DIALOG_EXTENSIONS,
 } from './markdown-file';
-import { grantFilePath, isFilePathGranted, grantRemoteFile, isRemoteFileGranted } from './file-grants';
+import { grantFilePath, isFilePathGranted, grantRemoteFile, isRemoteFileGranted, grantRemoteMarkdown, remoteMarkdownOrigin } from './file-grants';
 import { getAwakeManager, isKeepAwakeMode } from './awake-manager';
 import { agentBrowserPath, runAgentBrowser, unwrapAgentData, type RunResult } from './agent-browser-cli';
 // The process-wide singletons. Constructing a second SessionRegistry or
@@ -1451,7 +1451,10 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   // Backs "Reload from disk" (agents rewrite files under the pane constantly)
   // and drag-and-drop of a file onto a markdown pane. Same guards as every
   // other read — the renderer supplies the path, so it is treated as untrusted.
-  ipcMain.handle(IPC_CHANNELS.MARKDOWN_READ_FILE, async (_event, filePath: string) => {
+  ipcMain.handle(IPC_CHANNELS.MARKDOWN_READ_FILE, async (event, filePath: string) => {
+    // remotea: reload-from-disk of a file opened from a remote pane's tree.
+    const origin = remoteMarkdownOrigin(event.sender.id, filePath);
+    if (origin) return remoteFs(origin.surfaceId, event.sender, { op: 'readMarkdown', path: origin.relPath });
     return readMarkdownFile(filePath);
   });
 
@@ -1473,7 +1476,14 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   // Markdown editing (issue #116, F3). Re-stat only — backs the on-focus
   // "changed on disk?" check, which needs the mtime and not the content.
-  ipcMain.handle(IPC_CHANNELS.MARKDOWN_STAT_FILE, async (_event, filePath: string) => {
+  ipcMain.handle(IPC_CHANNELS.MARKDOWN_STAT_FILE, async (event, filePath: string) => {
+    // remotea: the server has no stat; a markdown read is small and answers the mtime.
+    const origin = remoteMarkdownOrigin(event.sender.id, filePath);
+    if (origin) {
+      const read = await remoteFs(origin.surfaceId, event.sender, { op: 'readMarkdown', path: origin.relPath }) as { mtimeMs?: number; error?: string; code?: string } | undefined;
+      if (!read || read.error || typeof read.mtimeMs !== 'number') return { error: read?.error ?? 'File not found', code: read?.code ?? 'not_found' };
+      return { mtimeMs: read.mtimeMs };
+    }
     return statMarkdownFile(filePath);
   });
 
@@ -1665,7 +1675,9 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
       const remote = remoteFs(surfaceId, event.sender, { op: 'readMarkdown', path: relOf(relPath) });
       if (remote) {
         const read = await remote;
-        if (read && typeof read === 'object' && !('error' in read)) grantRemoteFile(event.sender.id, surfaceId as string, relOf(relPath));
+        if (read && typeof read === 'object' && !('error' in read) && typeof (read as { filePath?: unknown }).filePath === 'string') {
+          grantRemoteMarkdown(event.sender.id, (read as { filePath: string }).filePath, surfaceId as string, relOf(relPath));
+        }
         return read;
       }
       const resolved = await resolveExplorerPath(surfaceId, relPath, event.sender, 'file');
@@ -1836,8 +1848,20 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(
     IPC_CHANNELS.MARKDOWN_SAVE_FILE,
     async (event, filePath: string, content: string, expectedMtimeMs?: number) => {
+      // remotea: a file opened from a remote pane's tree is written back on the
+      // server — same grant (recorded by that read), same mtime guard there.
+      const origin = remoteMarkdownOrigin(event.sender.id, filePath);
+      if (origin) {
+        const res = await remoteFs(origin.surfaceId, event.sender, {
+          op: 'write', path: origin.relPath, content: typeof content === 'string' ? content : '',
+          expectedMtimeMs: Number.isFinite(expectedMtimeMs) ? Number(expectedMtimeMs) : undefined,
+        }) as { mtimeMs?: number; error?: string; code?: string } | undefined;
+        if (res?.code === 'conflict') return { conflict: true, currentMtimeMs: 0 };
+        if (!res || res.error) return { error: res?.error ?? 'Could not save the file', code: res?.code ?? 'write_failed' };
+        return { ok: true, mtimeMs: res.mtimeMs ?? 0 };
+      }
       if (!isFilePathGranted(event.sender.id, filePath)) {
-        return { error: 'This file was not opened in wmux — use Save As', code: 'not_granted' };
+        return { error: 'This file was not opened in remotea — use Save As', code: 'not_granted' };
       }
       return writeMarkdownFile(filePath, content, expectedMtimeMs);
     },

@@ -6,9 +6,17 @@
  * - Claude Code: ~/.claude/settings.json, the exact entries the Windows app
  *   writes there (src/shared/claude-hooks.ts).
  * - Codex CLI: ~/.codex/hooks.json, the same helper with `--provider codex`.
- * - OpenCode: wmux's OpenCode plugin, ~/.config/opencode/plugin/wmux.js. It
- *   reports through the wmux CLI (`node $WMUX_CLI …`), which sessions are
- *   told about in hookEnv; the plugin does nothing outside a remotea pane.
+ * - OpenCode, pi and omp: wmux's plugin for each (~/.config/opencode/plugin,
+ *   ~/.pi/agent/extensions, ~/.omp/agent/extensions). They report through the
+ *   wmux CLI (`node $WMUX_CLI …`), which sessions are told about in hookEnv,
+ *   and do nothing outside a remotea pane.
+ * - Grok: ~/.grok/hooks/wmux.json, a file of wmux's own (Claude's hooks plus
+ *   Grok's two extra turn endings).
+ * - Qwen Code: ~/.qwen/settings.json, wmux's Qwen entries (`--provider qwen`).
+ * - Antigravity (agy): wmux's plugin directory, ~/.gemini/config/plugins/wmux.
+ *
+ * The same files the Windows app writes for its own agents, built by the same
+ * code (src/main/*-context.ts), pointed at this machine's copy of the helper.
  *
  * Only entries whose command runs `wmux-hook` are ours; every other hook (the
  * user's, herdr's, anything else) is left exactly as it was. The helper itself
@@ -19,6 +27,10 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { applyWmuxHooks, removeWmuxHooks } from '../../src/shared/claude-hooks';
+import { applyQwenHooks, removeQwenHooksFrom } from '../../src/main/qwen-context';
+import { buildGrokHooks } from '../../src/main/grok-context';
+import { ensureAgyPlugin, getAgyPluginDir, removeAgyPlugin } from '../../src/main/agy-context';
+import { isWmuxPluginFile } from '../../src/main/agent-plugin-file';
 import type { HookAgentStatus } from '../../src/shared/remote-host-protocol';
 
 const MARKER = 'wmux-hook';
@@ -118,42 +130,81 @@ function copyHelper(p: HookPaths): string {
   return path.join(p.cliDir, 'wmux-hook.js');
 }
 
-/** wmux's OpenCode plugin, which lives beside resources/cli. */
-const OPENCODE_MARKER = 'WmuxPlugin';
-function opencodePluginSource(p: HookPaths): string {
-  return path.resolve(p.sourceDir, '..', 'opencode-plugin', 'wmux.js');
-}
-function isOurOpencodePlugin(file: string): boolean {
+function readText(file: string): string | null {
   try {
-    return fs.readFileSync(file, 'utf8').includes(OPENCODE_MARKER);
+    return fs.readFileSync(file, 'utf8');
   } catch {
-    return false;
+    return null;
   }
 }
 
+/** A file wmux installed: the OpenCode plugin by its export, the others by their version marker. */
+function isOurPluginFile(file: string): boolean {
+  const text = readText(file);
+  return text !== null && (text.includes('WmuxPlugin') || isWmuxPluginFile(text));
+}
+
+/** Grok's hooks file is wmux's own; ours only while every command in it is the helper. */
+function isOurGrokFile(file: string): boolean {
+  let parsed: Json | null;
+  try {
+    parsed = readJson(file);
+  } catch {
+    return false;
+  }
+  const entries = Object.values((parsed?.hooks ?? {}) as Json).flat() as Array<{ hooks?: Array<{ command?: unknown }> }>;
+  return entries.length > 0 && entries.every((e) => Array.isArray(e?.hooks) && e.hooks.every((h) => typeof h?.command === 'string' && h.command.includes(MARKER)));
+}
+
+export type HookAgent = 'claude' | 'codex' | 'opencode' | 'pi' | 'omp' | 'grok' | 'qwen' | 'agy';
+
 export interface HookTarget {
-  agent: 'claude' | 'codex' | 'opencode';
+  agent: HookAgent;
   file: string;
   /** Present: the agent's config directory exists, so it is installed here. */
   present: boolean;
   entries: number;
 }
 
-function targets(p: HookPaths): Array<{ agent: HookTarget['agent']; file: string; dir: string }> {
+type Target =
+  /** Our entries merged into the agent's own settings file. */
+  | { agent: HookAgent; dir: string; file: string; kind: 'settings'; apply: (c: Json, script: string) => Json; remove: (c: Json) => Json }
+  /** A file of wmux's own, copied from resources/. */
+  | { agent: HookAgent; dir: string; file: string; kind: 'plugin'; source: string }
+  | { agent: HookAgent; dir: string; file: string; kind: 'grok' | 'agy' };
+
+function targets(p: HookPaths): Target[] {
+  const res = (...parts: string[]) => path.resolve(p.sourceDir, '..', ...parts);
+  const h = (...parts: string[]) => path.join(p.home, ...parts);
   return [
-    { agent: 'claude', dir: path.join(p.home, '.claude'), file: path.join(p.home, '.claude', 'settings.json') },
-    { agent: 'codex', dir: path.join(p.home, '.codex'), file: path.join(p.home, '.codex', 'hooks.json') },
-    { agent: 'opencode', dir: path.join(p.home, '.config', 'opencode'), file: path.join(p.home, '.config', 'opencode', 'plugin', 'wmux.js') },
+    { agent: 'claude', dir: h('.claude'), file: h('.claude', 'settings.json'), kind: 'settings', apply: applyWmuxHooks, remove: removeWmuxHooks },
+    { agent: 'codex', dir: h('.codex'), file: h('.codex', 'hooks.json'), kind: 'settings', apply: applyCodexHooks, remove: removeCodexHooks },
+    { agent: 'opencode', dir: h('.config', 'opencode'), file: h('.config', 'opencode', 'plugin', 'wmux.js'), kind: 'plugin', source: res('opencode-plugin', 'wmux.js') },
+    { agent: 'pi', dir: h('.pi'), file: h('.pi', 'agent', 'extensions', 'wmux.js'), kind: 'plugin', source: res('pi-extension', 'wmux.js') },
+    { agent: 'omp', dir: h('.omp'), file: h('.omp', 'agent', 'extensions', 'wmux.js'), kind: 'plugin', source: res('omp-extension', 'wmux.js') },
+    { agent: 'grok', dir: h('.grok'), file: h('.grok', 'hooks', 'wmux.json'), kind: 'grok' },
+    { agent: 'qwen', dir: h('.qwen'), file: h('.qwen', 'settings.json'), kind: 'settings', apply: applyQwenHooks, remove: removeQwenHooksFrom },
+    { agent: 'agy', dir: h('.gemini', 'antigravity-cli'), file: path.join(getAgyPluginDir(p.home), 'wmux-agy-hook.cjs'), kind: 'agy' },
   ];
 }
 
+function entriesOf(t: Target): number {
+  switch (t.kind) {
+    case 'settings':
+      try {
+        return countOurs(readJson(t.file));
+      } catch {
+        return 0; // not plain JSON (Qwen allows comments): not ours to read or write
+      }
+    case 'grok':
+      return isOurGrokFile(t.file) ? 1 : 0;
+    default:
+      return isOurPluginFile(t.file) ? 1 : 0;
+  }
+}
+
 export function hooksStatus(p: HookPaths = defaultHookPaths()): HookTarget[] {
-  return targets(p).map((t) => ({
-    agent: t.agent,
-    file: t.file,
-    present: fs.existsSync(t.dir),
-    entries: t.agent === 'opencode' ? (isOurOpencodePlugin(t.file) ? 1 : 0) : countOurs(readJson(t.file)),
-  }));
+  return targets(p).map((t) => ({ agent: t.agent, file: t.file, present: fs.existsSync(t.dir), entries: entriesOf(t) }));
 }
 
 /** Install for every agent whose config directory exists. Returns what was written. */
@@ -161,15 +212,34 @@ export function installHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
   const script = copyHelper(p);
   for (const t of targets(p)) {
     if (!fs.existsSync(t.dir)) continue;
-    if (t.agent === 'opencode') {
-      // A plugin file someone else put at that name is theirs: left alone.
-      if (fs.existsSync(t.file) && !isOurOpencodePlugin(t.file)) continue;
-      fs.mkdirSync(path.dirname(t.file), { recursive: true });
-      fs.copyFileSync(opencodePluginSource(p), t.file);
-      continue;
+    switch (t.kind) {
+      case 'settings': {
+        let current: Json | null;
+        try {
+          current = readJson(t.file);
+        } catch (err) {
+          // Claude's and Codex's files are plain JSON, so a bad one is worth
+          // stopping for; Qwen's may carry comments, and is left as it is.
+          if (t.agent === 'qwen') continue;
+          throw err;
+        }
+        writeJson(t.file, t.apply(current ?? {}, script));
+        break;
+      }
+      case 'plugin':
+        // A file someone else put at that name is theirs: left alone.
+        if (fs.existsSync(t.file) && !isOurPluginFile(t.file)) continue;
+        fs.mkdirSync(path.dirname(t.file), { recursive: true });
+        fs.copyFileSync(t.source, t.file);
+        break;
+      case 'grok':
+        if (fs.existsSync(t.file) && !isOurGrokFile(t.file)) continue;
+        writeJson(t.file, buildGrokHooks(script));
+        break;
+      case 'agy':
+        ensureAgyPlugin(p.home, path.resolve(p.sourceDir, '..', 'agy-plugin', 'wmux-agy-hook.cjs'));
+        break;
     }
-    const current = readJson(t.file) ?? {};
-    writeJson(t.file, t.agent === 'claude' ? applyWmuxHooks(current, script) : applyCodexHooks(current, script));
   }
   return hooksStatus(p);
 }
@@ -181,13 +251,22 @@ export function toAgentStatus(rows: HookTarget[]): HookAgentStatus[] {
 
 export function removeHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
   for (const t of targets(p)) {
-    if (t.agent === 'opencode') {
-      if (isOurOpencodePlugin(t.file)) fs.rmSync(t.file);
-      continue;
+    switch (t.kind) {
+      case 'settings': {
+        if (!entriesOf(t)) continue;
+        writeJson(t.file, t.remove(readJson(t.file)!));
+        break;
+      }
+      case 'plugin':
+        if (isOurPluginFile(t.file)) fs.rmSync(t.file);
+        break;
+      case 'grok':
+        if (isOurGrokFile(t.file)) fs.rmSync(t.file);
+        break;
+      case 'agy':
+        removeAgyPlugin(p.home);
+        break;
     }
-    const current = readJson(t.file);
-    if (!current || !countOurs(current)) continue;
-    writeJson(t.file, t.agent === 'claude' ? removeWmuxHooks(current) : removeCodexHooks(current));
   }
   return hooksStatus(p);
 }

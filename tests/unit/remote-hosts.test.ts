@@ -257,4 +257,18 @@ describe('remote file grants (code viewer write-back)', () => {
     clearFileGrants(7);
     expect(isRemoteFileGranted(7, 'surf-a', 'src/a.ts')).toBe(false);
   });
+
+  it('a remote markdown read remembers where its server path came from, for this window only', async () => {
+    const { grantRemoteMarkdown, remoteMarkdownOrigin, isRemoteFileGranted, isFilePathGranted, clearFileGrants } = await import('../../src/main/file-grants');
+    grantRemoteMarkdown(7, '/home/u/proj/docs/plan.md', 'surf-a', 'docs/plan.md');
+    expect(remoteMarkdownOrigin(7, '/home/u/proj/docs/plan.md')).toEqual({ surfaceId: 'surf-a', relPath: 'docs/plan.md' });
+    expect(isRemoteFileGranted(7, 'surf-a', 'docs/plan.md')).toBe(true);
+    // Never a local grant: the server path is not this machine's file.
+    expect(isFilePathGranted(7, '/home/u/proj/docs/plan.md')).toBe(false);
+    expect(remoteMarkdownOrigin(8, '/home/u/proj/docs/plan.md')).toBeUndefined();
+    expect(remoteMarkdownOrigin(7, '/home/u/proj/docs/other.md')).toBeUndefined();
+    expect(remoteMarkdownOrigin(7, 42)).toBeUndefined();
+    clearFileGrants(7);
+    expect(remoteMarkdownOrigin(7, '/home/u/proj/docs/plan.md')).toBeUndefined();
+  });
 });

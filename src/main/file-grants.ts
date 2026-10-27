@@ -82,6 +82,7 @@ export function isFilePathGranted(webContentsId: number, filePath: string): bool
 export function clearFileGrants(webContentsId: number): void {
   grants.delete(webContentsId);
   remoteGrants.delete(webContentsId);
+  remoteOrigins.delete(webContentsId);
 }
 
 /**
@@ -105,7 +106,32 @@ export function isRemoteFileGranted(webContentsId: number, surfaceId: string, re
   return remoteGrants.get(webContentsId)?.has(remoteKey(surfaceId, relPath)) ?? false;
 }
 
+/**
+ * The markdown viewer saves, re-stats and reloads by the path its read
+ * answered with — for a remote file, the path on the server, which means
+ * nothing to this machine's disk. Remembering where that path came from (pane
+ * and folder-relative path, as granted above) lets those three calls go back
+ * to the server instead. Only a jailed remote read records an origin.
+ */
+const remoteOrigins = new Map<number, Map<string, { surfaceId: string; relPath: string }>>();
+
+export function grantRemoteMarkdown(webContentsId: number, remotePath: string, surfaceId: string, relPath: string): void {
+  grantRemoteFile(webContentsId, surfaceId, relPath);
+  let map = remoteOrigins.get(webContentsId);
+  if (!map) {
+    map = new Map();
+    remoteOrigins.set(webContentsId, map);
+  }
+  map.set(remotePath, { surfaceId, relPath });
+}
+
+export function remoteMarkdownOrigin(webContentsId: number, filePath: unknown): { surfaceId: string; relPath: string } | undefined {
+  return typeof filePath === 'string' ? remoteOrigins.get(webContentsId)?.get(filePath) : undefined;
+}
+
 /** Test seam — the module-level map would otherwise leak between cases. */
 export function resetFileGrants(): void {
   grants.clear();
+  remoteGrants.clear();
+  remoteOrigins.clear();
 }

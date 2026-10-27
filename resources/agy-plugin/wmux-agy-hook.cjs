@@ -1,4 +1,4 @@
-// wmux-plugin-version: 1
+// wmux-plugin-version: 2
 // wmux plugin for the Antigravity CLI (agy) — tells wmux which conversation
 // each pane holds, so a restored tab can reopen it with `agy --conversation`.
 // Auto-installed by wmux to ~/.gemini/config/plugins/wmux/. Does nothing outside
@@ -60,16 +60,30 @@ function conversationToReport(raw, fired) {
   return typeof id === 'string' && CONVERSATION_ID_RE.test(id) ? id : null;
 }
 
+/**
+ * Where to send the report: wmux's named pipe, or — in a pane whose shell runs
+ * elsewhere (a devcontainer, a remotea session in WSL) — the TCP endpoint in
+ * WMUX_REMOTE, with its own token, the transport wmux-hook.js also speaks.
+ */
+function endpoint(e) {
+  const m = /^\[?([^\]]+?)\]?:(\d{1,5})$/.exec((e.WMUX_REMOTE || '').trim());
+  if (m) return { connect: { host: m[1], port: Number(m[2]) }, token: e.WMUX_REMOTE_TOKEN || '' };
+  const instance = (e.WMUX_INSTANCE || '').trim();
+  return {
+    connect: { path: e.WMUX_PIPE || '\\\\.\\pipe\\wmux' + (instance ? '-' + instance : '') },
+    token: e.WMUX_PIPE_TOKEN || '',
+  };
+}
+
 function report(conversationId) {
-  const instance = (env.WMUX_INSTANCE || '').trim();
-  const pipePath = env.WMUX_PIPE || '\\\\.\\pipe\\wmux' + (instance ? '-' + instance : '');
+  const target = endpoint(env);
   const frame = JSON.stringify({
     method: 'pane.report_agent_session',
     params: { surfaceId: env.WMUX_SURFACE_ID, sessionId: conversationId, provider: 'agy' },
     id: 1,
-    token: env.WMUX_PIPE_TOKEN || '',
+    token: target.token,
   });
-  const client = net.connect({ path: pipePath }, () => client.write(frame + '\n'));
+  const client = net.connect(target.connect, () => client.write(frame + '\n'));
   const deadline = setTimeout(() => { client.destroy(); finish(); }, PIPE_DEADLINE_MS);
   // The reply is the signal to leave; its content changes nothing here.
   client.on('data', () => { clearTimeout(deadline); client.destroy(); finish(); });
@@ -98,4 +112,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { conversationToReport, inWmuxPane };
+module.exports = { conversationToReport, inWmuxPane, endpoint };

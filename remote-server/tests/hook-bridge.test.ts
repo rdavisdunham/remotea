@@ -20,6 +20,7 @@ import { parseClientMsg } from '../../src/shared/remote-host-protocol';
 const SECRET = 'test-secret';
 const SURF = 'surf-hook-1';
 const HOOK_JS = path.resolve(__dirname, '..', '..', 'resources', 'cli', 'wmux-hook.js');
+const AGY_HOOK = path.resolve(__dirname, '..', '..', 'resources', 'agy-plugin', 'wmux-agy-hook.cjs');
 
 const cleanup: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -57,9 +58,9 @@ describe('hook bridge requests', () => {
 });
 
 /** Run the checked-in hook helper the way an agent does: env from hookEnv, payload on stdin. */
-function runHook(args: string[], env: Record<string, string>, payload: object): Promise<number> {
+function runHook(args: string[], env: Record<string, string>, payload: object, script = HOOK_JS): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [HOOK_JS, ...args], { env: { PATH: process.env.PATH ?? '', ...env }, stdio: ['pipe', 'ignore', 'inherit'] });
+    const child = spawn(process.execPath, [script, ...args], { env: { PATH: process.env.PATH ?? '', ...env }, stdio: ['pipe', 'ignore', 'inherit'] });
     child.on('error', reject);
     child.on('exit', (code) => resolve(code ?? -1));
     child.stdin.end(JSON.stringify(payload));
@@ -96,6 +97,19 @@ describe('wmux-hook.js through the bridge', () => {
     const sid = '019a0b1c-2d3e-7f40-8a5b-6c7d8e9f0a1b';
     expect(await runHook(['--event', 'PermissionRequest', '--provider', 'codex'], env, { session_id: sid, tool_name: 'shell' })).toBe(0);
     expect(relayed[0].params).toMatchObject({ event: 'Notification', notificationType: 'permission_prompt', provider: 'codex', sessionId: sid });
+  });
+
+  it('Qwen Code: the same helper, provider qwen', async () => {
+    const { relayed, env } = await bridge();
+    expect(await runHook(['--event', 'Stop', '--provider', 'qwen'], env, { session_id: 'q-1' })).toBe(0);
+    expect(relayed[0]).toMatchObject({ method: 'hook.event', params: { event: 'Stop' } });
+  });
+
+  it('Antigravity: wmux\'s agy hook reports the conversation over the bridge', async () => {
+    const { relayed, env } = await bridge();
+    const conv = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+    expect(await runHook(['SessionStart'], env, { conversationId: conv }, AGY_HOOK)).toBe(0);
+    expect(relayed).toEqual([{ id: SURF, method: 'pane.report_agent_session', params: { surfaceId: SURF, sessionId: conv, provider: 'agy' } }]);
   });
 
   it('outside a remotea session (no bridge in the environment) the helper leaves at once', async () => {
@@ -235,6 +249,49 @@ describe('hooks install', () => {
     expect(fs.readFileSync(plugin, 'utf8')).toBe('export const SomeoneElse = 1;\n');
     removeHooks(paths);
     expect(fs.existsSync(plugin)).toBe(true);
+  });
+
+  it('pi, omp, Grok, Qwen and agy: each gets wmux\'s own file or entries, and loses only those', () => {
+    const { home, paths } = tempHome();
+    const h = (...p: string[]) => path.join(home, ...p);
+    for (const d of [['.pi', 'agent'], ['.omp', 'agent'], ['.grok'], ['.qwen'], ['.gemini', 'antigravity-cli']]) fs.mkdirSync(h(...d), { recursive: true });
+    const qwen = { model: { name: 'qwen3-coder' }, hooks: { Stop: [{ hooks: [{ type: 'command', command: 'mine' }] }] } };
+    fs.writeFileSync(h('.qwen', 'settings.json'), JSON.stringify(qwen));
+    const rows = installHooks(paths);
+    for (const agent of ['pi', 'omp', 'grok', 'qwen', 'agy']) expect(rows.find((r) => r.agent === agent)).toMatchObject({ present: true });
+    expect(rows.filter((r) => r.entries > 0).map((r) => r.agent).sort()).toEqual(['agy', 'claude', 'codex', 'grok', 'omp', 'pi', 'qwen']);
+    const script = path.join(paths.cliDir, 'wmux-hook.js');
+    expect(fs.readFileSync(h('.pi', 'agent', 'extensions', 'wmux.js'), 'utf8')).toMatch(/wmux-plugin-version/);
+    expect(fs.readFileSync(h('.omp', 'agent', 'extensions', 'wmux.js'), 'utf8')).toMatch(/wmux-plugin-version/);
+    const grok = read(h('.grok', 'hooks', 'wmux.json'));
+    expect(grok.hooks.StopFailure[0].hooks[0].command).toBe(`node "${script}" --event StopFailure`);
+    const q = read(h('.qwen', 'settings.json'));
+    expect(q.model).toEqual(qwen.model);
+    expect(q.hooks.Stop.map((e: any) => e.hooks[0].command)).toEqual(['mine', `node ${script} --event Stop --provider qwen`]);
+    const agyDir = h('.gemini', 'config', 'plugins', 'wmux');
+    expect(fs.readdirSync(agyDir).sort()).toEqual(['hooks.json', 'plugin.json', 'wmux-agy-hook.cjs']);
+
+    removeHooks(paths);
+    expect(read(h('.qwen', 'settings.json'))).toEqual(qwen);
+    for (const f of [h('.pi', 'agent', 'extensions', 'wmux.js'), h('.omp', 'agent', 'extensions', 'wmux.js'), h('.grok', 'hooks', 'wmux.json'), path.join(agyDir, 'wmux-agy-hook.cjs')]) {
+      expect(fs.existsSync(f)).toBe(false);
+    }
+  });
+
+  it('leaves a Qwen settings file with comments, and a Grok hooks file of the user\'s, untouched', () => {
+    const { home, paths } = tempHome();
+    fs.mkdirSync(path.join(home, '.grok', 'hooks'), { recursive: true });
+    fs.mkdirSync(path.join(home, '.qwen'));
+    const commented = '{\n  // my settings\n  "model": {}\n}\n';
+    const userGrok = JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'say done' }] }] } });
+    fs.writeFileSync(path.join(home, '.qwen', 'settings.json'), commented);
+    fs.writeFileSync(path.join(home, '.grok', 'hooks', 'wmux.json'), userGrok);
+    const rows = installHooks(paths);
+    expect(rows.find((r) => r.agent === 'qwen')).toMatchObject({ present: true, entries: 0 });
+    expect(rows.find((r) => r.agent === 'grok')).toMatchObject({ present: true, entries: 0 });
+    removeHooks(paths);
+    expect(fs.readFileSync(path.join(home, '.qwen', 'settings.json'), 'utf8')).toBe(commented);
+    expect(fs.readFileSync(path.join(home, '.grok', 'hooks', 'wmux.json'), 'utf8')).toBe(userGrok);
   });
 
   it('skips an agent that is not installed', () => {

@@ -9,7 +9,9 @@ import { startRemoteHostStatus, useRemoteHosts } from '../remote-sessions/status
  * while the host's status says `hooks.prompt`; installing, "Not now" (this
  * run) and "Don't ask again" (this host) all clear that in every window.
  */
-const AGENT_LABELS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode' };
+const AGENT_LABELS: Record<string, string> = {
+  claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode', pi: 'pi', omp: 'omp', grok: 'Grok', qwen: 'Qwen Code', agy: 'Antigravity',
+};
 
 type Bridge = {
   installHooks(hostId: string): Promise<{ ok: boolean; error?: string }>;
