@@ -151,7 +151,9 @@ export type ClientMsg =
   | { t: 'theme'; fg: string; bg: string; cursor: string }
   | { t: 'ping'; n: number }
   /** App diagnostics for the server's log (only when welcome lists 'diag'). No terminal content. */
-  | { t: 'diag'; events: DiagEvent[] };
+  | { t: 'diag'; events: DiagEvent[] }
+  /** Register remotea's status hooks with the server's agents (welcome lists 'hooks'). The user asked for it in the app. */
+  | { t: 'hooksInstall'; rid: number };
 
 /**
  * One diagnostic event from an app: what happened, never what was on screen
@@ -166,7 +168,16 @@ export interface DiagEvent {
 }
 
 /** Features a server announces in `welcome`; an app uses a feature only when listed. */
-export type ServerFeature = 'rpc' | 'diag';
+export type ServerFeature = 'rpc' | 'diag' | 'hooks';
+
+/** Whether an agent CLI on the server reports its status to remotea (see `remotea hooks`). */
+export interface HookAgentStatus {
+  agent: string;
+  /** The agent is installed on the server (its config directory exists). */
+  present: boolean;
+  /** remotea's status hooks are registered with it. */
+  installed: boolean;
+}
 
 /**
  * Agent-status RPCs the server relays from a session's hook bridge to the apps
@@ -191,6 +202,8 @@ export type ServerMsg =
       t: 'welcome'; proto: number; serverId: string; bootId: string; epoch: string;
       hostname: string; you: DeviceId; groups: GroupRecord[]; sessions: SessionRecord[];
       features?: ServerFeature[];
+      /** With feature 'hooks': which agents on the server report their status. */
+      hooks?: HookAgentStatus[];
     }
   | {
       t: 'opened'; rid?: number; id: RemoteSurfaceId; mode: OpenMode; seq: number; fromSeq?: number;
@@ -214,6 +227,8 @@ export type ServerMsg =
    * do not notify again for something that happened earlier.
    */
   | { t: 'rpc'; id: RemoteSurfaceId; method: string; params: Record<string, unknown>; replay?: boolean }
+  /** The server's agents' hook state changed (an install from any device). */
+  | { t: 'hooksStatus'; hooks: HookAgentStatus[] }
   | { t: 'goingAway' }
   | { t: 'pong'; n: number; serverAt: number }
   | { t: 'error'; code: string; message: string };
@@ -392,6 +407,8 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
     case 'diag':
       return Array.isArray(m.events) && m.events.length <= LIMITS.maxDiagEvents && m.events.every(isDiagEvent)
         ? (m as unknown as ClientMsg) : null;
+    case 'hooksInstall':
+      return isRid(m.rid) ? (m as unknown as ClientMsg) : null;
     default:
       return null;
   }
@@ -400,7 +417,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
 const SERVER_TYPES = new Set([
   'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
   'sessionAdded', 'sessionUpdated', 'sessionClosed', 'groupUpserted', 'groupClosed',
-  'goingAway', 'pong', 'error', 'rpc',
+  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus',
 ]);
 
 /**

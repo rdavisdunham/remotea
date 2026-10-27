@@ -714,6 +714,8 @@ export const IPC_CHANNELS = {
   RHOST_TEST: 'rhost:test',
   RHOST_RECONNECT: 'rhost:reconnect',
   RHOST_STATUS: 'rhost:status',
+  RHOST_HOOKS_INSTALL: 'rhost:hooks-install',
+  RHOST_HOOKS_DISMISS: 'rhost:hooks-dismiss',
   RSESS_VIEWS: 'rsess:views',
   RSESS_REGISTRY: 'rsess:registry',
   RSESS_REPORT: 'rsess:report',

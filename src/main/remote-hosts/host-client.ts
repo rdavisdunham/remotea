@@ -25,6 +25,7 @@ import {
   type ClientMsg,
   type CreateSpec,
   type DiagEvent,
+  type HookAgentStatus,
   type GroupRecord,
   type RemoteSurfaceId,
   type ServerMsg,
@@ -81,6 +82,8 @@ export interface HostClientDeps {
   /** The registry mirror changed (welcome or any broadcast). */
   onRegistry?: () => void;
   onMeta?: (id: RemoteSurfaceId, meta: { cwd?: string; agent?: SessionRecord['agent'] | null }) => void;
+  /** True when the user declined the hook prompt for this host (forever, or for this run). */
+  hooksPromptDeclined?: () => boolean;
   /** An agent in a session attached here reported status (the server's hook bridge). */
   onRpc?: (id: RemoteSurfaceId, method: string, params: Record<string, unknown>, replay: boolean) => void;
   socket?: SocketFactory;
@@ -165,6 +168,8 @@ export class RemoteHostClient {
   readonly closedIds = new Set<string>();
   /** What the connected server offers (welcome.features); empty until welcome, and for older servers. */
   private features = new Set<string>();
+  /** The server's agents' hook state (welcome / hooksStatus); undefined for servers that do not report it. */
+  private hooks: HookAgentStatus[] | undefined;
 
   constructor(private readonly deps: HostClientDeps) {
     this.hostId = deps.hostId;
@@ -191,7 +196,22 @@ export class RemoteHostClient {
       nextRetryAt: this.fsm.state === 'reconnecting' || this.fsm.state === 'auth-failed' ? this.nextRetryAt : undefined,
       error: this.fsm.error,
       serverHostname: this.serverHostname,
+      hooks: this.hooks && {
+        agents: this.hooks,
+        prompt: this.ready && !(this.deps.hooksPromptDeclined?.() ?? false) && this.hooks.some((a) => a.present && !a.installed),
+      },
     };
+  }
+
+  /** Register the status hooks with the server's agents (the user said yes in the app). */
+  installHooks(): Promise<{ ok: boolean; error?: string }> {
+    if (!this.features.has('hooks')) return Promise.resolve({ ok: false, error: 'this server cannot install hooks; update it, or run `remotea hooks install` there' });
+    return this.request((rid) => ({ t: 'hooksInstall', rid }));
+  }
+
+  /** Something that decides `hooks.prompt` changed outside this client (the user dismissed the prompt). */
+  refreshStatus(): void {
+    this.deps.onStatus(this.status());
   }
 
   start(): void {
@@ -448,6 +468,11 @@ export class RemoteHostClient {
       case 'meta':
         this.deps.onMeta?.(msg.id, { cwd: msg.cwd, agent: msg.agent });
         return;
+      case 'hooksStatus':
+        this.hooks = msg.hooks;
+        diag('conn.hooks', { host: this.hostId, installed: msg.hooks.filter((a) => a.installed).map((a) => a.agent).join(',') });
+        this.deps.onStatus(this.status());
+        return;
       case 'rpc':
         // Only for a session this app has open; one it is not showing gets the
         // latest state replayed when (if) it opens it.
@@ -522,6 +547,7 @@ export class RemoteHostClient {
     this.epoch = msg.epoch;
     this.serverHostname = msg.hostname;
     this.features = new Set(msg.features ?? []);
+    this.hooks = msg.features?.includes('hooks') ? msg.hooks : undefined;
     diag('conn.welcome', { host: this.hostId, boot: msg.bootId.slice(0, 8), sessions: msg.sessions.length, features: (msg.features ?? []).join(',') });
     this.groups.clear();
     for (const g of msg.groups) this.groups.set(g.id, g);

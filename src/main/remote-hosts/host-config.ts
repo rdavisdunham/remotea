@@ -31,6 +31,8 @@ export interface StoredHost {
   tokenEnc?: string;
   /** Pinned on first successful connect; a different server at this URL fails closed. */
   serverId?: string;
+  /** The user chose "Don't ask again" on the agent-hooks prompt for this host. */
+  hooksPromptDeclined?: boolean;
 }
 
 function readJson<T>(file: string): T | null {
@@ -129,6 +131,13 @@ export class HostStore {
     const h = this.hosts.find((x) => x.id === id);
     if (!h || h.serverId === serverId) return;
     h.serverId = serverId;
+    this.persist();
+  }
+
+  declineHooksPrompt(id: string): void {
+    const h = this.hosts.find((x) => x.id === id);
+    if (!h || h.hooksPromptDeclined) return;
+    h.hooksPromptDeclined = true;
     this.persist();
   }
 

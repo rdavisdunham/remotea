@@ -12,7 +12,8 @@
  *             DevTools protocol on 127.0.0.1:9333 only while it runs.
  *   - server: transient systemd unit `remotea-test`, ports 7719 (+7720 hooks) on
  *             127.0.0.1 only, config ~/.config/remotea-test, logs
- *             ~/.local/state/remotea-test. Its sessions are real shells in WSL.
+ *             ~/.local/state/remotea-test. Its sessions are real shells in WSL;
+ *             agent hooks it installs go to ~/.local/state/remotea-test/hooks-home.
  *
  *   node scripts/desktop-test/harness.mjs <command>
  *     setup | sync          portable Node, copy the working tree, npm ci when the lockfile changed, build
@@ -47,6 +48,7 @@ const SERVER = { port: 7719, hookPort: 7720 };
 const HOST_NAME = 'test';
 const cfgDir = path.join(os.homedir(), '.config', 'remotea-test');
 const stateDir = path.join(os.homedir(), '.local', 'state', 'remotea-test');
+const hooksHome = path.join(stateDir, 'hooks-home');
 
 const say = (m) => console.error(`\x1b[1m${m}\x1b[0m`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -153,8 +155,15 @@ function serverStart() {
   const cfg = path.join(cfgDir, 'config.json');
   if (!fs.existsSync(cfg)) fs.writeFileSync(cfg, JSON.stringify({ port: SERVER.port, hookPort: SERVER.hookPort, bind: ['127.0.0.1'] }, null, 2) + '\n', { mode: 0o600 });
   execFileSync('npm', ['run', 'build'], { cwd: path.join(repo, 'remote-server'), stdio: ['ignore', 'ignore', 'inherit'] });
+  // Agent hook installs from the test app land in a scratch home with empty
+  // Claude Code and Codex settings, never in the real ~/.claude or ~/.codex.
+  for (const [dir, file] of [['.claude', 'settings.json'], ['.codex', 'hooks.json']]) {
+    fs.mkdirSync(path.join(hooksHome, dir), { recursive: true });
+    if (!fs.existsSync(path.join(hooksHome, dir, file))) fs.writeFileSync(path.join(hooksHome, dir, file), '{}\n');
+  }
   execFileSync('systemd-run', ['--user', '--unit=remotea-test', '--collect', '--quiet',
     `--setenv=REMOTEA_CONFIG_DIR=${cfgDir}`, `--setenv=REMOTEA_STATE_DIR=${stateDir}`, `--setenv=PATH=${process.env.PATH}`,
+    `--setenv=REMOTEA_HOOKS_HOME=${hooksHome}`,
     `--working-directory=${path.join(repo, 'remote-server')}`,
     process.execPath, path.join(repo, 'remote-server', 'dist', 'remote-server', 'src', 'main.js')], { stdio: 'inherit' });
   for (let i = 0; i < 50 && !fs.existsSync(path.join(cfgDir, 'token')); i++) execFileSync('sleep', ['0.1']);

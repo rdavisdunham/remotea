@@ -16,6 +16,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { applyWmuxHooks, removeWmuxHooks } from '../../src/shared/claude-hooks';
+import type { HookAgentStatus } from '../../src/shared/remote-host-protocol';
 
 const MARKER = 'wmux-hook';
 
@@ -31,7 +32,10 @@ export interface HookPaths {
 }
 
 export function defaultHookPaths(): HookPaths {
-  const home = os.homedir();
+  // REMOTEA_HOOKS_HOME: whose agent settings to manage. The desktop test
+  // harness points its test server at a scratch home so a test install never
+  // touches the real ~/.claude or ~/.codex.
+  const home = process.env.REMOTEA_HOOKS_HOME || os.homedir();
   const dataHome = process.env.XDG_DATA_HOME || path.join(home, '.local', 'share');
   return {
     home,
@@ -137,6 +141,11 @@ export function installHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
     writeJson(t.file, t.agent === 'claude' ? applyWmuxHooks(current, script) : applyCodexHooks(current, script));
   }
   return hooksStatus(p);
+}
+
+/** The protocol's view: which agents are here, and whether they report to remotea. */
+export function toAgentStatus(rows: HookTarget[]): HookAgentStatus[] {
+  return rows.map((r) => ({ agent: r.agent, present: r.present, installed: r.present && r.entries > 0 }));
 }
 
 export function removeHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {

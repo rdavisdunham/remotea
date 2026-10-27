@@ -791,6 +791,11 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(IPC_CHANNELS.RHOST_REMOVE, (_event, id: string) => remoteHosts.remove(String(id)));
   ipcMain.handle(IPC_CHANNELS.RHOST_TEST, (_event, req: { url: string; token?: string; id?: string }) => remoteHosts.test(req));
   ipcMain.on(IPC_CHANNELS.RHOST_RECONNECT, () => remoteHosts.wakeAll());
+  ipcMain.handle(IPC_CHANNELS.RHOST_HOOKS_INSTALL, (_event, hostId: unknown) =>
+    typeof hostId === 'string' ? remoteHosts.installHooks(hostId) : { ok: false, error: 'bad host' });
+  ipcMain.on(IPC_CHANNELS.RHOST_HOOKS_DISMISS, (_event, hostId: unknown, forever: unknown) => {
+    if (typeof hostId === 'string') remoteHosts.dismissHooksPrompt(hostId, forever === true);
+  });
   ipcMain.handle(IPC_CHANNELS.RSESS_VIEWS, () => remoteHosts.views());
   ipcMain.on(IPC_CHANNELS.RSESS_REPORT, (event, r: { ready?: unknown; surfaceIds?: unknown }) => {
     const wc = event.sender;

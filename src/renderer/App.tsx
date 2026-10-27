@@ -30,6 +30,7 @@ import { useBlockedAlert } from './hooks/useBlockedAlert';
 import type { AgentRosterEntry } from './store/agent-rollup';
 import ShortcutCheatSheet from './components/CheatSheet/ShortcutCheatSheet';
 import ConfirmCloseDialog from './components/ConfirmCloseDialog';
+import RemoteHooksPrompt from './components/RemoteHooksPrompt';
 import ConfirmWorktreeCloseDialog from './components/ConfirmWorktreeCloseDialog';
 import SaveLayoutDialog from './components/SaveLayoutDialog';
 import ConfirmCloseSurfaceDialog from './components/ConfirmCloseSurfaceDialog';
@@ -2044,6 +2045,7 @@ export default function App() {
       {cheatSheetOpen && <ShortcutCheatSheet onClose={closeCheatSheet} />}
 
       <ConfirmCloseDialog />
+      <RemoteHooksPrompt />
       <ConfirmWorktreeCloseDialog />
       <ConfirmCloseSurfaceDialog />
       <SaveLayoutDialog />

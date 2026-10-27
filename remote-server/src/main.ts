@@ -13,6 +13,7 @@ import { RemoteaServer } from './server';
 import { spawnPty } from './pty-spawn';
 import { HookBridge, hookEnv } from './hook-bridge';
 import { DiagLog, diagDir } from './diag-log';
+import { hooksStatus, installHooks, toAgentStatus } from './hooks-install';
 
 const DAY = 24 * 60 * 60 * 1000;
 const BIND_RETRY_MS = 5_000;
@@ -47,6 +48,7 @@ async function main(): Promise<void> {
     log,
     sessionEnv: config.hookPort ? (id) => hookEnv(hookSecret, config.hookPort, id) : undefined,
     diag: (device, events) => diag.write(device, events),
+    hooks: { status: () => toAgentStatus(hooksStatus()), install: () => toAgentStatus(installHooks()) },
   });
   const bridge = new HookBridge({ secret: hookSecret, relay: (id, method, params) => hub.relayRpc(id, method, params), log });
   if (config.hookPort) {

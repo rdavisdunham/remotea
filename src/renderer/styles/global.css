@@ -156,6 +156,24 @@ html.wmux-transparent #root {
   background: rgba(179, 38, 30, 0.35);
 }
 
+.confirm-dialog__btn--primary {
+  border-color: var(--ui-accent);
+  background: color-mix(in srgb, var(--ui-accent) 22%, transparent);
+}
+
+.confirm-dialog__btn--primary:hover {
+  background: color-mix(in srgb, var(--ui-accent) 40%, transparent);
+}
+
+.confirm-dialog__btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.confirm-dialog__error {
+  color: #e5534b;
+}
+
 /* Broadcast-input mode banner (issue #64) — pinned bottom-center while typing
    fans out to every terminal pane in the workspace (tmux synchronize-panes). */
 .broadcast-input-banner {

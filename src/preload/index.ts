@@ -82,6 +82,9 @@ contextBridge.exposeInMainWorld('wmux', {
     remove: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_REMOVE, id) as Promise<boolean>,
     test: (req: { url: string; token?: string; id?: string }) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_TEST, req) as Promise<HostTestResult>,
     reconnect: () => ipcRenderer.send(IPC_CHANNELS.RHOST_RECONNECT),
+    // Agent status hooks on a host's server: install them there, or stop asking.
+    installHooks: (hostId: string) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_HOOKS_INSTALL, hostId) as Promise<{ ok: boolean; error?: string }>,
+    dismissHooksPrompt: (hostId: string, forever: boolean) => ipcRenderer.send(IPC_CHANNELS.RHOST_HOOKS_DISMISS, hostId, forever),
     onStatus: (callback: (status: HostStatus) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, status: HostStatus) => callback(status);
       ipcRenderer.on(IPC_CHANNELS.RHOST_STATUS, handler);

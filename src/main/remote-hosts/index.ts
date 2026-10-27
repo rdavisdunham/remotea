@@ -33,6 +33,8 @@ export class RemoteHosts {
   private readonly log: (msg: string) => void;
   private registryTimer: NodeJS.Timeout | null = null;
   private diagTimer: NodeJS.Timeout | null = null;
+  /** Hosts whose agent-hooks prompt the user put off for this run ("Not now"). */
+  private readonly hooksNotNow = new Set<string>();
   private metaListener: ((surfaceId: string, meta: { cwd?: string }) => void) | undefined;
   private rpcListener: ((surfaceId: string, method: string, params: Record<string, unknown>, replay: boolean) => void) | undefined;
   /** Per renderer window: whether its layout is restored, and the remote tabs it shows. */
@@ -80,6 +82,7 @@ export class RemoteHosts {
         onRegistry: () => this.registryChanged(),
         onMeta: (id, meta) => this.metaListener?.(id, meta),
         onRpc: (id, method, params, replay) => this.rpcListener?.(id, method, params, replay),
+        hooksPromptDeclined: () => this.hooksNotNow.has(host.id) || !!this.store.get(host.id)?.hooksPromptDeclined,
         socket: this.deps.socket,
         log: this.log,
       });
@@ -131,6 +134,24 @@ export class RemoteHosts {
       client.start();
     }
     return this.dto(host);
+  }
+
+  /** The user said yes to the agent-hooks prompt: the server installs them. */
+  async installHooks(hostId: string): Promise<{ ok: boolean; error?: string }> {
+    const client = this.clients.get(hostId);
+    if (!client?.ready) return { ok: false, error: 'not connected' };
+    diag('hooks.install', { host: hostId });
+    const res = await client.installHooks();
+    diag('hooks.installed', { host: hostId, ok: res.ok, error: res.error ?? null });
+    return res;
+  }
+
+  /** "Not now" (this run) or "Don't ask again" (remembered for this host). */
+  dismissHooksPrompt(hostId: string, forever: boolean): void {
+    if (forever) this.store.declineHooksPrompt(hostId);
+    else this.hooksNotNow.add(hostId);
+    diag('hooks.dismissed', { host: hostId, forever });
+    this.clients.get(hostId)?.refreshStatus();
   }
 
   remove(id: string): boolean {

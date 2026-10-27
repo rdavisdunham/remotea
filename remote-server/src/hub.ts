@@ -13,6 +13,8 @@ import {
   type ClientMsg,
   type DiagEvent,
   type GroupId,
+  type HookAgentStatus,
+  type ServerFeature,
   type LostInfo,
   type ProbeStatus,
   type RemoteSurfaceId,
@@ -74,6 +76,8 @@ export interface HubDeps {
   sessionEnv?: (id: string) => Record<string, string>;
   /** Where app diagnostics go; absent = the server does not offer 'diag'. */
   diag?: (device: { id: string; name: string }, events: DiagEvent[]) => void;
+  /** The agents' status hooks (hooks-install.ts); absent = the server does not offer 'hooks'. */
+  hooks?: { status(): HookAgentStatus[]; install(): HookAgentStatus[] };
 }
 
 export interface HubConn extends ConnLike {
@@ -154,6 +158,40 @@ export class Hub {
       case 'diag':
         this.deps.diag?.(conn.device, msg.events);
         return;
+      case 'hooksInstall':
+        return this.installHooks(conn, msg.rid);
+    }
+  }
+
+  private features(): ServerFeature[] {
+    const f: ServerFeature[] = ['rpc'];
+    if (this.deps.diag) f.push('diag');
+    if (this.deps.hooks) f.push('hooks');
+    return f;
+  }
+
+  private hookStatus(): HookAgentStatus[] | undefined {
+    try {
+      return this.deps.hooks?.status();
+    } catch (err) {
+      this.log(`hooks status: ${(err as Error).message}`);
+      return undefined;
+    }
+  }
+
+  /** The user asked, in an app, for the agents' status hooks: install, and tell every device. */
+  private installHooks(conn: HubConn, rid: number): void {
+    if (!this.deps.hooks) {
+      conn.sendJson({ t: 'ack', rid, ok: false, error: 'this server cannot install hooks' });
+      return;
+    }
+    try {
+      const hooks = this.deps.hooks.install();
+      this.log(`agent hooks installed at the request of ${conn.device?.name}`);
+      this.broadcast({ t: 'hooksStatus', hooks });
+      conn.sendJson({ t: 'ack', rid, ok: true });
+    } catch (err) {
+      conn.sendJson({ t: 'ack', rid, ok: false, error: (err as Error).message });
     }
   }
 
@@ -193,7 +231,8 @@ export class Hub {
       you: msg.device.id,
       groups: this.registry.groups(),
       sessions: this.registry.sessions(),
-      features: this.deps.diag ? ['rpc', 'diag'] : ['rpc'],
+      features: this.features(),
+      hooks: this.hookStatus(),
     });
     this.log(`hello from ${msg.device.name} (${msg.device.id}) ${msg.app.name} ${msg.app.version}`);
   }

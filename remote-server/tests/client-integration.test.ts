@@ -33,12 +33,12 @@ afterEach(async () => {
   while (cleanup.length) await cleanup.pop()!();
 });
 
-async function startServer(opts: { port?: number; registryFile?: string; bootId?: string; ringBytes?: number } = {}): Promise<Rig> {
+async function startServer(opts: { port?: number; registryFile?: string; bootId?: string; ringBytes?: number; hooks?: ConstructorParameters<typeof Hub>[0]['hooks'] } = {}): Promise<Rig> {
   const registryFile = opts.registryFile ?? path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-int-')), 'registry.json');
   const bootId = opts.bootId ?? `boot-${Math.random().toString(36).slice(2)}`;
   const registry = Registry.load({ file: registryFile, bootId, saveDebounceMs: 1 });
   const sp = fakeSpawner();
-  const hub = new Hub({ registry, spawn: sp.spawn, bootId, serverId: 'srv-int', probe: () => ({}), config: { ringBytes: opts.ringBytes ?? 1 << 20 } });
+  const hub = new Hub({ registry, spawn: sp.spawn, bootId, serverId: 'srv-int', probe: () => ({}), config: { ringBytes: opts.ringBytes ?? 1 << 20 }, hooks: opts.hooks });
   const server = new RemoteaServer({ hub, token: () => TOKEN });
   const port = await server.listen('127.0.0.1', opts.port ?? 0);
   const rig = { server, hub, sp, port, registryFile };
@@ -49,7 +49,7 @@ async function startServer(opts: { port?: number; registryFile?: string; bootId?
   return rig;
 }
 
-function makeClient(port: number, deviceId: string, token = TOKEN) {
+function makeClient(port: number, deviceId: string, token = TOKEN, hooksPromptDeclined?: () => boolean) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-client-'));
   const statuses: HostStatus[] = [];
   const rpcs: Array<{ id: string; method: string; params: Record<string, unknown>; replay: boolean }> = [];
@@ -67,6 +67,7 @@ function makeClient(port: number, deviceId: string, token = TOKEN) {
     intents: new PendingIntents(path.join(dir, 'pending.json')),
     onStatus: (s) => statuses.push(s),
     onRpc: (id, method, params, replay) => rpcs.push({ id, method, params, replay }),
+    hooksPromptDeclined,
   });
   cleanup.push(() => client.stop());
   return { client, statuses, rpcs, pin: (id: string | undefined) => (pinned = id) };
@@ -108,6 +109,35 @@ describe('RemoteHostClient against a real server', () => {
     await waitFor(() => io.text().includes('hello from the server'));
     client.write('surf-int-1', 'ls\r');
     await waitFor(() => rig.sp.last().written.includes('ls\r'));
+  });
+
+  it('asks about agent hooks only while an agent lacks them and the user has not declined', async () => {
+    let installed = false;
+    const hooks = {
+      status: () => [{ agent: 'claude', present: true, installed }, { agent: 'codex', present: false, installed: false }],
+      install: () => { installed = true; return hooks.status(); },
+    };
+    const rig = await startServer({ hooks });
+    let declined = false;
+    const { client, statuses } = makeClient(rig.port, 'device-alpha11', TOKEN, () => declined);
+    client.start();
+    await waitFor(() => client.ready);
+    expect(client.status().hooks).toMatchObject({ prompt: true, agents: [{ agent: 'claude', installed: false }, { agent: 'codex', present: false }] });
+    declined = true;
+    expect(client.status().hooks?.prompt).toBe(false);
+    declined = false;
+    expect(await client.installHooks()).toEqual({ ok: true, error: undefined });
+    await waitFor(() => statuses.at(-1)?.hooks?.agents[0].installed === true);
+    expect(statuses.at(-1)!.hooks!.prompt).toBe(false);
+  });
+
+  it('an older server (no hooks feature) never prompts, and install says why', async () => {
+    const rig = await startServer();
+    const { client } = makeClient(rig.port, 'device-alpha12');
+    client.start();
+    await waitFor(() => client.ready);
+    expect(client.status().hooks).toBeUndefined();
+    expect((await client.installHooks()).ok).toBe(false);
   });
 
   it('resnapshot sends the current screen through onResync (a renderer that reloaded)', async () => {

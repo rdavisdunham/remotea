@@ -264,3 +264,43 @@ describe('diagnostics', () => {
     expect(all.find((e) => e.kind === 'diag.dropped')?.data.count).toBe(1001);
   });
 });
+
+describe('hook status for the app\'s prompt', () => {
+  it('welcome reports each agent\'s hooks; an install from one device updates every device', () => {
+    let installed = false;
+    const hooks = {
+      status: () => [{ agent: 'claude', present: true, installed }, { agent: 'codex', present: false, installed: false }],
+      install: () => { installed = true; return hooks.status(); },
+    };
+    const hub = new Hub({ registry: Registry.load({ file: null, bootId: 'b' }), spawn: fakeSpawner().spawn, bootId: 'b', serverId: 's', timers: new ManualTimers(), probe: () => ({}), hooks });
+    const connect = (id: number, dev: string) => {
+      const c = new FakeConn(id);
+      hub.connect(c);
+      hub.handle(c, { t: 'hello', proto: 1, device: { id: dev, name: dev }, app: { name: 't', version: '0' } });
+      return c;
+    };
+    const a = connect(1, 'device-aaaaaaaa');
+    const b = connect(2, 'device-bbbbbbbb');
+    expect(a.json('welcome')[0]).toMatchObject({ features: ['rpc', 'hooks'], hooks: [{ agent: 'claude', present: true, installed: false }, { agent: 'codex', present: false }] });
+    expect(parseClientMsg({ t: 'hooksInstall', rid: 4 })).not.toBeNull();
+    hub.handle(a, { t: 'hooksInstall', rid: 4 });
+    expect(a.json('ack').at(-1)).toEqual({ t: 'ack', rid: 4, ok: true });
+    expect(b.json('hooksStatus').at(-1)!.hooks[0]).toEqual({ agent: 'claude', present: true, installed: true });
+  });
+
+  it('a failed install is reported to the asking device; a server without the feature says so', () => {
+    const failing = { status: () => [], install: () => { throw new Error('settings.json is not valid JSON'); } };
+    const mk = (hooks?: typeof failing) => {
+      const hub = new Hub({ registry: Registry.load({ file: null, bootId: 'b' }), spawn: fakeSpawner().spawn, bootId: 'b', serverId: 's', timers: new ManualTimers(), probe: () => ({}), hooks });
+      const c = new FakeConn(1);
+      hub.connect(c);
+      hub.handle(c, { t: 'hello', proto: 1, device: { id: 'device-aaaaaaaa', name: 'a' }, app: { name: 't', version: '0' } });
+      hub.handle(c, { t: 'hooksInstall', rid: 9 });
+      return c;
+    };
+    expect(mk(failing).json('ack')[0]).toMatchObject({ ok: false, error: 'settings.json is not valid JSON' });
+    const old = mk();
+    expect(old.json('welcome')[0].hooks).toBeUndefined();
+    expect(old.json('ack')[0]).toMatchObject({ ok: false });
+  });
+});

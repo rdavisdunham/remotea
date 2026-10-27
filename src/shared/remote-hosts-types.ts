@@ -2,7 +2,7 @@
  * Remote-host data that crosses main <-> renderer. The token never does:
  * the renderer can set one (write-only) and learn whether one is stored.
  */
-import type { GroupRecord, LostInfo, SessionRecord } from './remote-host-protocol';
+import type { GroupRecord, HookAgentStatus, LostInfo, SessionRecord } from './remote-host-protocol';
 
 export type HostConnState =
   | 'disabled'      // no token yet, or switched off
@@ -23,6 +23,12 @@ export interface HostStatus {
   error?: string;
   /** The server's own hostname, once connected. */
   serverHostname?: string;
+  /** Agent status hooks on the server (servers that report them). */
+  hooks?: {
+    agents: HookAgentStatus[];
+    /** Ask the user to install them: an agent there lacks them, and the user has not declined for this host. */
+    prompt: boolean;
+  };
 }
 
 export interface HostDTO {
