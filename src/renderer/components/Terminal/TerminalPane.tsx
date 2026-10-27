@@ -6,6 +6,9 @@ import PinnedPrompt from './PinnedPrompt';
 import PromptOutline from './PromptOutline';
 import NewOutputPill from './NewOutputPill';
 import ResetNotice from './ResetNotice';
+import RemoteOverlay from './RemoteOverlay';
+import { useStore } from '../../store';
+import { parseRemoteShellSpec } from '../../../shared/remote-shell-spec';
 import '../../styles/terminal.css';
 import '../../styles/prompt-marks.css';
 
@@ -64,6 +67,10 @@ export default function TerminalPane({
   attachGeneration,
 }: TerminalPaneProps) {
   const { terminalRef, searchAddonRef, xtermRef } = useTerminal({ surfaceId, shell, cwd, visible, focused, attachGeneration, colorScheme, startupCommands, env, claudeSessionId, codexSessionId, opencodeSessionId, agySessionId, qwenSessionId, ompSessionId });
+
+  // remotea: which remote host backs this pane, if any (same resolution as the spawn).
+  const defaultShell = useStore((s) => s.workspacePrefs.defaultShell);
+  const remoteHostId = parseRemoteShellSpec(shell || defaultShell)?.hostId;
 
   const [_lastQuery, setLastQuery] = useState('');
 
@@ -136,6 +143,7 @@ export default function TerminalPane({
   return (
     <div className={`terminal-pane ${focused ? 'terminal-pane--focused' : ''}`}>
       <div ref={terminalRef} className="terminal-pane__container" />
+      {remoteHostId && <RemoteOverlay hostId={remoteHostId} />}
       {/* Prompt-log views (issue #207). All three are absolutely positioned over
           the container, never flow siblings of it: a flow sibling would be
           pushed out of the container's height:100% box WITHOUT firing the

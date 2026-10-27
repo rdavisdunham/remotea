@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents } from 'electron';
+import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents, safeStorage } from 'electron';
 import * as path from 'path';
 import { promises as fsp } from 'fs';
 import { IPC_CHANNELS, SurfaceId, WindowId, WorkspaceId, AgentId, type InsertionResult, type ExplorerListError } from '../shared/types';
@@ -6,6 +6,10 @@ import { observePtyData, clearActivity } from './claude-observer';
 import { createPtyDataBatcher } from './pty-data-batcher';
 import { clearAgentState, noteHumanInput, listAgentStates } from './agent-state';
 import { PtyManager } from './pty-manager';
+import { TerminalRouter } from './terminal-router';
+import { RemoteHosts } from './remote-hosts';
+import { isRemoteShellSpec, parseRemoteShellSpec } from '../shared/remote-shell-spec';
+import type { HostSaveRequest } from '../shared/remote-hosts-types';
 import { PtyLedger, reapOrphans } from './pty-ledger';
 import { SshDetector } from './ssh-detect';
 import { agentIdentity } from './agent-identity';
@@ -87,10 +91,27 @@ import { readGuestHistory } from './browser-history-restore';
 const ptyLedger = new PtyLedger(path.join(getAppDataDir(), 'pty-ledger.json'));
 const orphanCandidates = ptyLedger.takeOver();
 
-const ptyManager = new PtyManager(ptyLedger);
+const localPty = new PtyManager(ptyLedger);
+// remotea: terminals backed by a remote session server (shell `remote:<host>`).
+// Started from index.ts once the app is ready; see src/main/remote-hosts/.
+const remoteHosts = new RemoteHosts({
+  dataDir: getAppDataDir(),
+  box: safeStorage,
+  appVersion: app.getVersion(),
+  broadcast: (channel, ...args) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(channel, ...args);
+    }
+  },
+  log: (msg) => console.log(`[remote-hosts] ${msg}`),
+});
+// Same method names as PtyManager, so every existing call site routes local
+// and remote surfaces alike; see terminal-router.ts for where they differ.
+const ptyManager = new TerminalRouter(localPty, remoteHosts);
 const notificationManager = new NotificationManager();
 const cdpBridge = new CDPBridge();
-const agentManager = new AgentManager(ptyManager);
+// `wmux agent spawn` panes are always local (they need a synchronous spawn).
+const agentManager = new AgentManager(localPty);
 const insertionQueue = new SurfaceInsertionQueue();
 const surfaceOwners = new Map<SurfaceId, number>();
 const observedWebContents = new Set<number>();
@@ -175,6 +196,8 @@ function ownSurface(surfaceId: SurfaceId, webContents: Electron.WebContents): vo
       if (ownerId !== webContents.id) continue;
       surfaceOwners.delete(ownedSurfaceId);
       insertionQueue.cancel(ownedSurfaceId);
+      // A remote terminal outlives its window: stop streaming it here, keep it running.
+      ptyManager.release(ownedSurfaceId);
     }
   });
 }
@@ -591,14 +614,24 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   ipcMain.handle(IPC_CHANNELS.PTY_CREATE, async (_event, options) => {
     try {
-      const resolvedOptions = {
-        ...options,
-        cwd: options.cwd || process.env.USERPROFILE || 'C:\\',
-        // A renderer's env is a surface's (#284): valid keys only, never a
-        // WMUX_* identity key, `${env:NAME}` resolved here and only here.
-        env: resolveSurfaceEnv(options?.env, process.env),
-      };
-      const created = ptyManager.create(resolvedOptions);
+      const remote = isRemoteShellSpec(options?.shell);
+      const resolvedOptions = remote
+        ? {
+            // A remote session runs on the server: no Windows cwd fallback, and
+            // none of this machine's environment (which may hold secrets) travels.
+            ...options,
+            cwd: options.cwd || '',
+            env: {},
+          }
+        : {
+            ...options,
+            cwd: options.cwd || process.env.USERPROFILE || 'C:\\',
+            // A renderer's env is a surface's (#284): valid keys only, never a
+            // WMUX_* identity key, `${env:NAME}` resolved here and only here.
+            env: resolveSurfaceEnv(options?.env, process.env),
+          };
+      const created = await ptyManager.create(resolvedOptions);
+      if (created.unavailable) return created;
       const id = created.id;
       const existingOwner = surfaceOwners.get(id);
       // StrictMode may repeat create from the same renderer, and a replacement
@@ -621,12 +654,13 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
         // Keep this mutation behind the ownership decision: a different window
         // can call idempotent PTY_CREATE with a known id, but must not rewrite
         // where the legitimate owner's next file upload will go.
-        sshDetector.setSurfaceShell(id, resolvedOptions.shell, created.shell, resolvedOptions.cwd);
+        if (!remote) sshDetector.setSurfaceShell(id, resolvedOptions.shell, created.shell, resolvedOptions.cwd);
         // Same spec, same reason: `wmux agent spawn --cmd claude` and
         // `--shell "claude --resume"` put the agent's own command line here, so
         // this pane IS that agent for as long as it lives. Pure string work —
         // nothing added to the synchronous create path's budget (issue #176).
-        agentIdentity.setSurfaceShell(id, resolvedOptions.shell);
+        // A remote spec contributes only its command (`remote:desk claude` → claude).
+        agentIdentity.setSurfaceShell(id, remote ? parseRemoteShellSpec(resolvedOptions.shell)?.command ?? '' : resolvedOptions.shell);
       }
       // Reused PTY (idempotent create — e.g. StrictMode's double create() race):
       // the original create already wired data/exit forwarding. Re-wiring here
@@ -656,7 +690,16 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
       // which bytes came first (#254). Last-wins across forwarders.
       if (window) bindRemoteSurface(id, window.webContents);
       const unsubData = ptyManager.onData(id, (data) => batcher.push(data));
-      const unsubExit = ptyManager.onExit(id, (code) => {
+      // remotea: after a reconnect that missed too much, the server sends a
+      // fresh screen. Flush first so no older byte lands on top of it.
+      const unsubResync = ptyManager.onResync(id, (snapshot) => {
+        batcher.flush();
+        if (window && !window.isDestroyed()) {
+          window.webContents.send(IPC_CHANNELS.PTY_RESYNC, id, snapshot);
+        }
+        remoteTaps.noteResize(id);
+      });
+      const unsubExit = ptyManager.onExit(id, (code, info) => {
         // Trailing output must land before the exit notification, or the
         // renderer paints the exit over bytes still sitting in the window.
         batcher.flush();
@@ -666,8 +709,9 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
         remoteTaps.exit(id, code);
         unbindRemoteSurface(id);
         if (window && !window.isDestroyed()) {
-          window.webContents.send(IPC_CHANNELS.PTY_EXIT, id, code);
+          window.webContents.send(IPC_CHANNELS.PTY_EXIT, id, code, info);
         }
+        unsubResync();
         // The process that owned this surface is gone, so any state it declared
         // is now a lie. Drop it rather than leave a `working`/`blocked` pane
         // pointing at a dead PID (issue #128); the observer's scraped activity
@@ -710,10 +754,30 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     remoteTaps.noteResize(id);
   });
 
-  ipcMain.on(IPC_CHANNELS.PTY_KILL, (_event, id: SurfaceId) => {
-    ptyManager.kill(id);
+  ipcMain.on(IPC_CHANNELS.PTY_KILL, (_event, id: SurfaceId, shellSpec?: unknown) => {
+    // Remote: closes the session on the server for every device (queued if offline).
+    ptyManager.kill(id, typeof shellSpec === 'string' ? shellSpec : undefined);
     forgetSurface(id);
   });
+
+  // remotea: the user is looking at (focused) this terminal — on a remote one,
+  // this device takes control of its size.
+  ipcMain.on(IPC_CHANNELS.PTY_FOCUS, (_event, id: SurfaceId) => {
+    ptyManager.claim(id);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.RHOST_LIST, () => remoteHosts.list());
+  ipcMain.handle(IPC_CHANNELS.RHOST_SAVE, (_event, req: HostSaveRequest) => {
+    try {
+      return { ok: true, host: remoteHosts.save(req) };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  });
+  ipcMain.handle(IPC_CHANNELS.RHOST_REMOVE, (_event, id: string) => remoteHosts.remove(String(id)));
+  ipcMain.handle(IPC_CHANNELS.RHOST_TEST, (_event, req: { url: string; token?: string; id?: string }) => remoteHosts.test(req));
+  ipcMain.on(IPC_CHANNELS.RHOST_RECONNECT, () => remoteHosts.wakeAll());
+  ipcMain.handle(IPC_CHANNELS.RSESS_VIEWS, () => remoteHosts.views());
 
   ipcMain.handle(IPC_CHANNELS.PTY_HAS, (_event, id: SurfaceId) => {
     return ptyManager.has(id);
@@ -1844,4 +1908,4 @@ export function setupAgentPtyForwarding(surfaceId: string, window: BrowserWindow
   });
 }
 
-export { ptyManager, cdpBridge, agentManager };
+export { ptyManager, localPty, remoteHosts, cdpBridge, agentManager };

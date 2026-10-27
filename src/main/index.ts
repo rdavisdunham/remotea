@@ -1,5 +1,5 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
-import { registerIpcHandlers, agentManager, ptyManager, setupAgentPtyForwarding, reapOrphanedPtys, sshDetector, agentIdentity, replayRemoteBindings } from './ipc-handlers';
+import { app, BrowserWindow, ipcMain, powerMonitor, session, shell } from 'electron';
+import { registerIpcHandlers, agentManager, ptyManager, remoteHosts, setupAgentPtyForwarding, reapOrphanedPtys, sshDetector, agentIdentity, replayRemoteBindings } from './ipc-handlers';
 import { sequenceFrom, splitSequencedReport } from './ssh-detect';
 import { handleDetectionV2 } from './detection-rpc';
 import { isPtyCrashGuardInstalled } from './pty-manager';
@@ -1544,6 +1544,15 @@ app.whenReady().then(() => {
   // A wedged GPU process freezes every window while every PTY lives on
   // (issue #229); the renderer probes for frames, this restarts the process.
   installGpuWatchdog();
+
+  // remotea: connect to remote session servers, and treat sleep as a clean
+  // disconnect and wake as "reconnect NOW" — a laptop lid must not cost a
+  // 25-second dead-socket timeout before the panes come back.
+  remoteHosts.start();
+  powerMonitor.on('suspend', () => remoteHosts.suspendAll());
+  powerMonitor.on('resume', () => remoteHosts.wakeAll());
+  powerMonitor.on('unlock-screen', () => remoteHosts.wakeAll());
+  app.on('browser-window-focus', () => remoteHosts.wakeAll());
 
   // Keep Windows awake dynamically when coding agents are working
   const awakeManager = getAwakeManager();

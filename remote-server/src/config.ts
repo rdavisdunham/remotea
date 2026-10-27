@@ -10,6 +10,8 @@ import crypto from 'crypto';
 
 export interface ServerConfig {
   port: number;
+  /** Respawn lost sessions' agents with their resume command. */
+  resumeAgents: boolean;
   /** IPs or interface names (e.g. "tailscale0"); never 0.0.0.0 by default. */
   bind: string[];
   scrollback: number;
@@ -21,6 +23,7 @@ export interface ServerConfig {
 
 export const DEFAULT_CONFIG: ServerConfig = {
   port: 7717,
+  resumeAgents: true,
   bind: ['127.0.0.1', 'tailscale0'],
   scrollback: 5000,
   snapshotScrollback: 5000,

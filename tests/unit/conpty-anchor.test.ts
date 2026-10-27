@@ -336,6 +336,8 @@ describe('useTerminal wiring', () => {
   });
 
   it('reflows the cursor line, as ConPTY does (#273)', () => {
-    expect(src).toMatch(/reflowCursorLine: true/);
+    // remotea: every LOCAL terminal is ConPTY; a remote one is a Linux PTY on
+    // the server, which does not reflow the cursor line.
+    expect(src).toMatch(/reflowCursorLine: !remoteSpec/);
   });
 });

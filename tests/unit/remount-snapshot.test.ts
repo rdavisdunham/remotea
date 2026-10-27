@@ -208,7 +208,8 @@ describe('useTerminal wiring', () => {
     expect(USE_TERMINAL).not.toMatch(/surfaceBufferCache\.get\(/);
     // Each attach is preceded by the restore, told what the lookup found.
     expect(USE_TERMINAL).toMatch(/restoreSurfaceState\(true\);\s*attachToPty\(surfaceId!\);/);
-    const created = USE_TERMINAL.match(/restoreSurfaceState\(created\.reused\);[\s\S]{0,200}?attachToPty\(created\.id\);/g);
+    // remotea: the surfaceId path also hands over a remote server's own snapshot.
+    const created = USE_TERMINAL.match(/restoreSurfaceState\(created\.reused(, created\.snapshot)?\);[\s\S]{0,200}?attachToPty\(created\.id\);/g);
     expect(created).toHaveLength(2);
   });
 

@@ -16,6 +16,7 @@
   "include": [
     "src/**/*.ts",
     "../src/shared/remote-host-protocol.ts",
+    "../src/shared/remote-query-swallow.ts",
     "../src/main/startup-commands.ts",
     "../src/renderer/utils/mouse-modes.ts"
   ]

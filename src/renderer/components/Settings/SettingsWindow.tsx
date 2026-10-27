@@ -11,6 +11,7 @@ import QuickLaunchSettings from './QuickLaunchSettings';
 import HelpSettings from './HelpSettings';
 import ChangelogSettings from './ChangelogSettings';
 import RemoteConsoleSettings from './RemoteConsoleSettings';
+import RemoteHostsSettings from './RemoteHostsSettings';
 import { useT, type TranslationKey } from '../../i18n';
 import '../../styles/settings.css';
 
@@ -19,12 +20,13 @@ import '../../styles/settings.css';
 // preference tabs above them. Remote (#254) closes the preference tabs: it is
 // the one that exposes wmux beyond this machine, so it is not in the way of
 // the everyday ones.
-const TABS = ['General', 'Sidebar', 'Workspace', 'Terminal', 'Prompts', 'Notifications', 'Browser', 'Profiles', 'Shortcuts', 'Remote', 'Changelog', 'Help'] as const;
+const TABS = ['General', 'Hosts', 'Sidebar', 'Workspace', 'Terminal', 'Prompts', 'Notifications', 'Browser', 'Profiles', 'Shortcuts', 'Remote', 'Changelog', 'Help'] as const;
 
 // Map each tab to its i18n key (issue #56). Typed as TranslationKey, not
 // string: the lookup is what reaches t(), so the keys are checked here.
 const TAB_LABEL_KEYS: Record<typeof TABS[number], TranslationKey> = {
   General: 'settings.tab.general',
+  Hosts: 'settings.tab.hosts',
   Sidebar: 'settings.tab.sidebar',
   Workspace: 'settings.tab.workspace',
   Terminal: 'settings.tab.terminal',
@@ -78,6 +80,7 @@ export default function SettingsWindow({ onClose, initialTab }: SettingsWindowPr
           </div>
           <div className="settings-content">
             {activeTab === 'General' && <GeneralSettings />}
+            {activeTab === 'Hosts' && <RemoteHostsSettings />}
             {activeTab === 'Sidebar' && <SidebarSettings />}
             {activeTab === 'Workspace' && <WorkspaceSettings />}
             {activeTab === 'Terminal' && <TerminalSettings />}

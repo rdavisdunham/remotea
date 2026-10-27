@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     bootId,
     serverId,
     hostname: os.hostname(),
-    config: { scrollback: config.scrollback, snapshotScrollback: config.snapshotScrollback, ringBytes: config.ringBytes },
+    config: { resumeAgents: config.resumeAgents, scrollback: config.scrollback, snapshotScrollback: config.snapshotScrollback, ringBytes: config.ringBytes },
     log,
   });
   // Re-read the token on every handshake so `remotea rotate-token` takes effect without a restart.

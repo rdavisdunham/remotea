@@ -5,6 +5,7 @@ import { IPC_CHANNELS, type InsertionResult, type NotificationSoundPickResult, t
   type WorktreeCloseMode, type WorktreeInspectResult, type WorktreeRemoveResult,
 } from '../shared/types';
 import type { BrowserHistory } from '../shared/browser-history';
+import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, PtyExitInfo, RemoteRegistryView, TerminalSnapshot } from '../shared/remote-hosts-types';
 import type {
   RemoteConsoleBridge,
   RemoteConsoleStatus,
@@ -41,8 +42,12 @@ contextBridge.exposeInMainWorld('wmux', {
       ipcRenderer.send(IPC_CHANNELS.PTY_WRITE, id, data),
     resize: (id: string, cols: number, rows: number) =>
       ipcRenderer.send(IPC_CHANNELS.PTY_RESIZE, id, cols, rows),
-    kill: (id: string) =>
-      ipcRenderer.send(IPC_CHANNELS.PTY_KILL, id),
+    // `shellSpec` lets a remote surface that was never mounted here still be
+    // closed on its server (remotea).
+    kill: (id: string, shellSpec?: string) =>
+      ipcRenderer.send(IPC_CHANNELS.PTY_KILL, id, shellSpec),
+    focus: (id: string) =>
+      ipcRenderer.send(IPC_CHANNELS.PTY_FOCUS, id),
     has: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.PTY_HAS, id),
     onData: (id: string, callback: (data: string) => void) => {
@@ -52,12 +57,41 @@ contextBridge.exposeInMainWorld('wmux', {
       ipcRenderer.on(IPC_CHANNELS.PTY_DATA, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.PTY_DATA, handler);
     },
-    onExit: (id: string, callback: (code: number) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, ptyId: string, code: number) => {
-        if (ptyId === id) callback(code);
+    onExit: (id: string, callback: (code: number, info?: PtyExitInfo) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, ptyId: string, code: number, info?: PtyExitInfo) => {
+        if (ptyId === id) callback(code, info);
       };
       ipcRenderer.on(IPC_CHANNELS.PTY_EXIT, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.PTY_EXIT, handler);
+    },
+    // remotea: a remote terminal reconnected after missing too much — repaint from this snapshot.
+    onResync: (id: string, callback: (snapshot: TerminalSnapshot) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, ptyId: string, snapshot: TerminalSnapshot) => {
+        if (ptyId === id) callback(snapshot);
+      };
+      ipcRenderer.on(IPC_CHANNELS.PTY_RESYNC, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.PTY_RESYNC, handler);
+    },
+  },
+  // remotea: remote session servers. The token is write-only from here.
+  remoteHosts: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.RHOST_LIST) as Promise<HostDTO[]>,
+    save: (req: HostSaveRequest) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_SAVE, req) as Promise<{ ok: boolean; host?: HostDTO; error?: string }>,
+    remove: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_REMOVE, id) as Promise<boolean>,
+    test: (req: { url: string; token?: string; id?: string }) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_TEST, req) as Promise<HostTestResult>,
+    reconnect: () => ipcRenderer.send(IPC_CHANNELS.RHOST_RECONNECT),
+    onStatus: (callback: (status: HostStatus) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: HostStatus) => callback(status);
+      ipcRenderer.on(IPC_CHANNELS.RHOST_STATUS, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.RHOST_STATUS, handler);
+    },
+  },
+  remoteSessions: {
+    views: () => ipcRenderer.invoke(IPC_CHANNELS.RSESS_VIEWS) as Promise<RemoteRegistryView[]>,
+    onRegistry: (callback: (views: RemoteRegistryView[]) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, views: RemoteRegistryView[]) => callback(views);
+      ipcRenderer.on(IPC_CHANNELS.RSESS_REGISTRY, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.RSESS_REGISTRY, handler);
     },
   },
   system: {

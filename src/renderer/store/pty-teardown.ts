@@ -17,6 +17,7 @@
  * stays testable in Node.
  */
 import { SplitNode, SurfaceRef } from '../../shared/types';
+import { isRemoteShellSpec } from '../../shared/remote-shell-spec';
 
 /**
  * Announced for every surface that is destructively closed.
@@ -36,12 +37,15 @@ export const SURFACE_CLOSED_EVENT = 'wmux:surface-closed';
 /** Kill the PTY backing a single terminal surface. Idempotent — the main-process
  *  `PtyManager.kill` no-ops on an unknown/already-dead id, so double-calls (e.g.
  *  a legacy UI kill + the store kill) are harmless. */
-export function killSurfacePty(surface: Pick<SurfaceRef, 'id' | 'type'>): void {
+export function killSurfacePty(surface: Pick<SurfaceRef, 'id' | 'type'> & { shell?: string }): void {
   announceSurfaceClosed(surface.id);
   if (surface.type !== 'terminal') return;
   try {
-    (globalThis as { window?: { wmux?: { pty?: { kill?: (id: string) => void } } } }).window
-      ?.wmux?.pty?.kill?.(surface.id);
+    // A remote session's spec lets main close it on its server even when this
+    // tab was never mounted (so main never wired it up). Local closes are unchanged.
+    const kill = (globalThis as { window?: { wmux?: { pty?: { kill?: (id: string, shellSpec?: string) => void } } } }).window?.wmux?.pty?.kill;
+    if (isRemoteShellSpec(surface.shell)) kill?.(surface.id, surface.shell);
+    else kill?.(surface.id);
   } catch {
     /* preload/window unavailable (tests) — nothing to reap */
   }

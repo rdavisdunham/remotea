@@ -9,7 +9,8 @@ const DEV_B = 'device-bbbbbbbb';
 
 function setup(registry = Registry.load({ file: null, bootId: 'boot-1' }), bootId = 'boot-1') {
   const sp = fakeSpawner();
-  const hub = new Hub({ registry, spawn: sp.spawn, bootId, serverId: 'srv-1', hostname: 'desk', timers: new ManualTimers(), probe: () => ({}) });
+  const timers = new ManualTimers();
+  const hub = new Hub({ registry, spawn: sp.spawn, bootId, serverId: 'srv-1', hostname: 'desk', timers, probe: () => ({}) });
   let nextId = 1;
   const connect = (device: string) => {
     const c = new FakeConn(nextId++);
@@ -17,7 +18,7 @@ function setup(registry = Registry.load({ file: null, bootId: 'boot-1' }), bootI
     hub.handle(c, { t: 'hello', proto: 1, device: { id: device, name: device }, app: { name: 'test', version: '0' } });
     return c;
   };
-  return { hub, sp, registry, connect };
+  return { hub, sp, registry, connect, timers };
 }
 
 const send = (hub: Hub, c: FakeConn, m: ClientMsg) => hub.handle(c, m);
@@ -165,6 +166,10 @@ describe('Hub', () => {
     send(second.hub, b, { t: 'open', rid: 4, id: 'surf-1', cols: 80, rows: 24, create: { startupCommands: ['claude --resume x'] } });
     expect(second.sp.ptys).toHaveLength(1);
     expect(second.sp.last().req.cwd).toBe('/proj');
+    // The server resumes the agent it last saw rather than the client's commands.
+    second.timers.advance(6000);
+    expect(second.sp.last().written.join('')).toContain('claude --resume 11111111-2222-3333-4444-555555555555\r');
+    expect(second.sp.last().written.join('')).not.toContain('claude --resume x');
     expect(a.json('opened')[0]).toMatchObject({ wasLost: true, mode: 'fresh' });
     await waitFor(() => b.json('opened').length > 0);
     expect(b.json('opened')[0]).toMatchObject({ created: false });

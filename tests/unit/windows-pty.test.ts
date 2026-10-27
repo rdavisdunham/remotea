@@ -50,7 +50,8 @@ describe('windowsPtyCompat', () => {
 
 describe('useTerminal wiring', () => {
   it('constructs every terminal with the ConPTY compatibility block', () => {
-    expect(USE_TERMINAL).toMatch(/windowsPty:\s*windowsPtyCompat\(/);
+    // remotea: local terminals only; a remote session is a Linux PTY on the server.
+    expect(USE_TERMINAL).toMatch(/windowsPty:\s*remoteSpec \? undefined : windowsPtyCompat\(/);
   });
 
   it('fits the buffer to the pane before anything is written into it', () => {

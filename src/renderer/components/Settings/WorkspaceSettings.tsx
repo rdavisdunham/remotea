@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import { getAllPaneIds, findLeaf, patchLeafPrimarySurface, MAX_WORKSPACE_PANES } from '../../store/split-utils';
 import type { PaneId, WorkspaceLayout, KeepAwakeMode } from '../../../shared/types';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
+import { useRemoteHosts, startRemoteHostStatus } from '../../remote-sessions/status';
+import { remoteShellSpec } from '../../../shared/remote-shell-spec';
 
 /**
  * One editable startup-command line for a saved layout's pane.
@@ -96,6 +98,9 @@ export default function WorkspaceSettings() {
   } = useStore();
   // Keep-awake lives in main (issue #363), not in workspacePrefs.
   const keepAwake = useKeepAwake();
+  // remotea: configured remote hosts become default-shell choices.
+  useEffect(() => startRemoteHostStatus(), []);
+  const remoteHosts = useRemoteHosts((s) => s.hosts);
   // Which layout id was just overwritten, for a transient "Saved" confirmation
   // next to its button — unlike "+ Save as new preset", overwriting an
   // existing row changes data invisibly (the row itself doesn't change shape).
@@ -452,6 +457,9 @@ export default function WorkspaceSettings() {
           <option value="cmd.exe">Command Prompt</option>
           <option value="bash.exe">Git Bash</option>
           <option value="wsl.exe">WSL</option>
+          {Object.values(remoteHosts).map((h) => (
+            <option key={h.id} value={remoteShellSpec(h.id)}>Remote: {h.name}</option>
+          ))}
         </select>
       </div>
 

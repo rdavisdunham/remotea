@@ -697,6 +697,17 @@ export const IPC_CHANNELS = {
   PTY_HAS: 'pty:has',
   PTY_DATA: 'pty:data',
   PTY_EXIT: 'pty:exit',
+  // remotea: remote terminals (src/main/remote-hosts)
+  PTY_RESYNC: 'pty:resync',
+  PTY_FOCUS: 'pty:focus',
+  RHOST_LIST: 'rhost:list',
+  RHOST_SAVE: 'rhost:save',
+  RHOST_REMOVE: 'rhost:remove',
+  RHOST_TEST: 'rhost:test',
+  RHOST_RECONNECT: 'rhost:reconnect',
+  RHOST_STATUS: 'rhost:status',
+  RSESS_VIEWS: 'rsess:views',
+  RSESS_REGISTRY: 'rsess:registry',
   // Remote file upload (ssh panes) — main resolves the whole paste/drop
   REMOTE_RESOLVE_PASTE: 'remote:resolve-paste',
   REMOTE_RESOLVE_DROP: 'remote:resolve-drop',

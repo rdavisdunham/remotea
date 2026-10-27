@@ -192,6 +192,14 @@ export interface SurfaceSlice {
   updateSurface: (workspaceId: WorkspaceId, paneId: PaneId, surfaceId: SurfaceId, patch: Partial<Omit<SurfaceRef, 'id' | 'type' | 'shell'>>) => void;
 
   /**
+   * remotea: record the spec a terminal was actually spawned from when the
+   * surface had none (it came from the default shell). Only fills an UNSET
+   * shell — never rewrites one — so it cannot reintroduce the ssh restore bug
+   * above; it pins a `remote:<host>` session to its host across default changes.
+   */
+  pinSurfaceShell: (workspaceId: WorkspaceId, paneId: PaneId, surfaceId: SurfaceId, shell: string) => void;
+
+  /**
    * Set rendered markdown content on a surface, found by id across all
    * workspaces/panes (issue #54). Callers from the pipe bridge only know the
    * surfaceId, so this locates the owning pane itself.
@@ -746,6 +754,17 @@ export const createSurfaceSlice: StateCreator<SliceState, [], [], SurfaceSlice> 
     const newSurfaces = leaf.surfaces.map((s) => (s.id === surfaceId ? { ...s, ...patch } : s));
     const updatedTree = patchLeaf(ws.splitTree, paneId, { surfaces: newSurfaces });
     updateSplitTree(workspaceId, updatedTree);
+  },
+
+  pinSurfaceShell(workspaceId, paneId, surfaceId, shell) {
+    const { workspaces, updateSplitTree } = get();
+    const ws = workspaces.find((w) => w.id === workspaceId);
+    if (!ws) return;
+    const leaf = findLeaf(ws.splitTree, paneId);
+    const target = leaf?.surfaces.find((s) => s.id === surfaceId);
+    if (!leaf || !target || target.shell) return;
+    const newSurfaces = leaf.surfaces.map((s) => (s.id === surfaceId ? { ...s, shell } : s));
+    updateSplitTree(workspaceId, patchLeaf(ws.splitTree, paneId, { surfaces: newSurfaces }));
   },
 
   setMarkdownContent(surfaceId, content, options) {

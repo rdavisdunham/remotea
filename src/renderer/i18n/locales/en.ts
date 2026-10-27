@@ -19,6 +19,7 @@ export const en = {
   'settings.tab.browser': 'Browser',
   'settings.tab.profiles': 'Profiles',
   'settings.tab.shortcuts': 'Shortcuts',
+  'settings.tab.hosts': 'Remote hosts',
   'settings.tab.remote': 'Remote',
   // Settings — General panel
   'settings.general.languageSection': 'Language',

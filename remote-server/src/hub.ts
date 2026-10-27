@@ -9,6 +9,7 @@
 import os from 'os';
 import {
   PROTO,
+  type AgentHandle,
   type ClientMsg,
   type GroupId,
   type LostInfo,
@@ -25,6 +26,8 @@ import { probeSession, type ProbeResult } from './agent-probe';
 import { childrenIndex } from './proc';
 
 export interface HubConfig {
+  /** Respawn a lost session's agent with its resume command (`claude --resume <id>`). */
+  resumeAgents: boolean;
   scrollback: number;
   snapshotScrollback: number;
   ringBytes: number;
@@ -33,12 +36,23 @@ export interface HubConfig {
 }
 
 export const DEFAULT_HUB_CONFIG: HubConfig = {
+  resumeAgents: true,
   scrollback: 5000,
   snapshotScrollback: 5000,
   ringBytes: 1024 * 1024,
   defaultCols: 120,
   defaultRows: 32,
 };
+
+/** The command that reopens an agent conversation, or null when the provider has none. */
+export function resumeCommand(agent: AgentHandle): string | null {
+  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(agent.sessionId)) return null;
+  switch (agent.provider) {
+    case 'claude': return `claude --resume ${agent.sessionId}`;
+    case 'codex': return `codex resume ${agent.sessionId}`;
+    default: return null;
+  }
+}
 
 /** How stale the persisted lastActivityAt may get. */
 const ACTIVITY_PERSIST_MS = 30_000;
@@ -202,13 +216,15 @@ export class Hub {
     const wasLost = !!rec;
     const { groupId, created: newGroup } = this.registry.resolveGroup(spec.groupId ?? rec?.groupId ?? null, spec.group, device);
     if (newGroup) this.broadcast({ t: 'groupUpserted', group: newGroup });
+    // A respawn keeps what the server knew about the session (where it was,
+    // what it ran); the client's spec only fills gaps.
     const record: SessionRecord = {
       id: msg.id,
       groupId,
-      title: spec.title ?? rec?.title,
-      cwd: spec.cwd ?? rec?.lastCwd ?? rec?.cwd ?? '~',
+      title: rec?.title ?? spec.title,
+      cwd: rec ? rec.lastCwd ?? rec.cwd : spec.cwd ?? '~',
       lastCwd: undefined,
-      cmd: spec.cmd ?? rec?.cmd,
+      cmd: rec ? rec.cmd : spec.cmd,
       createdBy: rec?.createdBy ?? device,
       createdAt: rec?.createdAt ?? this.now(),
       bootId: this.deps.bootId,
@@ -216,9 +232,14 @@ export class Hub {
       agent: rec?.agent,
       hiddenBy: rec?.hiddenBy ?? [],
     };
+    // Resuming the agent that was running beats re-running the original
+    // command: a lost Claude session comes back as `claude --resume <id>`.
+    const resume = wasLost && this.cfg.resumeAgents && rec?.agent ? resumeCommand(rec.agent) : null;
+    const spawnCmd = resume && record.cmd ? resume : record.cmd;
+    const startup = resume && !record.cmd ? [resume] : spec.startupCommands;
     let session: TermSession;
     try {
-      session = this.makeSession(record, this.deps.spawn, msg.cols, msg.rows, spec.startupCommands);
+      session = this.makeSession(record, this.deps.spawn, msg.cols, msg.rows, startup, spawnCmd);
     } catch (err) {
       conn.sendJson({ t: 'openError', rid: msg.rid, id: msg.id, code: 'spawn-failed', message: err instanceof Error ? err.message : String(err) });
       return;
@@ -229,7 +250,7 @@ export class Hub {
     this.log(`${wasLost ? 'respawned' : 'created'} ${msg.id} for ${conn.device!.name}`);
   }
 
-  private makeSession(rec: SessionRecord, spawn: SpawnFn | null, cols: number, rows: number, startupCommands?: string[]): TermSession {
+  private makeSession(rec: SessionRecord, spawn: SpawnFn | null, cols: number, rows: number, startupCommands?: string[], cmd = rec.cmd): TermSession {
     const session = new TermSession({
       id: rec.id,
       bootId: this.deps.bootId,
@@ -239,7 +260,7 @@ export class Hub {
       snapshotScrollback: this.cfg.snapshotScrollback,
       ringBytes: this.cfg.ringBytes,
       spawn,
-      spawnRequest: { cmd: rec.cmd, cwd: rec.cwd },
+      spawnRequest: { cmd, cwd: rec.cwd },
       startupCommands,
       theme: () => this.theme,
       timers: this.deps.timers,

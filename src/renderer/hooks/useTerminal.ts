@@ -64,6 +64,9 @@ import {
   releaseAll as releaseAllAnchors,
 } from '../utils/prompt-anchor';
 import { withClaudeResume } from './claude-resume-command';
+import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
+import { installRemoteQuerySwallow } from '../../shared/remote-query-swallow';
+import type { PtyExitInfo, TerminalSnapshot } from '../../shared/remote-hosts-types';
 import '@xterm/xterm/css/xterm.css';
 
 declare global {
@@ -195,6 +198,27 @@ function setResolvedShellForSurface(surfaceId: string | undefined, resolvedShell
   const location = findSurfaceLocation(workspace.splitTree, surfaceId);
   if (!location) return;
   state.updateSurface(workspace.id, location.paneId as any, surfaceId as any, { resolvedShell });
+}
+
+/**
+ * remotea: a remote terminal created through the DEFAULT shell keeps its
+ * `remote:<host>` spec on the surface itself, so changing the default later
+ * never respawns a live remote session as a local shell on the next mount.
+ */
+function pinShellForSurface(surfaceId: string | undefined, shell: string): void {
+  if (!surfaceId || !shell) return;
+  const state = useStore.getState();
+  const workspace = state.workspaces.find((ws) => treeHasSurface(ws.splitTree, surfaceId));
+  if (!workspace) return;
+  const location = findSurfaceLocation(workspace.splitTree, surfaceId);
+  if (!location) return;
+  state.pinSurfaceShell(workspace.id, location.paneId as any, surfaceId as any, shell);
+}
+
+/** remotea: what a remote tab says when its session is gone for this device. */
+function remoteGoneLine(info: PtyExitInfo): string {
+  if (info.reason === 'hidden') return '[remotea] hidden on this device';
+  return `[remotea] session closed${info.by ? ` on ${info.by}` : ''}`;
 }
 
 /**
@@ -828,6 +852,10 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
   const replayHoldRef = useRef<ReplayHold>(new ReplayHold());
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const ptyIdRef = useRef<string | null>(null);
+  // remotea: whether this terminal is a remote session, and whether its pane is focused.
+  const remoteRef = useRef(false);
+  const focusedRef = useRef(focused);
+  focusedRef.current = focused;
   const cleanupFnsRef = useRef<Array<() => void>>([]);
   /**
    * Stops a touch fling in flight (#248). A ref because three places outside
@@ -948,6 +976,12 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       linkSurfaceId ? (path) => { void openTerminalFileLink(linkSurfaceId, path); } : undefined,
     );
 
+    // remotea: a `remote:<host>` shell is a Linux PTY on another machine, so
+    // none of the ConPTY workarounds below apply to it. Resolved the same way
+    // the spawn resolves it (surface/workspace shell, else the default).
+    const remoteSpec = parseRemoteShellSpec(shell || useStore.getState().workspacePrefs.defaultShell || '');
+    remoteRef.current = !!remoteSpec;
+
     // Create terminal instance. Theme/font are applied from settings on creation
     // AND kept in sync via a later effect, so live edits repaint without recreation.
     const initialBackground = withBgAlpha('#272822', bgAlpha);
@@ -976,12 +1010,12 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // window resized) leaves xterm and ConPTY disagreeing about which row the
       // cursor is on, and the prompt strands itself in the middle of old output.
       // See utils/windows-pty.ts for the mechanism.
-      windowsPty: windowsPtyCompat(window.wmux?.system?.osRelease ?? ''),
+      windowsPty: remoteSpec ? undefined : windowsPtyCompat(window.wmux?.system?.osRelease ?? ''),
       // ConPTY reflows the cursor's line on a column change and sends nothing
       // after it; xterm's default leaves that line at the width it was drawn
       // at, so a prompt first drawn in a narrower pane stayed broken there
       // (#273). Cursor placement: fit() → captureCursorLine.
-      reflowCursorLine: true,
+      reflowCursorLine: !remoteSpec,
     });
 
     xtermRef.current = terminal;
@@ -1050,6 +1084,9 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // handlers newest-first and stops at the first returning true, so neither the
     // image addon's DA1 override nor xterm's built-in reply runs.
     terminal.parser.registerCsiHandler({ final: 'c' }, () => true);
+    // remotea: on a remote pane the SERVER answers every terminal query (it is
+    // there even while this app sleeps), so this xterm must answer none of them.
+    if (remoteSpec) installRemoteQuerySwallow(terminal);
 
     // Open terminal in the DOM
     terminal.open(terminalRef.current);
@@ -1084,11 +1121,16 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // put its prompt on the alternate buffer (see utils/remount-snapshot.ts).
     // A TUI that was on the alternate screen comes back on it, and redraws
     // there via the post-remount SIGWINCH.
-    const restoreSurfaceState = (ptyReused: boolean) => {
+    const restoreSurfaceState = (ptyReused: boolean, serverSnapshot?: TerminalSnapshot) => {
       // StrictMode's discarded first mount answers its lookup too, and must not
       // take the snapshot its replacement is waiting for.
       if (disposed || !surfaceId) return;
-      const snapshot = surfaceBufferCache.take(surfaceId, ptyReused);
+      const cached = surfaceBufferCache.take(surfaceId, ptyReused);
+      // remotea: a remote session's own server snapshot wins over the local
+      // cache — it includes everything that happened while this app was closed.
+      const snapshot = serverSnapshot
+        ? { text: serverSnapshot.data, cols: serverSnapshot.cols, rows: serverSnapshot.rows }
+        : cached;
       if (snapshot) {
         // Replay at the size the snapshot was taken at, undoing the fit()
         // above — and HELD there, not merely set there. SerializeAddon restores
@@ -1151,6 +1193,35 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       const replay = takeMouseModeReplay(surfaceMouseModes, surfaceId, ptyReused);
       if (replay) terminal.write(replay);
       if (!ptyReused) wheelLineAccum.delete(surfaceId);
+      // The server snapshot carries the running app's mouse modes; the wheel handler reads them from here.
+      if (serverSnapshot) applyMouseModeSequences(mouseModesFor(surfaceId), serverSnapshot.data);
+    };
+
+    // remotea: a remote terminal reconnected after missing too much to replay,
+    // so the server sent a fresh screen. Queued behind whatever is still being
+    // parsed, then the screen is replaced wholesale; output after it follows in order.
+    const resyncFromServer = (snapshot: TerminalSnapshot) => {
+      if (disposed || !surfaceId) return;
+      replayHold.hold();
+      terminal.write('', () => {
+        if (disposed) return;
+        terminal.reset();
+        forgetAlternateScreen(surfaceId);
+        surfaceMouseModes.delete(surfaceId);
+        terminal.resize(snapshot.cols, snapshot.rows);
+        beginSnapshotReplay(surfaceId);
+      });
+      terminal.write(snapshot.data, () => {
+        endSnapshotReplay(surfaceId);
+        applyMouseModeSequences(mouseModesFor(surfaceId), snapshot.data);
+        replayHold.release();
+        if (disposed) return;
+        fit();
+        const dims = fitAddonRef.current?.proposeDimensions();
+        if (dims && ptyIdRef.current && (dims.cols !== snapshot.cols || dims.rows !== snapshot.rows)) {
+          window.wmux.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
+        }
+      });
     };
 
     // Wheel handling — we always take ownership on the capture phase (xterm's
@@ -1694,14 +1765,14 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
 
       // Wire PTY exit → inform user; also auto-heal a stuck "Running" badge
       // (see clearStuckRunningState).
-      const unsubExit = window.wmux.pty.onExit(id, (_code: number) => {
+      const unsubExit = window.wmux.pty.onExit(id, (_code: number, info?: PtyExitInfo) => {
         // Undo whatever the dead application left set BEFORE announcing the
         // exit, so the announcement itself lands on the normal buffer in
         // default colours rather than inside the corpse of an alt screen
         // (issue #175). Nothing here is written to the PTY — there is no PTY.
         resetTerminalModes(terminal);
         forgetAlternateScreen(id);
-        terminal.writeln('\r\n\x1b[2m[process exited]\x1b[0m');
+        terminal.writeln(`\r\n\x1b[2m${info && info.reason !== 'exited' ? remoteGoneLine(info) : '[process exited]'}\x1b[0m`);
         clearStuckRunningState(id);
         forgetProgressTurn(id);
         // An exited process can't be making progress — drop any leftover
@@ -1736,7 +1807,12 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         releaseAnchor(id, terminal);
       });
 
-      cleanupFnsRef.current.push(unsubData, unsubExit);
+      // remotea: a remote terminal that missed too much while disconnected gets a fresh screen.
+      const unsubResync = remoteRef.current ? window.wmux.pty.onResync(id, resyncFromServer) : () => {};
+
+      cleanupFnsRef.current.push(unsubData, unsubExit, unsubResync);
+      // The pane the user is looking at takes control of the remote terminal's size.
+      if (remoteRef.current && focusedRef.current && document.hasFocus()) window.wmux.pty.focus(id);
 
       // Flush any resize that arrived before this PTY was ready
       if (pendingResizeDims && !replayHold.isHolding) {
@@ -1825,13 +1901,18 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
             shell: effectiveShell,
           });
           window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, surfaceId, startupCommands: spawnCommands, cols: initialCols, rows: initialRows })
-            .then((created: { id: string; shell: string; reused: boolean; shellFallbackFrom?: string }) => {
+            .then((created: { id: string; shell: string; reused: boolean; shellFallbackFrom?: string; snapshot?: TerminalSnapshot; unavailable?: PtyExitInfo; remote?: boolean }) => {
               // PTY persists (keep-alive); a remount re-attaches via pty.has.
               if (disposed) return;
+              if (created.unavailable) {
+                terminal.writeln(`\r\n\x1b[2m${remoteGoneLine(created.unavailable)}\x1b[0m`);
+                return;
+              }
+              if (created.remote) pinShellForSurface(surfaceId, effectiveShell);
               setResolvedShellForSurface(surfaceId, created.shell);
               // `reused`: StrictMode's second mount loses the has() race and
               // lands here on the PTY its first mount just created.
-              restoreSurfaceState(created.reused);
+              restoreSurfaceState(created.reused, created.snapshot);
               noteShellFallback(created);
               attachToPty(created.id);
             })
@@ -2206,6 +2287,19 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       if (raf1 !== null) cancelAnimationFrame(raf1);
       if (raf2 !== null) cancelAnimationFrame(raf2);
     };
+  }, [visible, focused, attachGeneration]);
+
+  // remotea: the device the user is actually at controls a remote terminal's
+  // size (herdr's model). Being the focused pane of a focused window claims it;
+  // so does typing (server-side). Coming back to this window re-claims.
+  useEffect(() => {
+    if (!visible || !focused) return;
+    const claim = () => {
+      if (remoteRef.current && ptyIdRef.current && document.hasFocus()) window.wmux.pty.focus(ptyIdRef.current);
+    };
+    claim();
+    window.addEventListener('focus', claim);
+    return () => window.removeEventListener('focus', claim);
   }, [visible, focused, attachGeneration]);
 
   return { terminalRef, fit, xtermRef, searchAddonRef };

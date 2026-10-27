@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/headless';
 import { TermSession } from '../src/session';
 import { DA1_REPLY, DEFAULT_THEME, toXParseColor } from '../src/queries';
 import { FakeConn, fakeSpawner, ManualTimers } from './helpers';
+import { installRemoteQuerySwallow } from '../../src/shared/remote-query-swallow';
 
 /**
  * Every query a terminal can be asked. The server answers these (from its
@@ -19,6 +20,7 @@ const QUERIES: Record<string, string> = {
   DECXCPR: '\x1b[?6n',
   DECRQM_ansi: '\x1b[4$p',
   DECRQM_dec: '\x1b[?25$p',
+  DECRQSS: '\x1bP$qm\x1b\\',
   OSC10: '\x1b]10;?\x1b\\',
   OSC11: '\x1b]11;?\x1b\\',
   OSC12: '\x1b]12;?\x1b\\',
@@ -83,13 +85,25 @@ describe('toXParseColor', () => {
 });
 
 describe('client swallow contract', () => {
-  it('a plain xterm would also answer each of these (which is why the app must swallow them on remote panes)', async () => {
+  it('a plain xterm would also answer these, which is why the app must swallow them on remote panes', async () => {
     const term = new Terminal({ cols: 80, rows: 24, allowProposedApi: true });
     const out: string[] = [];
     term.onData((d) => out.push(d));
     for (const q of Object.values(QUERIES)) term.write(q);
     await new Promise((r) => term.write('', () => r(undefined)));
-    // OSC 10/11/12 are not answered by headless (no theme) — the server's overrides cover them.
-    expect(out.length).toBeGreaterThanOrEqual(Object.keys(QUERIES).length - 3);
+    // OSC 10/11/12 are not answered by xterm itself (no theme service headless); the server's overrides cover them.
+    expect(out.length).toBe(Object.keys(QUERIES).length - 3);
+  });
+
+  it('with the app\'s swallow installed, an xterm answers none of the queries the server answers', async () => {
+    const term = new Terminal({ cols: 80, rows: 24, allowProposedApi: true });
+    installRemoteQuerySwallow(term as never);
+    const out: string[] = [];
+    term.onData((d) => out.push(d));
+    for (const q of Object.values(QUERIES)) term.write(q);
+    // A colour SET must still apply.
+    term.write('\x1b]11;#102030\x1b\\');
+    await new Promise((r) => term.write('', () => r(undefined)));
+    expect(out).toEqual([]);
   });
 });
