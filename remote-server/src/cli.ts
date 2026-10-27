@@ -6,6 +6,7 @@
  *   remotea open --group <name> [--cwd <dir>] [--title <t>] [--id surf-…] [--json] -- <cmd…>
  *                                  create a session in a workspace group (created if missing) and run
  *                                  <cmd…> once its shell is ready; every connected app places it as a tab
+ *   remotea close <surf-id>        end a session on every device
  *   remotea token                  print the access token for the app's Settings → Remote hosts
  *   remotea rotate-token           issue a new token (connected apps must be given the new one)
  *
@@ -157,7 +158,15 @@ function cliDevice(): { id: string; name: string } {
   return { id: `cli-${h}`, name: `remotea CLI (${os.hostname()})` };
 }
 
-async function openSession(dir: string, args: OpenArgs): Promise<{ id: string; groupId: string; created: boolean }> {
+interface ServerLink {
+  welcome: Extract<ServerMsg, { t: 'welcome' }>;
+  send(msg: unknown): void;
+  next(pred: (m: ServerMsg) => boolean, ms?: number): Promise<ServerMsg>;
+  close(): void;
+}
+
+/** Connect to the local server as the CLI device and complete the hello. */
+async function connectLocal(dir: string): Promise<ServerLink> {
   const config = loadConfig(dir);
   const token = ensureToken(dir);
   const ws = new WebSocket(`ws://127.0.0.1:${config.port}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -189,16 +198,40 @@ async function openSession(dir: string, args: OpenArgs): Promise<{ id: string; g
     ws.once('unexpected-response', (_q, res) => reject(new Error(`server refused the connection (HTTP ${res.statusCode})`)));
     ws.once('error', (err) => reject(new Error(`cannot reach the remotea server on 127.0.0.1:${config.port}: ${err.message}`)));
   });
+  ws.send(JSON.stringify({ t: 'hello', proto: PROTO, device: cliDevice(), app: { name: 'remotea-cli', version: '1' } }));
+  const welcome = await next((m) => m.t === 'welcome' || m.t === 'error').catch((err) => {
+    ws.close();
+    throw err;
+  });
+  if (welcome.t !== 'welcome') {
+    ws.close();
+    throw new Error(welcome.t === 'error' ? welcome.message : 'unexpected reply');
+  }
+  return { welcome, send: (m) => ws.send(JSON.stringify(m)), next, close: () => ws.close() };
+}
+
+async function closeSession(dir: string, id: string): Promise<void> {
+  if (!/^surf-[A-Za-z0-9_-]{1,96}$/.test(id)) throw new Error('expected a session id like surf-…');
+  const link = await connectLocal(dir);
   try {
-    ws.send(JSON.stringify({ t: 'hello', proto: PROTO, device: cliDevice(), app: { name: 'remotea-cli', version: '1' } }));
-    const welcome = await next((m) => m.t === 'welcome' || m.t === 'error');
-    if (welcome.t !== 'welcome') throw new Error(welcome.t === 'error' ? welcome.message : 'unexpected reply');
+    link.send({ t: 'close', rid: 1, id });
+    const ack = await link.next((m) => m.t === 'ack' && m.rid === 1);
+    if (ack.t === 'ack' && !ack.ok) throw new Error(ack.error ?? 'close failed');
+  } finally {
+    link.close();
+  }
+}
+
+async function openSession(dir: string, args: OpenArgs): Promise<{ id: string; groupId: string; created: boolean }> {
+  const link = await connectLocal(dir);
+  const { welcome, next } = link;
+  try {
     const wanted = args.group.trim().toLowerCase();
     const existing = welcome.groups.find((g) => g.name.trim().toLowerCase() === wanted);
     const groupId = existing?.id ?? `grp-${crypto.randomUUID()}`;
     const id = args.id ?? `surf-${crypto.randomUUID()}`;
     const command = args.command.map(shellQuote).join(' ');
-    ws.send(JSON.stringify({
+    link.send({
       t: 'open', rid: 1, id, cols: 120, rows: 32,
       create: {
         cwd: args.cwd ? path.resolve(args.cwd) : process.cwd(),
@@ -207,15 +240,15 @@ async function openSession(dir: string, args: OpenArgs): Promise<{ id: string; g
         title: args.title,
         startupCommands: command ? [command] : undefined,
       },
-    }));
+    });
     const reply = await next((m) => (m.t === 'opened' || m.t === 'openError') && m.id === id);
     if (reply.t === 'openError') throw new Error(reply.message);
     if (reply.t !== 'opened') throw new Error('unexpected reply');
     // Startup commands are typed by the server once the shell is ready; we can leave now.
-    ws.send(JSON.stringify({ t: 'detach', ids: [id] }));
+    link.send({ t: 'detach', ids: [id] });
     return { id, groupId, created: reply.created || !!reply.wasLost };
   } finally {
-    ws.close();
+    link.close();
   }
 }
 
@@ -231,6 +264,7 @@ function fmtAge(ms: number | null): string {
 const USAGE = `usage:
   remotea status [--json]
   remotea open --group <name> [--cwd <dir>] [--title <t>] [--id surf-...] [--json] -- <command...>
+  remotea close <surf-id>
   remotea token
   remotea rotate-token`;
 
@@ -258,6 +292,9 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(args.json ? JSON.stringify(res) + '\n' : `${res.id}\n`);
       return 0;
     }
+    case 'close':
+      await closeSession(dir, rest[0] ?? '');
+      return 0;
     case 'token':
       process.stdout.write(ensureToken(dir) + '\n');
       return 0;
