@@ -72,6 +72,8 @@ contextBridge.exposeInMainWorld('wmux', {
       ipcRenderer.on(IPC_CHANNELS.PTY_RESYNC, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.PTY_RESYNC, handler);
     },
+    // remotea: this renderer lost its copy of a remote terminal (reload); ask for a snapshot (arrives via onResync).
+    requestResync: (id: string) => ipcRenderer.send(IPC_CHANNELS.PTY_RESYNC_REQUEST, id),
   },
   // remotea: remote session servers. The token is write-only from here.
   remoteHosts: {

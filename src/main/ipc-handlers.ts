@@ -770,6 +770,10 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     forgetSurface(id);
   });
 
+  ipcMain.on(IPC_CHANNELS.PTY_RESYNC_REQUEST, (_event, id: SurfaceId) => {
+    if (typeof id === 'string') ptyManager.requestResync(id);
+  });
+
   // remotea: the user is looking at (focused) this terminal — on a remote one,
   // this device takes control of its size.
   ipcMain.on(IPC_CHANNELS.PTY_FOCUS, (_event, id: SurfaceId) => {

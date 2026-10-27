@@ -119,6 +119,21 @@ function reportedEvent(event: ScreenEvent): ReportedScreenEvent {
  * returns what is visible. `lines` counts back from the bottom of the buffer,
  * scrollback included; trailing blank lines are trimmed.
  */
+/**
+ * One past the last line that has anything on it (or the cursor). The bottom
+ * of the buffer is not that: a pane taller than what it has printed so far —
+ * a fresh shell, or an agent TUI on a tall monitor — ends in blank rows, and
+ * "the last N lines" of it were all blank. Searched only through the rows
+ * below the viewport top, so a long scrollback costs nothing.
+ */
+export function contentEnd(terminal: Terminal): number {
+  const buf = terminal.buffer.active;
+  let end = buf.length;
+  const floor = Math.max(buf.baseY + buf.cursorY + 1, buf.length - terminal.rows);
+  while (end > floor && !(buf.getLine(end - 1)?.translateToString(true) ?? '')) end--;
+  return end;
+}
+
 export function readScreenReport(
   terminal: Terminal,
   surfaceId: string,
@@ -126,7 +141,7 @@ export function readScreenReport(
 ): ScreenReport {
   const buf = terminal.buffer.active;
   const count = Math.min(Math.max(Math.floor(options.lines), 1), 10000);
-  const end = buf.length;
+  const end = contentEnd(terminal);
   const out: string[] = [];
   for (let i = Math.max(0, end - count); i < end; i++) {
     out.push(buf.getLine(i)?.translateToString(true) ?? '');

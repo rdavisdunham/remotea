@@ -56,6 +56,7 @@ export class RemoteHosts {
   }
 
   start(): void {
+    this.seedFromEnv();
     for (const host of this.store.list()) this.ensureClient(host);
     if (!this.diagTimer) {
       this.diagTimer = setInterval(() => this.flushDiag(), DIAG_FLUSH_MS);
@@ -99,6 +100,27 @@ export class RemoteHosts {
 
   list(): HostDTO[] {
     return this.store.list().map((h) => this.dto(h));
+  }
+
+  /**
+   * REMOTEA_SEED_HOST={"name","url","token"}: add (or update) that host at
+   * startup. For scripted setups — the desktop test harness starts a test
+   * instance against a test server this way — since the stored token is
+   * encrypted with this machine's secure storage and cannot be written from
+   * outside. Matched by URL, so relaunching does not duplicate it.
+   */
+  private seedFromEnv(): void {
+    const raw = process.env.REMOTEA_SEED_HOST;
+    if (!raw) return;
+    try {
+      const seed = JSON.parse(raw) as { name?: unknown; url?: unknown; token?: unknown };
+      if (typeof seed.name !== 'string' || typeof seed.url !== 'string' || typeof seed.token !== 'string') throw new Error('needs name, url and token');
+      const existing = this.store.list().find((h) => h.url === seed.url);
+      this.store.save({ id: existing?.id, name: seed.name, url: seed.url, token: seed.token, enabled: true });
+      this.log(`seeded host ${seed.name} (${seed.url}) from REMOTEA_SEED_HOST`);
+    } catch (err) {
+      this.log(`ignoring REMOTEA_SEED_HOST: ${(err as Error).message}`);
+    }
   }
 
   save(req: HostSaveRequest): HostDTO {

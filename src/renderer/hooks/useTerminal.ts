@@ -1882,6 +1882,10 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         if (exists) {
           restoreSurfaceState(true);
           attachToPty(surfaceId!);
+          // remotea: a remote terminal's screen lives on the server, and this
+          // renderer may have none of it (a window reload drops the local
+          // cache). Ask for the server's; it arrives through onResync.
+          if (remoteSpec) window.wmux.pty.requestResync?.(surfaceId!);
         } else {
           // No existing PTY — create a new one, passing surfaceId so PTY ID = Surface ID
           const spawnCommands = withClaudeResume({

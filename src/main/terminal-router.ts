@@ -111,6 +111,11 @@ export class TerminalRouter {
     else this.local.kill(id);
   }
 
+  /** A renderer lost its copy of a remote terminal (reload): send it the server's screen. Local: nothing to do. */
+  requestResync(id: SurfaceId): void {
+    this.remote.clientOwning(id)?.resnapshot(id);
+  }
+
   /** Stop streaming a remote terminal to this app but keep it running (window closed, hidden here). */
   release(id: SurfaceId): void {
     this.remote.clientOwning(id)?.release(id);

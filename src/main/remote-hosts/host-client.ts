@@ -733,6 +733,19 @@ export class RemoteHostClient {
     }
   }
 
+  /**
+   * Send this terminal's current screen through onResync — the renderer that
+   * shows it lost its copy (a window reload). A re-open without sinceSeq: the
+   * server answers with a snapshot at a fence, and output continues after it.
+   */
+  resnapshot(id: string): void {
+    const s = this.surfs.get(id);
+    if (!s || !s.open || s.openRid !== null || !this.ready) return;
+    diag('surf.resnapshot', { host: this.hostId }, id);
+    s.healing = true;
+    this.sendOpen(s);
+  }
+
   /** Stop streaming to this app but keep the session (window closed, or hidden here). */
   release(id: string): void {
     const s = this.surfs.get(id);

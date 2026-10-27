@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Terminal } from '@xterm/xterm';
 import {
+  contentEnd,
   forgetAllScreenEvents,
   readScreenReport,
   screenEventsFor,
@@ -38,9 +39,11 @@ describe('readScreenReport', () => {
   it('reads the bottom of the active buffer and trims trailing blank lines', async () => {
     const t = makeTerminal(20, 4);
     await write(t, 'one\r\ntwo\r\nthree');
+    // remotea: the blank row below the output is trimmed BEFORE counting, so
+    // three lines asked for are three lines of content (see contentEnd).
     expect(readScreenReport(t, 'surf-a', { lines: 3 })).toMatchObject({
-      text: 'two\nthree',
-      lines: 2,
+      text: 'one\ntwo\nthree',
+      lines: 3,
       surfaceId: 'surf-a',
     });
   });
@@ -123,5 +126,23 @@ describe('trackScreenEvents', () => {
     }
     expect(screenEventsFor('surf-0')).toEqual([]);
     expect(screenEventsFor(`surf-${SCREEN_EVENT_SURFACE_LIMIT}`)).toHaveLength(1);
+  });
+});
+
+describe('readScreenReport on a pane taller than what it has printed (remotea)', () => {
+  it('reads up to the last printed line, not the blank bottom of the pane', async () => {
+    const t = makeTerminal(40, 60);
+    await write(t, 'line one\r\nline two\r\n$ ');
+    const r = readScreenReport(t, 'surf-tall', { lines: 40 });
+    expect(r.text).toBe('line one\nline two\n$ ');
+    expect(contentEnd(t)).toBe(3);
+  });
+
+  it('never cuts above the cursor, and still reads the true bottom of a full pane', async () => {
+    const t = makeTerminal(20, 6);
+    await write(t, 'a\r\n\r\n\r\n');
+    expect(contentEnd(t)).toBe(4); // cursor on the 4th (empty) row
+    await write(t, Array.from({ length: 10 }, (_, i) => `row${i}`).join('\r\n'));
+    expect(readScreenReport(t, 'surf-full', { lines: 3 }).text).toBe('row7\nrow8\nrow9');
   });
 });

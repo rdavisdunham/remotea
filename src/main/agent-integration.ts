@@ -285,6 +285,11 @@ export async function promptForConsent(parent?: Electron.BrowserWindow): Promise
  */
 export async function initAgentIntegration(parent?: Electron.BrowserWindow): Promise<IntegrationConsent> {
   let consent = readConsent();
+  // remotea: a test or scripted instance must neither ask nor reconcile. The
+  // files this manages (~/.claude/settings.json, CLAUDE.md, …) are shared by
+  // every instance on the machine, so even a "declined" here would strip the
+  // hooks a real install put there.
+  if (process.env.REMOTEA_SKIP_AGENT_INTEGRATION === '1') return consent;
   if (consent.decision === 'unset') {
     const decision = await promptForConsent(parent);
     if (decision === null) return consent; // ask again next launch

@@ -13,6 +13,13 @@ remotea-specific pieces:
 | `src/renderer/remote-sessions/` | Applies server-driven placement to the store and syncs workspace metadata back. |
 | `docs/remotea/plan.md` | The design and phasing plan. |
 
+Testing in the real app (from WSL, on the PC that runs the server): `node scripts/desktop-test/harness.mjs up` runs a **test copy** of the app on this PC's Windows side, against a **test server** (port 7719), and drives it over the Chrome DevTools Protocol.
+- `eval`, `shot`, `type`, `key` and `screen` drive the app; `diag` reads its diagnostics; `down` stops both.
+- The renderer's `window.__wmux_*` automation hooks (`src/renderer/pipe-bridge.ts`) do most of the work.
+- It never touches the real server, its sessions, or `~/.claude`.
+
+Debugging the real setup: `remotea logs` shows what each app reported (no content), and `remotea screen <id>` shows a pane's screen.
+
 Naming: "remote" already means the phone **Remote Console** (`remote-console-*`) and ssh uploads (`remote-insert.ts`). The new feature uses **remote host** and **remote session**.
 
 Identity: the app's pipe, APPDATA dir and AppUserModelId use the base name `remotea` (`src/shared/instance.ts`), so it runs beside a stock wmux install. Internal identifiers (`window.wmux`, `WMUX_*` env vars, `wmux*.ts` file names) are deliberately unchanged, to keep merges from upstream wmux cheap.

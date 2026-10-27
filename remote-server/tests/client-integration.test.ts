@@ -110,6 +110,24 @@ describe('RemoteHostClient against a real server', () => {
     await waitFor(() => rig.sp.last().written.includes('ls\r'));
   });
 
+  it('resnapshot sends the current screen through onResync (a renderer that reloaded)', async () => {
+    const rig = await startServer();
+    const { client } = makeClient(rig.port, 'device-alpha10');
+    client.start();
+    await waitFor(() => client.ready);
+    await client.create({ id: 'surf-int-10', cols: 80, rows: 24, spec: {} });
+    const io = collect(client, 'surf-int-10');
+    rig.sp.last().emit('history-line\r\n');
+    await waitFor(() => io.text().includes('history-line'));
+    client.resnapshot('surf-int-10');
+    await waitFor(() => io.resyncs.length === 1);
+    expect(io.resyncs[0].data).toContain('history-line');
+    // Output after the fence still streams, once.
+    rig.sp.last().emit('after\r\n');
+    await waitFor(() => io.text().includes('after'));
+    expect(io.text().match(/after/g)).toHaveLength(1);
+  });
+
   it('agent status from a hook reaches the app live, and is replayed (marked) after a reconnect', async () => {
     const rig = await startServer();
     const { client, rpcs } = makeClient(rig.port, 'device-alpha09');

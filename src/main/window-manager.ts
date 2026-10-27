@@ -289,7 +289,8 @@ export class WindowManager {
     if (isDev) {
       const devPort = process.env.VITE_DEV_PORT || '5199';
       win.loadURL(`http://localhost:${devPort}`);
-      win.webContents.openDevTools({ mode: 'detach' });
+      // REMOTEA_NO_DEVTOOLS: the desktop test harness drives the window over CDP instead.
+      if (process.env.REMOTEA_NO_DEVTOOLS !== '1') win.webContents.openDevTools({ mode: 'detach' });
     } else {
       win.loadFile(path.join(__dirname, '../renderer/index.html'));
     }

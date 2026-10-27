@@ -10,8 +10,12 @@
 | Phase 4a: hook bridge. wmux-hook.js (Claude Code, Codex) reports to `127.0.0.1:7718` in WSL with a per-session token; the server relays status to every app showing the session and replays the latest state to apps that attach later. `remotea hooks install` | **done**: unit + real-helper + integration + e2e (hook fired in a real shell) |
 | Diagnostics: apps send connection/reattach/agent-state events (no content) to the server; `remotea logs`, `remotea screen <id>` | **done** |
 | Phase 3: non-owner rendering at owner size, deflate, snapshots persisted across restarts, `\\wsl.localhost` explorer, uploads over WS | open |
+| To do (requested): after connecting to a host, the app shows whether agent hooks are installed on that host's harnesses (Claude Code, Codex, …) and offers to install them through the server (server side: `remotea hooks status/install`; needs a protocol message and a prompt in the app) | open |
 | Phase 4b: the other wmux plugins in WSL (OpenCode, pi, omp, Qwen, Grok, agy), server-side agent detection | open |
-| Server restarts that keep processes (a PTY holder outliving the server) | proposed |
+| Server restarts that keep processes | declined: like herdr, a restart (even of the PC) respawns sessions in their directories and resumes their agents |
+| Desktop test harness (`scripts/desktop-test/harness.mjs`): a test app instance on the Windows side driven over CDP from WSL, against a test server | **done** |
+| Found with the harness: a remote pane was blank after a window reload (now asks the server for a snapshot); screen reads and agent detection looked at the blank bottom of panes taller than 40 rows (now read up to the last printed line) | **fixed** |
+| To do: the first-run tour and other UI copy still say "wmux" | open |
 
 ---
 

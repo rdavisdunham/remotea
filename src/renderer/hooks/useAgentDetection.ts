@@ -26,6 +26,7 @@ import { useStore } from '../store';
 import { surfaceTerminalRegistry, surfaceOutputSeq, surfaceTitle } from './useTerminal';
 import { detectScreen } from '../../shared/detection/engine';
 import { progressTurnState, withProgressTurn } from '../utils/progress-turn';
+import { contentEnd } from '../utils/screen-report';
 import { BUNDLED_MANIFESTS } from '../../shared/detection/manifests';
 import type { DetectionResult, Manifest } from '../../shared/detection/types';
 import { detectionNeedsPublish, detectionPausedBy } from '../store/agent-rollup';
@@ -66,7 +67,9 @@ function readScreen(surfaceId: string): string[] | null {
   if (!terminal) return null;
 
   const buf = terminal.buffer.active;
-  const end = buf.length;
+  // Up to the last printed line, not the buffer's bottom: on a pane taller than
+  // DETECTION_LINES that has not filled yet, the bottom rows are all blank.
+  const end = contentEnd(terminal);
   const out: string[] = [];
   for (let i = Math.max(0, end - DETECTION_LINES); i < end; i++) {
     out.push(buf.getLine(i)?.translateToString(true) ?? '');
