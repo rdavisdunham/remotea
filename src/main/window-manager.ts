@@ -353,7 +353,7 @@ export class WindowManager {
     });
     dialog.showMessageBox(entry.window, {
       type: 'warning',
-      title: 'wmux',
+      title: 'remotea',
       message: copy.message,
       detail: copy.detail,
       buttons: [copy.confirmLabel, 'Cancel'],
@@ -387,7 +387,7 @@ export class WindowManager {
       const copy = rendererRecoveryCopy(kind);
       dialog.showMessageBox(win, {
         type: 'warning',
-        title: 'wmux',
+        title: 'remotea',
         message: copy.message,
         detail: copy.detail,
         buttons: copy.buttons,

@@ -7,7 +7,7 @@ import { cliPipePath, sendKeyParams } from '../../src/cli/wmux';
 // (wmux-hook.ts) already followed the instance; the CLI now does too.
 describe('cliPipePath', () => {
   it('follows WMUX_INSTANCE the way shared/instance.ts names the pipe', () => {
-    expect(cliPipePath({ WMUX_INSTANCE: 'dev' })).toBe('\\\\.\\pipe\\wmux-dev');
+    expect(cliPipePath({ WMUX_INSTANCE: 'dev' })).toBe('\\\\.\\pipe\\remotea-dev');
   });
 
   it('lets an explicit WMUX_PIPE win, as a pane spawned by wmux sets it', () => {
@@ -15,8 +15,8 @@ describe('cliPipePath', () => {
   });
 
   it('is the installed pipe with no instance, or a blank one', () => {
-    expect(cliPipePath({})).toBe('\\\\.\\pipe\\wmux');
-    expect(cliPipePath({ WMUX_INSTANCE: '  ' })).toBe('\\\\.\\pipe\\wmux');
+    expect(cliPipePath({})).toBe('\\\\.\\pipe\\remotea');
+    expect(cliPipePath({ WMUX_INSTANCE: '  ' })).toBe('\\\\.\\pipe\\remotea');
   });
 });
 

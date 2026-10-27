@@ -53,7 +53,7 @@ const firedAt = Date.now();
 // The fallback tracks WMUX_INSTANCE the way shared/instance.ts's getPipePath()
 // does — restated rather than imported, because the CLI ships file by file.
 const instance = process.env.WMUX_INSTANCE?.trim() ?? '';
-const pipePath = process.env.WMUX_PIPE || '\\\\.\\pipe\\wmux' + (instance ? '-' + instance : '');
+const pipePath = process.env.WMUX_PIPE || '\\\\.\\pipe\\remotea' + (instance ? '-' + instance : '');
 const surfaceId = process.env.WMUX_SURFACE_ID || '';
 
 /**

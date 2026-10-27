@@ -36,8 +36,8 @@ import * as path from 'path';
 import { getAppDataDir } from '../shared/instance';
 import { compareVersions, type GithubRelease } from './update-checker';
 
-const REPO_OWNER = 'amirlehmam';
-const REPO_NAME = 'wmux';
+const REPO_OWNER = 'rdavisdunham';
+const REPO_NAME = 'remotea';
 
 /**
  * How many releases to show. wmux ships often; a changelog is for "what changed

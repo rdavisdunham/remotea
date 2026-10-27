@@ -1,3 +1,24 @@
+# remotea: read this first
+
+This repository is **remotea**, a fork of [wmux](https://github.com/amirlehmam/wmux) (MIT, by Amir Lehmam). It adds a WSL session server (`remote-server/`, design modeled on [herdr](https://github.com/herdrdev/herdr)) that owns terminals, plus a remote-host backend in the app. Everything below the line is wmux's original development guide, and it still applies to the app.
+
+remotea-specific pieces:
+
+| Path | Role |
+|---|---|
+| `remote-server/` | WSL session server. It has its own `package.json` and `node_modules` (node-pty built for Linux Node, not Electron). Run its tests from WSL with `npm --prefix remote-server test`. |
+| `src/shared/remote-host-protocol.ts` | Wire protocol shared by the server and app main. Pure: no Node or DOM imports. |
+| `src/main/terminal-backend.ts`, `src/main/terminal-router.ts` | `TerminalBackend` interface; `PtyManager` is the local implementation. The router picks local or remote per surface. |
+| `src/main/remote-hosts/` | Remote host client: connection state machine, registry mirror, reconcile, placement, pending intents. |
+| `src/renderer/remote-sessions/` | Applies server-driven placement to the store and syncs workspace metadata back. |
+| `docs/remotea/plan.md` | The design and phasing plan. |
+
+Naming: "remote" already means the phone **Remote Console** (`remote-console-*`) and ssh uploads (`remote-insert.ts`). The new feature uses **remote host** and **remote session**.
+
+Identity: the app's pipe, APPDATA dir and AppUserModelId use the base name `remotea` (`src/shared/instance.ts`), so it runs beside a stock wmux install. Internal identifiers (`window.wmux`, `WMUX_*` env vars, `wmux*.ts` file names) are deliberately unchanged, to keep merges from upstream wmux cheap.
+
+---
+
 # wmux — Development Guide
 
 Electron-based Windows terminal multiplexer for AI agents. TypeScript, React 19, Zustand, xterm.js, node-pty.

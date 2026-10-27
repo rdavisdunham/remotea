@@ -1,11 +1,11 @@
 {
-  "name": "wmux",
-  "version": "2.45.0",
-  "description": "Windows terminal multiplexer for AI agents",
+  "name": "remotea",
+  "version": "0.1.0",
+  "description": "Persistent remote terminals for AI agents: a Windows GUI (built on wmux) attached to a session server in WSL (architecture inspired by herdr)",
   "license": "MIT",
   "main": "dist/main/index.js",
   "bin": {
-    "wmux": "dist/cli/wmux.js"
+    "remotea": "dist/cli/wmux.js"
   },
   "scripts": {
     "dev": "concurrently \"vite --port 5199\" \"wait-on http://localhost:5199 && electron .\"",

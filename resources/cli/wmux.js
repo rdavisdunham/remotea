@@ -79,7 +79,7 @@ function cliPipePath(env) {
     if (env.WMUX_PIPE)
         return env.WMUX_PIPE;
     const instance = env.WMUX_INSTANCE?.trim() ?? '';
-    return '\\\\.\\pipe\\wmux' + (instance ? '-' + instance : '');
+    return '\\\\.\\pipe\\remotea' + (instance ? '-' + instance : '');
 }
 const PIPE_PATH = cliPipePath(process.env);
 // ─── Remote transport (issue #78: remote wmux management) ────────────────────

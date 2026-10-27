@@ -1,9 +1,13 @@
 /**
- * wmux instance identity.
+ * remotea instance identity (inherited from wmux).
  *
- * Set WMUX_INSTANCE=<name> to run wmux as a separate, side-by-side instance:
+ * remotea is built on wmux, so its base name differs from wmux's ("remotea"
+ * rather than "wmux") — that keeps the pipe, APPDATA dir and taskbar id apart
+ * from a stock wmux install running on the same machine.
+ *
+ * Set WMUX_INSTANCE=<name> to run a separate, side-by-side instance:
  * the named pipe and APPDATA directory get a "-<name>" suffix, so a dev build
- * can run alongside an installed production wmux without colliding on the
+ * can run alongside an installed production build without colliding on the
  * pipe (Windows pipes are exclusive) or overwriting session.json.
  */
 import crypto from 'crypto';
@@ -17,12 +21,12 @@ function suffix(): string {
 }
 
 export function getPipePath(): string {
-  return `\\\\.\\pipe\\wmux${suffix()}`;
+  return `\\\\.\\pipe\\remotea${suffix()}`;
 }
 
 export function getAppDataDir(): string {
   const base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-  return path.join(base, `wmux${suffix()}`);
+  return path.join(base, `remotea${suffix()}`);
 }
 
 /**
@@ -35,7 +39,7 @@ export function getAppDataDir(): string {
  */
 export function getLocalAppDataDir(): string {
   const base = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  return path.join(base, `wmux${suffix()}`);
+  return path.join(base, `remotea${suffix()}`);
 }
 
 /**
@@ -54,7 +58,7 @@ export function getLocalAppDataDir(): string {
  * "run the dev build side by side" quietly destructive to a real install.
  */
 export function getAppUserModelId(): string {
-  return `com.wmux.app${suffix()}`;
+  return `com.remotea.app${suffix()}`;
 }
 
 /**

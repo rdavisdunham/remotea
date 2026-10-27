@@ -1,14 +1,14 @@
 {
-  "appId": "com.wmux.app",
-  "productName": "wmux",
+  "appId": "com.remotea.app",
+  "productName": "remotea",
   "npmRebuild": false,
   "directories": {
     "output": "release"
   },
   "publish": {
     "provider": "github",
-    "owner": "amirlehmam",
-    "repo": "wmux"
+    "owner": "rdavisdunham",
+    "repo": "remotea"
   },
   "files": [
     "dist/**/*",
@@ -34,12 +34,12 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "wmux",
-    "artifactName": "wmux-${version}-setup.${ext}",
+    "shortcutName": "remotea",
+    "artifactName": "remotea-${version}-setup.${ext}",
     "include": "build/installer.nsh"
   },
   "portable": {
-    "artifactName": "wmux-${version}-portable.exe"
+    "artifactName": "remotea-${version}-portable.exe"
   },
   "extraResources": [
     { "from": "resources/icon.png", "to": "icon.png" },

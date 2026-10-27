@@ -19,7 +19,7 @@ afterEach(() => {
 describe('getAppUserModelId', () => {
   it('is the bare production id when no instance is set', () => {
     delete process.env.WMUX_INSTANCE;
-    expect(getAppUserModelId()).toBe('com.wmux.app');
+    expect(getAppUserModelId()).toBe('com.remotea.app');
   });
 
   it('must equal electron-builder appId in the default case', () => {
@@ -34,8 +34,8 @@ describe('getAppUserModelId', () => {
 
   it('suffixes for a named instance, so a dev build cannot seize the install', () => {
     process.env.WMUX_INSTANCE = 'dev';
-    expect(getAppUserModelId()).toBe('com.wmux.app-dev');
-    expect(getAppUserModelId()).not.toBe('com.wmux.app');
+    expect(getAppUserModelId()).toBe('com.remotea.app-dev');
+    expect(getAppUserModelId()).not.toBe('com.remotea.app');
   });
 
   it('suffixes in lockstep with the pipe and the APPDATA dir', () => {
@@ -47,7 +47,7 @@ describe('getAppUserModelId', () => {
 
   it('ignores whitespace-only values like the other identities do', () => {
     process.env.WMUX_INSTANCE = '   ';
-    expect(getAppUserModelId()).toBe('com.wmux.app');
+    expect(getAppUserModelId()).toBe('com.remotea.app');
     expect(getPipePath()).toBe(getPipePath()); // same rule, no suffix
   });
 });

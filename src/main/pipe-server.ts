@@ -61,7 +61,7 @@ export class PipeServer extends EventEmitter {
   private pipePath: string;
   private authToken: string;
 
-  constructor(pipePath = '\\\\.\\pipe\\wmux', authToken = '') {
+  constructor(pipePath = '\\\\.\\pipe\\remotea', authToken = '') {
     super();
     this.pipePath = pipePath;
     this.authToken = authToken;
