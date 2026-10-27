@@ -111,7 +111,7 @@ remotea screen <surf-id>                             # what a session's screen s
 
 Agents in remotea terminals report their state (working, needs you, done) the same way they do in wmux: through wmux's hook helper, registered in Claude Code's and Codex's hook settings. In WSL the helper can't reach the app's named pipe, so it reports to the server instead, on `127.0.0.1:7718` (`hookPort` in `config.json`). The server relays it to every app showing that session and replays the latest state to an app that connects later, for example a laptop waking up after the turn ended.
 
-- `remotea hooks install` (run by `install.sh`) adds these entries next to any other hooks you have, and `remotea hooks remove` takes only its own back out. The first change to each file keeps a `.remotea-backup` copy.
+- `install.sh` offers to install the hooks (yes/no; `--hooks` or `--no-hooks` to decide up front). `remotea hooks install` adds these entries next to any other hooks you have, and `remotea hooks remove` takes only its own back out. The first change to each file keeps a `.remotea-backup` copy.
 - Each session gets its own token (`WMUX_REMOTE_TOKEN`), which can only report status for that session. The main token never enters a session's environment.
 - Outside a remotea terminal the helper exits immediately.
 

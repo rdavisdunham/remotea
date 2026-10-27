@@ -401,7 +401,7 @@ const USAGE = `usage:
   remotea close <surf-id>
   remotea token
   remotea rotate-token
-  remotea hooks install|remove|status
+  remotea hooks install|remove|status [--json]
   remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
   remotea screen <surf-id>`;
 
@@ -442,7 +442,7 @@ export async function main(argv: string[]): Promise<number> {
         process.stdout.write(fmtHooks(rows));
         process.stdout.write('new agent sessions in remotea terminals now report their status to the apps\n');
       } else if (sub === 'remove') process.stdout.write(fmtHooks(removeHooks()));
-      else if (sub === 'status') process.stdout.write(fmtHooks(hooksStatus()));
+      else if (sub === 'status') process.stdout.write(rest.includes('--json') ? JSON.stringify(hooksStatus()) + '\n' : fmtHooks(hooksStatus()));
       else throw new Error('usage: remotea hooks install|remove|status');
       return 0;
     }

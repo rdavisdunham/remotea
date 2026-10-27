@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
 # Build remotea-server and install it as a systemd user service in WSL.
-#   ./scripts/install.sh [--yes]
-# --yes: restart a running server without asking (live sessions are lost and respawned by the apps).
+#   ./scripts/install.sh [--yes] [--hooks | --no-hooks]
+# --yes:      restart a running server without asking (live sessions are lost and respawned by the apps).
+# --hooks:    install the agent status hooks without asking; --no-hooks: leave agent settings alone.
+#             Without either, you are asked (and nothing is changed when there is nobody to ask).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 assume_yes=0
-[[ "${1:-}" == "--yes" ]] && assume_yes=1
+hooks_choice=ask
+for arg in "$@"; do
+  case "$arg" in
+    --yes) assume_yes=1 ;;
+    --hooks) hooks_choice=yes ;;
+    --no-hooks) hooks_choice=no ;;
+    *) printf 'unknown option: %s\n' "$arg" >&2; exit 2 ;;
+  esac
+done
 say() { printf '\033[1m%s\033[0m\n' "$*"; }
 warn() { printf '\033[33m%s\033[0m\n' "$*" >&2; }
 die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
@@ -33,8 +43,42 @@ REMOTEA_CONFIG_DIR="$config_dir" "$node_bin" dist/remote-server/src/cli.js token
 mkdir -p "$HOME/.local/bin"
 ln -sf "$here/dist/remote-server/src/cli.js" "$HOME/.local/bin/remotea"
 
-# Agent status hooks (Claude Code, Codex): beside any hooks already there, never replacing them.
-[[ "${REMOTEA_SKIP_HOOKS:-0}" == 1 ]] || "$node_bin" dist/remote-server/src/cli.js hooks install
+# Agent status hooks (Claude Code, Codex): offered, not imposed. They go beside any hooks
+# already in those files and never replace them; `remotea hooks remove` takes them back out.
+cli() { "$node_bin" dist/remote-server/src/cli.js "$@"; }
+hooks_json="$(cli hooks status --json)"
+hooks_count() { "$node_bin" -e 'const [j,f]=process.argv.slice(1);console.log(JSON.parse(j).filter(x=>x.present&&x[f]).length)' "$hooks_json" "$1"; }
+present="$(hooks_count present)"
+installed="$(hooks_count entries)"
+if [[ "$hooks_choice" == no ]]; then
+  :
+elif (( present == 0 )); then
+  say "No Claude Code or Codex found in this WSL; skipping agent status hooks (remotea hooks install, later)."
+elif [[ "$hooks_choice" == ask && "$installed" -gt 0 ]]; then
+  cli hooks install >/dev/null  # chosen before: refresh the helper copy and entries
+  say "Agent status hooks: up to date."
+else
+  if [[ "$hooks_choice" == ask ]]; then
+    if [[ -t 0 ]]; then
+      say ""
+      say "Agent status hooks"
+      echo "  Let Claude Code and Codex running in remotea terminals tell the app when they are"
+      echo "  working, waiting on you, or done (and which conversation to resume after a restart)."
+      echo "  This adds remotea's entries to (other hooks there are kept as they are):"
+      "$node_bin" -e 'for (const t of JSON.parse(process.argv[1])) if (t.present) console.log("    " + t.file)' "$hooks_json"
+      read -r -p "  Install them? [Y/n] " answer || answer=n
+      [[ -z "$answer" || "$answer" == [yY]* ]] && hooks_choice=yes || hooks_choice=no
+    else
+      warn "Agent status hooks not installed (no terminal to ask). Run: remotea hooks install"
+      hooks_choice=no
+    fi
+  fi
+  if [[ "$hooks_choice" == yes ]]; then
+    cli hooks install
+  else
+    say "Skipped. Install them any time with: remotea hooks install"
+  fi
+fi
 
 unit_dir="$HOME/.config/systemd/user"
 mkdir -p "$unit_dir"
