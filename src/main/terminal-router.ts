@@ -17,7 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { PtyManager, CreateOptions, CreateResult } from './pty-manager';
 import type { SurfaceId } from '../shared/types';
 import type { GroupId } from '../shared/remote-host-protocol';
-import type { PtyExitInfo, TerminalSnapshot } from '../shared/remote-hosts-types';
+import type { PtyExitInfo, RemoteSize, TerminalSnapshot } from '../shared/remote-hosts-types';
 import { parseRemoteShellSpec } from '../shared/remote-shell-spec';
 import type { RemoteHosts } from './remote-hosts';
 
@@ -139,6 +139,15 @@ export class TerminalRouter {
   onExit(id: SurfaceId, cb: (code: number, info: PtyExitInfo) => void): () => void {
     const c = this.remote.clientOwning(id);
     return c ? c.onExit(id, cb) : this.local.onExit(id, (code) => cb(code, { reason: 'exited' }));
+  }
+
+  /** A remote terminal's size and who sets it (remote only; local terminals always fit their pane). */
+  onSize(id: SurfaceId, cb: (s: RemoteSize) => void): () => void {
+    return this.remote.clientOwning(id)?.onSize(id, cb) ?? (() => {});
+  }
+
+  remoteSize(id: SurfaceId): RemoteSize | undefined {
+    return this.remote.clientOwning(id)?.sizeOf(id);
   }
 
   onResync(id: SurfaceId, cb: (snap: TerminalSnapshot) => void): () => void {

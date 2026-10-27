@@ -5,7 +5,7 @@ import { IPC_CHANNELS, type InsertionResult, type NotificationSoundPickResult, t
   type WorktreeCloseMode, type WorktreeInspectResult, type WorktreeRemoveResult,
 } from '../shared/types';
 import type { BrowserHistory } from '../shared/browser-history';
-import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, PtyExitInfo, RegistryPayload, RemoteRegistryView, TerminalSnapshot } from '../shared/remote-hosts-types';
+import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, PtyExitInfo, RegistryPayload, RemoteSize, RemoteRegistryView, TerminalSnapshot } from '../shared/remote-hosts-types';
 import type {
   RemoteConsoleBridge,
   RemoteConsoleStatus,
@@ -74,6 +74,15 @@ contextBridge.exposeInMainWorld('wmux', {
     },
     // remotea: this renderer lost its copy of a remote terminal (reload); ask for a snapshot (arrives via onResync).
     requestResync: (id: string) => ipcRenderer.send(IPC_CHANNELS.PTY_RESYNC_REQUEST, id),
+    // remotea: a remote terminal's size, and whether this device sets it.
+    remoteSize: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PTY_REMOTE_SIZE, id) as Promise<RemoteSize | null>,
+    onRemoteSize: (id: string, callback: (size: RemoteSize) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, ptyId: string, size: RemoteSize) => {
+        if (ptyId === id) callback(size);
+      };
+      ipcRenderer.on(IPC_CHANNELS.PTY_SIZE, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.PTY_SIZE, handler);
+    },
   },
   // remotea: remote session servers. The token is write-only from here.
   remoteHosts: {

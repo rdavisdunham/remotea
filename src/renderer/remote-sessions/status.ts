@@ -53,6 +53,32 @@ export async function refreshRemoteHosts(): Promise<void> {
   }
 }
 
+/**
+ * Remote panes this device is only VIEWING: another device sets the terminal's
+ * size (the last one focused or typed in), so the pane shows it at that size,
+ * scaled down to fit (useTerminal's fit()), with a badge saying so.
+ */
+export interface RemoteView {
+  cols: number;
+  rows: number;
+  ownerName?: string;
+}
+
+export const useRemoteViews = create<{ views: Record<string, RemoteView> }>(() => ({ views: {} }));
+
+export function setRemoteView(surfaceId: string, view: RemoteView | null): void {
+  useRemoteViews.setState((st) => {
+    const cur = st.views[surfaceId];
+    if (!view) {
+      if (!cur) return st;
+      const { [surfaceId]: _gone, ...rest } = st.views;
+      return { views: rest };
+    }
+    if (cur && cur.cols === view.cols && cur.rows === view.rows && cur.ownerName === view.ownerName) return st;
+    return { views: { ...st.views, [surfaceId]: view } };
+  });
+}
+
 export function reconnectRemoteHosts(): void {
   bridge()?.reconnect();
 }

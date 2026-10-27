@@ -31,6 +31,15 @@ export interface HostStatus {
   };
 }
 
+/** A remote terminal's size as its server has it; `owner`: this device sets it (the last one focused or typed in). */
+export interface RemoteSize {
+  cols: number;
+  rows: number;
+  owner: boolean;
+  /** The device that does set it, when it is another one. */
+  ownerName?: string;
+}
+
 export interface HostDTO {
   id: string;
   name: string;

@@ -222,7 +222,8 @@ export type ServerMsg =
   | { t: 'probed'; rid: number; status: Record<string, ProbeStatus>; last: Record<string, LostInfo>; groupStatus?: Record<string, 'live' | 'closed' | 'unknown'> }
   | { t: 'ack'; rid: number; ok: boolean; error?: string }
   | { t: 'exit'; id: RemoteSurfaceId; code: number; signal?: number }
-  | { t: 'size'; id: RemoteSurfaceId; cols: number; rows: number; owner: boolean }
+  /** The terminal's size; `owner`: this device sets it. `ownerName`: the device that does, if any. */
+  | { t: 'size'; id: RemoteSurfaceId; cols: number; rows: number; owner: boolean; ownerName?: string }
   | { t: 'meta'; id: RemoteSurfaceId; cwd?: string; fg?: string; agent?: AgentHandle | null }
   | { t: 'sessionAdded'; session: SessionRecord }
   | { t: 'sessionUpdated'; session: SessionRecord }

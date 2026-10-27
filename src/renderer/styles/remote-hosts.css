@@ -132,3 +132,43 @@
   border-radius: 3px;
   background: rgba(127, 127, 127, 0.18);
 }
+
+/* A remote pane viewed at another device's size (RemoteSizeBadge). Bottom-right and small: the content is the point. */
+.remote-size-badge {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 20px);
+  padding: 3px 4px 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-secondary, #b8b8b8);
+  background: color-mix(in srgb, var(--bg-elevated, #2a2a2a) 88%, transparent);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+}
+
+.remote-size-badge__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-size-badge__fit {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.18));
+  background: transparent;
+  color: var(--text-primary, #e8e8e8);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.remote-size-badge__fit:hover {
+  background: color-mix(in srgb, var(--text-primary, #e8e8e8) 10%, transparent);
+}

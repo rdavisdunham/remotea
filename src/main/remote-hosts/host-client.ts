@@ -32,7 +32,7 @@ import {
   type ServerMsg,
   type SessionRecord,
 } from '../../shared/remote-host-protocol';
-import type { HostStatus, PtyExitInfo, TerminalSnapshot } from '../../shared/remote-hosts-types';
+import type { HostStatus, PtyExitInfo, RemoteSize, TerminalSnapshot } from '../../shared/remote-hosts-types';
 import { initialFsm, publicState, step, type Fsm, type FsmEvent } from './connection-fsm';
 import type { PendingIntent, PendingIntents } from './host-config';
 import { diag } from './diag';
@@ -139,7 +139,11 @@ interface Surf {
   openRid: number | null;
   /** A snapshot re-open was requested to heal a seq gap. */
   healing: boolean;
+  /** The terminal's size on the server, and whether this device sets it (last `size`/`opened`). */
+  size?: RemoteSize;
+  sizeCbs?: Set<(s: RemoteSize) => void>;
 }
+
 
 const RESTORED_NOTICE = (host: string) =>
   `\x1b[!p\r\n\x1b[2m[remotea] ${host} restarted; session restored\x1b[0m\r\n`;
@@ -531,6 +535,11 @@ export class RemoteHostClient {
         diag('conn.hooks', { host: this.hostId, installed: msg.hooks.filter((a) => a.installed).map((a) => a.agent).join(',') });
         this.deps.onStatus(this.status());
         return;
+      case 'size': {
+        const surf = this.surfs.get(msg.id);
+        if (surf) this.setSize(surf, { cols: msg.cols, rows: msg.rows, owner: msg.owner, ownerName: msg.ownerName });
+        return;
+      }
       case 'rpc':
         // Only for a session this app has open; one it is not showing gets the
         // latest state replayed when (if) it opens it.
@@ -635,6 +644,7 @@ export class RemoteHostClient {
     // a snapshot or a fresh process starts exactly at msg.seq.
     surf.lastSeq = msg.mode === 'delta' ? msg.fromSeq ?? surf.lastSeq : msg.seq;
     surf.bootId = this.bootId;
+    this.setSize(surf, { cols: msg.cols, rows: msg.rows, owner: msg.owner, ownerName: msg.owner ? undefined : surf.size?.ownerName });
 
     if (firstOpen) {
       const waiters = surf.waiters;
@@ -861,6 +871,25 @@ export class RemoteHostClient {
       cb(code, info);
     }
     return () => s.exit.delete(cb);
+  }
+
+  /** Size changes of terminal `id` (see RemoteSize). */
+  onSize(id: string, cb: (s: RemoteSize) => void): () => void {
+    const s = this.surfs.get(id);
+    if (!s) return () => {};
+    (s.sizeCbs ??= new Set()).add(cb);
+    return () => s.sizeCbs?.delete(cb);
+  }
+
+  sizeOf(id: string): RemoteSize | undefined {
+    return this.surfs.get(id)?.size;
+  }
+
+  private setSize(surf: Surf, size: RemoteSize): void {
+    const prev = surf.size;
+    if (prev && prev.cols === size.cols && prev.rows === size.rows && prev.owner === size.owner && prev.ownerName === size.ownerName) return;
+    surf.size = size;
+    for (const cb of surf.sizeCbs ?? []) cb(size);
   }
 
   onResync(id: string, cb: ResyncCb): () => void {

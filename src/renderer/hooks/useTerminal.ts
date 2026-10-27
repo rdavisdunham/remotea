@@ -67,7 +67,8 @@ import { withClaudeResume } from './claude-resume-command';
 import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
 import { installRemoteQuerySwallow } from '../../shared/remote-query-swallow';
 import { ensureRemoteGroup } from '../remote-sessions/sync';
-import type { PtyExitInfo, TerminalSnapshot } from '../../shared/remote-hosts-types';
+import { setRemoteView } from '../remote-sessions/status';
+import type { PtyExitInfo, RemoteSize, TerminalSnapshot } from '../../shared/remote-hosts-types';
 import '@xterm/xterm/css/xterm.css';
 
 declare global {
@@ -855,6 +856,12 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
   const ptyIdRef = useRef<string | null>(null);
   // remotea: whether this terminal is a remote session, and whether its pane is focused.
   const remoteRef = useRef(false);
+  /**
+   * remotea: set while ANOTHER device sets this remote terminal's size. The
+   * program in it draws for that size, so the grid stays at it here — scaled
+   * down to fit the pane — instead of being fitted to this pane and garbled.
+   */
+  const remoteViewRef = useRef<{ cols: number; rows: number } | null>(null);
   const focusedRef = useRef(focused);
   focusedRef.current = focused;
   const cleanupFnsRef = useRef<Array<() => void>>([]);
@@ -926,6 +933,33 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       .catch(() => { /* nothing pasted rather than something wrong */ });
   };
 
+  /**
+   * Viewing another device's size (remoteViewRef): hold the grid at it and
+   * scale the terminal down so all of it shows; never up. Returns false when
+   * this device sets the size, after taking any such scaling back off.
+   */
+  const applyRemoteView = (): boolean => {
+    const term = xtermRef.current;
+    const el = term?.element;
+    const view = remoteViewRef.current;
+    if (!term || !el) return false;
+    if (!view) {
+      if (el.style.transform) {
+        el.style.transform = '';
+        el.style.transformOrigin = '';
+      }
+      return false;
+    }
+    if (term.cols !== view.cols || term.rows !== view.rows) {
+      try { term.resize(view.cols, view.rows); } catch { /* not laid out yet */ }
+    }
+    const own = fitAddonRef.current?.proposeDimensions();
+    const scale = own ? Math.min(1, own.cols / view.cols, own.rows / view.rows) : 1;
+    el.style.transformOrigin = '0 0';
+    el.style.transform = scale < 1 ? `scale(${scale.toFixed(4)})` : '';
+    return true;
+  };
+
   const fit = () => {
     // A snapshot replay pins the terminal to the size the snapshot was taken
     // at until it has actually been PARSED — `terminal.write()` is async, so
@@ -934,6 +968,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // fit() is reached from the ResizeObserver, the PTY attach, the visibility
     // effect and the theme effect, and one ungated path is enough to lose it.
     if (!replayHoldRef.current.request()) return;
+    if (applyRemoteView()) return;
     if (fitAddonRef.current) {
       try {
         // A change of COLUMNS reflows, and xterm and ConPTY anchor a reflow at
@@ -1811,7 +1846,28 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // remotea: a remote terminal that missed too much while disconnected gets a fresh screen.
       const unsubResync = remoteRef.current ? window.wmux.pty.onResync(id, resyncFromServer) : () => {};
 
-      cleanupFnsRef.current.push(unsubData, unsubExit, unsubResync);
+      // remotea: who sets this remote terminal's size. Owning it, fit the pane as
+      // usual (and make sure the server has this pane's size); viewing another
+      // device's, hold its size (see applyRemoteView).
+      const onRemoteSize = (size: RemoteSize | null) => {
+        if (disposed || !size || !surfaceId) return;
+        const wasViewing = !!remoteViewRef.current;
+        remoteViewRef.current = size.owner ? null : { cols: size.cols, rows: size.rows };
+        setRemoteView(surfaceId, size.owner ? null : { cols: size.cols, rows: size.rows, ownerName: size.ownerName });
+        fit();
+        if (size.owner && wasViewing) {
+          const dims = fitAddonRef.current?.proposeDimensions();
+          if (dims && (dims.cols !== size.cols || dims.rows !== size.rows)) window.wmux.pty.resize(id, dims.cols, dims.rows);
+        }
+      };
+      const unsubSize = remoteRef.current ? window.wmux.pty.onRemoteSize(id, onRemoteSize) : () => {};
+      if (remoteRef.current) void window.wmux.pty.remoteSize(id).then(onRemoteSize);
+      const forgetView = () => {
+        remoteViewRef.current = null;
+        if (surfaceId) setRemoteView(surfaceId, null);
+      };
+
+      cleanupFnsRef.current.push(unsubData, unsubExit, unsubResync, unsubSize, forgetView);
       // The pane the user is looking at takes control of the remote terminal's size.
       if (remoteRef.current && focusedRef.current && document.hasFocus()) window.wmux.pty.focus(id);
 

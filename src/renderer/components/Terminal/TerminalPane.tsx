@@ -7,6 +7,7 @@ import PromptOutline from './PromptOutline';
 import NewOutputPill from './NewOutputPill';
 import ResetNotice from './ResetNotice';
 import RemoteOverlay from './RemoteOverlay';
+import RemoteSizeBadge from './RemoteSizeBadge';
 import { useStore } from '../../store';
 import { parseRemoteShellSpec } from '../../../shared/remote-shell-spec';
 import '../../styles/terminal.css';
@@ -144,6 +145,7 @@ export default function TerminalPane({
     <div className={`terminal-pane ${focused ? 'terminal-pane--focused' : ''}`}>
       <div ref={terminalRef} className="terminal-pane__container" />
       {remoteHostId && <RemoteOverlay hostId={remoteHostId} />}
+      {remoteHostId && surfaceId && <RemoteSizeBadge surfaceId={surfaceId} />}
       {/* Prompt-log views (issue #207). All three are absolutely positioned over
           the container, never flow siblings of it: a flow sibling would be
           pushed out of the container's height:100% box WITHOUT firing the

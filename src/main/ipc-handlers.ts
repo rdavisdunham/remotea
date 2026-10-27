@@ -702,6 +702,9 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
       const unsubData = ptyManager.onData(id, (data) => batcher.push(data));
       // remotea: after a reconnect that missed too much, the server sends a
       // fresh screen. Flush first so no older byte lands on top of it.
+      const unsubSize = ptyManager.onSize(id, (size) => {
+        if (window && !window.isDestroyed()) window.webContents.send(IPC_CHANNELS.PTY_SIZE, id, size);
+      });
       const unsubResync = ptyManager.onResync(id, (snapshot) => {
         batcher.flush();
         if (window && !window.isDestroyed()) {
@@ -722,6 +725,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
           window.webContents.send(IPC_CHANNELS.PTY_EXIT, id, code, info);
         }
         unsubResync();
+        unsubSize();
         // The process that owned this surface is gone, so any state it declared
         // is now a lie. Drop it rather than leave a `working`/`blocked` pane
         // pointing at a dead PID (issue #128); the observer's scraped activity
@@ -769,6 +773,9 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     ptyManager.kill(id, typeof shellSpec === 'string' ? shellSpec : undefined);
     forgetSurface(id);
   });
+
+  ipcMain.handle(IPC_CHANNELS.PTY_REMOTE_SIZE, (_event, id: unknown) =>
+    (typeof id === 'string' ? ptyManager.remoteSize(id as SurfaceId) : undefined) ?? null);
 
   ipcMain.on(IPC_CHANNELS.PTY_RESYNC_REQUEST, (_event, id: SurfaceId) => {
     if (typeof id === 'string') ptyManager.requestResync(id);

@@ -140,6 +140,28 @@ describe('RemoteHostClient against a real server', () => {
     expect((await client.installHooks()).ok).toBe(false);
   });
 
+  it('the device that types sets the size; the other learns it, and who has it', async () => {
+    const rig = await startServer();
+    const desk = makeClient(rig.port, 'device-desk0001').client;
+    const lap = makeClient(rig.port, 'device-lap00001').client;
+    desk.start();
+    lap.start();
+    await waitFor(() => desk.ready && lap.ready);
+    await desk.create({ id: 'surf-int-13', cols: 200, rows: 60, spec: {} });
+    await lap.create({ id: 'surf-int-13', cols: 80, rows: 24, spec: {} });
+    const lapSizes: Array<{ cols: number; rows: number; owner: boolean; ownerName?: string }> = [];
+    lap.onSize('surf-int-13', (sz) => lapSizes.push(sz));
+    expect(desk.sizeOf('surf-int-13')).toMatchObject({ cols: 200, rows: 60, owner: true });
+    expect(lap.sizeOf('surf-int-13')).toMatchObject({ cols: 200, rows: 60, owner: false });
+    lap.write('surf-int-13', 'x');
+    await waitFor(() => desk.sizeOf('surf-int-13')?.owner === false);
+    expect(desk.sizeOf('surf-int-13')).toEqual({ cols: 80, rows: 24, owner: false, ownerName: 'device-lap00001' });
+    expect(lapSizes.at(-1)).toMatchObject({ cols: 80, rows: 24, owner: true });
+    desk.claim('surf-int-13');
+    await waitFor(() => lap.sizeOf('surf-int-13')?.owner === false);
+    expect(lap.sizeOf('surf-int-13')).toEqual({ cols: 200, rows: 60, owner: false, ownerName: 'device-desk0001' });
+  });
+
   it('resnapshot sends the current screen through onResync (a renderer that reloaded)', async () => {
     const rig = await startServer();
     const { client } = makeClient(rig.port, 'device-alpha10');

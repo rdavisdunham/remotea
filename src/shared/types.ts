@@ -707,6 +707,8 @@ export const IPC_CHANNELS = {
   // remotea: remote terminals (src/main/remote-hosts)
   PTY_RESYNC: 'pty:resync',
   PTY_RESYNC_REQUEST: 'pty:resync-request',
+  PTY_SIZE: 'pty:size',
+  PTY_REMOTE_SIZE: 'pty:remote-size',
   PTY_FOCUS: 'pty:focus',
   RHOST_LIST: 'rhost:list',
   RHOST_SAVE: 'rhost:save',

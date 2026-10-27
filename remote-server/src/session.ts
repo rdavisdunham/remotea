@@ -45,6 +45,8 @@ import { descendants, isSignalablePid, signalTree } from './proc';
 export interface ConnLike {
   readonly id: number;
   readonly deviceId: string;
+  /** The device's display name (after hello). */
+  readonly device?: { name: string } | null;
   sendJson(msg: ServerMsg): void;
   sendBinary(buf: Uint8Array): void;
   bufferedAmount(): number;
@@ -414,8 +416,9 @@ export class TermSession {
   }
 
   private broadcastSize(): void {
+    const ownerName = this.sizeOwner === null ? undefined : this.subs.get(this.sizeOwner)?.conn.device?.name;
     for (const sub of this.subs.values()) {
-      sub.conn.sendJson({ t: 'size', id: this.id, cols: this.cols, rows: this.rows, owner: this.sizeOwner === sub.conn.id });
+      sub.conn.sendJson({ t: 'size', id: this.id, cols: this.cols, rows: this.rows, owner: this.sizeOwner === sub.conn.id, ownerName });
     }
   }
 
