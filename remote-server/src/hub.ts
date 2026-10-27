@@ -26,6 +26,7 @@ import { TermSession, type ConnLike, type Timers } from './session';
 import type { SpawnFn } from './pty-spawn';
 import { DEFAULT_THEME, type ThemeColors } from './queries';
 import { probeSession, type ProbeResult } from './agent-probe';
+import type { FsRequest } from './remote-fs';
 import { childrenIndex } from './proc';
 
 export interface HubConfig {
@@ -76,6 +77,8 @@ export interface HubDeps {
   sessionEnv?: (id: string) => Record<string, string>;
   /** Where app diagnostics go; absent = the server does not offer 'diag'. */
   diag?: (device: { id: string; name: string }, events: DiagEvent[]) => void;
+  /** The explorer's file operations on a session's folder (remote-fs.ts); absent = no 'fs'. */
+  fs?: (cwd: string | undefined, req: FsRequest) => Promise<unknown>;
   /** The agents' status hooks (hooks-install.ts); absent = the server does not offer 'hooks'. */
   hooks?: { status(): HookAgentStatus[]; install(): HookAgentStatus[] };
 }
@@ -160,6 +163,8 @@ export class Hub {
         return;
       case 'hooksInstall':
         return this.installHooks(conn, msg.rid);
+      case 'fs':
+        return void this.fsOp(conn, msg);
     }
   }
 
@@ -167,6 +172,7 @@ export class Hub {
     const f: ServerFeature[] = ['rpc'];
     if (this.deps.diag) f.push('diag');
     if (this.deps.hooks) f.push('hooks');
+    if (this.deps.fs) f.push('fs');
     return f;
   }
 
@@ -177,6 +183,26 @@ export class Hub {
       this.log(`hooks status: ${(err as Error).message}`);
       return undefined;
     }
+  }
+
+  /**
+   * A remote pane's explorer: run the operation in that session's folder —
+   * where its process is now (the /proc probe), else where it started. Only for
+   * a session this device may see.
+   */
+  private async fsOp(conn: HubConn, msg: Extract<ClientMsg, { t: 'fs' }>): Promise<void> {
+    const rec = this.registry.session(msg.id);
+    let result: unknown;
+    if (!this.deps.fs) result = { error: 'This server has no file access for remote panes', code: 'read_failed' };
+    else if (!rec || rec.hiddenBy.includes(conn.device!.id) || !this.isLive(msg.id)) result = { error: 'No working directory reported for this pane', code: 'no_root' };
+    else {
+      try {
+        result = await this.deps.fs(rec.lastCwd ?? rec.cwd, msg);
+      } catch (err) {
+        result = { error: (err as Error).message, code: 'read_failed' };
+      }
+    }
+    conn.sendJson({ t: 'fsResult', rid: msg.rid, result });
   }
 
   /** The user asked, in an app, for the agents' status hooks: install, and tell every device. */

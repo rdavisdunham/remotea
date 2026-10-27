@@ -66,7 +66,7 @@ import {
   writeMarkdownFile,
   MD_DIALOG_EXTENSIONS,
 } from './markdown-file';
-import { grantFilePath, isFilePathGranted } from './file-grants';
+import { grantFilePath, isFilePathGranted, grantRemoteFile, isRemoteFileGranted } from './file-grants';
 import { getAwakeManager, isKeepAwakeMode } from './awake-manager';
 import { agentBrowserPath, runAgentBrowser, unwrapAgentData, type RunResult } from './agent-browser-cli';
 // The process-wide singletons. Constructing a second SessionRegistry or
@@ -1528,9 +1528,29 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     return resolveInRoot(root.realRoot, typeof relPath === 'string' ? relPath : '', leaf);
   };
 
+  /**
+   * remotea: a remote pane's folder is on its host, so the explorer's
+   * operations run there (remote-server/src/remote-fs.ts — the same jail and
+   * readers, rooted at the session's directory as the server sees it).
+   * Undefined for a local pane; the caller falls through to the local path.
+   */
+  const remoteFs = (
+    surfaceId: unknown,
+    sender: Electron.WebContents,
+    req: Parameters<typeof remoteHosts.fs>[1],
+  ): Promise<unknown> | undefined => {
+    if (typeof surfaceId !== 'string' || !ptyManager.isRemote(surfaceId as SurfaceId)) return undefined;
+    if (!ownsLiveSurface(surfaceId, sender)) return Promise.resolve({ error: 'No working directory reported for this pane', code: 'no_root' });
+    return remoteHosts.fs(surfaceId, req);
+  };
+  const relOf = (relPath: unknown) => (typeof relPath === 'string' ? relPath : '');
+  const notForRemote = { error: 'Not available for a pane on a remote host', code: 'remote' } as const;
+
   ipcMain.handle(
     IPC_CHANNELS.EXPLORER_LIST_DIR,
     async (event, surfaceId: unknown, relPath: unknown, opts?: { showHidden?: boolean }) => {
+      const remote = remoteFs(surfaceId, event.sender, { op: 'list', path: relOf(relPath), showHidden: !!opts?.showHidden });
+      if (remote) return remote;
       const root = explorerRootFor(surfaceId, event.sender);
       if ('error' in root) return root;
       return listDir(root.realRoot, typeof relPath === 'string' ? relPath : '', {
@@ -1568,6 +1588,13 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(
     IPC_CHANNELS.CODE_READ_FILE,
     async (event, surfaceId: unknown, relPath: unknown) => {
+      const remote = remoteFs(surfaceId, event.sender, { op: 'readCode', path: relOf(relPath) });
+      if (remote) {
+        const read = await remote;
+        // Same consent as a local read: opened through the jailed tree, in this window.
+        if (read && typeof read === 'object' && !('error' in read)) grantRemoteFile(event.sender.id, surfaceId as string, relOf(relPath));
+        return read;
+      }
       const resolved = await resolveExplorerPath(surfaceId, relPath, event.sender, 'file');
       if ('error' in resolved) return resolved;
       const read = readCodeFile(resolved.abs);
@@ -1589,6 +1616,15 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(
     IPC_CHANNELS.CODE_WRITE_FILE,
     async (event, surfaceId: unknown, relPath: unknown, content: unknown, expectedMtimeMs?: unknown) => {
+      if (typeof surfaceId === 'string' && ptyManager.isRemote(surfaceId as SurfaceId)) {
+        if (!isRemoteFileGranted(event.sender.id, surfaceId, relOf(relPath))) {
+          return { error: 'This file was not opened in a pane in this window', code: 'not_granted' };
+        }
+        return remoteFs(surfaceId, event.sender, {
+          op: 'write', path: relOf(relPath), content: typeof content === 'string' ? content : '',
+          expectedMtimeMs: Number.isFinite(expectedMtimeMs) ? Number(expectedMtimeMs) : undefined,
+        });
+      }
       const resolved = await resolveExplorerPath(surfaceId, relPath, event.sender, 'file');
       if ('error' in resolved) return resolved;
       if (!isFilePathGranted(event.sender.id, resolved.abs)) {
@@ -1619,6 +1655,12 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(
     IPC_CHANNELS.EXPLORER_READ_MARKDOWN,
     async (event, surfaceId: unknown, relPath: unknown) => {
+      const remote = remoteFs(surfaceId, event.sender, { op: 'readMarkdown', path: relOf(relPath) });
+      if (remote) {
+        const read = await remote;
+        if (read && typeof read === 'object' && !('error' in read)) grantRemoteFile(event.sender.id, surfaceId as string, relOf(relPath));
+        return read;
+      }
       const resolved = await resolveExplorerPath(surfaceId, relPath, event.sender, 'file');
       if ('error' in resolved) return resolved;
       const read = readMarkdownFile(resolved.abs);
@@ -1635,6 +1677,8 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(
     IPC_CHANNELS.EXPLORER_DIFF_STATS,
     async (event, surfaceId: unknown) => {
+      const remote = remoteFs(surfaceId, event.sender, { op: 'diffStats' });
+      if (remote) return remote;
       const root = explorerRootFor(surfaceId, event.sender);
       if ('error' in root) return root;
       try {
@@ -1657,6 +1701,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(
     IPC_CHANNELS.EXPLORER_REVEAL,
     async (event, surfaceId: unknown, relPath: unknown) => {
+      if (typeof surfaceId === 'string' && ptyManager.isRemote(surfaceId as SurfaceId)) return notForRemote;
       const resolved = await resolveExplorerPath(surfaceId, relPath, event.sender, 'any');
       if ('error' in resolved) return resolved;
       shell.showItemInFolder(resolved.abs);
@@ -1670,6 +1715,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(
     IPC_CHANNELS.EXPLORER_OPEN_IN_APP,
     async (event, surfaceId: unknown, relPath: unknown) => {
+      if (typeof surfaceId === 'string' && ptyManager.isRemote(surfaceId as SurfaceId)) return notForRemote;
       const resolved = await resolveExplorerPath(surfaceId, relPath, event.sender, 'any');
       if ('error' in resolved) return resolved;
       // FILES only. The deny-list reads an extension off a basename, and a

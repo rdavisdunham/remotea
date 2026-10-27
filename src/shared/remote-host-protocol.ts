@@ -47,6 +47,8 @@ export const LIMITS = Object.freeze({
   maxRows: 500,
   maxInputBytes: 1024 * 1024,
   maxDiagEvents: 200,
+  /** One write-back from the code viewer (the WebSocket's own cap is 16 MiB). */
+  maxFsWrite: 8 * 1024 * 1024,
   maxDiagFields: 16,
   maxDiagString: 300,
 });
@@ -153,7 +155,13 @@ export type ClientMsg =
   /** App diagnostics for the server's log (only when welcome lists 'diag'). No terminal content. */
   | { t: 'diag'; events: DiagEvent[] }
   /** Register remotea's status hooks with the server's agents (welcome lists 'hooks'). The user asked for it in the app. */
-  | { t: 'hooksInstall'; rid: number };
+  | { t: 'hooksInstall'; rid: number }
+  /** The explorer / code viewer on a remote pane, inside that session's folder (welcome lists 'fs'). */
+  | { t: 'fs'; rid: number; id: RemoteSurfaceId; op: FsOp; path?: string; showHidden?: boolean; content?: string; expectedMtimeMs?: number };
+
+/** File operations on a remote pane's folder (remote-server/src/remote-fs.ts). */
+export type FsOp = 'root' | 'list' | 'readCode' | 'readMarkdown' | 'write' | 'diffStats';
+const FS_OPS: ReadonlySet<string> = new Set<FsOp>(['root', 'list', 'readCode', 'readMarkdown', 'write', 'diffStats']);
 
 /**
  * One diagnostic event from an app: what happened, never what was on screen
@@ -168,7 +176,7 @@ export interface DiagEvent {
 }
 
 /** Features a server announces in `welcome`; an app uses a feature only when listed. */
-export type ServerFeature = 'rpc' | 'diag' | 'hooks';
+export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs';
 
 /** Whether an agent CLI on the server reports its status to remotea (see `remotea hooks`). */
 export interface HookAgentStatus {
@@ -229,6 +237,8 @@ export type ServerMsg =
   | { t: 'rpc'; id: RemoteSurfaceId; method: string; params: Record<string, unknown>; replay?: boolean }
   /** The server's agents' hook state changed (an install from any device). */
   | { t: 'hooksStatus'; hooks: HookAgentStatus[] }
+  /** The answer to an `fs` request: exactly what the app's local operation would have returned. */
+  | { t: 'fsResult'; rid: number; result: unknown }
   | { t: 'goingAway' }
   | { t: 'pong'; n: number; serverAt: number }
   | { t: 'error'; code: string; message: string };
@@ -409,6 +419,13 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
         ? (m as unknown as ClientMsg) : null;
     case 'hooksInstall':
       return isRid(m.rid) ? (m as unknown as ClientMsg) : null;
+    case 'fs':
+      return isRid(m.rid) && isSurfaceId(m.id) && typeof m.op === 'string' && FS_OPS.has(m.op)
+        && (m.path === undefined || isStr(m.path, LIMITS.maxPath))
+        && (m.showHidden === undefined || typeof m.showHidden === 'boolean')
+        && (m.content === undefined || isStr(m.content, LIMITS.maxFsWrite))
+        && (m.expectedMtimeMs === undefined || (typeof m.expectedMtimeMs === 'number' && Number.isFinite(m.expectedMtimeMs)))
+        ? (m as unknown as ClientMsg) : null;
     default:
       return null;
   }
@@ -417,7 +434,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
 const SERVER_TYPES = new Set([
   'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
   'sessionAdded', 'sessionUpdated', 'sessionClosed', 'groupUpserted', 'groupClosed',
-  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus',
+  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus', 'fsResult',
 ]);
 
 /**

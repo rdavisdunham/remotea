@@ -25,6 +25,7 @@ import {
   type ClientMsg,
   type CreateSpec,
   type DiagEvent,
+  type FsOp,
   type HookAgentStatus,
   type GroupRecord,
   type RemoteSurfaceId,
@@ -52,6 +53,7 @@ export interface SocketLike {
 export type SocketFactory = (url: string, headers: Record<string, string>) => SocketLike;
 
 const OPEN = 1;
+const FS_TIMEOUT_MS = 20_000;
 
 const realSocket: SocketFactory = (url, headers) =>
   new WebSocket(url, { headers, perMessageDeflate: false, handshakeTimeout: 8000, maxPayload: 32 * 1024 * 1024 }) as unknown as SocketLike;
@@ -153,6 +155,7 @@ export class RemoteHostClient {
   private nextRid = 1;
   private readonly surfs = new Map<string, Surf>();
   private readonly acks = new Map<number, (ok: boolean, error?: string) => void>();
+  private readonly fsWaiters = new Map<number, (result: unknown) => void>();
   private readonly timers: ClientTimers;
   private readonly now: () => number;
   private readonly log: (msg: string) => void;
@@ -222,6 +225,30 @@ export class RemoteHostClient {
     }
     diag('surf.upload', { host: this.hostId, ok: true, files: paths.length }, id);
     return { ok: true, paths };
+  }
+
+  /**
+   * The explorer / code viewer on remote pane `id`: run `op` in its folder on
+   * the server. Resolves with what the local operation would have returned
+   * (an `{ error, code }` object included), never rejects.
+   */
+  fs(id: string, req: { op: FsOp; path?: string; showHidden?: boolean; content?: string; expectedMtimeMs?: number }): Promise<unknown> {
+    if (!this.features.has('fs')) return Promise.resolve({ error: 'Update the remotea server to browse files of remote panes', code: 'read_failed' });
+    const rid = this.nextRid++;
+    return new Promise((resolve) => {
+      if (!this.sendJson({ t: 'fs', rid, id: id as RemoteSurfaceId, ...req })) {
+        resolve({ error: 'Not connected to the remote host', code: 'read_failed' });
+        return;
+      }
+      const timer = this.timers.setTimeout(() => {
+        this.fsWaiters.delete(rid);
+        resolve({ error: 'The remote host did not answer', code: 'read_failed' });
+      }, FS_TIMEOUT_MS);
+      this.fsWaiters.set(rid, (result) => {
+        this.timers.clearTimeout(timer);
+        resolve(result);
+      });
+    });
   }
 
   /** Register the status hooks with the server's agents (the user said yes in the app). */
@@ -412,6 +439,10 @@ export class RemoteHostClient {
       this.acks.delete(rid);
       ack(false, 'disconnected');
     }
+    for (const [rid, w] of this.fsWaiters) {
+      this.fsWaiters.delete(rid);
+      w({ error: 'Disconnected from the remote host', code: 'read_failed' });
+    }
   }
 
   private sendIntent(intent: PendingIntent): void {
@@ -489,6 +520,12 @@ export class RemoteHostClient {
       case 'meta':
         this.deps.onMeta?.(msg.id, { cwd: msg.cwd, agent: msg.agent });
         return;
+      case 'fsResult': {
+        const w = this.fsWaiters.get(msg.rid);
+        this.fsWaiters.delete(msg.rid);
+        w?.(msg.result);
+        return;
+      }
       case 'hooksStatus':
         this.hooks = msg.hooks;
         diag('conn.hooks', { host: this.hostId, installed: msg.hooks.filter((a) => a.installed).map((a) => a.agent).join(',') });

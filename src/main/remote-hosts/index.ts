@@ -153,6 +153,12 @@ export class RemoteHosts {
     return { text: remoteInsertionText(r.paths) };
   }
 
+  /** The explorer / code viewer on a remote pane (see RemoteHostClient.fs). */
+  fs(surfaceId: string, req: Parameters<RemoteHostClient['fs']>[1]): Promise<unknown> {
+    const client = this.clientOwning(surfaceId);
+    return client ? client.fs(surfaceId, req) : Promise.resolve({ error: 'No working directory reported for this pane', code: 'no_root' });
+  }
+
   /** The user said yes to the agent-hooks prompt: the server installs them. */
   async installHooks(hostId: string): Promise<{ ok: boolean; error?: string }> {
     const client = this.clients.get(hostId);

@@ -81,6 +81,28 @@ export function isFilePathGranted(webContentsId: number, filePath: string): bool
 /** Forget a window's grants when it is destroyed. */
 export function clearFileGrants(webContentsId: number): void {
   grants.delete(webContentsId);
+  remoteGrants.delete(webContentsId);
+}
+
+/**
+ * remotea: the same consent for a file in a REMOTE pane's folder, opened
+ * through the jailed tree. Keyed by pane and folder-relative path — the file
+ * is on another machine, so a local absolute path would mean nothing.
+ */
+const remoteGrants = new Map<number, Set<string>>();
+const remoteKey = (surfaceId: string, relPath: string) => `${surfaceId}\0${relPath.split(/[\\/]+/).filter((s) => s && s !== '.').join('/')}`;
+
+export function grantRemoteFile(webContentsId: number, surfaceId: string, relPath: string): void {
+  let set = remoteGrants.get(webContentsId);
+  if (!set) {
+    set = new Set<string>();
+    remoteGrants.set(webContentsId, set);
+  }
+  set.add(remoteKey(surfaceId, relPath));
+}
+
+export function isRemoteFileGranted(webContentsId: number, surfaceId: string, relPath: string): boolean {
+  return remoteGrants.get(webContentsId)?.has(remoteKey(surfaceId, relPath)) ?? false;
 }
 
 /** Test seam — the module-level map would otherwise leak between cases. */

@@ -244,3 +244,17 @@ describe('diagnostics queue', () => {
     takeDiag(10_000);
   });
 });
+
+describe('remote file grants (code viewer write-back)', () => {
+  it('are per window, per pane and per folder-relative path, and cleared with the window', async () => {
+    const { grantRemoteFile, isRemoteFileGranted, clearFileGrants } = await import('../../src/main/file-grants');
+    grantRemoteFile(7, 'surf-a', 'src/./a.ts');
+    expect(isRemoteFileGranted(7, 'surf-a', 'src/a.ts')).toBe(true);
+    expect(isRemoteFileGranted(7, 'surf-a', 'src\\a.ts')).toBe(true);
+    expect(isRemoteFileGranted(8, 'surf-a', 'src/a.ts')).toBe(false);
+    expect(isRemoteFileGranted(7, 'surf-b', 'src/a.ts')).toBe(false);
+    expect(isRemoteFileGranted(7, 'surf-a', 'src/b.ts')).toBe(false);
+    clearFileGrants(7);
+    expect(isRemoteFileGranted(7, 'surf-a', 'src/a.ts')).toBe(false);
+  });
+});
