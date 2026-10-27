@@ -255,7 +255,7 @@ function applyInsertion(
       text: t('terminal.uploadFailed', 'Upload to {host} failed: {reason}')
         .replace('{host}', result.failure.destination)
         .replace('{reason}', result.failure.detail),
-      title: 'wmux',
+      title: 'remotea',
     });
   }
   if (!result.text) return;
@@ -407,7 +407,7 @@ export const surfaceTerminalRegistry = new Map<string, Terminal>();
 const pendingPaneNotices = new Map<string, string[]>();
 
 function writePaneNotice(term: Terminal, text: string): void {
-  term.writeln(`\r\n\x1b[33m[wmux] ${text}\x1b[0m`);
+  term.writeln(`\r\n\x1b[33m[remotea] ${text}\x1b[0m`);
 }
 
 /**
@@ -1843,7 +1843,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // pane, once, before the shell's own output.
     const noteShellFallback = (created: { shell: string; shellFallbackFrom?: string }) => {
       if (!created.shellFallbackFrom) return;
-      terminal.writeln(`\x1b[33m[wmux] shell "${created.shellFallbackFrom}" was not found; started ${created.shell} instead.\x1b[0m`);
+      terminal.writeln(`\x1b[33m[remotea] shell "${created.shellFallbackFrom}" was not found; started ${created.shell} instead.\x1b[0m`);
     };
 
     // Resolve effective shell: explicit (workspace) > user default preference > main-process fallback.

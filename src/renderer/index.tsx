@@ -11,7 +11,7 @@ initNotificationSound();
 const root = createRoot(document.getElementById('root')!);
 root.render(
   <React.StrictMode>
-    <ErrorBoundary label="wmux">
+    <ErrorBoundary label="remotea">
       <App />
     </ErrorBoundary>
   </React.StrictMode>,

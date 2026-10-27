@@ -17,7 +17,7 @@
 | Server restarts that keep processes | declined: like herdr, a restart (even of the PC) respawns sessions in their directories and resumes their agents |
 | Desktop test harness (`scripts/desktop-test/harness.mjs`): a test app instance on the Windows side driven over CDP from WSL, against a test server | **done** |
 | Found with the harness: a remote pane was blank after a window reload (now asks the server for a snapshot); screen reads and agent detection looked at the blank bottom of panes taller than 40 rows (now read up to the last printed line) | **fixed** |
-| To do: the first-run tour and other UI copy still say "wmux" | open |
+| UI copy says "remotea" (all 18 languages): product-name uses only. The in-pane `wmux` command, `~/.wmux/config.toml`, `.wmux.json` and other real names are unchanged | **done** |
 
 ---
 

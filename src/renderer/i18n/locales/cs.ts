@@ -33,8 +33,8 @@ export const cs: Translation = {
     'Ovládá postranní panel, panel karet a rám okna. Barvy terminálu se nastavují zvlášť.',
   // Nastavení — panel Obecné — kontextová nabídka Průzkumníka
   'settings.general.shellSection': 'Windows Explorer',
-  'settings.general.contextMenu': 'Přidat „Open in wmux“ do kontextové nabídky složky',
-  'settings.general.contextMenuLabel': 'Open in wmux',
+  'settings.general.contextMenu': 'Přidat „Open in remotea“ do kontextové nabídky složky',
+  'settings.general.contextMenuLabel': 'Open in remotea',
   'settings.general.contextMenuHint':
     'Klikněte pravým tlačítkem na složku — nebo na prázdné místo v ní — a otevřete ji jako pracovní prostor, místo vkládání cesty. Ve Windows 11 se položka zobrazuje pod „Zobrazit další možnosti“ (Shift+F10); moderní nabídka nejvyšší úrovně vyžaduje podepsaný balíček MSIX. Zapisuje se pouze do HKCU, takže nejsou potřeba práva správce.',
   'settings.general.contextMenuFailed': 'Položku kontextové nabídky se nepodařilo aktualizovat.',
@@ -78,7 +78,7 @@ export const cs: Translation = {
   'titlebar.updateRetry': 'Klikněte pro nový pokus',
   // Nastavení — panel Nápověda / O aplikaci
   'settings.tab.help': 'Nápověda',
-  'settings.help.about': 'O aplikaci wmux',
+  'settings.help.about': 'O aplikaci remotea',
   'settings.help.version': 'Verze',
   'settings.help.checkUpdate': 'Zkontrolovat aktualizace',
   'settings.help.updateTo': 'Aktualizovat na',
@@ -147,7 +147,7 @@ export const cs: Translation = {
   'markdown.error.notRegularFile': 'Nejde o běžný soubor',
   'markdown.error.tooLarge': 'Soubor je příliš velký (max. 5 MB)',
   'markdown.error.noContent': 'Žádný obsah k zapsání',
-  'markdown.error.notGranted': 'Tento soubor nebyl otevřen ve wmux — použijte Uložit jako',
+  'markdown.error.notGranted': 'Tento soubor nebyl otevřen ve remotea — použijte Uložit jako',
   'markdown.closeUnsaved': 'Zavřít „{name}“ bez uložení?',
   'markdown.closeUnsavedHint': 'Tato poznámka obsahuje úpravy, které nebyly nikdy zapsány na disk.',
   'markdown.keepEditing': 'Pokračovat v úpravách',
@@ -182,9 +182,9 @@ export const cs: Translation = {
   'tutorial.previous': 'Zpět',
   'tutorial.next': 'Další',
   'tutorial.getStarted': 'Začít',
-  'tutorial.step.welcome.title': 'Vítejte ve wmux',
+  'tutorial.step.welcome.title': 'Vítejte ve remotea',
   'tutorial.step.welcome.body':
-    'wmux je terminálový multiplexer pro souběžné spouštění AI agentů, kteří píší kód. Tato krátká prohlídka vám ukáže to nejdůležitější.',
+    'remotea je terminálový multiplexer pro souběžné spouštění AI agentů, kteří píší kód. Tato krátká prohlídka vám ukáže to nejdůležitější.',
   'tutorial.step.workspaces.title': 'Pracovní prostory',
   'tutorial.step.workspaces.body':
     'Postranní panel vlevo zobrazuje vaše pracovní prostory. Každý pracovní prostor je samostatná relace s vlastním rozvržením terminálů. Nové vytvoříte pomocí Ctrl+N. Dvojitým kliknutím na název pracovního prostoru jej přejmenujete.',
@@ -259,7 +259,7 @@ export const cs: Translation = {
   'settings.browser.openOnStartup': 'Otevřít panel prohlížeče při spuštění',
   'settings.browser.linksSection': 'Odkazy',
   'settings.browser.openLinksExternally': 'Otevírat odkazy v systémovém prohlížeči',
-  'settings.browser.openLinksExternallyHint': 'Kliknuté odkazy v terminálech a markdownu se otevřou ve výchozím prohlížeči místo panelu wmux. Ctrl+kliknutí vždy udělá opak.',
+  'settings.browser.openLinksExternallyHint': 'Kliknuté odkazy v terminálech a markdownu se otevřou ve výchozím prohlížeči místo panelu remotea. Ctrl+kliknutí vždy udělá opak.',
   'settings.browser.devToolsSection': 'Nástroje pro vývojáře',
   'settings.browser.devToolsIcon': 'Ikona DevTools',
   'settings.browser.devToolsIcon.default': 'Výchozí',
@@ -352,7 +352,7 @@ export const cs: Translation = {
   'explorer.close': 'Zavřít průzkumník',
   'explorer.empty': 'Tato složka je prázdná',
   'explorer.truncated': 'Zobrazeno prvních {count} položek',
-  'explorer.notViewable': 'wmux umí otevřít jen textové soubory',
+  'explorer.notViewable': 'remotea umí otevřít jen textové soubory',
   'explorer.copyPath': 'Kopírovat cestu',
   'explorer.viewChanges': 'Zobrazit změny',
   'explorer.reveal': 'Zobrazit v Průzkumníku souborů',
@@ -364,7 +364,7 @@ export const cs: Translation = {
   'explorer.error.not_found': 'Složka nenalezena',
   'explorer.error.not_a_directory': 'Není to složka',
   'explorer.error.binary': 'Tento soubor není text',
-  'explorer.error.executable': 'wmux nespouští programy ani skripty',
+  'explorer.error.executable': 'remotea nespouští programy ani skripty',
   'explorer.error.too_large': 'Tento soubor je příliš velký k zobrazení',
   'explorer.error.denied': 'Přístup odepřen',
   'explorer.error.read_failed': 'Složku se nepodařilo přečíst',
@@ -473,10 +473,10 @@ export const cs: Translation = {
   'settings.workspacePanel.confirmCloseHint':
     'Zeptat se, než tlačítko ×, kontextová nabídka nebo Ctrl+Shift+W zavře relaci — náhodný klik tak nemůže shodit agenty, kteří ještě neuložili svůj stav. Zavření z CLI a od agentů se nikdy nepotvrzuje.',
   'settings.workspacePanel.restoreClaudeSessions': 'Obnovit relace Claude Code při obnovení',
-  'settings.workspacePanel.restoreClaudeSessionsHint': 'Když wmux obnoví relaci, spustí znovu každý terminál, ve kterém běžel Claude Code, příkazem `claude --resume` v původním adresáři. Ve výchozím stavu vypnuto: každý takový panel hned spustí agenta. Panely, jejichž konverzaci už Claude nemá, se přeskočí, a Claude, který jste řádně ukončili, se neobnoví.',
+  'settings.workspacePanel.restoreClaudeSessionsHint': 'Když remotea obnoví relaci, spustí znovu každý terminál, ve kterém běžel Claude Code, příkazem `claude --resume` v původním adresáři. Ve výchozím stavu vypnuto: každý takový panel hned spustí agenta. Panely, jejichž konverzaci už Claude nemá, se přeskočí, a Claude, který jste řádně ukončili, se neobnoví.',
   'settings.workspacePanel.autoOpenDiff': 'Automaticky otevřít kartu Diff při úpravách agenta',
   'settings.workspacePanel.autoOpenDiffHint':
-    'Když agent upravuje nebo zapisuje soubory, wmux otevře kartu Diff ve spodním panelu. Vypnutím této volby se přestane zobrazovat.',
+    'Když agent upravuje nebo zapisuje soubory, remotea otevře kartu Diff ve spodním panelu. Vypnutím této volby se přestane zobrazovat.',
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Výchozí shell',
   'settings.workspacePanel.shell.systemDefault': 'Výchozí systémový',
@@ -659,9 +659,9 @@ export const cs: Translation = {
   'surfaceTab.profileBadge': 'projekt',
   // Nastavení — souhlas s integrací agentů (issue #132)
   'settings.integration.section': 'Integrace agentů',
-  'settings.integration.enable': 'Povolit wmux konfigurovat Claude Code, OpenCode, Kiro, omp, pi a Grok',
+  'settings.integration.enable': 'Povolit remotea konfigurovat Claude Code, OpenCode, Kiro, omp, pi a Grok',
   'settings.integration.hint':
-    'wmux upravuje soubory ve vašem domovském adresáři, aby kódovací agenti mohli ovládat jeho panel prohlížeče, náhledy Markdown a stav postranního panelu. Vypnutím zde se odstraní i to, co bylo zapsáno.',
+    'remotea upravuje soubory ve vašem domovském adresáři, aby kódovací agenti mohli ovládat jeho panel prohlížeče, náhledy Markdown a stav postranního panelu. Vypnutím zde se odstraní i to, co bylo zapsáno.',
   'settings.integration.instructions': 'Instrukce pro agenty',
   'settings.integration.hooks': 'Stavové hooky',
   'settings.integration.orchestrator': 'Plugin orchestrátoru',
@@ -685,9 +685,9 @@ export const cs: Translation = {
   'settings.remote.statusListening': 'Naslouchá na {host}:{port} · připojeno: {count}',
   'settings.remote.error.portBusy': 'Port {port} už používá jiný program. Níže vyberte jiný port.',
   'settings.remote.error.bindFailed': 'Na této adrese nelze naslouchat. Zkontrolujte níže nastavení dostupnosti.',
-  'settings.remote.error.uiNotBuilt': 'V tomto sestavení wmux chybí stránka pro telefon.',
+  'settings.remote.error.uiNotBuilt': 'V tomto sestavení remotea chybí stránka pro telefon.',
   'settings.remote.error.lanAddressGone': 'Síťová adresa {host} už na tomto počítači není. Vyberte jiné rozhraní nebo přepněte na „Pouze tento počítač“.',
-  'settings.remote.rejectedOrigin': 'Prohlížeč na adrese {origin} byl odmítnut, protože wmux tuto adresu nezná.',
+  'settings.remote.rejectedOrigin': 'Prohlížeč na adrese {origin} byl odmítnut, protože remotea tuto adresu nezná.',
   'settings.remote.rejectedOriginCaution': 'Tuto zprávu může vyvolat jakákoli webová stránka otevřená na tomto počítači. Použijte ji jen tehdy, pokud adresu poznáváte jako svou, například svou adresu Tailscale.',
   'settings.remote.useAsPublicUrl': 'Použít jako veřejnou URL',
   'settings.remote.useAsPublicUrlConfirm': 'Párovací odkazy a QR kódy pošlou telefony na {origin}. Kdo tuto adresu ovládá, může párování převzít. Pokračujte, jen pokud je to vaše vlastní adresa Tailscale.',
@@ -744,8 +744,8 @@ export const cs: Translation = {
   'settings.remote.configError.badLanHost': 'Tato síťová adresa na tomto počítači není.',
   'settings.remote.configError.deviceCap': 'Spárováno je už 10 zařízení. Než spárujete další, jedno odeberte.',
   'settings.remote.configError.notRunning': 'Vzdálená konzole neběží. Nejdřív ji zapněte.',
-  'settings.remote.configError.writeFailed': 'wmux nemohl změnu uložit na disk (soubor možná drží jiný program). Zkuste to znovu.',
-  'settings.remote.configError.failed': 'Něco se pokazilo. Podrobnosti najdete v protokolu wmux.',
+  'settings.remote.configError.writeFailed': 'remotea nemohl změnu uložit na disk (soubor možná drží jiný program). Zkuste to znovu.',
+  'settings.remote.configError.failed': 'Něco se pokazilo. Podrobnosti najdete v protokolu remotea.',
   'settings.remote.actionFailed': 'Nepodařilo se to ({error}).',
   'settings.remote.notice.paired': 'Vzdálená konzole: spárováno {name} ({scope})',
   'settings.remote.notice.connected': 'Vzdálená konzole: {name} je připojeno',
@@ -764,20 +764,20 @@ export const cs: Translation = {
   'settings.remote.pair.oneUse': 'Funguje jednou, po dobu 2 minut. Kdokoli ho otevře, získá přístup, proto nesdílejte snímek obrazovky.',
   'settings.remote.pair.expired': 'Platnost tohoto kódu vypršela.',
   'settings.remote.pair.voided': 'Tento kód už není platný.',
-  'settings.remote.pair.loopbackWarn': 'wmux naslouchá jen na tomto počítači a není nastavena veřejná URL, takže se tato adresa v telefonu takto neotevře. Nejprve ji zpřístupněte:',
+  'settings.remote.pair.loopbackWarn': 'remotea naslouchá jen na tomto počítači a není nastavena veřejná URL, takže se tato adresa v telefonu takto neotevře. Nejprve ji zpřístupněte:',
   'settings.remote.pair.paired': 'Spárováno: {name}',
   'settings.remote.pair.close': 'Zavřít',
   // Další nastavení a oznámení aplikace
   'settings.tab.prompts': 'Zadání',
-  'settings.general.iconCache': 'Zobrazuje hlavní panel stále starou ikonu wmux?',
+  'settings.general.iconCache': 'Zobrazuje hlavní panel stále starou ikonu remotea?',
   'settings.general.iconCacheButton': 'Obnovit ikony hlavního panelu',
   'settings.general.iconCacheStarted': 'Průzkumník Windows se restartuje…',
   'settings.general.iconCacheHint':
     'Windows ukládá ikony do mezipaměti a znovu je načte až po restartu Průzkumníka Windows. Po aktualizaci, která změnila ikonu, tak může hlavní panel nebo připnuté tlačítko stále zobrazovat starou ikonu, i když okno a oznámení už používají novou. Tato akce vymaže mezipaměť ikon a restartuje Průzkumníka Windows: hlavní panel na chvíli zmizí a otevřená okna Průzkumníka se zavřou. Terminály tím nejsou ovlivněny.',
-  'notification.iconChanged.title': 'wmux má novou ikonu',
+  'notification.iconChanged.title': 'remotea má novou ikonu',
   'notification.iconChanged.text':
     'Pokud hlavní panel nebo připnuté tlačítko stále zobrazuje starou ikonu, použijte Nastavení → Obecné → Obnovit ikony hlavního panelu.',
-  'notification.gpuRestarted.title': 'wmux restartoval grafický proces',
+  'notification.gpuRestarted.title': 'remotea restartoval grafický proces',
   'notification.gpuRestarted.text':
     'Okno během používání přestalo vykreslovat obsah. Terminály ani agenti tím nebyli ovlivněni.',
   'settings.general.transparencySection': 'Průhlednost okna',
@@ -793,14 +793,14 @@ export const cs: Translation = {
   'titlebar.maximize': 'Maximalizovat',
   'titlebar.restore': 'Obnovit',
   'titlebar.close': 'Zavřít',
-  'settings.general.transparencyRestart': 'Změna se projeví po restartu wmux.',
+  'settings.general.transparencyRestart': 'Změna se projeví po restartu remotea.',
   'palette.openWorkspaceFile': 'Otevřít soubor pracovního prostoru… (wmux.workspace.json)',
   'titlebar.focusMode': 'Režim soustředění: ztlumit všechny panely kromě aktivního',
   // Historie verzí
   'settings.tab.changelog': 'Historie verzí',
   'settings.changelog.title': 'Historie verzí',
   'settings.changelog.hint':
-    'Poznámky k posledním verzím wmux se načítají z GitHubu a ukládají do mezipaměti, aby byly dostupné i bez připojení.',
+    'Poznámky k posledním verzím remotea se načítají z GitHubu a ukládají do mezipaměti, aby byly dostupné i bez připojení.',
   'settings.changelog.refresh': 'Obnovit',
   'settings.changelog.loading': 'Načítání…',
   'settings.changelog.offline': 'Zobrazuje se poslední uložená kopie — GitHub není dostupný.',
@@ -820,7 +820,7 @@ export const cs: Translation = {
   // Prohlížeč — úvodní stránka a vývojové servery
   'settings.browser.defaultUrl': 'Úvodní stránka',
   'settings.browser.defaultUrlHint':
-    'Stránka, kterou panel prohlížeče otevře v pracovním prostoru před první navigací. Adresa musí začínat http:// nebo https://. Prázdná hodnota použije úvodní stránku wmux. Lze nastavit také v ~/.wmux/config.toml jako [browser] default-url.',
+    'Stránka, kterou panel prohlížeče otevře v pracovním prostoru před první navigací. Adresa musí začínat http:// nebo https://. Prázdná hodnota použije úvodní stránku remotea. Lze nastavit také v ~/.wmux/config.toml jako [browser] default-url.',
   'settings.browser.autoOpenDevServer': 'Automaticky otevírat vývojové servery v panelu prohlížeče',
   'settings.browser.autoOpenDevServerHint':
     'Panel prohlížeče automaticky přejde na vývojový server (Vite, Next, …), jakmile se spustí. Ve výchozím stavu zapnuto. Po vypnutí se nalezené porty nadále zobrazují u pracovního prostoru, ale žádná stránka se sama neotevře. Lze nastavit také v ~/.wmux/config.toml jako [browser] auto-open.',
@@ -867,9 +867,9 @@ export const cs: Translation = {
   'settings.terminalPanel.touchPanGainHint':
     'Počet kroků posunu odeslaných za každý řádek pohybu prstu při posouvání aplikace přes celou obrazovku (opencode, tmux). Hodnota 1 vyhovuje aplikaci, která se na jeden krok posune o jeden řádek. Aby obsah sledoval prst, použijte 1 ÷ rychlost posouvání dané aplikace: pro výchozí rychlost 3 v opencode zadejte 0.33. Kolečko myši, historie terminálu ani setrvačný posun po uvolnění prstu tím nejsou ovlivněny.',
   // Pracovní prostor — zavírání a obnova relací
-  'settings.workspacePanel.confirmAppClose': 'Potvrdit před zavřením wmux',
+  'settings.workspacePanel.confirmAppClose': 'Potvrdit před zavřením remotea',
   'settings.workspacePanel.confirmAppCloseHint':
-    'Zeptat se, než tlačítko × okna nebo Alt+F4 ukončí wmux — zavření okna ukončí všechny jeho terminálové relace včetně agentů. Při aktualizaci, restartu ani vypnutí Windows se potvrzení nezobrazuje.',
+    'Zeptat se, než tlačítko × okna nebo Alt+F4 ukončí remotea — zavření okna ukončí všechny jeho terminálové relace včetně agentů. Při aktualizaci, restartu ani vypnutí Windows se potvrzení nezobrazuje.',
   'settings.workspacePanel.sessionSnapshot': 'Ukládat snímky relací každých',
   'settings.workspacePanel.sessionSnapshotOff': 'Nikdy',
   'settings.workspacePanel.sessionSnapshot5': '5 minut',
@@ -882,18 +882,18 @@ export const cs: Translation = {
   'settings.workspacePanel.restoreCodexSessions': 'Pokračovat v relacích Codex při obnovení',
   'settings.workspacePanel.restoreOpencodeSessions': 'Pokračovat v relacích OpenCode při obnovení',
   'settings.workspacePanel.restoreOpencodeSessionsHint':
-    'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje plugin wmux pro OpenCode (zapnutou integraci agentů). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. Relace OpenCode 2 lze zachytit pouze při spuštění s --standalone: jeho sdílený server na pozadí nedokáže rozlišit jednotlivé karty.',
+    'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje plugin remotea pro OpenCode (zapnutou integraci agentů). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. Relace OpenCode 2 lze zachytit pouze při spuštění s --standalone: jeho sdílený server na pozadí nedokáže rozlišit jednotlivé karty.',
   'settings.workspacePanel.restoreQwenSessions': 'Pokračovat v relacích Qwen Code při obnovení',
   'settings.workspacePanel.restoreQwenSessionsHint':
-    'Znovu spustí Qwen Code v každé obnovené kartě, kde běžel, pomocí „qwen --resume“ v původním adresáři. Vyžaduje hooky wmux pro Qwen (zapnuté stavové hooky) a Qwen Code 0.14 nebo novější. Karty, jejichž relace už Qwen nemá, se přeskočí. Řádně ukončené relace Qwen se neobnovují.',
+    'Znovu spustí Qwen Code v každé obnovené kartě, kde běžel, pomocí „qwen --resume“ v původním adresáři. Vyžaduje hooky remotea pro Qwen (zapnuté stavové hooky) a Qwen Code 0.14 nebo novější. Karty, jejichž relace už Qwen nemá, se přeskočí. Řádně ukončené relace Qwen se neobnovují.',
   'settings.workspacePanel.restoreAgySessions': 'Pokračovat v konverzacích Antigravity CLI při obnovení',
   'settings.workspacePanel.restoreAgySessionsHint':
-    'Znovu otevře konverzaci agy každé obnovené karty pomocí „agy --conversation“ v původním adresáři. Vyžaduje plugin wmux pro agy (zapnuté stavové hooky) a Node.js. Konverzace se zaznamená při zahájení nebo při první zprávě po obnovení. Relace agy ukončené návratem do příkazového řádku se znovu neotevřou.',
+    'Znovu otevře konverzaci agy každé obnovené karty pomocí „agy --conversation“ v původním adresáři. Vyžaduje plugin remotea pro agy (zapnuté stavové hooky) a Node.js. Konverzace se zaznamená při zahájení nebo při první zprávě po obnovení. Relace agy ukončené návratem do příkazového řádku se znovu neotevřou.',
   'settings.workspacePanel.restoreOmpSessions': 'Pokračovat v relacích omp při obnovení',
   'settings.workspacePanel.restoreOmpSessionsHint':
-    'Znovu otevře konkrétní relaci omp každé obnovené karty pomocí „omp --resume <path>“ v původním adresáři. Vyžaduje rozšíření wmux pro omp (zapnuté stavové hooky). Běžně ukončené relace omp se neotevřou. Pokud byl soubor relace mezitím smazán, obnovení se přeskočí a nová relace se nevytvoří.',
+    'Znovu otevře konkrétní relaci omp každé obnovené karty pomocí „omp --resume <path>“ v původním adresáři. Vyžaduje rozšíření remotea pro omp (zapnuté stavové hooky). Běžně ukončené relace omp se neotevřou. Pokud byl soubor relace mezitím smazán, obnovení se přeskočí a nová relace se nevytvoří.',
   'settings.workspacePanel.restoreCodexSessionsHint':
-    'Znovu otevře původní konverzaci Codex v každé obnovené kartě. Zapněte tuto volbu a poté spusťte codex v novém terminálu wmux. Vyžaduje Node.js a nativní Codex CLI pro Windows v PowerShellu nebo příkazovém řádku. Běžně ukončené relace se neotevřou.',
+    'Znovu otevře původní konverzaci Codex v každé obnovené kartě. Zapněte tuto volbu a poté spusťte codex v novém terminálu remotea. Vyžaduje Node.js a nativní Codex CLI pro Windows v PowerShellu nebo příkazovém řádku. Běžně ukončené relace se neotevřou.',
   'settings.workspacePanel.explorerOpenByDefault': 'Zobrazovat průzkumník souborů ve výchozím stavu',
   'settings.workspacePanel.explorerOpenByDefaultHint':
     'Otevírá průzkumník souborů napravo v každém pracovním prostoru s aktuálními počty přidaných a odstraněných řádků u souborů a přehledem souborů upravovaných agentem. Funguje v libovolné složce: repozitář Git se porovnává s posledním commitem, ostatní složky se stavem při otevření panelu. Když průzkumník v pracovním prostoru zavřete, zůstane v něm zavřený. Vypnutím této volby ho skryjete všude. Pokud terminály pracovního prostoru ještě neoznámily adresář, průzkumník se neotevře.',
@@ -901,7 +901,7 @@ export const cs: Translation = {
   'settings.workspacePanel.defaultCwdPlaceholder': 'Aktuální adresář (např. ~\\projects)',
   'settings.workspacePanel.browse': 'Procházet…',
   'settings.workspacePanel.defaultCwdHint':
-    'Adresář nového terminálu, pokud není určen jinak. Rozdělené panely, „Open in wmux“, --cwd a obnovené relace si ponechávají vlastní adresář. ~ a %VARIABLES% se rozbalí; prázdná hodnota zachová dosavadní chování.',
+    'Adresář nového terminálu, pokud není určen jinak. Rozdělené panely, „Open in remotea“, --cwd a obnovené relace si ponechávají vlastní adresář. ~ a %VARIABLES% se rozbalí; prázdná hodnota zachová dosavadní chování.',
   // Pracovní prostor — rozložení a uložené předvolby
   'settings.workspacePanel.newWorkspaceSection': 'Nový pracovní prostor',
   'settings.workspacePanel.newWorkspaceHint':
@@ -934,9 +934,9 @@ export const cs: Translation = {
   'addressBar.engineGroup': 'Režim prohlížeče',
   'addressBar.engineWeb': 'web',
   'addressBar.engineAgent': 'agent',
-  'addressBar.engineWebTitle': 'Procházejte web v tomto panelu. wmux ovládá stránku přímo — nic dalšího se neinstaluje.',
+  'addressBar.engineWebTitle': 'Procházejte web v tomto panelu. remotea ovládá stránku přímo — nic dalšího se neinstaluje.',
   'addressBar.engineAgentTitle':
-    'Předejte tuto kartu skutečnému Chromu mimo wmux a zde sledujte, co v něm agent dělá. Vyžaduje jednorázovou instalaci.',
+    'Předejte tuto kartu skutečnému Chromu mimo remotea a zde sledujte, co v něm agent dělá. Vyžaduje jednorázovou instalaci.',
   'addressBar.backAgent': 'Historie není dostupná, když prohlížeč ovládá agent',
   'addressBar.reloadViewer': 'Znovu načíst přehled aktivity (neobnoví stránku, kterou používá agent)',
   'browser.blank.title': 'Není otevřená žádná stránka',
@@ -950,7 +950,7 @@ export const cs: Translation = {
   'agentBrowser.installing':
     'Instalace probíhá v terminálovém panelu níže — sledujte její průběh. Tato karta se po dokončení sama přepne.',
   'agentBrowser.installFailed':
-    'wmux nemohl otevřít terminálový panel pro instalaci. Spusťte oba výše uvedené příkazy v libovolném terminálu a poté znovu vyberte režim agent.',
+    'remotea nemohl otevřít terminálový panel pro instalaci. Spusťte oba výše uvedené příkazy v libovolném terminálu a poté znovu vyberte režim agent.',
   'agentBrowser.install': 'Nainstalovat',
   'agentBrowser.waiting': 'Čekání…',
   'agentBrowser.cancel': 'Zrušit',
@@ -1065,7 +1065,7 @@ export const cs: Translation = {
   'prompt.outlineClose': 'Zavřít (Esc)',
   'prompt.outlineJump': 'Kliknutím přejdete na zadání, dvojkliknutím na něj přejdete a přehled zavřete',
   'prompt.outlineNoMatch': 'Tomuto filtru neodpovídá žádné zadání.',
-  'prompt.outlineEmpty': 'Zatím nejsou zaznamenána žádná zadání — wmux je získává z hooků agenta nebo z integrace shellu.',
+  'prompt.outlineEmpty': 'Zatím nejsou zaznamenána žádná zadání — remotea je získává z hooků agenta nebo z integrace shellu.',
   'prompt.paneJump': 'Přejít v terminálu na toto zadání',
   'prompt.paneLock': 'Sleduje aktivní panel — kliknutím k němu tento seznam připnete',
   'prompt.paneUnlock': 'Sleduje připnutý panel — kliknutím znovu zapnete sledování aktivního panelu',

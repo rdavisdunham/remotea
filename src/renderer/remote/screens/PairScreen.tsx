@@ -23,7 +23,7 @@ export function NoticeScreen({ title, body, action }: Readonly<NoticeProps>) {
   return (
     <main className="rc-full">
       <div className="rc-full__panel">
-        <div className="rc-full__mark" aria-hidden="true">wmux</div>
+        <div className="rc-full__mark" aria-hidden="true">remotea</div>
         <h1 className="rc-full__title">{title}</h1>
         <p className="rc-full__body">{body}</p>
         {action && (
@@ -83,7 +83,7 @@ export function PairScreen({ t, busy, failed, onPair, onCancel }: Readonly<PairP
           if (!busy) onPair(trimmed);
         }}
       >
-        <div className="rc-full__mark" aria-hidden="true">wmux</div>
+        <div className="rc-full__mark" aria-hidden="true">remotea</div>
         <h1 className="rc-full__title">{t.t('pair.title')}</h1>
         <p className="rc-full__body">{t.t('pair.body')}</p>
         <label className="rc-field">

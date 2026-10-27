@@ -967,7 +967,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     // The Settings toggles for both, which this handler used to ignore (#335).
     const effects = notificationEffects(loadSettings()['wmux-notification-prefs']);
     if (effects.toast) {
-      notificationManager.showToast(data.title || 'wmux', data.text, () => {
+      notificationManager.showToast(data.title || 'remotea', data.text, () => {
         if (window && !window.isDestroyed()) {
           window.focus();
           window.webContents.send('notification:focus-surface', data.surfaceId);
@@ -1895,7 +1895,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
     const { response } = await dialog.showMessageBox(win as BrowserWindow, {
       type: 'warning',
-      title: 'wmux',
+      title: 'remotea',
       message: 'Restart Windows Explorer to refresh the icon cache?',
       detail:
         'The taskbar disappears for a second and any open File Explorer windows close. ' +

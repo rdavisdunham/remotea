@@ -42,7 +42,7 @@ export default function SaveLayoutDialog() {
       window.wmux?.notification?.fire({
         surfaceId: '',
         text: t('palette.saveCurrentLayoutFailed', 'No active workspace to save as a layout.'),
-        title: 'wmux',
+        title: 'remotea',
       });
     }
   };

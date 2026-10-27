@@ -60,7 +60,7 @@ describe('WorkspaceSettings Keep Awake UI', () => {
     const text = host.textContent ?? '';
     expect(text).toContain('Keep computer awake');
     expect(text).toContain('Smart (when agents are working)');
-    expect(text).toContain('Always (keep awake while wmux is open)');
+    expect(text).toContain('Always (keep awake while remotea is open)');
     expect(text).toContain('Off (system defaults)');
     expect(text).toContain('Keep display awake');
   });

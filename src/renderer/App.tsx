@@ -245,7 +245,7 @@ function fireNotification(
   if (workspaceId) {
     addNotification({ surfaceId: (surfaceId || '') as SurfaceId, workspaceId, text });
   }
-  window.wmux?.notification?.fire({ surfaceId: surfaceId || '', text, title: 'wmux' });
+  window.wmux?.notification?.fire({ surfaceId: surfaceId || '', text, title: 'remotea' });
 }
 
 /** Resolve the workspace that owns a surface, or undefined. */
@@ -1425,7 +1425,7 @@ export default function App() {
       terminalPrefs: { ...state.terminalPrefs },
     };
     await window.wmux?.session?.save(session);
-    window.wmux?.notification?.fire({ surfaceId: '', text: t('app.sessionSaved', 'Session "{name}" saved').replace('{name}', name), title: 'wmux' });
+    window.wmux?.notification?.fire({ surfaceId: '', text: t('app.sessionSaved', 'Session "{name}" saved').replace('{name}', name), title: 'remotea' });
     // sidebarWidth is read through sidebarWidthRef (PR #131), so it is
     // deliberately not a dependency — a drag must not rebuild this callback.
   }, [t]);

@@ -56,7 +56,7 @@ function trustDialogText(text: string, changed: { added: string[]; removed: stri
 async function confirmTrust(plan: WorkspacePlan, text: string, changed: { added: string[]; removed: string[] } | null, parent: BrowserWindow | null): Promise<TrustAnswer> {
   const options: Electron.MessageBoxOptions = {
     type: 'warning',
-    title: 'wmux',
+    title: 'remotea',
     message: changed
       ? `"${plan.name}" changed. Run its commands?`
       : `Run the commands in "${plan.name}"?`,
@@ -180,7 +180,7 @@ export async function pickAndOpenManifest(parent: BrowserWindow | null, host: Ma
   if (picked.canceled || !picked.filePaths[0]) return;
   const result = await openManifest({ path: picked.filePaths[0] }, openDeps(host, null));
   if (!result.ok) {
-    const box: Electron.MessageBoxOptions = { type: 'error', title: 'wmux', message: 'This workspace file cannot be opened.', detail: result.errors.join('\n'), noLink: true };
+    const box: Electron.MessageBoxOptions = { type: 'error', title: 'remotea', message: 'This workspace file cannot be opened.', detail: result.errors.join('\n'), noLink: true };
     if (parent) await dialog.showMessageBox(parent, box);
     else await dialog.showMessageBox(box);
   }
