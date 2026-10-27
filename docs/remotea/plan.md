@@ -1,3 +1,16 @@
+# Status (2026-10-27)
+
+| Area | State |
+|---|---|
+| Server: sessions, gap-free attach, query replies, size policy, registry/tombstones/lost-on-boot, auth, CLI (`status --json`, `open`, `close`, `token`), systemd install | **done**: unit, property, integration and e2e tests; installed and verified in WSL |
+| App: router, host client, reconnect FSM, power hooks, offline intents, settings, overlay, remote panes in `useTerminal` | **done**: unit tests, plus the real client driven against the real server; needs a first run on Windows |
+| Cross-device sync: groups, placement, closes, renames/colours, hide/unhide, Load-session hides, offline closes via probes | **done**: planner and store unit tests; needs a two-device run |
+| Agent resume after server restart (Claude via `~/.claude/sessions`, Codex via rollout file / state db) | **done** |
+| Phase 3: non-owner rendering at owner size, deflate, snapshots persisted across restarts, `\\wsl.localhost` explorer, uploads over WS | open |
+| Phase 4: hook relay (shared Claude SessionStart hook with the Eridani ledger), server-side agent detection | open |
+
+---
+
 # remotea: wmux GUI backed by a persistent terminal server in WSL
 
 ## Context

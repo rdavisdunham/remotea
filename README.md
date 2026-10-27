@@ -41,36 +41,80 @@ SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the s
 
 ## Install
 
-### 1. Server (in WSL on the desktop)
+### 1. Server (in WSL on the machine that runs your agents)
 
-Requirements: systemd enabled in WSL, Node ≥ 20, `make`, `g++`, `python3`.
+Requirements: systemd enabled in WSL (`[boot] systemd=true` in `/etc/wsl.conf`), Node ≥ 20, `make`, `g++`, `python3`.
 
 ```bash
 cd remote-server
 ./scripts/install.sh      # builds, creates ~/.config/remotea/{config.json,token}, enables remotea.service
+remotea token             # the token the app needs
 ```
 
-The server listens on port **7717**, on `127.0.0.1` and on WSL's Tailscale address only. Every connection must present the token from `~/.config/remotea/token`, which is effectively shell access: treat it like an SSH key.
-
-Keep WSL from idling out, or the sessions die with it: set `vmIdleTimeout=-1` under `[wsl2]` in `%UserProfile%\.wslconfig`.
+- The server listens on port **7717**, on `127.0.0.1` and WSL's Tailscale address only, never on every interface.
+- Every connection must present the token. The token is effectively shell access to that machine, so treat it like an SSH key. A Tailscale ACL that limits port 7717 to your own devices is a good second fence.
+- Keep WSL from idling out, or the sessions die with it. In `%UserProfile%\.wslconfig`, set `vmIdleTimeout=-1` under `[wsl2]`.
+- Logs: `journalctl --user -u remotea -f`
+- Restart: `systemctl --user restart remotea`. A restart ends running processes. The apps respawn them, and Claude Code and Codex sessions are resumed.
 
 ### 2. App (on each Windows machine)
 
+Requirements: Node 22 (`winget install OpenJS.NodeJS.LTS`) and git. Clone to a path **without spaces**, then:
+
 ```powershell
+git clone https://github.com/rdavisdunham/remotea C:\dev\remotea
+cd C:\dev\remotea
 npm ci
 npm run build:main
-npm run dev               # or: npm run build  (installer)
+npm run dev               # development run (Vite + Electron)
+# npm run build           # installer, in release\
 ```
 
-Then in **Settings → Remote hosts**, add the host:
-- **URL:** `ws://<tailscale-name>:7717` from the laptop, or `ws://127.0.0.1:7717` on the desktop itself.
-- **Token:** paste the token.
+`node-pty` ships Windows prebuilds, so no compiler is needed.
 
-To make every new terminal remote, set **Default shell** to `Remote: <host>`.
+Then, in **Settings → Remote hosts → Add remote host**:
 
-## Status
+| Field | Value |
+|---|---|
+| URL from a laptop (over Tailscale) | `ws://<tailscale-name>:7717` |
+| URL on the server PC's own Windows side | `ws://127.0.0.1:7717` |
+| Token | output of `remotea token` |
 
-Under active development. See the plan in `docs/remotea/plan.md`.
+Press **Test**, then **Save**. Tick **New terminals open here by default** to make every new terminal remote. The same choice is in **Settings → Workspace → Default shell** as `Remote: <host>`.
+
+remotea uses its own named pipe and app-data folder (`%APPDATA%\remotea`), so it runs side by side with a stock wmux install.
+
+## Using it
+
+- **Opening terminals.** New terminals open on the host (when it's the default). A shell spec of `remote:<host>` or `remote:<host> claude` works anywhere a shell can be chosen: profiles, workspace shells, `wmux`-style CLI commands.
+- **Sleep, Wi-Fi loss, quitting the app.** Panes show "Reconnecting…" and catch up on their own; nothing you type while disconnected is sent later. Quitting detaches the sessions, and reopening the app reattaches them.
+- **A second device.** Every session shows up there in the same workspace (name and colour are shared). Arrange it however suits that screen; layouts are never synced.
+- **Closing.**
+  - Closing a tab ends that session on every device.
+  - Closing a workspace ends all of its sessions everywhere.
+  - **Hide on this device** (tab right-click) removes a tab from one device only. Bring it back from Settings → Remote hosts → Hidden on this device.
+- **Terminal size.** The device you're typing on, or whose window is focused on that pane, controls the size of a shared terminal.
+
+Server-side CLI (in WSL):
+
+```bash
+remotea status [--json]                              # sessions, workspaces, agents (stable JSON, "version": 1)
+remotea open --group "Acme" --cwd ~/acme -- claude   # open a session in a workspace on every device
+remotea close <surf-id>                              # end a session everywhere
+remotea token | rotate-token
+```
+
+## Development
+
+| Area | Command |
+|---|---|
+| Server tests (WSL) | `npm --prefix remote-server test` |
+| Server end-to-end (WSL) | `npm --prefix remote-server run build && node remote-server/scripts/e2e.mjs` |
+| App tests | `npm test` (some upstream tests need Windows: ConPTY, PowerShell) |
+| Typecheck | `npm run typecheck` |
+| Lint | `npm run lint` |
+
+Design and phasing are in [docs/remotea/plan.md](docs/remotea/plan.md). Notes for agents working in this repo are at the top of [AGENTS.md](AGENTS.md).
 
 ## License
 
