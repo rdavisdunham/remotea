@@ -79,6 +79,19 @@ function collect(client: RemoteHostClient, id: string) {
 }
 
 describe('RemoteHostClient against a real server', () => {
+  it('a second create while the first is in flight is a reuse (no double forwarding)', async () => {
+    const rig = await startServer();
+    const { client } = makeClient(rig.port, 'device-alpha01');
+    client.start();
+    await waitFor(() => client.ready);
+    const opts = { id: 'surf-int-dup', cols: 80, rows: 24, spec: { cwd: '/tmp' } };
+    const [a, b] = await Promise.all([client.create(opts), client.create(opts)]);
+    expect([a.reused, b.reused]).toEqual([false, true]);
+    expect(rig.sp.ptys.length).toBe(1);
+    const third = await client.create(opts);
+    expect(third.reused).toBe(true);
+  });
+
   it('creates a session, streams output, and sends input', async () => {
     const rig = await startServer();
     const { client } = makeClient(rig.port, 'device-alpha01');

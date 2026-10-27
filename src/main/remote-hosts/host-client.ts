@@ -528,7 +528,11 @@ export class RemoteHostClient {
     if (firstOpen) {
       const waiters = surf.waiters;
       surf.waiters = [];
-      for (const w of waiters) w({ reused: false, existed: !msg.created, snapshot });
+      // Only the first caller wires output forwarding. A second create() that
+      // arrived while the open was in flight (React StrictMode runs effects
+      // twice) is a reuse, exactly as it would be for a local PTY — otherwise
+      // every chunk is forwarded, and painted, twice.
+      waiters.forEach((w, i) => w({ reused: i > 0, existed: !msg.created, snapshot }));
     } else if (msg.mode === 'fresh') {
       // A new process under an existing tab: respawned after a server restart
       // (wasLost), or re-created because the registry no longer knew it.
