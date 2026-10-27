@@ -14,7 +14,8 @@
 | A device that does not set a shared terminal's size shows it at the owner's size, scaled down to fit, with "Sized for <device> · C×R [Fit here]" | **done**: two-client integration test; checked in the desktop test copy against a simulated second device |
 | Phase 3 (rest): deflate, snapshots persisted across restarts | open (low value: Tailscale links are fast; restarts respawn and resume by design) |
 | After connecting, the app shows whether agent hooks are installed on that host's agents and offers to install them through the server (Install / Not now / Don't ask again per host) | **done**: hub + client integration tests; clicked through in the desktop test copy |
-| Phase 4b: the other wmux plugins in WSL (OpenCode, pi, omp, Qwen, Grok, agy), server-side agent detection | open |
+| Phase 4b: OpenCode in WSL — `remotea hooks install` (and the app's prompt) installs wmux's OpenCode plugin; sessions get `WMUX_CLI`/`WMUX_NODE`, so the plugin's `node $WMUX_CLI …` reports through the bridge | **done**: install tests; e2e runs the real CLI in a real shell |
+| Phase 4b (rest): pi, omp, Qwen, Grok, agy (none installed here yet), server-side agent detection | open |
 | Server restarts that keep processes | declined: like herdr, a restart (even of the PC) respawns sessions in their directories and resumes their agents |
 | Desktop test harness (`scripts/desktop-test/harness.mjs`): a test app instance on the Windows side driven over CDP from WSL, against a test server | **done** |
 | Found with the harness: a remote pane was blank after a window reload (now asks the server for a snapshot); screen reads and agent detection looked at the blank bottom of panes taller than 40 rows (now read up to the last printed line) | **fixed** |

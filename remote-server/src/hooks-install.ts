@@ -6,6 +6,9 @@
  * - Claude Code: ~/.claude/settings.json, the exact entries the Windows app
  *   writes there (src/shared/claude-hooks.ts).
  * - Codex CLI: ~/.codex/hooks.json, the same helper with `--provider codex`.
+ * - OpenCode: wmux's OpenCode plugin, ~/.config/opencode/plugin/wmux.js. It
+ *   reports through the wmux CLI (`node $WMUX_CLI …`), which sessions are
+ *   told about in hookEnv; the plugin does nothing outside a remotea pane.
  *
  * Only entries whose command runs `wmux-hook` are ours; every other hook (the
  * user's, herdr's, anything else) is left exactly as it was. The helper itself
@@ -103,18 +106,33 @@ function writeJson(file: string, value: Json): void {
   fs.renameSync(tmp, file);
 }
 
+/** The hook helper and the wmux CLI with the modules it loads (resources/cli), copied together. */
 function copyHelper(p: HookPaths): string {
   fs.mkdirSync(p.cliDir, { recursive: true });
-  for (const f of ['wmux-hook.js', 'transport-deadline.js']) {
-    const src = path.join(p.sourceDir, f);
-    if (!fs.existsSync(src)) throw new Error(`missing ${src} (is the repository intact?)`);
-    fs.copyFileSync(src, path.join(p.cliDir, f));
+  for (const f of ['wmux-hook.js', 'transport-deadline.js', 'wmux.js']) {
+    if (!fs.existsSync(path.join(p.sourceDir, f))) throw new Error(`missing ${path.join(p.sourceDir, f)} (is the repository intact?)`);
+  }
+  for (const f of fs.readdirSync(p.sourceDir)) {
+    if (f.endsWith('.js')) fs.copyFileSync(path.join(p.sourceDir, f), path.join(p.cliDir, f));
   }
   return path.join(p.cliDir, 'wmux-hook.js');
 }
 
+/** wmux's OpenCode plugin, which lives beside resources/cli. */
+const OPENCODE_MARKER = 'WmuxPlugin';
+function opencodePluginSource(p: HookPaths): string {
+  return path.resolve(p.sourceDir, '..', 'opencode-plugin', 'wmux.js');
+}
+function isOurOpencodePlugin(file: string): boolean {
+  try {
+    return fs.readFileSync(file, 'utf8').includes(OPENCODE_MARKER);
+  } catch {
+    return false;
+  }
+}
+
 export interface HookTarget {
-  agent: 'claude' | 'codex';
+  agent: 'claude' | 'codex' | 'opencode';
   file: string;
   /** Present: the agent's config directory exists, so it is installed here. */
   present: boolean;
@@ -125,11 +143,17 @@ function targets(p: HookPaths): Array<{ agent: HookTarget['agent']; file: string
   return [
     { agent: 'claude', dir: path.join(p.home, '.claude'), file: path.join(p.home, '.claude', 'settings.json') },
     { agent: 'codex', dir: path.join(p.home, '.codex'), file: path.join(p.home, '.codex', 'hooks.json') },
+    { agent: 'opencode', dir: path.join(p.home, '.config', 'opencode'), file: path.join(p.home, '.config', 'opencode', 'plugin', 'wmux.js') },
   ];
 }
 
 export function hooksStatus(p: HookPaths = defaultHookPaths()): HookTarget[] {
-  return targets(p).map((t) => ({ agent: t.agent, file: t.file, present: fs.existsSync(t.dir), entries: countOurs(readJson(t.file)) }));
+  return targets(p).map((t) => ({
+    agent: t.agent,
+    file: t.file,
+    present: fs.existsSync(t.dir),
+    entries: t.agent === 'opencode' ? (isOurOpencodePlugin(t.file) ? 1 : 0) : countOurs(readJson(t.file)),
+  }));
 }
 
 /** Install for every agent whose config directory exists. Returns what was written. */
@@ -137,6 +161,13 @@ export function installHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
   const script = copyHelper(p);
   for (const t of targets(p)) {
     if (!fs.existsSync(t.dir)) continue;
+    if (t.agent === 'opencode') {
+      // A plugin file someone else put at that name is theirs: left alone.
+      if (fs.existsSync(t.file) && !isOurOpencodePlugin(t.file)) continue;
+      fs.mkdirSync(path.dirname(t.file), { recursive: true });
+      fs.copyFileSync(opencodePluginSource(p), t.file);
+      continue;
+    }
     const current = readJson(t.file) ?? {};
     writeJson(t.file, t.agent === 'claude' ? applyWmuxHooks(current, script) : applyCodexHooks(current, script));
   }
@@ -150,6 +181,10 @@ export function toAgentStatus(rows: HookTarget[]): HookAgentStatus[] {
 
 export function removeHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
   for (const t of targets(p)) {
+    if (t.agent === 'opencode') {
+      if (isOurOpencodePlugin(t.file)) fs.rmSync(t.file);
+      continue;
+    }
     const current = readJson(t.file);
     if (!current || !countOurs(current)) continue;
     writeJson(t.file, t.agent === 'claude' ? removeWmuxHooks(current) : removeCodexHooks(current));

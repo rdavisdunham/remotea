@@ -13,7 +13,7 @@ import { RemoteaServer } from './server';
 import { spawnPty } from './pty-spawn';
 import { HookBridge, hookEnv } from './hook-bridge';
 import { DiagLog, diagDir } from './diag-log';
-import { hooksStatus, installHooks, toAgentStatus } from './hooks-install';
+import { defaultHookPaths, hooksStatus, installHooks, toAgentStatus } from './hooks-install';
 import { runFsOp } from './remote-fs';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -47,7 +47,9 @@ async function main(): Promise<void> {
     hostname: os.hostname(),
     config: { resumeAgents: config.resumeAgents, scrollback: config.scrollback, snapshotScrollback: config.snapshotScrollback, ringBytes: config.ringBytes },
     log,
-    sessionEnv: config.hookPort ? (id) => hookEnv(hookSecret, config.hookPort, id) : undefined,
+    sessionEnv: config.hookPort
+      ? (id) => hookEnv(hookSecret, config.hookPort, id, { cliPath: path.join(defaultHookPaths().cliDir, 'wmux.js'), nodePath: process.execPath })
+      : undefined,
     diag: (device, events) => diag.write(device, events),
     hooks: { status: () => toAgentStatus(hooksStatus()), install: () => toAgentStatus(installHooks()) },
     fs: runFsOp,

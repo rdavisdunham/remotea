@@ -9,7 +9,7 @@ import { startRemoteHostStatus, useRemoteHosts } from '../remote-sessions/status
  * while the host's status says `hooks.prompt`; installing, "Not now" (this
  * run) and "Don't ask again" (this host) all clear that in every window.
  */
-const AGENT_LABELS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
+const AGENT_LABELS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode' };
 
 type Bridge = {
   installHooks(hostId: string): Promise<{ ok: boolean; error?: string }>;
@@ -62,7 +62,7 @@ export default function RemoteHooksPrompt() {
         <div className="confirm-dialog__message">
           {t(
             'remoteHooks.message',
-            '{agents} on {server} do not report their status to remotea yet. Install the status hooks there? Panes will then show when an agent is working, waiting on you or done, and which conversation to resume after a restart. Other hooks in those settings are kept.',
+            '{agents} on {server} cannot report their status to remotea yet. Install the status hooks there? Panes will then show when an agent is working, waiting on you or done, and which conversation to resume after a restart. Other hooks in those settings are kept.',
           )
             .replace('{agents}', listLabels(missing, t('remoteHooks.and', 'and')))
             .replace('{server}', st.serverHostname ?? where)}

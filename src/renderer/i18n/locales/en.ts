@@ -24,7 +24,7 @@ export const en = {
   'remoteView.anotherDevice': 'another device',
   'remoteView.fitHere': 'Fit here',
   'remoteHooks.title': 'Agent status on {host}',
-  'remoteHooks.message': '{agents} on {server} do not report their status to remotea yet. Install the status hooks there? Panes will then show when an agent is working, waiting on you or done, and which conversation to resume after a restart. Other hooks in those settings are kept.',
+  'remoteHooks.message': '{agents} on {server} cannot report their status to remotea yet. Install the status hooks there? Panes will then show when an agent is working, waiting on you or done, and which conversation to resume after a restart. Other hooks in those settings are kept.',
   'remoteHooks.and': 'and',
   'remoteHooks.never': "Don't ask again",
   'remoteHooks.later': 'Not now',

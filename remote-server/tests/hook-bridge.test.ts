@@ -174,6 +174,7 @@ describe('hub relay', () => {
   it('new sessions get the bridge address and their own token', () => {
     const env = hookEnv(SECRET, 7718, SURF);
     expect(env).toEqual({ WMUX: '1', WMUX_SURFACE_ID: SURF, WMUX_REMOTE: '127.0.0.1:7718', WMUX_REMOTE_TOKEN: hookToken(SECRET, SURF) });
+    expect(hookEnv(SECRET, 7718, SURF, { cliPath: '/x/wmux.js', nodePath: '/n/node' })).toMatchObject({ WMUX_CLI: '/x/wmux.js', WMUX_NODE: '/n/node' });
     expect(hookToken(SECRET, SURF)).not.toBe(hookToken(SECRET, 'surf-other'));
     expect(hookToken(SECRET, SURF)).not.toContain(SECRET);
   });
@@ -216,6 +217,24 @@ describe('hooks install', () => {
     removeHooks(paths);
     expect(read(path.join(home, '.claude', 'settings.json'))).toEqual(claude);
     expect(read(path.join(home, '.codex', 'hooks.json'))).toEqual(codex);
+  });
+
+  it('OpenCode: installs wmux\'s plugin and the CLI it runs; leaves someone else\'s plugin of that name alone', () => {
+    const { home, paths } = tempHome();
+    fs.mkdirSync(path.join(home, '.config', 'opencode'), { recursive: true });
+    const rows = installHooks(paths);
+    const plugin = path.join(home, '.config', 'opencode', 'plugin', 'wmux.js');
+    expect(rows.find((r) => r.agent === 'opencode')).toMatchObject({ present: true, entries: 1 });
+    expect(fs.readFileSync(plugin, 'utf8')).toContain('WmuxPlugin');
+    expect(fs.existsSync(path.join(paths.cliDir, 'wmux.js'))).toBe(true);
+    expect(fs.existsSync(path.join(paths.cliDir, 'wsl-network.js'))).toBe(true);
+    removeHooks(paths);
+    expect(fs.existsSync(plugin)).toBe(false);
+    fs.writeFileSync(plugin, 'export const SomeoneElse = 1;\n');
+    installHooks(paths);
+    expect(fs.readFileSync(plugin, 'utf8')).toBe('export const SomeoneElse = 1;\n');
+    removeHooks(paths);
+    expect(fs.existsSync(plugin)).toBe(true);
   });
 
   it('skips an agent that is not installed', () => {

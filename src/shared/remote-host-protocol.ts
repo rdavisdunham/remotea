@@ -201,6 +201,8 @@ export const RELAYED_RPC_METHODS: ReadonlySet<string> = new Set([
   'pane.release_agent',
   'pane.report_codex_session',
   'pane.release_codex_session',
+  'pane.release_opencode_session',
+  'pane.release_omp_session',
 ]);
 
 export type OpenMode = 'fresh' | 'delta' | 'snapshot';

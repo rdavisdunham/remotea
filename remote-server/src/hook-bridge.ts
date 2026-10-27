@@ -116,13 +116,18 @@ export class HookBridge {
   }
 }
 
-/** The environment that points a session's hooks at the bridge. */
-export function hookEnv(secret: string, port: number, sessionId: string): Record<string, string> {
+/**
+ * The environment that points a session's hooks at the bridge. `cli`: where
+ * the wmux CLI and a Node to run it are — the OpenCode plugin (and the other
+ * wmux plugins) report through `node $WMUX_CLI <command>`.
+ */
+export function hookEnv(secret: string, port: number, sessionId: string, cli?: { cliPath: string; nodePath: string }): Record<string, string> {
   return {
     // wmux-hook.js and the wmux CLI read these (see the header).
     WMUX: '1',
     WMUX_SURFACE_ID: sessionId,
     WMUX_REMOTE: `127.0.0.1:${port}`,
     WMUX_REMOTE_TOKEN: hookToken(secret, sessionId),
+    ...(cli ? { WMUX_CLI: cli.cliPath, WMUX_NODE: cli.nodePath } : {}),
   };
 }
