@@ -19,7 +19,6 @@ export interface RemoteHostsDeps {
   broadcast: (channel: string, ...args: unknown[]) => void;
   log?: (msg: string) => void;
   socket?: SocketFactory;
-  onMeta?: (surfaceId: string, meta: { cwd?: string }) => void;
 }
 
 
@@ -30,6 +29,7 @@ export class RemoteHosts {
   private readonly clients = new Map<string, RemoteHostClient>();
   private readonly log: (msg: string) => void;
   private registryTimer: NodeJS.Timeout | null = null;
+  private metaListener: ((surfaceId: string, meta: { cwd?: string }) => void) | undefined;
   /** Per renderer window: whether its layout is restored, and the remote tabs it shows. */
   private readonly windows = new Map<number, { ready: boolean; ids: Set<string>; send: (payload: RegistryPayload) => void }>();
 
@@ -38,6 +38,11 @@ export class RemoteHosts {
     this.device = loadDevice(path.join(deps.dataDir, 'remote-device.json'));
     this.store = new HostStore(path.join(deps.dataDir, 'remote-hosts.json'), deps.box);
     this.intents = new PendingIntents(path.join(deps.dataDir, 'remote-pending.json'));
+  }
+
+  /** Where a remote session's cwd reports go (the same path a shell's report_pwd takes). */
+  setMetaListener(fn: (surfaceId: string, meta: { cwd?: string }) => void): void {
+    this.metaListener = fn;
   }
 
   start(): void {
@@ -58,7 +63,7 @@ export class RemoteHosts {
         intents: this.intents,
         onStatus: (status) => this.deps.broadcast(IPC_CHANNELS.RHOST_STATUS, status),
         onRegistry: () => this.registryChanged(),
-        onMeta: (id, meta) => this.deps.onMeta?.(id, meta),
+        onMeta: (id, meta) => this.metaListener?.(id, meta),
         socket: this.deps.socket,
         log: this.log,
       });

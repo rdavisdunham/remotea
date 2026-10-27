@@ -1548,6 +1548,11 @@ app.whenReady().then(() => {
   // remotea: connect to remote session servers, and treat sleep as a clean
   // disconnect and wake as "reconnect NOW" — a laptop lid must not cost a
   // 25-second dead-socket timeout before the panes come back.
+  // A remote session's cwd (read from /proc on the server) reaches the tab
+  // label, the workspace and the next split exactly like a shell's report_pwd.
+  remoteHosts.setMetaListener((surfaceId, meta) => {
+    if (meta.cwd) broadcastMetadataUpdate({ command: 'report_pwd', surfaceId, args: [meta.cwd] });
+  });
   remoteHosts.start();
   powerMonitor.on('suspend', () => remoteHosts.suspendAll());
   powerMonitor.on('resume', () => remoteHosts.wakeAll());
