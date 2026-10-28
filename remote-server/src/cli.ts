@@ -15,7 +15,7 @@
  *   remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
  *                                  diagnostics the apps sent (connection, reattach, agent state; no content)
  *   remotea screen <surf-id>       print what a session's screen shows right now
- *   remotea eridani connect|status|disconnect|collect
+ *   remotea eridani connect|status|disconnect|collect|targets|worktrees
  *                                  the link to Eridani (see eridani-cli.ts)
  *
  * `status --json` is a stable contract for other tools (STATUS_VERSION below).
@@ -56,6 +56,12 @@ export interface StatusSession {
   agentState: AgentStateInfo | null;
   incarnation: number;
   turnSeq: number;
+  /** Stage C (additive): the Eridani run this session belongs to, null for any other session. */
+  eridani: { runId: string; generation: number; taskId: string | null } | null;
+  worktree: string | null;
+  branch: string | null;
+  /** A stop Eridani requested and the process has not yet been seen to exit. */
+  stopRequested: { at: number; mode: 'interrupt' | 'kill' } | null;
 }
 
 export interface StatusOutput {
@@ -122,6 +128,10 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
     agentState: s.agentState ?? null,
     incarnation: s.incarnation ?? 0,
     turnSeq: s.turnSeq ?? 0,
+    eridani: s.eridani ? { runId: s.eridani.runId, generation: s.eridani.generation, taskId: s.eridani.taskId } : null,
+    worktree: s.eridani?.worktree ?? null,
+    branch: s.eridani?.branch ?? null,
+    stopRequested: s.eridani?.stopRequested ? { at: s.eridani.stopRequested.at, mode: s.eridani.stopRequested.mode } : null,
   }));
   sessions.sort((a, b) => a.createdAt - b.createdAt);
   const running = await healthy(config.port);
@@ -416,7 +426,9 @@ const USAGE = `usage:
   remotea hooks install|remove|status [--json]
   remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
   remotea screen <surf-id>
-  remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]`;
+  remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]
+  remotea eridani targets list [--json] | add … | remove <id>     where Eridani may start work
+  remotea eridani worktrees [--json]                            managed worktrees and unmerged work (never removes)`;
 
 export async function main(argv: string[]): Promise<number> {
   const dir = configDir();

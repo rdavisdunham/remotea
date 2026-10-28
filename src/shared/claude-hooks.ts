@@ -68,7 +68,32 @@ export function removeWmuxHooks(settings: any): any {
  * preserved. Extracted so the merge logic is unit-testable without touching
  * the fs (issue #53).
  */
-export function applyWmuxHooks(settings: any, hookScript: string): any {
+export interface WmuxHookOptions {
+  /**
+   * Hold AskUserQuestion for Eridani (remotea stage C): a SYNCHRONOUS
+   * PreToolUse entry matched on that tool, whose helper may wait for a remote
+   * answer. Only the remotea server installs it; the app's own panes have no
+   * one to ask, and a sync hook there would only add node's start-up to every
+   * question.
+   */
+  questions?: boolean;
+}
+
+/**
+ * Claude Code's timeout per entry, in seconds, written explicitly so nothing
+ * depends on its default (600 s for a command hook). The question hold is the
+ * one long wait: remotea gives the question back to the terminal at 570 s,
+ * before Claude would kill the hook (questions-claude.ts).
+ */
+export const HOOK_TIMEOUTS_S = {
+  /** Observers: report and leave. */
+  observer: 10,
+  /** SessionStart may print Eridani's context (context.ts waits 2.5 s for it). */
+  sessionStart: 10,
+  question: 600,
+} as const;
+
+export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHookOptions = {}): any {
   const next = { ...(settings || {}) };
   next.hooks = { ...(next.hooks || {}) };
 
@@ -99,7 +124,8 @@ export function applyWmuxHooks(settings: any, hookScript: string): any {
   // finished turn (issue #151). SessionStart, Stop and SessionEnd stay
   // synchronous: they fire once per turn or session, and SessionEnd runs while
   // the process is leaving.
-  const ASYNC = { async: true } as const;
+  const ASYNC = { async: true, timeout: HOOK_TIMEOUTS_S.observer } as const;
+  const SYNC = { timeout: HOOK_TIMEOUTS_S.observer } as const;
 
   // PostToolUse — one entry per tracked tool for specific sidebar tracking.
   next.hooks.PostToolUse = [
@@ -108,24 +134,28 @@ export function applyWmuxHooks(settings: any, hookScript: string): any {
       matcher: tool,
       hooks: [{ type: 'command', command: makeToolCmd(tool), ...ASYNC }],
     })),
+    // The confirmation of a held question: the answers as the agent received them.
+    ...(opts.questions
+      ? [{ matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: makeToolCmd('AskUserQuestion'), ...ASYNC }] }]
+      : []),
   ];
 
   // Notification — Claude Code is asking for input/permission (waiting on you).
   next.hooks.Notification = [
     ...stripWmux(next.hooks.Notification),
-    { hooks: [{ type: 'command', command: makeEventCmd('Notification') }] },
+    { hooks: [{ type: 'command', command: makeEventCmd('Notification'), ...SYNC }] },
   ];
 
   // Stop — Claude Code finished its turn and is back at the prompt.
   next.hooks.Stop = [
     ...stripWmux(next.hooks.Stop),
-    { hooks: [{ type: 'command', command: makeEventCmd('Stop') }] },
+    { hooks: [{ type: 'command', command: makeEventCmd('Stop'), ...SYNC }] },
   ];
 
   // SubagentStop — one parallel subagent finished (drives sidebar agent lines).
   next.hooks.SubagentStop = [
     ...stripWmux(next.hooks.SubagentStop),
-    { hooks: [{ type: 'command', command: makeEventCmd('SubagentStop') }] },
+    { hooks: [{ type: 'command', command: makeEventCmd('SubagentStop'), ...SYNC }] },
   ];
 
   // SubagentStart — a subagent was spawned (issue #272). Its `agent_id` is what
@@ -148,7 +178,7 @@ export function applyWmuxHooks(settings: any, hookScript: string): any {
   // command, so the shell says running for the session's whole life).
   next.hooks.SessionStart = [
     ...stripWmux(next.hooks.SessionStart),
-    { hooks: [{ type: 'command', command: makeEventCmd('SessionStart') }] },
+    { hooks: [{ type: 'command', command: makeEventCmd('SessionStart'), timeout: HOOK_TIMEOUTS_S.sessionStart }] },
   ];
 
   // UserPromptSubmit — the human just sent a message: the turn is in flight, and
@@ -166,6 +196,9 @@ export function applyWmuxHooks(settings: any, hookScript: string): any {
   next.hooks.PreToolUse = [
     ...stripWmux(next.hooks.PreToolUse),
     { hooks: [{ type: 'command', command: makeEventCmd('PreToolUse'), ...ASYNC }] },
+    ...(opts.questions
+      ? [{ matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: makeEventCmd('AskUserQuestion'), timeout: HOOK_TIMEOUTS_S.question }] }]
+      : []),
   ];
 
   // SessionEnd — Claude Code exited but the shell lives on. Releases the pane so
@@ -173,7 +206,7 @@ export function applyWmuxHooks(settings: any, hookScript: string): any {
   // it last said.
   next.hooks.SessionEnd = [
     ...stripWmux(next.hooks.SessionEnd),
-    { hooks: [{ type: 'command', command: makeEventCmd('SessionEnd') }] },
+    { hooks: [{ type: 'command', command: makeEventCmd('SessionEnd'), ...SYNC }] },
   ];
 
   return next;

@@ -116,6 +116,33 @@ export interface SessionRecord {
   turnSeq?: number;
   /** Where turn capture is in the current conversation (turn-capture.ts). */
   turnCursor?: TurnCursor;
+  /** Set when Eridani started this session for a run (remote-server/src/dispatch.ts). */
+  eridani?: EridaniBinding;
+}
+
+/**
+ * An Eridani run executing in a session. No secrets: the run token and the
+ * spawn's ERIDANI_* environment live in the server's own eridani-runs.json.
+ */
+export interface EridaniBinding {
+  runId: string;
+  /** The run generation this process currently serves (advanced by steer / runs.snapshot). */
+  generation: number;
+  attempt: number;
+  taskId: string | null;
+  /** The execution target id (eridani.json targets[]). */
+  target: string;
+  harness: 'claude' | 'codex';
+  model: string;
+  worktree: string;
+  branch: string;
+  base: string;
+  /** The base commit the worktree was created from (null when it was reused). */
+  baseSha: string | null;
+  /** op_id of the spawn command. */
+  spawnOp: string;
+  /** A stop was accepted; cleared only by the process exiting. Never resumed while set. */
+  stopRequested?: { at: number; mode: 'interrupt' | 'kill'; op: string | null };
 }
 
 export type AgentStateName = 'working' | 'needs_you' | 'idle' | 'exited';
@@ -136,6 +163,9 @@ export interface TurnCursor {
   captured: number;
   /** Recent provider turn ids already captured, newest last. */
   recent: string[];
+  /** The run generation the open turn was bound to when its prompt was accepted (F07). */
+  generation?: number;
+  runId?: string | null;
 }
 
 export interface Tombstone {

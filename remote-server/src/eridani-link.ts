@@ -21,6 +21,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import WebSocket from 'ws';
+import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_LIMITS,
   ERIDANI_PROTO,
@@ -29,12 +30,16 @@ import {
   STAGE_B_CAPS,
   canonicalJson,
   chunkItems,
+  commandShapeError,
   parseDownFrame,
   semanticPayload,
   type AckBody,
   type CapabilityMatrix,
   type CommandBody,
+  type CommandOutcomeState,
   type DownFrame,
+  type LinkCap,
+  type RunsSnapshotBody,
   type ExitBody,
   type SessionReportInput,
   type SessionTool,
@@ -44,7 +49,7 @@ import {
 } from '../../src/shared/eridani-link-protocol';
 import { initialFsm, publicState, step, type Fsm, type FsmEvent } from '../../src/main/remote-hosts/connection-fsm';
 import { Spool, type Lane, type SpoolEntry } from './eridani-spool';
-import { FINAL_STATES, Journal } from './eridani-journal';
+import { FINAL_STATES, Journal, type JournalRecord } from './eridani-journal';
 
 export const OUTBOX_FILE = 'eridani-outbox.jsonl';
 export const JOURNAL_FILE = 'eridani-journal.jsonl';
@@ -89,8 +94,24 @@ const realSocket: LinkSocketFactory = (url, headers) =>
     maxPayload: 1024 * 1024,
   }) as unknown as LinkSocket;
 
+export interface CommandResult {
+  state: 'executed' | 'failed' | 'rejected';
+  detail?: string;
+  /** Kind-specific facts, recorded in the journal and sent as `command.outcome.result`. */
+  result?: Record<string, unknown>;
+}
+
+export interface CommandContext {
+  /**
+   * The effect is about to happen: journal `executing` (fsync). Until a
+   * handler calls this the command is only `accepted`, and a restart re-runs
+   * it (a queued input waits here until the agent is at its prompt).
+   */
+  begin(): void;
+}
+
 /** Executes one inbound command kind (stage C). Returns the outcome to record and report. */
-export type CommandHandler = (cmd: CommandBody) => Promise<{ state: 'executed' | 'failed' | 'rejected'; detail?: string; outcome?: unknown }>;
+export type CommandHandler = (cmd: CommandBody, ctx: CommandContext) => Promise<CommandResult>;
 
 export interface LinkStatus {
   enabled: boolean;
@@ -129,6 +150,21 @@ export interface EridaniLinkDeps {
   journalPending?: () => { pending: string[]; uncertain: string[] };
   /** Commands this release executes, by frame type. Stage B has none. */
   handlers?: Record<string, CommandHandler>;
+  /**
+   * Fence and policy check before a command is accepted (stale incarnation,
+   * generation, unknown run, …). A reason rejects it; null accepts it.
+   */
+  precheck?: (cmd: CommandBody) => string | null;
+  /** Settle a command found `executing` after a restart (see eridani-journal.ts). */
+  recover?: (rec: JournalRecord) => { state: 'executed' | 'failed' | 'rejected'; detail?: string; outcome?: unknown } | null;
+  /** Facts the ack of an accepted command carries (a spawn: its surf and incarnation). */
+  acceptFacts?: (cmd: CommandBody) => Record<string, unknown>;
+  /** Execution targets listed in hello (stage C). */
+  targets?: () => HelloTarget[];
+  /** Capabilities advertised in hello (defaults to stage B's). */
+  caps?: () => readonly LinkCap[];
+  /** Eridani's desired state per run, after each welcome. */
+  onRunsSnapshot?: (runs: RunsSnapshotBody['runs']) => void;
   /** An event left the spool acknowledged (the collector advances its fingerprint here). */
   onDelivered?: (entry: SpoolEntry) => void;
   /** An event was evicted or refused for good: its entity must be re-read. */
@@ -181,6 +217,12 @@ export class EridaniLink {
   private stopped = true;
   private readonly inflightMax: number;
   private readonly maxFrameBytes: number;
+  /** Correlated requests (context.request) waiting for their response, by req_id. */
+  private readonly waiting = new Map<string, { resolve: (f: Record<string, unknown> | null) => void; timer: unknown }>();
+  /** runs.snapshot parts being assembled, by `part.of`. */
+  private readonly runParts = new Map<string, Array<{ i: number; runs: RunsSnapshotBody['runs'] }>>();
+  /** Commands running now, so a duplicate arriving mid-effect is not run twice. */
+  private readonly running = new Set<string>();
 
   constructor(private readonly deps: EridaniLinkDeps) {
     this.timers = deps.timers ?? realTimers;
@@ -202,7 +244,10 @@ export class EridaniLink {
       horizonMs: ERIDANI_LIMITS.replayHorizonMs,
       now: this.now,
       log: this.log,
+      recover: deps.recover,
     });
+    // What a restart settled (or left uncertain) is reported once, through the spool.
+    for (const r of this.journal.settledOnLoad) this.outcome(r.op_id, r.state as CommandOutcomeState, r.detail, r.t, r.outcome);
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -377,8 +422,9 @@ export class EridaniLink {
         machine: this.deps.machine,
         proto: ERIDANI_PROTO,
         version: this.deps.version,
-        caps: [...STAGE_B_CAPS],
+        caps: [...(this.deps.caps?.() ?? STAGE_B_CAPS)],
         harnesses: this.deps.harnesses?.() ?? {},
+        ...(this.deps.targets ? { targets: this.deps.targets() } : {}),
       });
       this.handshakeTimer = this.timers.setTimeout(() => {
         this.handshakeTimer = null;
@@ -471,6 +517,47 @@ export class EridaniLink {
   private onDown(): void {
     this.connEpoch = null;
     this.spool.dropEphemeral();
+    this.runParts.clear();
+    for (const [id, w] of this.waiting) {
+      this.timers.clearTimeout(w.timer);
+      this.waiting.delete(id);
+      w.resolve(null);
+    }
+  }
+
+  /**
+   * Send one correlated request now (never spooled: it only means something
+   * while the asker waits) and resolve with the matching response, or null
+   * when the link is down or nothing came back within `ms`. A response that
+   * arrives later is dropped.
+   */
+  request(body: Record<string, unknown> & { t: string; req_id: string }, ms: number): Promise<Record<string, unknown> | null> {
+    if (!this.ready || this.waiting.has(body.req_id)) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const timer = this.timers.setTimeout(() => {
+        this.waiting.delete(body.req_id);
+        resolve(null);
+      }, ms);
+      this.waiting.set(body.req_id, { resolve, timer });
+      if (!this.sendFrame(body)) {
+        this.timers.clearTimeout(timer);
+        this.waiting.delete(body.req_id);
+        resolve(null);
+      }
+    });
+  }
+
+  /**
+   * Re-run commands accepted before a restart and never started. Called once
+   * the reconcile has settled (runs.snapshot applied), so their fences are
+   * checked against the current state.
+   */
+  replayAccepted(): void {
+    for (const rec of this.journal.acceptedOps()) {
+      if (this.running.has(rec.op_id)) continue;
+      const cmd = { ...rec.body, op_id: rec.op_id, digest: rec.digest } as CommandBody;
+      void this.run(cmd, rec.digest, true);
+    }
   }
 
   private sendSnapshot(): void {
@@ -530,8 +617,17 @@ export class EridaniLink {
       case 'bye':
         this.log(`eridani: bye (${(f as { reason?: string }).reason || 'no reason'})`);
         return;
-      case 'context.response':
-        return; // stage C
+      case 'context.response': {
+        const r = f as DownFrame & { req_id: string };
+        const w = this.waiting.get(r.req_id);
+        if (!w) return; // late or unknown: dropped
+        this.waiting.delete(r.req_id);
+        this.timers.clearTimeout(w.timer);
+        w.resolve(r as unknown as Record<string, unknown>);
+        return;
+      }
+      case 'runs.snapshot':
+        return this.onRunsSnapshot(f as DownFrame & RunsSnapshotBody);
       default:
         void this.onCommand(f as DownFrame & CommandBody);
     }
@@ -569,45 +665,122 @@ export class EridaniLink {
     this.writeStatus();
   }
 
-  /** An inbound operation: journal first, ack, then execute at most once. */
+  private onRunsSnapshot(f: RunsSnapshotBody): void {
+    if (!f.part || f.part.n <= 1) {
+      this.deps.onRunsSnapshot?.(f.runs);
+      return;
+    }
+    const list = this.runParts.get(f.part.of) ?? [];
+    if (!list.some((p) => p.i === f.part!.i)) list.push({ i: f.part.i, runs: f.runs });
+    this.runParts.set(f.part.of, list);
+    if (list.length < f.part.n) return;
+    this.runParts.delete(f.part.of);
+    this.deps.onRunsSnapshot?.(list.sort((a, b) => a.i - b.i).flatMap((p) => p.runs));
+  }
+
+  /**
+   * An inbound operation (C01, F06):
+   *   1. a repeat of a known op_id: same digest → its recorded state, never
+   *      run again; different digest → refused;
+   *   2. shape, expiry (and the replay horizon), and the host's fences and
+   *      policy → `rejected`, journaled, reported;
+   *   3. `accepted` is journaled and fsynced BEFORE the ack goes out;
+   *   4. the handler marks `executing` when its effect starts; the outcome is
+   *      journaled, then reported as `command.outcome`.
+   */
   private async onCommand(cmd: CommandBody & { id: string }): Promise<void> {
     const digest = typeof cmd.digest === 'string' && cmd.digest ? cmd.digest : digestOf(cmd as unknown as Record<string, unknown>);
     const prior = this.journal.get(cmd.op_id);
     if (prior) {
       if (prior.digest !== digest) {
-        this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: false, error: 'digest-mismatch' });
+        this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: false, error: 'DIGEST_MISMATCH' });
         return;
       }
-      this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: prior.state, detail: prior.detail, outcome: prior.outcome } });
-      if (FINAL_STATES.has(prior.state)) this.outcome(cmd.op_id, prior.state as 'executed', prior.detail);
+      this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: prior.state, detail: prior.detail, result: prior.outcome } });
+      if (FINAL_STATES.has(prior.state)) this.outcome(cmd.op_id, prior.state as CommandOutcomeState, prior.detail, prior.t, prior.outcome);
       return;
     }
-    const expires = typeof cmd.expires_at === 'number' ? cmd.expires_at : typeof cmd.expires_at === 'string' ? Date.parse(cmd.expires_at) : NaN;
-    const handler = this.deps.handlers?.[cmd.t];
-    let reject: string | null = null;
-    if (Number.isFinite(expires) && expires < this.now()) reject = 'expired';
-    else if (!handler) reject = 'unsupported';
+    const reject = this.admit(cmd);
     if (reject) {
       this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject });
       this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: 'rejected', detail: reject } });
-      this.outcome(cmd.op_id, 'rejected', reject);
+      this.outcome(cmd.op_id, 'rejected', reject, cmd.t);
       return;
     }
-    this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'accepted' });
-    this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true });
-    this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'executing' });
-    let res: Awaited<ReturnType<CommandHandler>>;
-    try {
-      res = await handler!(cmd);
-    } catch (err) {
-      res = { state: 'failed', detail: (err as Error).message };
-    }
-    this.journal.record(cmd.op_id, { digest, t: cmd.t, state: res.state, detail: res.detail, outcome: res.outcome });
-    this.outcome(cmd.op_id, res.state, res.detail);
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(cmd)) if (!['v', 'id', 'conn_epoch', 'at', 'op_id', 'digest'].includes(k)) body[k] = v;
+    this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'accepted', body });
+    this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: 'accepted', ...this.acceptFacts(cmd) } });
+    await this.run(cmd, digest, false);
   }
 
-  private outcome(commandId: string, state: 'executed' | 'failed' | 'rejected' | 'uncertain', detail?: string): void {
-    this.enqueue({ t: 'command.outcome', command_id: commandId, state, ...(detail ? { detail } : {}) }, 0, `outcome:${commandId}`, state);
+  /** Why a command is refused before it is accepted, or null. */
+  private admit(cmd: CommandBody): string | null {
+    const handler = this.deps.handlers?.[cmd.t];
+    if (!handler) return 'unsupported';
+    const shape = commandShapeError(cmd as unknown as Record<string, unknown>);
+    if (shape) return shape;
+    const expires = typeof cmd.expires_at === 'number' ? cmd.expires_at : typeof cmd.expires_at === 'string' ? Date.parse(cmd.expires_at) : NaN;
+    if (Number.isFinite(expires)) {
+      if (expires < this.now()) return 'expired';
+      // An op must not outlive the memory of its id, or a late duplicate could run twice.
+      if (expires > this.now() + ERIDANI_LIMITS.replayHorizonMs) return 'expires beyond the replay horizon';
+    } else if (cmd.t === 'spawn') return 'spawn needs expires_at';
+    return this.deps.precheck?.(cmd) ?? null;
+  }
+
+  /** Facts the ack can carry at once (a spawn's surface id is known before it runs). */
+  private acceptFacts(cmd: CommandBody): Record<string, unknown> {
+    try {
+      return this.deps.acceptFacts?.(cmd) ?? {};
+    } catch {
+      return {};
+    }
+  }
+
+  private async run(cmd: CommandBody, digest: string, replay: boolean): Promise<void> {
+    if (this.running.has(cmd.op_id)) return;
+    if (replay) {
+      // Accepted before a restart: everything is checked again against what is true now.
+      const reject = this.admit(cmd);
+      if (reject) {
+        this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject });
+        this.outcome(cmd.op_id, 'rejected', reject, cmd.t);
+        return;
+      }
+    }
+    const handler = this.deps.handlers![cmd.t];
+    this.running.add(cmd.op_id);
+    let began = false;
+    const ctx: CommandContext = {
+      begin: () => {
+        if (began) return;
+        began = true;
+        // The body stays with the record so a restart can reconcile it (recover).
+        this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'executing', body: this.journal.get(cmd.op_id)?.body });
+      },
+    };
+    let res: CommandResult;
+    try {
+      res = await handler(cmd, ctx);
+    } catch (err) {
+      res = { state: 'failed', detail: (err as Error).message.slice(0, ERIDANI_LIMITS.reasonChars) };
+    } finally {
+      this.running.delete(cmd.op_id);
+    }
+    this.journal.record(cmd.op_id, { digest, t: cmd.t, state: res.state, detail: res.detail, outcome: res.result });
+    this.outcome(cmd.op_id, res.state, res.detail, cmd.t, res.result);
+  }
+
+  private outcome(commandId: string, state: CommandOutcomeState, detail?: string, kind?: string, result?: unknown): void {
+    this.enqueue({
+      t: 'command.outcome',
+      command_id: commandId,
+      state,
+      ...(detail ? { detail: detail.slice(0, ERIDANI_LIMITS.reasonChars) } : {}),
+      ...(kind ? { kind } : {}),
+      ...(result && typeof result === 'object' ? { result } : {}),
+    }, 0, `outcome:${commandId}`, state);
   }
 
   // ── Status file ──────────────────────────────────────────────────────────

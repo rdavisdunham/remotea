@@ -14,8 +14,12 @@
  * the replay horizon are dropped on compaction; a command whose own
  * `expires_at` has passed is rejected before it is journaled as accepted.
  *
- * Stage B receives no effectful commands (it advertises none), so in practice
- * everything here ends `rejected: unsupported`; stage C plugs handlers in.
+ * An `accepted` record carries the command body: a restart between the ack and
+ * the start of the effect re-runs it (its fences are checked again, so a
+ * command for a process the restart lost is rejected, not replayed). An
+ * `executing` record found after a restart is handed to `recover` (a spawn is
+ * resolved by its run → surface mapping, a stop by whether the process is
+ * gone); what `recover` cannot settle becomes `uncertain` and is never re-run.
  */
 import fs from 'fs';
 import path from 'path';
@@ -29,6 +33,8 @@ export interface JournalRecord {
   state: JournalState;
   detail?: string;
   outcome?: unknown;
+  /** The command itself, kept while it is `accepted` (re-run after a restart). */
+  body?: Record<string, unknown>;
   /** First seen, epoch ms. */
   at: number;
   updatedAt: number;
@@ -40,9 +46,18 @@ export class Journal {
   private readonly recs = new Map<string, JournalRecord>();
   private fd: number | null = null;
   private lines = 0;
+  /** Ops a restart moved out of `executing` (settled by `recover`, or uncertain): reported once. */
+  readonly settledOnLoad: JournalRecord[] = [];
   private readonly now: () => number;
 
-  constructor(private readonly opts: { file: string | null; horizonMs: number; now?: () => number; log?: (m: string) => void }) {
+  constructor(private readonly opts: {
+    file: string | null;
+    horizonMs: number;
+    now?: () => number;
+    log?: (m: string) => void;
+    /** Settle an op found `executing` after a restart; null leaves it `uncertain`. */
+    recover?: (rec: JournalRecord) => { state: 'executed' | 'failed' | 'rejected'; detail?: string; outcome?: unknown } | null;
+  }) {
     this.now = opts.now ?? Date.now;
     this.load();
   }
@@ -62,8 +77,18 @@ export class Journal {
     return { pending, uncertain };
   }
 
+  /** Accepted before a restart and never started: the caller re-runs these. */
+  acceptedOps(): JournalRecord[] {
+    return [...this.recs.values()].filter((r) => r.state === 'accepted' && r.body);
+  }
+
+  /** Every record (tests, status). */
+  all(): JournalRecord[] {
+    return [...this.recs.values()];
+  }
+
   /** Record a state change durably (fsync) before anything acts on it. */
-  record(op: string, patch: { digest: string; t: string; state: JournalState; detail?: string; outcome?: unknown }): JournalRecord {
+  record(op: string, patch: { digest: string; t: string; state: JournalState; detail?: string; outcome?: unknown; body?: Record<string, unknown> }): JournalRecord {
     const prev = this.recs.get(op);
     const now = this.now();
     const rec: JournalRecord = { op_id: op, at: prev?.at ?? now, updatedAt: now, ...patch };
@@ -130,10 +155,23 @@ export class Journal {
     // A restart in the middle of an effect: nobody knows whether it happened.
     for (const r of this.recs.values()) {
       if (r.state === 'executing') {
-        r.state = 'uncertain';
-        r.detail = 'the server restarted while this was running';
-        this.opts.log?.(`eridani journal: ${r.op_id} is uncertain after a restart`);
+        let settled: ReturnType<NonNullable<typeof this.opts.recover>> = null;
+        try {
+          settled = this.opts.recover?.(r) ?? null;
+        } catch {
+          settled = null;
+        }
+        this.settledOnLoad.push(r);
+        if (settled) {
+          Object.assign(r, settled, { updatedAt: this.now() });
+          this.opts.log?.(`eridani journal: ${r.op_id} (${r.t}) settled after a restart: ${settled.state}`);
+        } else {
+          r.state = 'uncertain';
+          r.detail = 'the server restarted while this was running';
+          this.opts.log?.(`eridani journal: ${r.op_id} (${r.t}) is uncertain after a restart`);
+        }
       }
+      if (FINAL_STATES.has(r.state)) delete r.body;
     }
     this.compact();
   }
