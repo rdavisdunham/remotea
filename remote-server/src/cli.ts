@@ -32,7 +32,7 @@ import { diagDir } from './diag-log';
 import { hooksStatus, installHooks, removeHooks, type HookTarget } from './hooks-install';
 import type { RegistryData } from './registry';
 import { eridaniCommand, statusBlock } from './eridani-cli';
-import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord } from '../../src/shared/remote-host-protocol';
+import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord, type VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
 
 export const STATUS_VERSION = 1;
 
@@ -62,6 +62,8 @@ export interface StatusSession {
   branch: string | null;
   /** A stop Eridani requested and the process has not yet been seen to exit. */
   stopRequested: { at: number; mode: 'interrupt' | 'kill' } | null;
+  /** Stage D (additive): the latest verification attempt, null when none ran. */
+  verify: { attemptId: string; state: VerifyAttemptStatus['state']; startedAt: number | null } | null;
 }
 
 export interface StatusOutput {
@@ -132,6 +134,7 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
     worktree: s.eridani?.worktree ?? null,
     branch: s.eridani?.branch ?? null,
     stopRequested: s.eridani?.stopRequested ? { at: s.eridani.stopRequested.at, mode: s.eridani.stopRequested.mode } : null,
+    verify: s.verify ? { attemptId: s.verify.attemptId, state: s.verify.state, startedAt: s.verify.startedAt } : null,
   }));
   sessions.sort((a, b) => a.createdAt - b.createdAt);
   const running = await healthy(config.port);

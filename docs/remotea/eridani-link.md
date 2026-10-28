@@ -273,11 +273,11 @@ recovery ref first (`refs/remotea/recovery/<branch>`), then
 
 | `t` | Fields | Effect |
 |---|---|---|
-| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
+| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
 | `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text` | `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then the text. Typed as a bracketed paste and Enter. Never counts as a person answering. |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
-| `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, `CI=1`, the target's timeout), then sends `verify.result`. One at a time per worktree. |
+| `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, `CI=1`, the target's timeout), then sends `verify.result`. Shares the attempt machinery of [stage D](#stage-d-verification-after-turns). |
 
 Every command needs a fence that matches: an `input`/`stop` names the surface
 and its `incarnation`, the run, and the generation (a queued input must match
@@ -309,7 +309,7 @@ This happens whether or not the link is enabled.
 
 **runs.snapshot** (Eridani → remotea, after welcome, chunked like the
 snapshot): `runs [{run_id, generation, desired: continue|stop|none,
-stop_mode?}]`. A newer generation is adopted (an older queued input is then
+stop_mode?, verify? {verify_id, plan_revision} | null}]`. A newer generation is adopted (an older queued input is then
 refused); `desired: stop` is carried out like a stop command.
 
 ### Questions (Claude)
@@ -355,8 +355,8 @@ is not enabled.
 
 remotea also sends: `question`, `question.resolved`, `verify.result
 {attempt_id, run_id, generation, turn_seq, plan_revision, verify_id,
-workspace_fingerprint ("<HEAD>:<sha256 of status, diff and untracked
-contents>"), exit_code, tail (last 4000 chars), truncated, duration_ms,
+workspace_fingerprint ("<HEAD>:<sha256 of the branch, status, diff and
+untracked contents>"), exit_code, tail (last 4000 chars), truncated, duration_ms,
 timed_out, canceled, error?}` and `worktrees.report {worktrees: [...]}` (on
 ready, after a spawn or exit, and every 2 min when it changed). `turn` now
 carries the run binding taken when the turn's prompt was submitted, Claude's
@@ -370,9 +370,89 @@ answer, stop, verify, runs.snapshot, worktrees.report`.
 taskId}`, `worktree`, `branch`, `stopRequested` (null for other sessions;
 `version` stays 1).
 
-## Not yet implemented (stage D and later)
+## Stage D: verification after turns
 
-- Automatic verification after turns (stage C runs `verify` on command only).
+Code: `remote-server/src/verify-attempts.ts` (when, and under which attempt
+id), `verify-runner.ts` (the run itself). `caps` adds `verify.auto`.
+
+**Which runs verify.** A run carries a verify config on its binding,
+`{verifyId, planRevision}`, learned from any of: the spawn's `verify
+{verify_id, plan_revision}`; `runs.snapshot` entries (`verify` present sets
+it, `null` clears it, absent leaves it); a `verify` command, when the run has
+none yet or the command names a newer plan revision. The verify id must be one
+of the execution target's `verify` entries (a spawn naming another is
+rejected).
+
+**When.** After every root turn the host captures on a bound surface (a `turn`
+frame), 2 s later. Not after an interim Stop (`interim: true`, background
+tasks still running), not for a turn of an older generation than the run's
+current one, not while a stop is requested. One attempt at a time per
+surface:
+
+| Event | Effect |
+|---|---|
+| a newer turn inside the 2 s | replaces the waiting attempt (only the newer turn is verified) |
+| a newer turn while an attempt runs | the process tree is killed; its `verify.result` says `canceled: true`; the newer turn's attempt follows |
+| a `stop` (command or runs.snapshot), a steer, the process exiting | the running attempt is canceled the same way; a waiting one is dropped without a result |
+| the target's timeout | the tree is killed (SIGTERM, SIGKILL 2 s later); `timed_out: true` |
+
+**Attempt ids and the tuple.** Eridani matches results on `(run_id,
+generation, turn_seq, plan_revision, attempt_id)`. A host-started attempt
+mints `local:<uuid>` and says `initiator: "host"`; its `generation` and
+`turn_seq` are the TURN's (not the run's current ones), its `plan_revision`
+the config's. An Eridani `verify` command keeps Eridani's `attempt_id` and is
+deduplicated against host attempts for the same tuple (and `verify_id`):
+
+- a host attempt still waiting → it starts at once, under Eridani's id;
+- a host attempt running → Eridani's id adopts it: one run, one result, with
+  `adopted: "local:…"`;
+- a host attempt finished, the tree unchanged since → its result is sent again
+  under Eridani's id (`adopted` set, same `duration_ms`), nothing reruns;
+- an attempt for a NEWER turn is running → the command is `rejected`
+  ("superseded by turn N"); for any other tuple it cancels the running attempt
+  and runs.
+
+**Fingerprint and `stale_workspace`.** `workspace_fingerprint` is
+`<HEAD>:<sha256>` over the branch name, `git status`, the diff against HEAD
+and every untracked file's content, taken before the run; `workspace {head,
+branch, tree}` says what it was taken from. It is also taken when the turn
+ends (`turn_fingerprint`) and after the run. If the turn's fingerprint differs
+from the one before the run (someone edited the checkout in between), or the
+one after differs from the one before (the run, or anything beside it,
+changed the tree), the result says `stale_workspace: true`. A verify command
+that writes files git does not ignore therefore always reports stale: ignore
+its outputs.
+
+`verify.result` now: `{attempt_id, run_id, generation, turn_seq,
+plan_revision, verify_id, workspace_fingerprint, workspace {head, branch,
+tree}, turn_fingerprint?, stale_workspace, initiator: host|eridani,
+adopted?, exit_code|null, tail, truncated, duration_ms, timed_out, canceled,
+error?}`. Output is the last 4000 characters of stdout and stderr together.
+
+**Restart.** The latest attempt per surface is kept on the session record.
+A waiting or running attempt at a restart becomes `interrupted`: a host
+attempt is not rerun (the next turn makes a new one, and Eridani's own
+deadline covers the missing result); a commanded one is settled by the
+journal (`failed`, "interrupted by a server restart").
+
+**Generation of every event (F07).** Each input Eridani types (the spawn's
+prompt, a queued input, a steer) has its generation persisted on the binding
+(`acceptedInput`) before the bytes are sent. The agent's next accepted prompt
+(UserPromptSubmit) binds its turn to that generation and consumes it, even if
+`runs.snapshot` advanced the run in between; a prompt typed in the terminal
+(nothing accepted in the last 60 s) takes the run's current generation. The
+binding lives on the turn cursor, so `turn`, `question`,
+`question.resolved` and the `verify.result` after that turn all carry the
+generation that produced them. A duplicate Stop for the same logical turn
+(same provider turn id, or same turn number) is dropped: no second turn,
+`turn_seq` does not advance, no second attempt.
+
+**Status.** `remotea status --json` adds, per session, `verify {attemptId,
+state: pending|running|passed|failed|timed_out|canceled|error|interrupted,
+startedAt}` (null when none ran).
+
+## Not yet implemented (stage E and later)
+
 - Answering permission prompts (captured only) and Codex questions (no hook).
 - Removing worktrees (nominate only, by design).
 - Switching the collector from parity to authoritative, and removing the

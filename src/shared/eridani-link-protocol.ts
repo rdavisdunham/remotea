@@ -93,7 +93,9 @@ export type LinkCap =
   | 'stop'
   | 'verify'
   | 'runs.snapshot'
-  | 'worktrees.report';
+  | 'worktrees.report'
+  // Stage D: the host verifies after each root turn on its own (`local:` attempt ids).
+  | 'verify.auto';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -103,6 +105,9 @@ export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
 export const STAGE_C_CAPS: readonly LinkCap[] = Object.freeze([
   ...STAGE_B_CAPS, 'question', 'context', 'spawn', 'input', 'answer', 'stop', 'verify', 'runs.snapshot', 'worktrees.report',
 ]);
+
+/** Stage D: everything in C, plus automatic verification after turns. */
+export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 'verify.auto']);
 
 /** What one harness can do on this host (the capability matrix, C15). Advertise only what is verified. */
 export interface HarnessCaps {
@@ -391,6 +396,24 @@ export interface QuestionResolvedBody extends OpFields {
   answer_echo?: Record<string, string>;
 }
 
+/** What the fingerprint was taken from (stage D, additive). */
+export interface WorkspaceFacts {
+  /** HEAD's commit, or null in a repository with no commit. */
+  head: string | null;
+  /** The checked-out branch, or null when HEAD is detached. */
+  branch: string | null;
+  /** sha256 of the branch, the status, the diff against HEAD and every untracked file. */
+  tree: string;
+}
+
+/**
+ * One verification attempt's result. The tuple (run_id, generation,
+ * turn_seq, plan_revision, attempt_id) is what Eridani matches on. Stage D:
+ * an attempt the host started on its own after a turn has an attempt id
+ * `local:<uuid>` and `initiator: "host"`; an Eridani `verify` command's
+ * attempt keeps its id (a host attempt already running for the same tuple is
+ * adopted under it, `adopted` naming the local id).
+ */
 export interface VerifyResultBody extends OpFields {
   t: 'verify.result';
   attempt_id: string;
@@ -409,6 +432,19 @@ export interface VerifyResultBody extends OpFields {
   timed_out: boolean;
   canceled: boolean;
   error?: string;
+  /** Stage D (additive): who started the attempt. */
+  initiator?: 'host' | 'eridani';
+  /** Stage D: HEAD, branch and tree hash behind `workspace_fingerprint`. */
+  workspace?: WorkspaceFacts;
+  /**
+   * Stage D: the checkout changed between the turn and the run, or during
+   * the run, so the result does not describe the tree the turn left.
+   */
+  stale_workspace?: boolean;
+  /** Stage D: the turn's fingerprint (taken when the turn ended), when known. */
+  turn_fingerprint?: string;
+  /** Stage D: the host attempt this Eridani attempt adopted (same tuple, already running or finished). */
+  adopted?: string;
 }
 
 // ── Both ways ──────────────────────────────────────────────────────────────
@@ -472,7 +508,15 @@ export interface SpawnCommand extends OpFields {
   /** Only ERIDANI_* keys are accepted. */
   env?: Record<string, string>;
   run_token?: string;
+  /** Stage D: verify after each root turn with this target verify id, against this plan revision. */
+  verify?: RunVerifyConfig | null;
   expires_at: number | string;
+}
+
+/** The verification a run's frozen plan asks for after each root turn (stage D). */
+export interface RunVerifyConfig {
+  verify_id: string;
+  plan_revision: number;
 }
 
 export interface InputCommand extends OpFields {
@@ -529,6 +573,8 @@ export interface RunsSnapshotEntry {
   generation: number;
   desired: 'continue' | 'stop' | 'none';
   stop_mode?: 'interrupt' | 'kill';
+  /** Stage D: the run's current verify config (null: none; absent: unchanged). */
+  verify?: RunVerifyConfig | null;
 }
 /** One managed worktree, as `remotea eridani worktrees` reports it (nominate-only, never removed). */
 export interface WorktreeReport {
@@ -662,7 +708,7 @@ export function parseUpFrame(raw: unknown): UpFrame | null {
     case 'verify.result':
       return op && isStr(m.attempt_id, 200) && isStr(m.run_id, 200) && isNum(m.generation) && isStr(m.workspace_fingerprint, 200)
         && (m.exit_code === null || isNum(m.exit_code)) && typeof m.tail === 'string' && m.tail.length <= ERIDANI_LIMITS.verifyTailChars
-        && typeof m.timed_out === 'boolean' ? (m as unknown as UpFrame) : null;
+        && typeof m.timed_out === 'boolean' && (m.stale_workspace === undefined || typeof m.stale_workspace === 'boolean') ? (m as unknown as UpFrame) : null;
     case 'worktrees.report':
       return op && Array.isArray(m.worktrees) && (m.worktrees as unknown[]).every((w) => isObj(w) && isStr(w.target, 64) && isStr(w.path, 4096)
         && typeof w.candidate === 'boolean' && Array.isArray(w.reasons)) ? (m as unknown as UpFrame) : null;
@@ -681,7 +727,14 @@ function isQuestionItem(v: unknown): boolean {
 
 function isRunsEntry(v: unknown): boolean {
   return isObj(v) && isStr(v.run_id, 200) && isNum(v.generation) && ['continue', 'stop', 'none'].includes(v.desired as string)
-    && (v.stop_mode === undefined || v.stop_mode === 'interrupt' || v.stop_mode === 'kill');
+    && (v.stop_mode === undefined || v.stop_mode === 'interrupt' || v.stop_mode === 'kill')
+    && (v.verify === undefined || v.verify === null || isVerifyConfig(v.verify));
+}
+
+const VERIFY_ID_RE = /^[A-Za-z0-9._-]{1,64}$/;
+
+export function isVerifyConfig(v: unknown): v is RunVerifyConfig {
+  return isObj(v) && typeof v.verify_id === 'string' && VERIFY_ID_RE.test(v.verify_id) && isInt(v.plan_revision);
 }
 
 const RUN_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -716,6 +769,7 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       if (m.title !== undefined && !(isStr(m.title, 200) && noControl(m.title) && !/[\r\n]/.test(m.title))) return 'bad title';
       if (m.group !== undefined && !(isStr(m.group, 100) && noControl(m.group) && !/[\r\n]/.test(m.group))) return 'bad group';
       if (m.task_id !== undefined && !(isStr(m.task_id, 128) && RUN_ID_RE.test(m.task_id))) return 'bad task_id';
+      if (m.verify !== undefined && m.verify !== null && !isVerifyConfig(m.verify)) return 'bad verify';
       if (m.run_token !== undefined && !(isStr(m.run_token, 512) && /^[\x21-\x7e]+$/.test(m.run_token))) return 'bad run_token';
       if (m.env !== undefined) {
         if (!isObj(m.env) || Object.keys(m.env).length > 32) return 'bad env';

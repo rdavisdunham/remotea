@@ -1,12 +1,16 @@
 /**
- * Runs one configured verification (C04, C09): runner only. Stage C runs it on
- * an explicit `verify` command; automatic verify after turns is stage D.
+ * Runs one configured verification (C04, C09). The runner only: when an
+ * attempt runs, and under which id, is verify-attempts.ts.
  *
  *   - only a `verify.id` from the run's execution target: fixed argv, no
  *     shell, cwd inside the worktree, the target's timeout;
  *   - the workspace fingerprint is taken BEFORE the run: `<HEAD>:<sha256>` of
- *     the status, the diff against HEAD and every untracked file's content, so
- *     a result can be tied to exactly the tree it tested;
+ *     the branch, the status, the diff against HEAD and every untracked
+ *     file's content, so a result can be tied to exactly the tree it tested.
+ *     It is taken again AFTER the run, and compared with the fingerprint the
+ *     turn left (when the caller has one): any difference is
+ *     `stale_workspace` (stage D). A test that writes files git does not
+ *     ignore makes every result stale; that is the honest answer;
  *   - output is bounded (the last ERIDANI_LIMITS.verifyTailChars characters of
  *     stdout and stderr, interleaved as they arrived);
  *   - on timeout or cancel the whole process tree is killed (signalTree:
@@ -16,7 +20,7 @@ import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { ERIDANI_LIMITS } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_LIMITS, type WorkspaceFacts } from '../../src/shared/eridani-link-protocol';
 import type { VerifySpec } from './eridani-targets';
 import { runGit, within, type GitRunner } from './worktrees';
 import { descendants, isSignalablePid, signalTree } from './proc';
@@ -30,12 +34,17 @@ export interface VerifyOutcome {
   timed_out: boolean;
   canceled: boolean;
   error?: string;
+  workspace?: WorkspaceFacts;
+  /** The tree changed between the turn and the run, or during the run. */
+  stale_workspace: boolean;
 }
 
 export interface VerifyRunOptions {
   spec: VerifySpec;
   worktree: string;
   signal?: AbortSignal;
+  /** The fingerprint the turn left; a different one before the run is `stale_workspace`. */
+  expectFingerprint?: string | null | Promise<string | null>;
   /** Override the spec's timeout (tests). */
   timeoutMs?: number;
   killGraceMs?: number;
@@ -49,12 +58,21 @@ export interface VerifyRunOptions {
 const MAX_UNTRACKED_FILES = 2000;
 const MAX_UNTRACKED_BYTES = 4 * 1024 * 1024;
 
-/** `<HEAD sha or "none">:<sha256 hex of the dirty tree>`. */
+/** `<HEAD sha or "none">:<sha256 hex of the branch and the dirty tree>`. */
 export async function workspaceFingerprint(dir: string, git: GitRunner = runGit): Promise<string> {
+  return (await workspaceState(dir, git)).fingerprint;
+}
+
+/** The fingerprint and what it was taken from. */
+export async function workspaceState(dir: string, git: GitRunner = runGit): Promise<WorkspaceFacts & { fingerprint: string }> {
   const head = await git(['rev-parse', '--verify', '--quiet', 'HEAD'], dir, { readOnly: true });
+  const ref = await git(['symbolic-ref', '--quiet', '--short', 'HEAD'], dir, { readOnly: true });
   const status = await git(['status', '--porcelain=v1', '-z', '--untracked-files=all'], dir, { readOnly: true });
   const diff = await git(['diff', 'HEAD', '--binary', '--no-ext-diff', '--no-textconv'], dir, { readOnly: true });
+  const branch = ref.code === 0 && ref.stdout.trim() ? ref.stdout.trim() : null;
   const h = crypto.createHash('sha256');
+  // A branch switch at the same commit is a different workspace.
+  h.update(`branch\0${branch ?? ''}\0`);
   h.update(status.stdout);
   h.update('\0diff\0');
   h.update(diff.stdout);
@@ -71,7 +89,9 @@ export async function workspaceFingerprint(dir: string, git: GitRunner = runGit)
       h.update('missing');
     }
   }
-  return `${head.code === 0 ? head.stdout.trim() : 'none'}:${h.digest('hex')}`;
+  const tree = h.digest('hex');
+  const sha = head.code === 0 ? head.stdout.trim() : null;
+  return { fingerprint: `${sha ?? 'none'}:${tree}`, head: sha, branch, tree };
 }
 
 /** Keep the last `max` characters of what a process printed. */
@@ -116,23 +136,37 @@ function killTree(pid: number | undefined, graceMs: number): void {
 export async function runVerify(o: VerifyRunOptions): Promise<VerifyOutcome> {
   const now = o.now ?? Date.now;
   const tail = new Tail(o.tailChars ?? ERIDANI_LIMITS.verifyTailChars);
-  const fail = (fingerprint: string, error: string): VerifyOutcome => ({ workspace_fingerprint: fingerprint, exit_code: null, tail: '', truncated: false, duration_ms: 0, timed_out: false, canceled: false, error });
+  const fail = (fingerprint: string, error: string, workspace?: WorkspaceFacts, stale = false): VerifyOutcome => ({
+    workspace_fingerprint: fingerprint, exit_code: null, tail: '', truncated: false, duration_ms: 0, timed_out: false, canceled: false, error,
+    ...(workspace ? { workspace } : {}), stale_workspace: stale,
+  });
   if (!fs.existsSync(o.worktree)) return fail('none:', 'the worktree is missing');
   const cwd = o.spec.cwd ? path.resolve(o.worktree, o.spec.cwd) : o.worktree;
   if (!within(o.worktree, cwd)) return fail('none:', 'cwd escapes the worktree');
-  let fingerprint: string;
+  const state = async (): Promise<(WorkspaceFacts & { fingerprint: string }) | null> => {
+    try {
+      return await workspaceState(o.worktree, o.git);
+    } catch {
+      return null;
+    }
+  };
+  const before = await state();
+  const fingerprint = before?.fingerprint ?? 'none:';
+  const workspace = before ? { head: before.head, branch: before.branch, tree: before.tree } : undefined;
+  let expected: string | null = null;
   try {
-    fingerprint = await workspaceFingerprint(o.worktree, o.git);
-  } catch (err) {
-    fingerprint = `none:${(err as Error).message.slice(0, 40)}`;
+    expected = (await o.expectFingerprint) ?? null;
+  } catch {
+    expected = null;
   }
-  if (!fs.existsSync(cwd)) return fail(fingerprint, `no such folder ${o.spec.cwd}`);
-  if (o.signal?.aborted) return { ...fail(fingerprint, 'canceled'), canceled: true };
+  const staleBefore = !!expected && !!before && expected !== before.fingerprint;
+  if (!fs.existsSync(cwd)) return fail(fingerprint, `no such folder ${o.spec.cwd}`, workspace, staleBefore);
+  if (o.signal?.aborted) return { ...fail(fingerprint, 'canceled', workspace, staleBefore), canceled: true };
 
   const started = now();
   const timeoutMs = o.timeoutMs ?? o.spec.timeout * 1000;
   const grace = o.killGraceMs ?? 2_000;
-  return new Promise<VerifyOutcome>((resolve) => {
+  const finished = await new Promise<Omit<VerifyOutcome, 'stale_workspace'>>((resolve) => {
     let child: ChildProcess;
     try {
       child = (o.spawn ?? nodeSpawn)(o.spec.argv[0], o.spec.argv.slice(1), {
@@ -143,7 +177,7 @@ export async function runVerify(o: VerifyRunOptions): Promise<VerifyOutcome> {
         windowsHide: true,
       });
     } catch (err) {
-      resolve(fail(fingerprint, (err as Error).message));
+      resolve(fail(fingerprint, (err as Error).message, workspace));
       return;
     }
     let timedOut = false;
@@ -179,7 +213,12 @@ export async function runVerify(o: VerifyRunOptions): Promise<VerifyOutcome> {
         timed_out: timedOut,
         canceled,
         ...(spawnError ? { error: spawnError.slice(0, ERIDANI_LIMITS.reasonChars) } : {}),
+        ...(workspace ? { workspace } : {}),
       });
     });
   });
+  // Did the run itself (or someone beside it) change the tree?
+  const after = before ? await state() : null;
+  const staleAfter = !!before && !!after && after.fingerprint !== before.fingerprint;
+  return { ...finished, stale_workspace: staleBefore || staleAfter };
 }

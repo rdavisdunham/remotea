@@ -115,6 +115,8 @@ export interface HubEridaniHooks {
   hook?(id: string, params: Record<string, unknown>): void;
   /** Extra snapshot fields for a surface (open question ids). */
   snapshot?(id: string): Partial<SnapshotSurface>;
+  /** A root turn was captured (stage D: verification after turns). */
+  turn?(t: TurnFields): void;
 }
 
 export interface HubConn extends ConnLike {
@@ -168,10 +170,19 @@ export class Hub {
     this.turns = new TurnCapture({
       session: (id) => this.registry.session(id),
       update: (id, patch) => void this.registry.updateSession(id, patch),
-      emit: (t) => this.sink?.turn(t),
+      emit: (t) => {
+        this.sink?.turn(t);
+        this.eridani.turn?.(t);
+      },
       binding: (id) => {
         const b = this.registry.session(id)?.eridani;
-        return b ? { runId: b.runId, generation: b.generation } : null;
+        return b ? { runId: b.runId, generation: b.generation, ...(b.acceptedInput ? { accepted: b.acceptedInput } : {}) } : null;
+      },
+      consumeAccepted: (id) => {
+        const b = this.registry.session(id)?.eridani;
+        if (!b?.acceptedInput) return;
+        const { acceptedInput: _used, ...rest } = b;
+        this.registry.updateSession(id, { eridani: rest });
       },
       now: this.now,
       log: (m) => this.log(m),

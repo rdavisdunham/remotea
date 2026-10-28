@@ -118,6 +118,8 @@ export interface SessionRecord {
   turnCursor?: TurnCursor;
   /** Set when Eridani started this session for a run (remote-server/src/dispatch.ts). */
   eridani?: EridaniBinding;
+  /** Stage D: the latest verification attempt (remote-server/src/verify-attempts.ts). */
+  verify?: VerifyAttemptStatus;
 }
 
 /**
@@ -143,6 +145,30 @@ export interface EridaniBinding {
   spawnOp: string;
   /** A stop was accepted; cleared only by the process exiting. Never resumed while set. */
   stopRequested?: { at: number; mode: 'interrupt' | 'kill'; op: string | null };
+  /** Stage D: verify after each root turn with this target verify id (from the spawn, a verify command or runs.snapshot). */
+  verify?: { verifyId: string; planRevision: number };
+  /**
+   * Stage D (F07): the generation of the input Eridani typed (spawn prompt,
+   * queued input, steer), persisted before it was typed. The next prompt the
+   * agent accepts binds to it, then it is consumed.
+   */
+  acceptedInput?: { generation: number; at: number };
+}
+
+/** Stage D: the latest verification attempt on a surface (verify-attempts.ts). */
+export interface VerifyAttemptStatus {
+  attemptId: string;
+  state: 'pending' | 'running' | 'passed' | 'failed' | 'timed_out' | 'canceled' | 'error' | 'interrupted';
+  /** When the run began (null while pending). */
+  startedAt: number | null;
+  finishedAt?: number;
+  runId: string;
+  generation: number;
+  turnSeq: number;
+  planRevision: number;
+  verifyId: string;
+  initiator: 'host' | 'eridani';
+  staleWorkspace?: boolean;
 }
 
 export type AgentStateName = 'working' | 'needs_you' | 'idle' | 'exited';
