@@ -216,7 +216,7 @@ describe('EridaniLink', () => {
     eri.send(ws, { ...cmd, value: 2, id: 'c3', digest: digestOf({ ...cmd, value: 2 }) });
     await until(() => eri.of('ack').some((a) => (a as { acked_id: string }).acked_id === 'c3'));
     const refusal = eri.of('ack').find((a) => (a as { acked_id: string }).acked_id === 'c3') as { ok: boolean; error: string };
-    expect(refusal).toMatchObject({ ok: false, error: 'digest-mismatch' });
+    expect(refusal).toMatchObject({ ok: false, error: 'DIGEST_MISMATCH' });
     expect(runs).toBe(1);
   });
 
@@ -386,5 +386,143 @@ describe('Journal', () => {
     expect(b.get('op-2')?.state).toBe('uncertain');
     expect(b.unsettled()).toEqual({ pending: [], uncertain: ['op-2'] });
     expect((fs.statSync(file).mode & 0o777)).toBe(0o600);
+  });
+});
+
+describe('EridaniLink: stage C commands', () => {
+  const EXPIRES = Date.now() + 10 * 60_000;
+  const cmdOf = (over: Record<string, unknown> = {}) => {
+    const body = { t: 'test.cmd', op_id: 'op-c', expires_at: EXPIRES, value: 1, ...over };
+    return { ...body, digest: digestOf(body) };
+  };
+
+  it('journals accepted (fsynced) before the ack, and the ack carries the accept facts', async () => {
+    const dir = tmpDir();
+    let journalAtRun = '';
+    const { eri, link } = await setup({
+      dir,
+      handlers: {
+        'test.cmd': async () => {
+          journalAtRun = fs.readFileSync(path.join(dir, 'eridani-journal.jsonl'), 'utf8');
+          return { state: 'executed', result: { ok: 1 } };
+        },
+      },
+      acceptFacts: () => ({ surf: 'surf-x', incarnation: 1 }),
+    });
+    link.start();
+    await until(() => link.ready);
+    eri.send(eri.sockets[0], { ...cmdOf(), id: 'c1' });
+    await until(() => eri.of('command.outcome').length === 1);
+    expect(eri.of('ack').find((a) => (a as { acked_id: string }).acked_id === 'c1')).toMatchObject({ ok: true, op_id: 'op-c', outcome: { state: 'accepted', surf: 'surf-x', incarnation: 1 } });
+    expect(journalAtRun).toContain('"state":"accepted"');
+    expect(eri.of('command.outcome')[0]).toMatchObject({ command_id: 'op-c', state: 'executed', kind: 'test.cmd', result: { ok: 1 } });
+  });
+
+  it('rejects an expired command, one beyond the replay horizon, and a failed fence', async () => {
+    const { eri, link } = await setup({
+      handlers: { 'test.cmd': async () => ({ state: 'executed' }) },
+      precheck: (c) => ((c as unknown as { value: number }).value === 9 ? 'stale incarnation' : null),
+    });
+    link.start();
+    await until(() => link.ready);
+    const ws = eri.sockets[0];
+    eri.send(ws, { ...cmdOf({ op_id: 'op-old', expires_at: Date.now() - 1 }), id: 'c1' });
+    eri.send(ws, { ...cmdOf({ op_id: 'op-far', expires_at: Date.now() + 30 * 86_400_000 }), id: 'c2' });
+    eri.send(ws, { ...cmdOf({ op_id: 'op-fence', value: 9 }), id: 'c3' });
+    await until(() => eri.of('command.outcome').length === 3);
+    const by = (id: string) => eri.of('command.outcome').find((o) => (o as { command_id: string }).command_id === id);
+    expect(by('op-old')).toMatchObject({ state: 'rejected', detail: 'expired' });
+    expect(by('op-far')).toMatchObject({ state: 'rejected', detail: 'expires beyond the replay horizon' });
+    expect(by('op-fence')).toMatchObject({ state: 'rejected', detail: 'stale incarnation' });
+  });
+
+  it('crash after accept, before the effect: the command runs once after the restart (replayAccepted)', async () => {
+    const dir = tmpDir();
+    let runs = 0;
+    const first = await setup({ dir, handlers: { 'test.cmd': () => new Promise(() => {}) } });
+    first.link.start();
+    await until(() => first.link.ready);
+    first.eri.send(first.eri.sockets[0], { ...cmdOf(), id: 'c1' });
+    await until(() => first.eri.of('ack').some((a) => (a as { acked_id: string }).acked_id === 'c1'));
+    first.link.stop(); // the "crash": the handler never began
+
+    const deps = { ...(first.link as unknown as { deps: EridaniLinkDeps }).deps, handlers: { 'test.cmd': async () => (runs++, { state: 'executed' as const }) } };
+    const again = new EridaniLink(deps);
+    cleanups.push(() => again.stop());
+    again.start();
+    await until(() => again.ready);
+    again.replayAccepted();
+    again.replayAccepted();
+    await until(() => first.eri.of('command.outcome').length === 1);
+    expect(runs).toBe(1);
+    // Eridani resends the same op: the recorded outcome, no second run.
+    first.eri.send(first.eri.sockets.at(-1)!, { ...cmdOf(), id: 'c2' });
+    await until(() => first.eri.of('ack').some((a) => (a as { acked_id: string }).acked_id === 'c2'));
+    expect(first.eri.of('ack').find((a) => (a as { acked_id: string }).acked_id === 'c2')).toMatchObject({ ok: true, outcome: { state: 'executed' } });
+    expect(runs).toBe(1);
+  });
+
+  it('crash during the effect: recover() settles it, or it is reported uncertain; never re-run', async () => {
+    const dir = tmpDir();
+    const first = await setup({ dir, handlers: { 'test.cmd': (_c, ctx) => (ctx.begin(), new Promise(() => {})) } });
+    first.link.start();
+    await until(() => first.link.ready);
+    first.eri.send(first.eri.sockets[0], { ...cmdOf({ op_id: 'op-a' }), id: 'c1' });
+    first.eri.send(first.eri.sockets[0], { ...cmdOf({ op_id: 'op-b', value: 2 }), id: 'c2' });
+    await until(() => first.eri.of('ack').length >= 2);
+    await new Promise((r) => setTimeout(r, 20));
+    first.link.stop();
+
+    let runs = 0;
+    const seen: unknown[] = [];
+    const again = new EridaniLink({
+      ...(first.link as unknown as { deps: EridaniLinkDeps }).deps,
+      handlers: { 'test.cmd': async () => (runs++, { state: 'executed' as const }) },
+      recover: (rec) => (seen.push(rec.body), rec.op_id === 'op-a' ? { state: 'executed', detail: 'mapped' } : null),
+    });
+    cleanups.push(() => again.stop());
+    again.start();
+    await until(() => first.eri.of('command.outcome').length === 2);
+    again.replayAccepted();
+    const by = (id: string) => first.eri.of('command.outcome').find((o) => (o as { command_id: string }).command_id === id);
+    expect(by('op-a')).toMatchObject({ state: 'executed', detail: 'mapped' });
+    expect(by('op-b')).toMatchObject({ state: 'uncertain' });
+    // The body survived into the executing record, so recover could reconcile it.
+    expect(seen[0]).toMatchObject({ t: 'test.cmd', value: 1 });
+    expect(runs).toBe(0);
+  });
+
+  it('context.request round trip; a timeout resolves null and a late response is dropped', async () => {
+    const { eri, link } = await setup();
+    link.start();
+    await until(() => link.ready);
+    const ws = eri.sockets[0];
+    const p = link.request({ t: 'context.request', req_id: 'r1', surf: 'surf-1', incarnation: 1, generation: 0 }, 2000);
+    await until(() => eri.of('context.request').length === 1);
+    eri.send(ws, { t: 'context.response', req_id: 'r1', text: 'Plan: do X', run_token: 'tok' });
+    expect(await p).toMatchObject({ text: 'Plan: do X', run_token: 'tok' });
+
+    const slow = link.request({ t: 'context.request', req_id: 'r2', surf: 'surf-1', incarnation: 1, generation: 0 }, 30);
+    expect(await slow).toBeNull();
+    eri.send(ws, { t: 'context.response', req_id: 'r2', text: 'too late' });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(link.ready).toBe(true);
+  });
+
+  it('hello lists targets and stage C caps; runs.snapshot parts are assembled', async () => {
+    const got: unknown[] = [];
+    const { eri, link } = await setup({
+      caps: () => ['turn', 'spawn'],
+      targets: () => [{ id: 'proj', repo: '/r', harnesses: ['claude'], verify: ['test'] }],
+      onRunsSnapshot: (runs) => got.push(runs),
+    });
+    link.start();
+    await until(() => link.ready);
+    expect(eri.of('hello')[0]).toMatchObject({ caps: ['turn', 'spawn'], targets: [{ id: 'proj', repo: '/r', harnesses: ['claude'], verify: ['test'] }] });
+    const ws = eri.sockets[0];
+    eri.send(ws, { t: 'runs.snapshot', part: { of: 'x', i: 2, n: 2 }, runs: [{ run_id: 'r2', generation: 1, desired: 'stop' }] });
+    eri.send(ws, { t: 'runs.snapshot', part: { of: 'x', i: 1, n: 2 }, runs: [{ run_id: 'r1', generation: 3, desired: 'continue' }] });
+    await until(() => got.length === 1);
+    expect((got[0] as Array<{ run_id: string }>).map((r) => r.run_id)).toEqual(['r1', 'r2']);
   });
 });

@@ -15,6 +15,15 @@
  * methods in RELAYED_RPC_METHODS — reporting status for oneself is all a
  * session's token can do. The main server token, which is shell access, never
  * enters a session's environment.
+ *
+ * Two methods are answered later rather than at once, for the same session's
+ * token only (stage C, Eridani):
+ *   remotea.question  AskUserQuestion's PreToolUse hook HOLDS here until
+ *                     Eridani answers (questions-claude.ts); the reply carries
+ *                     the answers to print, or nothing. While a request is
+ *                     held the connection is exempt from the idle timeout, and
+ *                     its closing (Claude killed the hook) is reported.
+ *   remotea.context   SessionStart's text for the agent (context.ts).
  */
 import crypto from 'crypto';
 import net from 'net';
@@ -39,13 +48,23 @@ export interface HookBridgeDeps {
   secret: string;
   /** Relay an accepted report; false when the session is not live here. */
   relay: (sessionId: string, method: string, params: Record<string, unknown>) => boolean;
+  /** Hold an AskUserQuestion; `closed` registers a callback for the helper going away. */
+  question?: (sessionId: string, params: Record<string, unknown>, closed: (cb: () => void) => void) => Promise<unknown>;
+  /** SessionStart context text. */
+  context?: (sessionId: string, params: Record<string, unknown>) => Promise<string>;
   log?: (msg: string) => void;
 }
 
+/** Methods answered asynchronously (see the header). */
+export const HELD_METHODS: ReadonlySet<string> = new Set(['remotea.question', 'remotea.context']);
+
 export type BridgeReply = { result?: unknown; error?: { code: number; message: string }; id?: unknown };
 
-/** Decide one request. Pure apart from `relay`, so it is tested without sockets. */
-export function handleBridgeRequest(deps: HookBridgeDeps, raw: unknown): BridgeReply {
+/**
+ * Decide one request. Pure apart from the deps, so it is tested without
+ * sockets. Async for the held methods; everything else resolves at once.
+ */
+export async function handleBridgeRequest(deps: HookBridgeDeps, raw: unknown, closed: (cb: () => void) => void = () => {}): Promise<BridgeReply> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: { code: -32700, message: 'Parse error' } };
   const req = raw as { method?: unknown; params?: unknown; id?: unknown; token?: unknown };
   const id = typeof req.id === 'string' || typeof req.id === 'number' ? req.id : undefined;
@@ -53,12 +72,25 @@ export function handleBridgeRequest(deps: HookBridgeDeps, raw: unknown): BridgeR
   // Discovery, answered here: the wmux CLI identifies what it is talking to.
   if (method === 'system.identify') return { result: { name: 'remotea', platform: 'linux' }, id };
   if (method === 'system.capabilities') return { result: { protocols: ['v2'], features: ['status'] }, id };
-  if (!RELAYED_RPC_METHODS.has(method)) return { error: { code: -32601, message: `Method not relayed by remotea: ${method}` }, id };
+  const held = HELD_METHODS.has(method);
+  if (!RELAYED_RPC_METHODS.has(method) && !held) return { error: { code: -32601, message: `Method not relayed by remotea: ${method}` }, id };
   const params = req.params && typeof req.params === 'object' && !Array.isArray(req.params) ? (req.params as Record<string, unknown>) : null;
   const surfaceId = typeof params?.surfaceId === 'string' ? params.surfaceId : '';
   const token = typeof req.token === 'string' ? req.token : '';
   if (!params || !/^surf-[A-Za-z0-9_-]{1,96}$/.test(surfaceId) || !tokenMatches(token, hookToken(deps.secret, surfaceId))) {
     return { error: { code: -32001, message: 'Unauthorized' }, id };
+  }
+  if (held) {
+    try {
+      if (method === 'remotea.question') {
+        if (!deps.question) return { result: { reason: 'unsupported' }, id };
+        return { result: await deps.question(surfaceId, params, closed), id };
+      }
+      if (!deps.context) return { result: { text: '' }, id };
+      return { result: { text: await deps.context(surfaceId, params) }, id };
+    } catch (err) {
+      return { error: { code: -32000, message: (err as Error).message.slice(0, 200) }, id };
+    }
   }
   if (!deps.relay(surfaceId, method, params)) return { error: { code: -32000, message: 'No such live session' }, id };
   return { result: { ok: true }, id };
@@ -89,7 +121,14 @@ export class HookBridge {
 
   private serve(sock: net.Socket): void {
     sock.setEncoding('utf8');
-    sock.setTimeout(IDLE_MS, () => sock.destroy());
+    let pending = 0;
+    sock.setTimeout(IDLE_MS, () => {
+      if (!pending) sock.destroy();
+    });
+    const onClose: Array<() => void> = [];
+    sock.on('close', () => {
+      for (const cb of onClose.splice(0)) cb();
+    });
     let buf = '';
     sock.on('data', (chunk: string) => {
       buf += chunk;
@@ -102,14 +141,19 @@ export class HookBridge {
         const line = buf.slice(0, nl).trim();
         buf = buf.slice(nl + 1);
         if (!line) continue;
-        let reply: BridgeReply;
+        let raw: unknown;
         try {
-          reply = handleBridgeRequest(this.deps, JSON.parse(line));
+          raw = JSON.parse(line);
         } catch {
-          reply = { error: { code: -32700, message: 'Parse error' } };
+          sock.write(JSON.stringify({ error: { code: -32700, message: 'Parse error' } }) + '\n');
+          continue;
         }
-        if (reply.error && reply.error.code === -32001) this.deps.log?.('hook bridge: rejected a request with a bad token');
-        sock.write(JSON.stringify(reply) + '\n');
+        pending++;
+        void handleBridgeRequest(this.deps, raw, (cb) => onClose.push(cb)).then((reply) => {
+          pending--;
+          if (reply.error && reply.error.code === -32001) this.deps.log?.('hook bridge: rejected a request with a bad token');
+          if (!sock.destroyed) sock.write(JSON.stringify(reply) + '\n');
+        });
       }
     });
     sock.on('error', () => sock.destroy());

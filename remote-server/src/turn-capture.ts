@@ -6,7 +6,9 @@
  * Codex, `turnId`. This module turns that into exactly one `turn` per logical
  * provider turn (C15):
  *
- *   identity  Codex: its `turn_id`. Claude: the session id plus the number of
+ *   identity  Codex: its `turn_id`. Claude: its `prompt_id` (stage A: a UUID
+ *             on UserPromptSubmit and Stop, unique per turn); for a hook
+ *             helper too old to forward it, the session id plus the number of
  *             the turn within this surface's conversation, counted from
  *             UserPromptSubmit (the root Stop sequence). A second Stop for the
  *             same turn (a Stop hook that blocked and continued, a duplicate
@@ -19,6 +21,15 @@
  *             same Stop and the same turn id, so it can never add a turn.
  *   text      Redacted with the collector's rules, then cut at 16k chars with
  *             `truncated` set. Never called a transcript.
+ *
+ *   generation  The run generation is bound when the turn's prompt is
+ *             accepted (UserPromptSubmit), persisted on the cursor and stamped
+ *             on the Stop that ends it, so a Stop arriving after a steer keeps
+ *             the generation that produced it (F07). A synthetic hand-back
+ *             prompt (`<agent-message from=…>`, a background subagent
+ *             reporting) keeps the generation of the turn it belongs to.
+ *   interim   A root Stop while background tasks still run is an interim
+ *             answer (`interim: true`): the real one follows the hand-back.
  *
  * The cursor (which turn a conversation is on, recent ids) and the per-surface
  * `turnSeq` live in the registry, so a server restart neither repeats nor
@@ -41,6 +52,8 @@ export interface TurnCaptureDeps {
   session(id: string): SessionRecord | undefined;
   update(id: string, patch: Partial<SessionRecord>): void;
   emit(turn: TurnFields): void;
+  /** The Eridani run the surface serves now, or null. */
+  binding?(id: string): { runId: string; generation: number } | null;
   now?: () => number;
   /** Rollout reader (tests inject one). */
   readTail?: (file: string, bytes: number) => string;
@@ -95,7 +108,7 @@ export function rolloutFinalAnswer(tail: string, turnId?: string): string | null
 
 export class TurnCapture {
   /** The prompt that opened the current turn, per surface (memory only: the hook sends it at submit). */
-  private readonly prompts = new Map<string, { sessionId: string; text: string }>();
+  private readonly prompts = new Map<string, { sessionId: string; text: string; synthetic: boolean }>();
   private readonly now: () => number;
 
   constructor(private readonly deps: TurnCaptureDeps) {
@@ -119,8 +132,15 @@ export class TurnCapture {
     const cursor = this.cursorFor(rec, provider, sessionId);
 
     if (event === 'UserPromptSubmit') {
+      const text = typeof params.prompt === 'string' ? params.prompt : '';
+      const synthetic = /^\s*<agent-message from=/.test(text);
       cursor.opened += 1;
-      this.prompts.set(surf, { sessionId, text: typeof params.prompt === 'string' ? params.prompt : '' });
+      if (!synthetic || cursor.generation === undefined) {
+        const b = this.deps.binding?.(surf) ?? null;
+        cursor.generation = b?.generation ?? 0;
+        cursor.runId = b?.runId ?? null;
+      }
+      this.prompts.set(surf, { sessionId, text, synthetic });
       this.deps.update(surf, { turnCursor: cursor });
       return null;
     }
@@ -130,9 +150,10 @@ export class TurnCapture {
       if (cursor.captured === 0) cursor.opened = 1; // never saw the turn open (server restarted mid-turn)
     }
     const n = Math.max(cursor.opened, 1);
-    const codexTurn = provider === 'codex' && typeof params.turnId === 'string' && TURN_ID_RE.test(params.turnId) ? params.turnId : null;
-    const turnId = codexTurn ?? `${sessionId}:${surf}:${n}`;
-    if (cursor.recent.includes(turnId) || (!codexTurn && n <= cursor.captured)) {
+    const providerTurn = typeof params.turnId === 'string' && TURN_ID_RE.test(params.turnId) ? params.turnId : null;
+    const codexTurn = provider === 'codex' ? providerTurn : null;
+    const turnId = providerTurn ?? `${sessionId}:${surf}:${n}`;
+    if (cursor.recent.includes(turnId) || (!providerTurn && n <= cursor.captured)) {
       this.deps.log?.(`turn ${turnId}: duplicate Stop ignored`);
       return null;
     }
@@ -159,11 +180,13 @@ export class TurnCapture {
     this.deps.update(surf, { turnCursor: cursor, turnSeq: seq });
 
     const at = typeof params.at === 'number' && Number.isFinite(params.at) ? params.at : this.now();
+    const now = this.deps.binding?.(surf) ?? null;
+    const bound = cursor.generation !== undefined ? { runId: cursor.runId ?? null, generation: cursor.generation } : { runId: now?.runId ?? null, generation: now?.generation ?? 0 };
     this.deps.emit({
       surf,
       incarnation: rec.incarnation ?? 0,
-      run_id: null,
-      generation: 0,
+      run_id: bound.runId,
+      generation: bound.generation,
       provider,
       tool: toolFor(provider),
       provider_session_id: sessionId,
@@ -175,6 +198,8 @@ export class TurnCapture {
       missing: !raw,
       source,
       ...(prompt && prompt.text ? { prompt: prompt.text, prompt_truncated: prompt.truncated } : {}),
+      ...(pending?.synthetic ? { synthetic: true } : {}),
+      ...(params.backgroundTasks === '1' ? { interim: true } : {}),
       ended_at: at,
     });
     return { provider, sessionId };

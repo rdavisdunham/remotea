@@ -39,6 +39,8 @@ import { CollectorState } from './collector/state';
 import { statusFromRegistry } from './collector/report';
 import { WINDOWS_USERS, serverVersion } from './eridani-runtime';
 import type { RegistryData } from './registry';
+import { loadTargets, removeTarget, saveTarget, type ExecutionTarget, type VerifySpec } from './eridani-targets';
+import { WorktreeManager, cleanupCommands } from './worktrees';
 
 export interface EridaniSummary {
   enabled: boolean;
@@ -271,8 +273,119 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
       out.write('scan requested; the server runs it within 30 s\n');
       return 0;
     }
+    case 'targets':
+      return targetsCommand(dir, rest, out);
+    case 'worktrees':
+      return worktreesCommand(dir, rest, out);
     default:
-      process.stderr.write('usage: remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]\n');
+      process.stderr.write(`usage: remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]
+       remotea eridani targets list [--json] | add --id <id> --repo <path> --worktree-root <path> [--base <branch>] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>] | add --json '<target>' | remove <id>
+       remotea eridani worktrees [--json]\n`);
       return sub === undefined ? 0 : 2;
   }
+}
+
+/** Every value of a repeated flag. */
+function flags(args: string[], name: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== name) continue;
+    const v = args[i + 1];
+    if (!v || v.startsWith('--')) throw new Error(`${name} needs a value`);
+    out.push(v);
+  }
+  return out;
+}
+
+/**
+ * `remotea eridani targets`: where Eridani may start work (eridani-targets.ts).
+ * A verify command is split on spaces into a fixed argv and runs with no
+ * shell; for quoting or anything unusual, `add --json` takes the whole target.
+ */
+function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream): number {
+  const [sub, ...rest] = args;
+  switch (sub) {
+    case undefined:
+    case 'list': {
+      const list = loadTargets(dir, (m) => process.stderr.write(`${m}\n`));
+      if (rest.includes('--json')) {
+        out.write(JSON.stringify(list, null, 2) + '\n');
+        return 0;
+      }
+      if (!list.length) {
+        out.write('no execution targets: add one with `remotea eridani targets add`\n');
+        return 0;
+      }
+      for (const t of list) {
+        const harnesses = (['claude', 'codex'] as const).filter((h) => t.launch[h]).join(', ') || 'none';
+        out.write(`${t.id}  ${t.repo}  worktrees in ${t.worktreeRoot}  base ${t.base}  harnesses ${harnesses}\n`);
+        for (const v of t.verify) out.write(`  verify ${v.id}: ${v.argv.join(' ')}${v.cwd ? ` (in ${v.cwd})` : ''}, ${v.timeout} s\n`);
+      }
+      return 0;
+    }
+    case 'add': {
+      let target: ExecutionTarget;
+      const json = flag(rest, '--json');
+      if (json) {
+        target = JSON.parse(json) as ExecutionTarget;
+      } else {
+        const id = flag(rest, '--id');
+        const repo = flag(rest, '--repo');
+        const root = flag(rest, '--worktree-root');
+        if (!id || !repo || !root) throw new Error('targets add needs --id, --repo and --worktree-root (or --json)');
+        const timeout = Number(flag(rest, '--verify-timeout') ?? 600);
+        const verify: VerifySpec[] = flags(rest, '--verify').map((v) => {
+          const eq = v.indexOf('=');
+          if (eq < 1) throw new Error(`--verify ${v}: <id>=<command>`);
+          return { id: v.slice(0, eq), argv: v.slice(eq + 1).trim().split(/\s+/).filter(Boolean), timeout };
+        });
+        const launch: ExecutionTarget['launch'] = {};
+        if (rest.includes('--claude')) launch.claude = {};
+        if (rest.includes('--codex')) launch.codex = {};
+        if (!launch.claude && !launch.codex) launch.claude = {};
+        target = { id, repo: path.resolve(repo), worktreeRoot: path.resolve(root), base: flag(rest, '--base') ?? 'main', launch, verify };
+      }
+      if (!fs.existsSync(path.join(target.repo ?? '', '.git'))) throw new Error(`${target.repo} is not a git repository`);
+      saveTarget(dir, target);
+      out.write(`target ${target.id} saved; it applies to the next spawn (no restart)\n`);
+      return 0;
+    }
+    case 'remove': {
+      const id = rest[0];
+      if (!id) throw new Error('targets remove <id>');
+      out.write(removeTarget(dir, id) ? `target ${id} removed (its worktrees stay on disk)\n` : `no target ${id}\n`);
+      return 0;
+    }
+    default:
+      throw new Error(`unknown targets command ${sub}`);
+  }
+}
+
+/**
+ * `remotea eridani worktrees`: every managed worktree, with what would be
+ * lost by removing it. Nothing is ever removed: a candidate gets the commands
+ * that would, recovery ref first, for a person to run.
+ */
+async function worktreesCommand(dir: string, args: string[], out: NodeJS.WritableStream): Promise<number> {
+  const targets = loadTargets(dir, (m) => process.stderr.write(`${m}\n`));
+  const reg = readRegistry(dir);
+  const active = new Set(Object.values(reg?.sessions ?? {}).filter((r) => r.eridani && r.state !== 'exited').map((r) => r.eridani!.worktree));
+  const rows = await new WorktreeManager({ dir }).nominate(targets, (p) => active.has(p));
+  if (args.includes('--json')) {
+    out.write(JSON.stringify(rows, null, 2) + '\n');
+    return 0;
+  }
+  if (!rows.length) {
+    out.write('no managed worktrees\n');
+    return 0;
+  }
+  for (const r of rows) {
+    out.write(`${r.candidate ? 'candidate ' : 'keep      '} ${r.target}  ${r.branch ?? '(detached)'}  ${r.path}\n`);
+    if (r.reasons.length) out.write(`           ${r.reasons.join('; ')}\n`);
+    if (r.candidate) {
+      const t = targets.find((x) => x.id === r.target);
+      if (t) for (const c of cleanupCommands(t.repo, r)) out.write(`           $ ${c}\n`);
+    }
+  }
+  return 0;
 }

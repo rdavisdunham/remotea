@@ -12,11 +12,18 @@
  *     (onDelivered); an evicted report marks its entity dirty and is re-read.
  *   - `remotea eridani collect` drops a request file; it is picked up on the
  *     same 30 s tick.
+ *   - Stage C: Eridani's commands (dispatch.ts), held Claude questions
+ *     (questions-claude.ts) and SessionStart context (context.ts) live here
+ *     for the server's whole life, link or no link: a restart resumes
+ *     Eridani's sessions even when the link is off. Commands accepted before
+ *     a restart are replayed once Eridani's `runs.snapshot` is applied (or
+ *     10 s after the link is ready without one), so their fences see the
+ *     reconciled state.
  */
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import type { CapabilityMatrix, HarnessCaps } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_TIMING, STAGE_C_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
   eridaniConfigStamp,
@@ -30,6 +37,12 @@ import type { Registry } from './registry';
 import { Collector } from './collector/collector';
 import { CollectorState } from './collector/state';
 import { statusFromRegistry } from './collector/report';
+import { Dispatch } from './dispatch';
+import { QuestionBroker } from './questions-claude';
+import { ContextService } from './context';
+import { WorktreeManager } from './worktrees';
+import { loadTargets } from './eridani-targets';
+import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 
 export const COLLECTOR_STATE_FILE = 'eridani-collector.json';
 /** collector.py's Windows side. */
@@ -37,6 +50,9 @@ export const WINDOWS_USERS = '/mnt/c/Users';
 const CHECK_MS = 30_000;
 const SCAN_MS = 2 * 60_000;
 const MAX_FILL_FOR_SCAN = 0.8;
+/** How long after ready to wait for runs.snapshot before replaying accepted commands anyway. */
+const REPLAY_FALLBACK_MS = 10_000;
+const WORKTREES_ENTITY = 'worktrees';
 
 export interface EridaniRuntimeDeps {
   dir: string;
@@ -54,6 +70,11 @@ export interface EridaniRuntimeDeps {
   windowsUsers?: string | null;
   checkMs?: number;
   scanMs?: number;
+  resumeAgents?: boolean;
+  /** Tests: dispatch timing. */
+  dispatchTiming?: ConstructorParameters<typeof Dispatch>[0]['timing'];
+  questionHoldMs?: number;
+  contextMs?: number;
 }
 
 /** `claude --version` / `codex --version`, once per link start. Never blocks the link. */
@@ -77,6 +98,20 @@ export function stageBCaps(versions: { claude: string | null; codex: string | nu
   return { claude: caps(versions.claude), codex: caps(versions.codex) };
 }
 
+/**
+ * Stage C, from the stage A capability matrix: both harnesses spawn, take
+ * SessionStart context and steer by interrupt; only Claude's AskUserQuestion
+ * is answerable (Codex's request_user_input has no hook), and Claude's
+ * PermissionRequest is captured, not answered.
+ */
+export function stageCCaps(versions: { claude: string | null; codex: string | null }): CapabilityMatrix {
+  const base = (version: string | null): HarnessCaps => ({ version, observe: true, capture: true, question: false, context: true, resume: true, spawn: true, steer: 'interrupt' });
+  return {
+    claude: { ...base(versions.claude), question: true, permission: 'capture', launch_flags: ['--permission-mode', 'auto'] },
+    codex: { ...base(versions.codex), launch_flags: ['--disable', 'daemon_auto_start'] },
+  };
+}
+
 export class EridaniRuntime {
   private link: EridaniLink | null = null;
   private stamp = '';
@@ -85,11 +120,55 @@ export class EridaniRuntime {
   private collector: Collector | null = null;
   private state: CollectorState | null = null;
   private cfg: EridaniConfig | null = null;
-  private harnesses: CapabilityMatrix = stageBCaps({ claude: null, codex: null });
+  private harnesses: CapabilityMatrix = stageCCaps({ claude: null, codex: null });
+  private replayTimer: NodeJS.Timeout | null = null;
+  private worktreesSent = '';
+  private worktreesRev = 0;
+  private worktreesBusy = false;
+  private worktreesAgain = false;
+  private readonly worktrees: WorktreeManager;
+  readonly dispatch: Dispatch;
+  readonly questions: QuestionBroker;
+  readonly context: ContextService;
 
-  constructor(private readonly deps: EridaniRuntimeDeps) {}
+  constructor(private readonly deps: EridaniRuntimeDeps) {
+    const { hub, registry } = deps;
+    this.questions = new QuestionBroker({
+      session: (id) => registry.session(id),
+      canHold: (id) => !!this.link?.ready && !!registry.session(id)?.eridani,
+      // No entity: a question and its resolution are separate facts, never coalesced.
+      emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
+      needsYou: (id, reason) => hub.agentState.report(id, { awaitingHuman: reason !== null, reason }),
+      holdMs: deps.questionHoldMs,
+      log: deps.log,
+    });
+    this.dispatch = new Dispatch({
+      hub,
+      registry,
+      dir: deps.dir,
+      worktrees: (this.worktrees = new WorktreeManager({ dir: deps.dir })),
+      targets: () => loadTargets(deps.dir),
+      questions: this.questions,
+      emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
+      changed: () => this.reportWorktrees(),
+      linkReady: () => !!this.link?.ready,
+      resumeAgents: deps.resumeAgents,
+      log: deps.log,
+      timing: deps.dispatchTiming,
+    });
+    this.context = new ContextService({
+      session: (id) => registry.session(id),
+      enabled: () => this.link !== null,
+      request: (body, ms) => this.link?.request(body, ms) ?? Promise.resolve(null),
+      runToken: (id) => this.dispatch.runToken(id),
+      timeoutMs: deps.contextMs ?? ERIDANI_TIMING.contextMs,
+      log: deps.log,
+    });
+    hub.setEridani(this.dispatch.hubHooks());
+  }
 
   start(): void {
+    this.dispatch.resumeOnBoot();
     this.check();
     this.checkTimer = setInterval(() => this.check(), this.deps.checkMs ?? CHECK_MS);
     this.checkTimer.unref?.();
@@ -164,13 +243,31 @@ export class EridaniRuntime {
       onReady: () => {
         this.takeDirty();
         this.scan();
+        this.worktreesSent = '';
+        this.reportWorktrees();
+        if (this.replayTimer) clearTimeout(this.replayTimer);
+        this.replayTimer = setTimeout(() => this.replay(), REPLAY_FALLBACK_MS);
+        this.replayTimer.unref?.();
+      },
+      handlers: this.dispatch.handlers(),
+      precheck: (cmd) => this.dispatch.precheck(cmd),
+      recover: (rec) => this.dispatch.recover(rec),
+      acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
+      caps: () => STAGE_C_CAPS,
+      targets: () => this.helloTargets(),
+      onRunsSnapshot: (runs) => {
+        this.dispatch.applyRunsSnapshot(runs);
+        this.replay();
       },
       onDelivered: (entry) => {
         if (entry.body.t === 'session.report' && entry.entity && typeof entry.revision === 'string') {
           this.state?.delivered(entry.entity, entry.revision);
         }
       },
-      onDirty: (entity) => this.state?.dirty(entity),
+      onDirty: (entity) => {
+        if (entity === WORKTREES_ENTITY) this.worktreesSent = '';
+        else this.state?.dirty(entity);
+      },
       ...this.deps.linkOverrides,
     });
     this.link = link;
@@ -186,10 +283,58 @@ export class EridaniRuntime {
     this.deps.log(`eridani: link to ${cfg!.url} as ${machine} (collector ${cfg!.collector})`);
     link.start();
     void Promise.all([probeVersion('claude'), probeVersion('codex')]).then(([claude, codex]) => {
-      this.harnesses = stageBCaps({ claude, codex });
+      this.harnesses = stageCCaps({ claude, codex });
     });
     this.scanTimer = setInterval(() => this.scan(), this.deps.scanMs ?? SCAN_MS);
     this.scanTimer.unref?.();
+  }
+
+  /** Execution targets for hello: ids, repos and verify ids only. */
+  private helloTargets(): HelloTarget[] {
+    return loadTargets(this.deps.dir).map((t) => ({
+      id: t.id,
+      repo: t.repo,
+      worktree_root: t.worktreeRoot,
+      harnesses: (['claude', 'codex'] as const).filter((h) => !!t.launch[h]),
+      verify: t.verify.map((v) => v.id),
+    }));
+  }
+
+  /**
+   * `worktrees.report`: every managed worktree with its unmerged-work
+   * reasons. Sent when the link becomes ready and whenever the list changes
+   * (after a spawn, an exit, and on the scan tick); coalesced in the spool.
+   */
+  reportWorktrees(): void {
+    if (!this.link?.ready) return;
+    if (this.worktreesBusy) {
+      this.worktreesAgain = true;
+      return;
+    }
+    this.worktreesBusy = true;
+    const active = new Set(this.deps.registry.sessions().filter((r) => r.eridani && r.state !== 'exited').map((r) => r.eridani!.worktree));
+    this.worktrees.nominate(loadTargets(this.deps.dir), (p) => active.has(p)).then(
+      (rows) => {
+        const text = JSON.stringify(rows);
+        if (text !== this.worktreesSent && this.link?.ready) {
+          if (this.link.enqueue({ t: 'worktrees.report', worktrees: rows }, 0, WORKTREES_ENTITY, ++this.worktreesRev)) this.worktreesSent = text;
+        }
+      },
+      (err) => this.deps.log(`eridani: worktrees report failed: ${(err as Error).message}`),
+    ).finally(() => {
+      this.worktreesBusy = false;
+      if (this.worktreesAgain) {
+        this.worktreesAgain = false;
+        this.reportWorktrees();
+      }
+    });
+  }
+
+  /** Run what was accepted before a restart and never started (once per connection). */
+  private replay(): void {
+    if (this.replayTimer) clearTimeout(this.replayTimer);
+    this.replayTimer = null;
+    if (this.link?.ready) this.link.replayAccepted();
   }
 
   /** Entities evicted from the outbox: forget their fingerprints so the next scan sends them again. */
@@ -201,6 +346,7 @@ export class EridaniRuntime {
   }
 
   private scan(): void {
+    this.reportWorktrees();
     const link = this.link;
     if (!link || !this.collector || !link.ready) return;
     if (link.spool.fill > MAX_FILL_FOR_SCAN) {
@@ -217,6 +363,8 @@ export class EridaniRuntime {
   }
 
   private teardown(reason: string): void {
+    if (this.replayTimer) clearTimeout(this.replayTimer);
+    this.replayTimer = null;
     if (this.scanTimer) clearInterval(this.scanTimer);
     this.scanTimer = null;
     this.deps.hub.setSink(null);

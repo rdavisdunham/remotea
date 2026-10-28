@@ -163,12 +163,27 @@ export function loadEridaniConfig(dir: string): EridaniConfig | null {
   }
 }
 
-export function saveEridaniConfig(dir: string, cfg: EridaniConfig): void {
+/** The file as written, unknown keys included (execution targets live beside the link settings). */
+export function readEridaniFile(dir: string): Record<string, unknown> {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dir, ERIDANI_FILE), 'utf8')) as unknown;
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeEridaniFile(dir: string, data: Record<string, unknown>): void {
   ensureDir(dir);
   const file = path.join(dir, ERIDANI_FILE);
   const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
   fs.renameSync(tmp, file);
+}
+
+/** Write the link settings; every other key in the file (targets) is kept. */
+export function saveEridaniConfig(dir: string, cfg: EridaniConfig): void {
+  writeEridaniFile(dir, { ...readEridaniFile(dir), ...cfg });
 }
 
 export function readEridaniToken(dir: string): string | null {
@@ -192,15 +207,20 @@ export function forgetEridaniToken(dir: string): void {
   fs.rmSync(path.join(dir, ERIDANI_TOKEN_FILE), { force: true });
 }
 
-/** mtimes of the link's config and key: main.ts restarts the link when either changes. */
+/**
+ * What the link depends on: its settings and the key file. The runtime
+ * restarts the link when this changes. Execution targets are not in it:
+ * dispatch reads them from the file on every spawn, so `remotea eridani
+ * targets add` never drops the connection.
+ */
 export function eridaniConfigStamp(dir: string): string {
-  const stamp = (f: string) => {
-    try {
-      const st = fs.statSync(path.join(dir, f));
-      return `${st.mtimeMs}:${st.size}`;
-    } catch {
-      return '-';
-    }
-  };
-  return `${stamp(ERIDANI_FILE)}|${stamp(ERIDANI_TOKEN_FILE)}`;
+  const cfg = loadEridaniConfig(dir);
+  let key = '-';
+  try {
+    const st = fs.statSync(path.join(dir, ERIDANI_TOKEN_FILE));
+    key = `${st.mtimeMs}:${st.size}`;
+  } catch {
+    /* no key */
+  }
+  return `${cfg ? JSON.stringify([cfg.enabled, cfg.url, cfg.machine ?? null, cfg.collector]) : '-'}|${key}`;
 }

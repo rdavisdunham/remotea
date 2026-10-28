@@ -374,6 +374,13 @@ export class TermSession {
   }
 
   /** Human input from a client. Typing at a device is the strongest "I'm here" signal: it claims the size. */
+  /** Bytes for the process that come from no client (Eridani's input). */
+  write(data: string): void {
+    if (!this.alive) return;
+    this.lastActivityAt = Date.now();
+    this.writePty(data);
+  }
+
   input(connId: number, data: string): void {
     if (!this.alive) return;
     this.lastActivityAt = Date.now();

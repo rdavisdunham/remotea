@@ -31,29 +31,29 @@ describe('hook bridge requests', () => {
   const relayed: Array<[string, string, Record<string, unknown>]> = [];
   const deps = { secret: SECRET, relay: (id: string, m: string, p: Record<string, unknown>) => (relayed.push([id, m, p]), id === SURF) };
 
-  it('accepts a status report only with the token issued to that session', () => {
+  it('accepts a status report only with the token issued to that session', async () => {
     const token = hookToken(SECRET, SURF);
-    expect(handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: SURF, event: 'Stop' }, id: 1, token })).toEqual({ result: { ok: true }, id: 1 });
+    expect(await handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: SURF, event: 'Stop' }, id: 1, token })).toEqual({ result: { ok: true }, id: 1 });
     expect(relayed.at(-1)).toEqual([SURF, 'hook.event', { surfaceId: SURF, event: 'Stop' }]);
     // Another session's token, no token, or a forged surface id: refused, nothing relayed.
     const n = relayed.length;
-    expect(handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: SURF }, token: hookToken(SECRET, 'surf-other') }).error?.code).toBe(-32001);
-    expect(handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: SURF } }).error?.code).toBe(-32001);
-    expect(handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: 'surf-x' }, token }).error?.code).toBe(-32001);
+    expect((await handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: SURF }, token: hookToken(SECRET, 'surf-other') })).error?.code).toBe(-32001);
+    expect((await handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: SURF } })).error?.code).toBe(-32001);
+    expect((await handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: 'surf-x' }, token })).error?.code).toBe(-32001);
     expect(relayed.length).toBe(n);
   });
 
-  it('relays only agent-status methods; answers discovery itself', () => {
+  it('relays only agent-status methods; answers discovery itself', async () => {
     const token = hookToken(SECRET, SURF);
-    expect(handleBridgeRequest(deps, { method: 'surface.send_text', params: { surfaceId: SURF, text: 'rm -rf ~' }, token }).error?.code).toBe(-32601);
-    expect(handleBridgeRequest(deps, { method: 'workspace.create', params: { surfaceId: SURF }, token }).error?.code).toBe(-32601);
-    expect(handleBridgeRequest(deps, { method: 'system.identify', id: 3 }).result).toMatchObject({ name: 'remotea' });
-    expect(handleBridgeRequest(deps, 'nonsense').error?.code).toBe(-32700);
+    expect((await handleBridgeRequest(deps, { method: 'surface.send_text', params: { surfaceId: SURF, text: 'rm -rf ~' }, token })).error?.code).toBe(-32601);
+    expect((await handleBridgeRequest(deps, { method: 'workspace.create', params: { surfaceId: SURF }, token })).error?.code).toBe(-32601);
+    expect((await handleBridgeRequest(deps, { method: 'system.identify', id: 3 })).result).toMatchObject({ name: 'remotea' });
+    expect((await handleBridgeRequest(deps, 'nonsense')).error?.code).toBe(-32700);
   });
 
-  it('a session that is not live here is an error, not a silent success', () => {
+  it('a session that is not live here is an error, not a silent success', async () => {
     const id = 'surf-gone';
-    expect(handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: id }, token: hookToken(SECRET, id) }).error?.code).toBe(-32000);
+    expect((await handleBridgeRequest(deps, { method: 'hook.event', params: { surfaceId: id }, token: hookToken(SECRET, id) })).error?.code).toBe(-32000);
   });
 });
 

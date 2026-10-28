@@ -446,6 +446,8 @@ function parsePayload(raw) {
         file: '', message: '', sessionId: '', toolName: '', prompt: '', notificationType: '', subagent: false,
         agentId: '', agentType: '', bgTask: '', bgTaskDetail: '', bgTasksEnded: '', freshSession: false,
         lastAssistantMessage: '', lastAssistantTruncated: false, turnId: '', transcriptPath: '',
+        promptId: '', source: '', toolUseId: '', backgroundTasks: false, permissionMode: '', answerEcho: '', annotations: false,
+        phantomSubagent: false,
     };
     if (!raw.trim())
         return out;
@@ -535,6 +537,38 @@ function readPayloadFields(data, out) {
     // and only toward a remotea server: the local wmux has no use for it.
     if (remote && event === 'Stop')
         readTurnFields(data, out);
+    if (remote)
+        readRemoteaFields(data, out);
+}
+const MAX_ANSWER_ECHO = 4000;
+const SOURCES = new Set(['startup', 'resume', 'clear', 'compact']);
+/**
+ * What a remotea server reads for Eridani (stage C), and only it: the local
+ * wmux has no use for any of it. Identifiers and flags, never free text,
+ * except the answers a question hook confirms.
+ */
+function readRemoteaFields(data, out) {
+    if (typeof data.permission_mode === 'string' && /^[A-Za-z]{1,32}$/.test(data.permission_mode))
+        out.permissionMode = data.permission_mode;
+    if (event === 'UserPromptSubmit' && !isCodex && typeof data.prompt_id === 'string' && TURN_ID_RE.test(data.prompt_id))
+        out.promptId = data.prompt_id;
+    if (event === 'SessionStart' && typeof data.source === 'string' && SOURCES.has(data.source))
+        out.source = data.source;
+    if (event === 'SubagentStop' && !isCodex && data.agent_type === '')
+        out.phantomSubagent = true;
+    if (event === 'Stop' && Array.isArray(data.background_tasks) && data.background_tasks.length > 0)
+        out.backgroundTasks = true;
+    if (typeof data.tool_use_id === 'string' && TURN_ID_RE.test(data.tool_use_id))
+        out.toolUseId = data.tool_use_id;
+    if (!event && tool === 'AskUserQuestion') {
+        const res = data.tool_response;
+        if (res && typeof res === 'object' && res.answers && typeof res.answers === 'object') {
+            const echo = JSON.stringify(res.answers);
+            if (echo.length <= MAX_ANSWER_ECHO)
+                out.answerEcho = echo;
+        }
+        out.annotations = !!(res && typeof res === 'object' && res.annotations && Object.keys(res.annotations).length > 0);
+    }
 }
 function readTurnFields(data, out) {
     const msg = data.last_assistant_message ?? data.lastAssistantMessage;
@@ -548,7 +582,8 @@ function readTurnFields(data, out) {
             out.lastAssistantMessage = msg;
         }
     }
-    const turnId = data.turn_id ?? data.turnId;
+    // Codex: `turn_id`. Claude: `prompt_id`, the same on every hook of the turn (stage A).
+    const turnId = data.turn_id ?? data.turnId ?? (isCodex ? undefined : data.prompt_id);
     if (typeof turnId === 'string' && TURN_ID_RE.test(turnId))
         out.turnId = turnId;
     if (isCodex && typeof data.transcript_path === 'string' && data.transcript_path.length <= 1024)
@@ -595,6 +630,13 @@ function hookParams(fields) {
         lastAssistantTruncated: fields.lastAssistantTruncated ? '1' : '',
         turnId: fields.turnId,
         transcriptPath: fields.transcriptPath,
+        promptId: fields.promptId,
+        source: fields.source,
+        toolUseId: fields.toolUseId,
+        backgroundTasks: fields.backgroundTasks ? '1' : '',
+        permissionMode: fields.permissionMode,
+        answerEcho: fields.answerEcho,
+        annotations: fields.annotations ? '1' : '',
         // Not under Grok (it sets GROK_HOOK_EVENT on every hook process). Grok
         // 1.0.44 sends `session_id` alongside `sessionId`, and an id recorded here
         // ends up on a `claude --resume` command line at restore — naming a session
@@ -622,7 +664,14 @@ function sendHook() {
     // caller opened it and never closes it, exiting would otherwise wait on a
     // stream nobody is going to end.
     process.stdin.pause();
+    if (event === 'AskUserQuestion') {
+        holdQuestion();
+        return;
+    }
     const fields = parsePayload(stdinData);
+    // A phantom SubagentStop (prompt suggestion, /compact summary) is nobody's subagent.
+    if (fields.phantomSubagent)
+        process.exit(0);
     const reported = reportedEvent(event, fields.subagent);
     // Nothing to say, so no connection either: the pipe is never opened.
     if (reported === null)
@@ -658,13 +707,124 @@ function sendHook() {
     client.on('data', () => {
         clearTimeout(deadline);
         client.destroy();
-        process.exit(0);
+        // SessionStart toward a remotea server: print Eridani's context for the agent.
+        if (remote && event === 'SessionStart' && !fields.agentId)
+            requestContext(fields);
+        else
+            process.exit(0);
     });
     client.on('close', () => clearTimeout(deadline));
     client.on('error', () => {
         // wmux not running — silently ignore.
         clearTimeout(deadline);
         process.exit(0);
+    });
+}
+/**
+ * One request to the remotea bridge, answered with its `result` (null on any
+ * failure). The bridge replies with one JSON line.
+ */
+function bridgeRequest(method, params, ms) {
+    return new Promise((resolve) => {
+        if (!remote)
+            return resolve(null);
+        let buf = '';
+        let done = false;
+        const finish = (v) => {
+            if (done)
+                return;
+            done = true;
+            if (timer)
+                clearTimeout(timer);
+            client.destroy();
+            resolve(v);
+        };
+        const client = net_1.default.connect({ host: remote.host, port: remote.port }, () => {
+            client.write(JSON.stringify({ method, params: { ...params, surfaceId }, id: 1, token }) + '\n');
+        });
+        const timer = ms === null ? null : setTimeout(() => finish(null), ms);
+        client.setEncoding('utf8');
+        client.on('data', (chunk) => {
+            buf += chunk;
+            const nl = buf.indexOf('\n');
+            if (nl === -1)
+                return;
+            try {
+                finish(JSON.parse(buf.slice(0, nl)).result ?? null);
+            }
+            catch {
+                finish(null);
+            }
+        });
+        client.on('error', () => finish(null));
+        client.on('close', () => finish(null));
+    });
+}
+/**
+ * SessionStart: ask the remotea server for Eridani's context and print it,
+ * which Claude Code and Codex add to the agent's context. The server answers
+ * within its own 2.5 s budget; this deadline only guards a wedged server, and
+ * the hook's timeout (claude-hooks.ts, 10 s) is above both.
+ */
+function requestContext(fields) {
+    const params = { sessionId: fields.sessionId, source: fields.source, provider: isCodex ? 'codex' : '' };
+    void bridgeRequest('remotea.context', params, 5000).then((res) => {
+        const text = res && typeof res.text === 'string' ? res.text : '';
+        if (text)
+            process.stdout.write(text, () => process.exit(0));
+        else
+            process.exit(0);
+    });
+}
+/**
+ * `--event AskUserQuestion`: a SYNCHRONOUS PreToolUse hook (remotea only)
+ * that holds the question while Eridani may answer it.
+ *
+ *   - answered: print `allow` with the answers in `updatedInput`, which Claude
+ *     uses as the person's choice (stage A); the question never shows;
+ *   - anything else (not an Eridani session, link down, a subagent's call, the
+ *     server gave up at its 570 s hold): print nothing, and Claude asks in the
+ *     terminal as usual.
+ *
+ * SIGTERM is Claude giving up on the hook (its 600 s timeout, or Esc): exit
+ * at once. The server sees the connection close and tells the two apart by
+ * how long the hook was held (questions-claude.ts).
+ */
+function holdQuestion() {
+    for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'])
+        process.on(sig, () => process.exit(0));
+    if (!remote)
+        process.exit(0);
+    let data;
+    try {
+        data = JSON.parse(stdinData);
+    }
+    catch {
+        process.exit(0);
+    }
+    // A subagent's question (or the phantom one after Stop) is not held (stage A).
+    if (typeof data.agent_id === 'string' && data.agent_id)
+        process.exit(0);
+    const questions = data.tool_input?.questions;
+    if (!Array.isArray(questions) || typeof data.tool_use_id !== 'string' || typeof data.session_id !== 'string')
+        process.exit(0);
+    const params = {
+        toolUseId: data.tool_use_id,
+        sessionId: data.session_id,
+        promptId: typeof data.prompt_id === 'string' ? data.prompt_id : '',
+        questions,
+    };
+    void bridgeRequest('remotea.question', params, null).then((res) => {
+        if (!res || !res.answers || typeof res.answers !== 'object')
+            process.exit(0);
+        const out = {
+            hookSpecificOutput: {
+                hookEventName: 'PreToolUse',
+                permissionDecision: 'allow',
+                updatedInput: { questions, answers: res.answers },
+            },
+        };
+        process.stdout.write(JSON.stringify(out), () => process.exit(0));
     });
 }
 // Read stdin (Claude Code pipes the hook payload as JSON).

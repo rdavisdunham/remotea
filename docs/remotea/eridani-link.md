@@ -1,9 +1,11 @@
-# The Eridani link (stage B)
+# The Eridani link (stages B and C)
 
 remotea-server can keep one outbound WebSocket to Eridani. In stage B the link
 is **read-only**: it reports what agents in remotea terminals are doing (state,
-finished turns, exits) and runs the session collector in **parity mode**. It
-executes nothing Eridani sends.
+finished turns, exits) and runs the session collector in **parity mode**.
+Stage C adds the commands Eridani may send (start an agent in a worktree, type
+into it, stop it, answer its question, run a configured verification) and
+SessionStart context; see [Stage C](#stage-c-dispatch) below.
 
 The design is in `docs/remotea/plan.md` and the mission-control plan (v2,
 "Unified link protocol"). The code is:
@@ -19,6 +21,12 @@ The design is in `docs/remotea/plan.md` and the mission-control plan (v2,
 | `remote-server/src/turn-capture.ts` | One `turn` per root provider turn, from the Stop hook. |
 | `remote-server/src/collector/` | TypeScript port of `collector.py`. |
 | `remote-server/src/eridani-cli.ts` | `remotea eridani …`. |
+| `remote-server/src/dispatch.ts` | Stage C: what each command does; recovery on boot and after a reconnect. |
+| `remote-server/src/eridani-targets.ts` | Execution targets in `eridani.json`. |
+| `remote-server/src/worktrees.ts` | One worktree per branch; the nominate-only cleanup report. |
+| `remote-server/src/questions-claude.ts` | Holding Claude's AskUserQuestion for Eridani. |
+| `remote-server/src/context.ts` | SessionStart context from Eridani. |
+| `remote-server/src/verify-runner.ts` | One configured verification, with a workspace fingerprint. |
 
 ## Configuration
 
@@ -124,7 +132,7 @@ Eridani sends:
   journaled, acked, and answered with `command.outcome` `rejected` /
   `unsupported`. A repeated `op_id` with the same digest gets the recorded
   outcome again. A repeated `op_id` with a different digest gets
-  `ack ok:false error:"digest-mismatch"`.
+  `ack ok:false error:"DIGEST_MISMATCH"`.
 
 ## Delivery and the outbox
 
@@ -206,13 +214,166 @@ while the outbox is over 80% full.
 A source's fingerprint is recorded (`eridani-collector.json`) only when
 Eridani acks the report that carried it.
 
-## Not yet implemented (stage C and later)
+## Stage C: dispatch
 
-- Executing anything inbound: prompt injection, answering questions, the
-  PreToolUse hold, and context on SessionStart. The journal is built and
-  records outcomes, but stage B rejects every command as `unsupported`.
-- `context.request` / `context.response`: the types exist, but nothing is sent.
-- Run bindings: `run_id` is always `null` and `generation` 0.
+### Execution targets
+
+Eridani can only start work where `eridani.json` says it may:
+
+```json
+"targets": [{
+  "id": "remotea",
+  "repo": "/home/davin/remotea/remotea",
+  "worktreeRoot": "/home/davin/remotea/worktrees",
+  "base": "main",
+  "launch": { "claude": {}, "codex": { "bin": "/home/davin/.local/bin/codex" } },
+  "verify": [{ "id": "test", "argv": ["npm", "test"], "cwd": "remote-server", "timeout": 600 }]
+}]
+```
+
+```
+remotea eridani targets list [--json]
+remotea eridani targets add --id <id> --repo <path> --worktree-root <path> [--base main] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>]
+remotea eridani targets add --json '<target>'
+remotea eridani targets remove <id>
+remotea eridani worktrees [--json]
+```
+
+Targets are read on every use: adding one needs no restart and does not
+reconnect the link. `hello` lists them (`targets: [{id, repo, worktree_root,
+harnesses, verify}]`, never argv or env) for Eridani's target picker.
+
+**Trust boundary.** Nothing Eridani sends becomes a program, a path or a shell
+word, apart from three validated values: the model name
+(`MODEL_RE`: letters, digits and `._:/@[]-`, at most 80), the branch (git ref rules), and the
+prompt. The prompt is passed in `$ERIDANI_PROMPT` and expanded by the login
+shell as **one argv word**; it is never parsed as shell text, and a prompt
+starting with `-` is refused. `env` accepts only `ERIDANI_*` keys with
+one-line values. This is policy against Eridani's text becoming commands. It
+is not a sandbox: the agent itself runs with `--permission-mode auto` as you.
+
+### Worktrees
+
+One worktree per branch under the target's `worktreeRoot`
+(`eri/task-1` → `<root>/eri--task-1`): reused when it exists, created from the
+base otherwise (`git worktree add -b <branch> <path> <base sha>`), and the base
+is recorded in `eridani-worktrees.json`. A spawn on the base branch itself is
+refused. Operations on one repo run one at a time.
+
+remotea **never removes a worktree**. `remotea eridani worktrees` (and the
+`worktrees.report` frame) lists each with why removing it would lose work:
+in use by a live session, locked, uncommitted / untracked / ignored files
+(an unforced `git worktree remove` deletes ignored files such as `.env`), not
+merged into its base, unpushed or no upstream, detached. A row with no reason
+is a *candidate*, and the CLI prints the commands a person could run: a
+recovery ref first (`refs/remotea/recovery/<branch>`), then
+`git worktree remove`.
+
+### Commands
+
+| `t` | Fields | Effect |
+|---|---|---|
+| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
+| `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text` | `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then the text. Typed as a bracketed paste and Enter. Never counts as a person answering. |
+| `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
+| `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
+| `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, `CI=1`, the target's timeout), then sends `verify.result`. One at a time per worktree. |
+
+Every command needs a fence that matches: an `input`/`stop` names the surface
+and its `incarnation`, the run, and the generation (a queued input must match
+the current generation; steer and stop may name a newer one). A command whose
+`expires_at` is past, or more than 7 days out (the replay horizon), is
+rejected.
+
+**Journal.** For every command: `accepted` is written and fsynced (with the
+command body) **before** the ack goes out; `executing` is written when its
+effect starts; the outcome is written, then sent as
+`command.outcome {command_id: <op_id>, state, kind, detail?, result?}`. The
+ack of an accepted command already says
+`outcome {state: "accepted", surf, incarnation}` for a spawn. After a restart:
+
+- `accepted` commands are re-checked and run once Eridani's `runs.snapshot`
+  has been applied (or 10 s after the link is ready without one);
+- `executing` commands are settled without being run again: a `spawn` by
+  whether its session exists (`executed` / `failed`), a `stop` as `executed`
+  (the process ended with the server), a `verify` as `failed`; an `input` or
+  `answer` becomes `uncertain`, since its bytes may or may not have arrived;
+- a duplicate `op_id` gets its recorded outcome, never a second run.
+
+**Recovery on boot.** Eridani sessions the restart lost are respawned with
+their conversation (`claude --resume <id> --model <m> --permission-mode auto`,
+`codex resume --disable daemon_auto_start -m <m> <id>`), with the run's env
+from `eridani-runs.json` (0600; the run token and env never go into the
+registry). A lost session whose stop was requested is marked exited instead.
+This happens whether or not the link is enabled.
+
+**runs.snapshot** (Eridani → remotea, after welcome, chunked like the
+snapshot): `runs [{run_id, generation, desired: continue|stop|none,
+stop_mode?}]`. A newer generation is adopted (an older queued input is then
+refused); `desired: stop` is carried out like a stop command.
+
+### Questions (Claude)
+
+The remotea server installs one synchronous PreToolUse hook matched on
+`AskUserQuestion` (timeout 600 s) and one async PostToolUse for it. The app
+does not install them. For a session bound to a run, with the link up:
+
+1. the helper holds `remotea.question` on the bridge; the server sends
+   `question {question_id, surf, incarnation, run_id, generation,
+   provider: "claude", provider_session_id, provider_request_id (tool_use_id),
+   provider_turn_id (prompt_id), kind: "ask", group_id, items [{id, text,
+   header?, choices [{id, label, description?}], multi?}], hold_until}` and the
+   pane says needs_you;
+2. the first valid `answer` wins: its outcome is `executed` with
+   `result.state: "submitted"`, and the helper prints
+   `{"hookSpecificOutput": {"hookEventName": "PreToolUse",
+   "permissionDecision": "allow", "updatedInput": {"questions": …,
+   "answers": {"<question text>": "<label>[, <label>…][, text]"}}}}`;
+3. PostToolUse with the same `tool_use_id` sends
+   `question.resolved {outcome: "accepted", still_open: false, answer_echo}`.
+
+Otherwise: at 570 s remotea lets go and the question shows in the terminal
+(`question.resolved {outcome: "timed_out", still_open: true}`; answered
+there later → `answered_locally`); the hook killed early (Esc) →
+`canceled`; the process exiting or a new prompt → `canceled`. A subagent's
+question (`agent_id`) is never held. `remote_answerable` is always false on
+`question.resolved`. Claude's PermissionRequest is captured, not answered
+(`permission: "capture"` in `harnesses`).
+
+### Context (SessionStart)
+
+The SessionStart hook asks the server (`remotea.context`), which sends
+`context.request {req_id, surf, incarnation, provider, provider_session_id,
+source, cwd, run_id, generation, task_id}` and waits 2.5 s for
+`context.response {req_id, text, run_token?}`. The text (≤ 16 000 chars) is
+printed for the agent, followed by `Eridani run token: <token>` when there is
+one. With no answer in time, one line naming the tool, session and run is
+printed instead; a late response is dropped. Nothing is printed when the link
+is not enabled.
+
+### Other frames
+
+remotea also sends: `question`, `question.resolved`, `verify.result
+{attempt_id, run_id, generation, turn_seq, plan_revision, verify_id,
+workspace_fingerprint ("<HEAD>:<sha256 of status, diff and untracked
+contents>"), exit_code, tail (last 4000 chars), truncated, duration_ms,
+timed_out, canceled, error?}` and `worktrees.report {worktrees: [...]}` (on
+ready, after a spawn or exit, and every 2 min when it changed). `turn` now
+carries the run binding taken when the turn's prompt was submitted, Claude's
+`prompt_id` as `provider_turn_id`, and `interim: true` for a Stop with
+background tasks still running. `sessions.snapshot` surfaces carry `task_id,
+target, worktree, branch, stop_requested, questions`; `status` carries
+`effective_permission_mode`. `caps` adds `question, context, spawn, input,
+answer, stop, verify, runs.snapshot, worktrees.report`.
+
+`remotea status --json` adds, per session: `eridani {runId, generation,
+taskId}`, `worktree`, `branch`, `stopRequested` (null for other sessions;
+`version` stays 1).
+
+## Not yet implemented (stage D and later)
+
+- Automatic verification after turns (stage C runs `verify` on command only).
+- Answering permission prompts (captured only) and Codex questions (no hook).
+- Removing worktrees (nominate only, by design).
 - Switching the collector from parity to authoritative, and removing the
   Python collector's hooks.
-- `effective_permission_mode` on `status`.
