@@ -57,7 +57,7 @@ export default function BrowserSettings() {
       <p className="settings-hint">
         {t(
           'settings.browser.defaultUrlHint',
-          'Where a workspace\'s browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for wmux\'s own page. Also settable in ~/.wmux/config.toml as [browser] default-url.',
+          'Where a workspace\'s browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea\'s own page. Also settable in ~/.wmux/config.toml as [browser] default-url.',
         )}
       </p>
 
@@ -97,7 +97,7 @@ export default function BrowserSettings() {
       <p className="settings-hint">
         {t(
           'settings.browser.openLinksExternallyHint',
-          'Clicked links in terminals and markdown go to your default browser instead of the wmux panel. Ctrl+click always does the opposite.',
+          'Clicked links in terminals and markdown go to your default browser instead of the remotea panel. Ctrl+click always does the opposite.',
         )}
       </p>
       <p className="settings-hint">

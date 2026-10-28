@@ -138,7 +138,7 @@ export async function withFrameKick<T>(
       if (Date.now() - started >= SCREENSHOT_DEADLINE_MS) {
         reject(new Error(
           `screenshot timed out after ${SCREENSHOT_DEADLINE_MS}ms — the browser pane produced no frame. ` +
-          'Is the wmux window minimized?',
+          'Is the remotea window minimized?',
         ));
         return;
       }

@@ -302,13 +302,13 @@ describe('buildApplyUpdateCmd', () => {
   // CREATE_NO_WINDOW), so it has to say what it is: a user reported an empty
   // window titled "findstr.exe" and could not tell whether it wanted input.
   it('names itself and says the window closes on its own', () => {
-    expect(cmd).toContain('title wmux update');
-    expect(cmd).toMatch(/echo\s+Installing the wmux update\./);
+    expect(cmd).toContain('title remotea update');
+    expect(cmd).toMatch(/echo\s+Installing the remotea update\./);
     expect(cmd).toMatch(/This window closes by itself/);
     // Windows renames a console after the child running in it, so the title is
     // re-set inside the wait loop and not only once at the top.
-    expect(cmd.match(/title wmux update/g)?.length).toBeGreaterThan(1);
-    expect(cmd.indexOf('title wmux update')).toBeLessThan(cmd.indexOf(':wait'));
+    expect(cmd.match(/title remotea update/g)?.length).toBeGreaterThan(1);
+    expect(cmd.indexOf('title remotea update')).toBeLessThan(cmd.indexOf(':wait'));
   });
 
   // timeout.exe refuses a redirected stdin, and the helper is spawned with
@@ -338,7 +338,7 @@ describe('buildApplyUpdateCmd', () => {
     expect(cmd).toContain('if %WAITED% LSS 120 goto wait');
     // A timed-out wait must not copy over what may be a live install, and the
     // payload is kept for the next attempt.
-    const timeout = lines.indexOf('set "SKIPCOPY=wmux did not close within two minutes"');
+    const timeout = lines.indexOf('set "SKIPCOPY=remotea did not close within two minutes"');
     expect(timeout).toBeGreaterThan(lines.indexOf(':wait'));
     expect(lines[timeout + 1]).toBe('set "KEEPSRC=1"');
     expect(cmd).toContain('del "%LIST%" >nul 2>nul');

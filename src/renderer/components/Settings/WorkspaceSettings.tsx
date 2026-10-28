@@ -237,7 +237,7 @@ export default function WorkspaceSettings() {
       </p>
 
       <div className="settings-row">
-        <label className="settings-label">{t('settings.workspacePanel.confirmAppClose', 'Confirm before closing wmux')}</label>
+        <label className="settings-label">{t('settings.workspacePanel.confirmAppClose', 'Confirm before closing remotea')}</label>
         <input
           type="checkbox"
           className="settings-toggle"
@@ -248,7 +248,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint">
         {t(
           'settings.workspacePanel.confirmAppCloseHint',
-          "Ask before the window's × button or Alt+F4 quits wmux — closing the window ends every terminal session in it, agents included. Updates, restarts and Windows shutdown never prompt.",
+          "Ask before the window's × button or Alt+F4 quits remotea — closing the window ends every terminal session in it, agents included. Updates, restarts and Windows shutdown never prompt.",
         )}
       </p>
 
@@ -289,7 +289,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint">
         {t(
           'settings.workspacePanel.restoreClaudeSessionsHint',
-          'When wmux restores a session, re-launch each terminal that was running Claude Code with `claude --resume`, in the directory it was in. Off by default: every such pane starts an agent at once. Panes whose conversation Claude no longer has are skipped, and a Claude you exited cleanly is not resumed.',
+          'When remotea restores a session, re-launch each terminal that was running Claude Code with `claude --resume`, in the directory it was in. Off by default: every such pane starts an agent at once. Panes whose conversation Claude no longer has are skipped, and a Claude you exited cleanly is not resumed.',
         )}
       </p>
 
@@ -303,7 +303,7 @@ export default function WorkspaceSettings() {
         />
       </div>
       <p className="settings-hint">
-        {t('settings.workspacePanel.restoreCodexSessionsHint', 'Reopens the exact Codex conversation in each restored tab. Enable this, then launch codex in a new wmux terminal. Requires Node.js and the native Windows Codex CLI in PowerShell or Command Prompt. Sessions you exit normally are not reopened.')}
+        {t('settings.workspacePanel.restoreCodexSessionsHint', 'Reopens the exact Codex conversation in each restored tab. Enable this, then launch codex in a new remotea terminal. Requires Node.js and the native Windows Codex CLI in PowerShell or Command Prompt. Sessions you exit normally are not reopened.')}
       </p>
 
       <div className="settings-row">
@@ -316,7 +316,7 @@ export default function WorkspaceSettings() {
         />
       </div>
       <p className="settings-hint">
-        {t('settings.workspacePanel.restoreOpencodeSessionsHint', "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the wmux OpenCode plugin (Agent integration on). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 is captured only when started with --standalone: its shared background server cannot tell tabs apart.")}
+        {t('settings.workspacePanel.restoreOpencodeSessionsHint', "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode plugin (Agent integration on). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 is captured only when started with --standalone: its shared background server cannot tell tabs apart.")}
       </p>
 
       <div className="settings-row">
@@ -329,7 +329,7 @@ export default function WorkspaceSettings() {
         />
       </div>
       <p className="settings-hint">
-        {t('settings.workspacePanel.restoreAgySessionsHint', "Reopens each restored tab's agy conversation with `agy --conversation`, in the directory it was in. Needs the wmux agy plugin (Status hooks on) and Node.js. A conversation is captured when it starts, or at its first message once resumed. An agy you quit back to the shell prompt is not reopened.")}
+        {t('settings.workspacePanel.restoreAgySessionsHint', "Reopens each restored tab's agy conversation with `agy --conversation`, in the directory it was in. Needs the remotea agy plugin (Status hooks on) and Node.js. A conversation is captured when it starts, or at its first message once resumed. An agy you quit back to the shell prompt is not reopened.")}
       </p>
 
       <div className="settings-row">
@@ -342,7 +342,7 @@ export default function WorkspaceSettings() {
         />
       </div>
       <p className="settings-hint">
-        {t('settings.workspacePanel.restoreQwenSessionsHint', "Re-launches each restored tab that was running Qwen Code with `qwen --resume`, in the directory it was in. Needs the wmux Qwen hooks (Status hooks on) and Qwen Code 0.14 or later. Tabs whose session Qwen no longer has are skipped, and a Qwen you exited cleanly is not resumed.")}
+        {t('settings.workspacePanel.restoreQwenSessionsHint', "Re-launches each restored tab that was running Qwen Code with `qwen --resume`, in the directory it was in. Needs the remotea Qwen hooks (Status hooks on) and Qwen Code 0.14 or later. Tabs whose session Qwen no longer has are skipped, and a Qwen you exited cleanly is not resumed.")}
       </p>
 
       <div className="settings-row">
@@ -355,7 +355,7 @@ export default function WorkspaceSettings() {
         />
       </div>
       <p className="settings-hint">
-        {t('settings.workspacePanel.restoreOmpSessionsHint', "Reopens each restored tab's exact omp session with `omp --resume <path>`, in the directory it was in. Needs the wmux omp extension (Status hooks on). An omp session you quit normally is not reopened. If a session file was deleted since, the pane skips resume safely without creating a new session.")}
+        {t('settings.workspacePanel.restoreOmpSessionsHint', "Reopens each restored tab's exact omp session with `omp --resume <path>`, in the directory it was in. Needs the remotea omp extension (Status hooks on). An omp session you quit normally is not reopened. If a session file was deleted since, the pane skips resume safely without creating a new session.")}
       </p>
 
       <div className="settings-row">
@@ -370,7 +370,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint">
         {t(
           'settings.workspacePanel.detectAgentScreensHint',
-          'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\wmux\\agent-detection, and use `wmux detect explain` to see which rule fired.',
+          'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `wmux detect explain` to see which rule fired.',
         )}
       </p>
 
@@ -402,7 +402,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint">
         {t(
           'settings.workspacePanel.autoOpenDiffHint',
-          'When an agent edits or writes files, wmux pops a diff tab in the bottom pane. Turn this off to stop it appearing.',
+          'When an agent edits or writes files, remotea pops a diff tab in the bottom pane. Turn this off to stop it appearing.',
         )}
       </p>
 
@@ -414,7 +414,7 @@ export default function WorkspaceSettings() {
           onChange={(e) => keepAwake.setMode(e.target.value as KeepAwakeMode)}
         >
           <option value="smart">{t('settings.workspacePanel.keepAwakeSmart', 'Smart (when agents are working)')}</option>
-          <option value="always">{t('settings.workspacePanel.keepAwakeAlways', 'Always (keep awake while wmux is open)')}</option>
+          <option value="always">{t('settings.workspacePanel.keepAwakeAlways', 'Always (keep awake while remotea is open)')}</option>
           <option value="off">{t('settings.workspacePanel.keepAwakeOff', 'Off (system defaults)')}</option>
         </select>
       </div>
@@ -480,7 +480,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint">
         {t(
           'settings.workspacePanel.defaultCwdHint',
-          'Where a new terminal opens when nothing else decides. Splits, "Open in wmux", --cwd and restored sessions keep their own directory. ~ and %VARIABLES% are expanded; leave empty to keep the old behaviour.',
+          'Where a new terminal opens when nothing else decides. Splits, "Open in remotea", --cwd and restored sessions keep their own directory. ~ and %VARIABLES% are expanded; leave empty to keep the old behaviour.',
         )}
       </p>
 

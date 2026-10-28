@@ -75,16 +75,16 @@ export function closeDialogCopy(opts: { lastWindow: boolean; ptyCount: number })
     const n = Math.max(0, Math.floor(opts.ptyCount));
     const sessions = n === 1 ? '1 terminal session' : `${n} terminal sessions`;
     return {
-      message: 'Quit wmux?',
+      message: 'Quit remotea?',
       detail: n === 0
-        ? 'This closes the last wmux window.'
+        ? 'This closes the last remotea window.'
         : `${sessions} will be terminated, including any agents running in them. The layout is saved and restored on the next launch, but the processes are not.`,
-      confirmLabel: 'Quit wmux',
+      confirmLabel: 'Quit remotea',
     };
   }
   return {
     message: 'Close this window?',
-    detail: 'The terminal sessions in this window will be terminated. Other wmux windows stay open.',
+    detail: 'The terminal sessions in this window will be terminated. Other remotea windows stay open.',
     confirmLabel: 'Close window',
   };
 }

@@ -44,10 +44,10 @@ export function ensureOpencodeContext(): void {
     const next = injectWmuxBlock(existing, wmuxBlock);
     if (next !== existing) {
       fs.writeFileSync(agentsPath, next, 'utf-8');
-      console.log('[wmux] Updated wmux context in ~/.config/opencode/AGENTS.md');
+      console.log('[remotea] Updated remotea context in ~/.config/opencode/AGENTS.md');
     }
   } catch (err) {
-    console.warn('[wmux] Failed to update OpenCode context:', err);
+    console.warn('[remotea] Failed to update OpenCode context:', err);
   }
 }
 
@@ -67,7 +67,7 @@ export function ensureOpencodePlugin(): void {
   try {
     const srcPath = getPluginSrcPath();
     if (!fs.existsSync(srcPath)) {
-      console.warn('[wmux] opencode plugin source not found at', srcPath);
+      console.warn('[remotea] opencode plugin source not found at', srcPath);
       return;
     }
     const src = fs.readFileSync(srcPath, 'utf-8');
@@ -77,9 +77,9 @@ export function ensureOpencodePlugin(): void {
     if (!pluginNeedsUpdate(src, target)) return;
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
     fs.writeFileSync(dest, src, 'utf-8');
-    console.log('[wmux] Installed wmux OpenCode plugin to', dest);
+    console.log('[remotea] Installed remotea OpenCode plugin to', dest);
   } catch (err) {
-    console.warn('[wmux] Failed to install OpenCode plugin:', err);
+    console.warn('[remotea] Failed to install OpenCode plugin:', err);
   }
 }
 
@@ -99,9 +99,9 @@ export function removeOpencodeContext(): void {
     if (stripped === null) return;
     if (stripped === '') fs.unlinkSync(agentsPath);
     else fs.writeFileSync(agentsPath, stripped, 'utf-8');
-    console.log('[wmux] Removed wmux context from ~/.config/opencode/AGENTS.md');
+    console.log('[remotea] Removed remotea context from ~/.config/opencode/AGENTS.md');
   } catch (err) {
-    console.warn('[wmux] Failed to remove OpenCode context:', err);
+    console.warn('[remotea] Failed to remove OpenCode context:', err);
   }
 }
 
@@ -118,8 +118,8 @@ export function removeOpencodePlugin(): void {
     if (!fs.existsSync(dest)) return;
     if (!isWmuxPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
     fs.unlinkSync(dest);
-    console.log('[wmux] Removed the wmux OpenCode plugin from', dest);
+    console.log('[remotea] Removed the remotea OpenCode plugin from', dest);
   } catch (err) {
-    console.warn('[wmux] Failed to remove OpenCode plugin:', err);
+    console.warn('[remotea] Failed to remove OpenCode plugin:', err);
   }
 }

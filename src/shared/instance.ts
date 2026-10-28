@@ -107,7 +107,7 @@ export function ensurePipeToken(): string {
     fs.writeFileSync(tokenPath, token, { encoding: 'utf-8', mode: 0o600 });
     try { fs.chmodSync(tokenPath, 0o600); } catch { /* best-effort on Windows */ }
   } catch (err) {
-    console.warn('[wmux] Failed to persist pipe token:', err);
+    console.warn('[remotea] Failed to persist pipe token:', err);
   }
   return token;
 }

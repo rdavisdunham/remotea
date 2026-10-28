@@ -418,7 +418,7 @@ function resolveAgentAssignments(strategy: string, count: number, paneLoads: any
     return Array.from({ length: count }, () => sorted[0].paneId);
   }
   if (strategy !== 'distribute') {
-    console.warn('[wmux] split strategy not yet implemented, falling back to distribute');
+    console.warn('[remotea] split strategy not yet implemented, falling back to distribute');
   }
   return distributeAgents(count, paneLoads);
 }
@@ -1617,7 +1617,7 @@ app.whenReady().then(() => {
   // each close, so a pane restored into agent mode while the list is in flight
   // cannot be swept up by it.
   reconcileOrphanSessions(agentBrowserTeardownDeps).catch((err: Error) => {
-    console.warn('[wmux] agent-browser session reconcile failed:', err?.message);
+    console.warn('[remotea] agent-browser session reconcile failed:', err?.message);
   });
 
   // Clear stale session data on version change (clean start for upgrades/fresh installs)

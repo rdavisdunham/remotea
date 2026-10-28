@@ -16,10 +16,10 @@ interface Step {
 function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step[] {
   return [
     {
-      title: t('tutorial.step.welcome.title', 'Welcome to wmux'),
+      title: t('tutorial.step.welcome.title', 'Welcome to remotea'),
       body: t(
         'tutorial.step.welcome.body',
-        'wmux is a terminal multiplexer for running AI coding agents in parallel. This quick tour will show you the essentials.',
+        'remotea is a terminal multiplexer for running AI coding agents in parallel. This quick tour will show you the essentials.',
       ),
       shortcuts: [],
     },

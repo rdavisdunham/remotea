@@ -1,31 +1,29 @@
 <!--
-  wmux app icon — master art, feeds the 48px and larger ICO entries plus
-  icon.png. Regenerate rasters with `npm run build:icons`.
+  remotea app icon — master art. Every raster the app ships (icon.png and
+  each ICO entry) is drawn from these numbers; regenerate with
+  `npm run build:icons` on Windows, or scripts/build-icons-pillow.py in WSL.
 
-  Redrawn as vector from new-logo.png (286x271), which was too small and not
-  square to source a 256px ICO entry from directly. Every number below is a
-  least-squares fit against that file rather than an eyeballed approximation:
-  each bar edge fitted to under 0.3px RMS, the corner arc to 0.5px, so this is
-  the same mark at unlimited resolution, not an interpretation of it.
+  The mark: a terminal split into two panes, and one of the panes is alive.
+  The dim pane is the terminal you are looking at; the lit pane is the one
+  that keeps running on the other machine. Yellow (#f5c518) is remotea's
+  accent; the plate (#15151a) and the dim pane (#3a3a43) are the terminal's
+  own greys, kept from the wmux mark so the icon sits with its ancestry.
 
-  Measured, and deliberately kept:
-    - plate #15151a and bars #e8e8e9 — the mark is not pure black on white.
-    - corner radius 0.241 of the side (the badge was 219px with a 52.8px arc).
-    - the middle bar is a TRAPEZIUM, not a parallelogram: its top edge runs at
-      -0.500 but its bottom at -0.747, so the left side is 75.5 units against
-      69.3 on the right. Bars 1 and 3 are regular parallelograms at +-0.5.
-      That asymmetry is in the source art, so it is reproduced rather than
-      regularised — squaring it off would be redrawing the brand, not porting it.
-
-  The plate is full-bleed: new-logo.png had the badge inset in a transparent
-  286x271 canvas, but an app icon owns its whole square (Windows applies its own
-  padding), so the badge is scaled to the full 1024 viewBox.
+  Geometry on a 512 grid, chosen so the mark survives the 16px tray entry:
+    - plate corner radius 0.241 of the side (kept from the wmux badge)
+    - panes 124 wide x 256 tall, corner radius 18, 40 apart, centred
+    - the glow is the lit pane grown by 14 and blurred by 22; it is the only
+      soft element and it is behind everything, so at 16px it just warms the
+      plate around the lit pane rather than turning to mush
 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <rect x="0" y="0" width="1024" height="1024" rx="247" fill="#15151a"/>
-  <g fill="#e8e8e9">
-    <path d="M 229.1 307.6 L 346.0 370.6 L 346.0 674.4 L 229.1 619.6 Z"/>
-    <path d="M 462.9 376.3 L 579.8 317.9 L 579.8 641.9 L 462.9 729.2 Z"/>
-    <path d="M 678.0 369.6 L 790.2 313.1 L 790.2 620.7 L 678.0 678.7 Z"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="123.4" ry="123.4" fill="#15151a"/>
+  <rect x="262" y="114" width="152" height="284" rx="32" ry="32" fill="#f5c518" opacity="0.55" filter="url(#glow)"/>
+  <rect x="112" y="128" width="124" height="256" rx="18" ry="18" fill="#3a3a43"/>
+  <rect x="276" y="128" width="124" height="256" rx="18" ry="18" fill="#f5c518"/>
 </svg>

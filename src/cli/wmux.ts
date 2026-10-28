@@ -308,7 +308,7 @@ function deadline(base: number): number {
  * budget, it was usually the *only* thing a slow browser command ever printed.
  */
 export function timeoutMessage(method: string, timeoutMs: number): string {
-  return `${method} timed out after ${timeoutMs}ms — wmux accepted the request but sent no reply. The command may still have completed.`;
+  return `${method} timed out after ${timeoutMs}ms — remotea accepted the request but sent no reply. The command may still have completed.`;
 }
 
 function sendV2(
@@ -522,7 +522,7 @@ function failSubcommand(command: CommandName, sub: string | undefined): never {
 const REMOTE_ERROR_WORDS: Record<string, string> = {
   'port-busy': 'the port is already in use',
   'bind-failed': 'could not listen on the configured address',
-  'ui-not-built': 'the phone page is missing from this build of wmux (reinstall or update)',
+  'ui-not-built': 'the phone page is missing from this build of remotea (reinstall or update)',
   'lan-address-gone': 'the configured network address is no longer on this machine',
 };
 
@@ -616,7 +616,7 @@ export function parseFlagArgs(
     }
     if (!takesValue.has(tok)) {
       throw new Error(
-        `Unexpected argument '${tok}'. A flag value containing spaces or quotes must reach wmux`
+        `Unexpected argument '${tok}'. A flag value containing spaces or quotes must reach remotea`
         + ' as ONE argument — check how it was quoted.',
       );
     }
@@ -1232,7 +1232,7 @@ async function cmdBridge(args: string[]): Promise<void> {
 // WMUX_REMOTE_TOKEN on the machine that will drive this one remotely.
 function cmdToken(): void {
   if (!PIPE_TOKEN) {
-    console.error('No pipe token found — has wmux been started on this machine?');
+    console.error('No pipe token found — has remotea been started on this machine?');
     process.exit(1);
   }
   console.log(PIPE_TOKEN);
@@ -1462,9 +1462,9 @@ function cmdOpencodeTui(args: string[]): void {
   if (args.includes('--remove')) {
     const result = removeOpencodeTui({ configDir });
     if (result.status === 'removed') {
-      console.log(`Removed the wmux OpenCode TUI plugin from ${result.dir}`);
+      console.log(`Removed the remotea OpenCode TUI plugin from ${result.dir}`);
     } else if (result.status === 'absent') {
-      console.log(`No wmux OpenCode TUI plugin installed at ${result.dir}`);
+      console.log(`No remotea OpenCode TUI plugin installed at ${result.dir}`);
     } else {
       console.error(`Refusing to remove ${path.join(result.dir, 'tui.js')}: it carries no wmux version marker.`);
       process.exit(1);
@@ -1479,7 +1479,7 @@ function cmdOpencodeTui(args: string[]): void {
   }
   const result = installOpencodeTui({ sourceDir, configDir });
   if (result.status === 'installed') {
-    console.log(`Installed the wmux OpenCode TUI plugin (v${result.version ?? '?'}) to ${result.dir}`);
+    console.log(`Installed the remotea OpenCode TUI plugin (v${result.version ?? '?'}) to ${result.dir}`);
     console.log('Restart OpenCode so the TUI loads it.');
   } else {
     console.log(`wmux OpenCode TUI plugin already current (v${result.version ?? '?'}) at ${result.dir}`);
@@ -1817,7 +1817,7 @@ export function formatCrashReport(input: {
     '# wmux crash report',
     '',
     'This output is what a wmux crash report should contain: the Windows crash',
-    'fingerprint and wmux\'s own process-lifecycle log. It carries no memory —',
+    'fingerprint and remotea\'s own process-lifecycle log. It carries no memory —',
     'no environment variables, no pane contents, no command lines.',
     '',
     'Do NOT attach a crash dump unless it is asked for by name. See',
@@ -1831,7 +1831,7 @@ export function formatCrashReport(input: {
   if (input.platform !== 'win32') {
     out.push('(not Windows — no Application Error log to read)');
   } else if (!input.events.length) {
-    out.push('No matching entries. wmux may never have crashed on this machine, or the');
+    out.push('No matching entries. remotea may never have crashed on this machine, or the');
     out.push('records have aged out of the Application log.');
     out.push('');
     out.push('You can also read them by hand: Event Viewer > Windows Logs > Application,');
@@ -1868,7 +1868,7 @@ export function formatCrashReport(input: {
   }
 
   out.push('', '## wmux main.log (process lifecycle only)', '');
-  out.push(...(input.diagnostics.length ? input.diagnostics : ['(no log — wmux 1.1.1+ writes one on every launch)']));
+  out.push(...(input.diagnostics.length ? input.diagnostics : ['(no log — remotea 1.1.1+ writes one on every launch)']));
 
   out.push(...describeWerConfig(input.wer));
   return out.join('\n');
@@ -2107,7 +2107,7 @@ export const COMMAND_SPECS = {
   // Remote management (issue #78)
   bridge: {
     usage: [
-      'wmux bridge [--port P] [--host H] [--wsl]   (expose this wmux\'s pipe over TCP, default 127.0.0.1:9787)',
+      'wmux bridge [--port P] [--host H] [--wsl]   (expose this remotea\'s pipe over TCP, default 127.0.0.1:9787)',
       '  --wsl   bind 0.0.0.0 so a container on this host can reach a bridge running in WSL2',
     ].join('\n'),
     value: ['--port', '--host'],
@@ -2283,9 +2283,9 @@ export const COMMAND_SPECS = {
   'sidebar-state': { usage: 'wmux sidebar-state' },
   'crash-report': {
     usage: 'wmux crash-report [--events N] [--log-lines N]\n'
-      + '  Collect the crash fingerprint from the Windows Event Log plus wmux\'s own\n'
+      + '  Collect the crash fingerprint from the Windows Event Log plus remotea\'s own\n'
       + '  process-lifecycle log. Safe to paste into an issue — it contains no memory.\n'
-      + '  Needs no running wmux, which is the point: you run it after wmux died.',
+      + '  Needs no running remotea, which is the point: you run it after remotea died.',
     value: ['--events', '--log-lines'],
   },
 
@@ -2348,8 +2348,8 @@ export const COMMAND_SPECS = {
   detect: {
     usage: [
       'wmux detect explain [--surface <id>]              (why this pane reads the way it does)',
-      'wmux detect explain --file <path> [--agent <k>]   (replay a captured screen, no live wmux needed)',
-      'wmux detect reload                                (re-read %APPDATA%\\wmux\\agent-detection)',
+      'wmux detect explain --file <path> [--agent <k>]   (replay a captured screen, no live remotea needed)',
+      'wmux detect reload                                (re-read %APPDATA%\\remotea\\agent-detection)',
     ].join('\n'),
     value: ['--surface', '--file', '--agent'],
   },
@@ -2597,7 +2597,7 @@ async function main() {
     await handler(args);
   } catch (err: any) {
     if (err.code === 'ENOENT' || err.code === 'ECONNREFUSED') {
-      console.error('wmux is not running (could not connect to pipe)');
+      console.error('remotea is not running (could not connect to pipe)');
     } else {
       console.error(`Error: ${err.message}`);
     }
@@ -2615,10 +2615,10 @@ Links:      open <url>   (open it in the wmux browser panel, per Settings → Br
 Workspace:  new-workspace, close-workspace, select-workspace, rename-workspace, list-workspaces
             current-workspace | whoami [--surface <id>]   (the workspace THIS pane is in)
 Remote:     ssh [ssh options] <user@host> [--title T]   (remote terminal in a new workspace)
-            bridge [--port P] [--host H] [--wsl]   (expose this wmux's pipe over TCP, default 127.0.0.1:9787)
+            bridge [--port P] [--host H] [--wsl]   (expose this remotea's pipe over TCP, default 127.0.0.1:9787)
             token                          (print this instance's auth token, for --token)
             remote status [--json]         (the phone Remote Console: on/off, where, devices)
-Global:     --remote host[:port] --token <T>   (drive a REMOTE wmux through an SSH tunnel;
+Global:     --remote host[:port] --token <T>   (drive a REMOTE remotea through an SSH tunnel;
             env equivalents: WMUX_REMOTE, WMUX_REMOTE_TOKEN)
 Surface:    new-surface [--type T] [--color-scheme NAME], close-surface, focus-surface, list-surfaces
             rename-surface [surfaceId] <title>   (renames the current surface when run inside a pane)
@@ -2643,7 +2643,7 @@ Sidebar:    set-status, set-progress, log, sidebar-state
 Hook:       hook --event <type> --tool <name> [--agent <id>] [--prompt <text>]
 OpenCode:   opencode-tui [--remove]   # the CLI-side half, for remote/shared OpenCode v2 servers
 Crash:      crash-report [--events N] [--log-lines N]
-            (Event Log fingerprint + wmux's own log. No memory, so no secrets —
+            (Event Log fingerprint + remotea's own log. No memory, so no secrets —
              paste this instead of a crash dump. See docs/crash-reports.md.)
 Agent state: report-agent --blocked [reason] [--choices <json>] | --unblocked
             report-agent --run-start | --run-end

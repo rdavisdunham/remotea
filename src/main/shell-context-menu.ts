@@ -83,7 +83,7 @@ export function isContextMenuInstalled(): boolean {
  * @param exePath absolute path to wmux.exe
  * @param label   menu text, localized by the caller
  */
-export function installContextMenu(exePath: string, label = 'Open in wmux'): void {
+export function installContextMenu(exePath: string, label = 'Open in remotea'): void {
   if (process.platform !== 'win32') return;
   for (const root of REG_ROOTS) {
     const key = verbKeyFor(root);

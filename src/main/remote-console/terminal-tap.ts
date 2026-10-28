@@ -222,7 +222,7 @@ export class TerminalTap {
     att.snapTimer = null;
     this.retireReq(att);
     if (att.noTermRetried) {
-      this.fail(att, 'no-terminal', 'This terminal is not open in any wmux window.');
+      this.fail(att, 'no-terminal', 'This terminal is not open in any remotea window.');
       return;
     }
     att.noTermRetried = true;

@@ -316,7 +316,7 @@ export { agentIdentity };
 export function reapOrphanedPtys(): void {
   reapOrphans(orphanCandidates).then(
     () => { /* reaped, or nothing to reap */ },
-    (err) => { console.warn('[wmux] orphan reap failed:', err?.message); },
+    (err) => { console.warn('[remotea] orphan reap failed:', err?.message); },
   );
 }
 
@@ -537,7 +537,7 @@ export async function enableAgentBrowser(
     // well without its viewer, so refusing to enable because the viewer did
     // not start would trade a degraded feature for a broken one. Same call as
     // v2-browser.ts's `agentTargetFor` makes, for the same reason.
-    console.warn('[wmux] agent-browser dashboard did not start:', (err as Error)?.message);
+    console.warn('[remotea] agent-browser dashboard did not start:', (err as Error)?.message);
   }
 
   const session = await deps.ensureSession(surfaceId);
@@ -1219,7 +1219,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
         text: null,
         failure: {
           destination: remoteHint,
-          detail: 'wmux could not safely verify the active SSH destination',
+          detail: 'remotea could not safely verify the active SSH destination',
         },
       };
     }
@@ -1907,7 +1907,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
       if (enabled) {
         // app.getPath('exe') is Electron's own binary in dev, which is correct:
         // the verb then launches the dev build, and the user gets what they see.
-        installContextMenu(app.getPath('exe'), label || 'Open in wmux');
+        installContextMenu(app.getPath('exe'), label || 'Open in remotea');
       } else {
         uninstallContextMenu();
       }
@@ -1930,7 +1930,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
       message: 'Restart Windows Explorer to refresh the icon cache?',
       detail:
         'The taskbar disappears for a second and any open File Explorer windows close. ' +
-        'Your terminals and wmux itself are not affected. This is the only way Windows ' +
+        'Your terminals and remotea itself are not affected. This is the only way Windows ' +
         'lets a taskbar or pinned button pick up a changed icon.',
       buttons: ['Restart Explorer', 'Cancel'],
       defaultId: 1,

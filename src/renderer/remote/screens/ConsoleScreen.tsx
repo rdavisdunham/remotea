@@ -115,7 +115,7 @@ export function ConsoleScreen({ t, roster, rosterReceived, rosterAt, status, hos
   return (
     <main className="rc-screen rc-console">
       <header className="rc-bar">
-        <h1 className="rc-bar__title">wmux<span className="rc-bar__host">{host}</span></h1>
+        <h1 className="rc-bar__title">remotea<span className="rc-bar__host">{host}</span></h1>
         <span className={`rc-chip rc-chip--${status}`}>{t.t(connKey(status))}</span>
         <button type="button" className="rc-bar__btn" onClick={onPrefs} aria-label={t.t('common.settings')}>⚙</button>
       </header>

@@ -80,7 +80,7 @@ export default function ChangelogSettings() {
     <div className="settings-section">
       <h3 className="settings-section-title">{t('settings.changelog.title', 'Changelog')}</h3>
       <p className="settings-hint settings-hint--lead">
-        {t('settings.changelog.hint', 'Release notes for recent versions of wmux, read from GitHub and cached so they stay readable offline.')}
+        {t('settings.changelog.hint', 'Release notes for recent versions of remotea, read from GitHub and cached so they stay readable offline.')}
       </p>
 
       <div className="settings-row">

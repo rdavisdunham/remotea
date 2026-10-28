@@ -176,7 +176,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
           (window as any).wmux?.notification?.fire({
             surfaceId: '',
             text: t('palette.saveCurrentLayoutFailed', 'No active workspace to save as a layout.'),
-            title: 'wmux',
+            title: 'remotea',
           });
         }
       },
@@ -217,7 +217,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
         label: theme,
         category: t('palette.category.themes'),
         action: () => {
-          console.log(`[wmux] Switch theme: ${theme}`);
+          console.log(`[remotea] Switch theme: ${theme}`);
           onClose();
         },
       });

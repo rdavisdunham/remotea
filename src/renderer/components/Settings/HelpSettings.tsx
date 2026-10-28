@@ -68,7 +68,7 @@ export default function HelpSettings() {
       <div className="settings-row">
         <label className="settings-label">{t('settings.help.version')}</label>
         <div className="settings-help-version">
-          <span>wmux{version ? ` v${version}` : ''}</span>
+          <span>remotea{version ? ` v${version}` : ''}</span>
           <button
             className={`settings-btn ${updateKind === 'accent' ? 'settings-btn--accent' : 'settings-btn--secondary'}`}
             onClick={() => { void trigger(); }}

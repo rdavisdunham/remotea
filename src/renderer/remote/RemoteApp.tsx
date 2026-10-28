@@ -263,7 +263,7 @@ export function RemoteApp({ pairSecret, laterSecrets }: Readonly<{ pairSecret: s
   // ── Title: "(N) wmux", N = agents waiting on a human.
   const blockedCount = roster.filter((e) => e.state === 'blocked').length;
   useEffect(() => {
-    document.title = blockedCount > 0 ? `(${blockedCount}) wmux` : 'wmux';
+    document.title = blockedCount > 0 ? `(${blockedCount}) remotea` : 'remotea';
   }, [blockedCount]);
 
   const answer = useCallback((s: string, choiceId: string, prompt: number | null) => {
@@ -469,7 +469,7 @@ function onNotify(
   const body = msg.kind === 'blocked' ? t.t('toast.blocked', { label: msg.label }) : t.t('toast.done', { label: msg.label });
   try {
     // `tag` per surface+kind, so a flapping agent replaces its notification instead of stacking them.
-    const note = new Notification('wmux', { body, tag: `${msg.kind}:${msg.s}` });
+    const note = new Notification('remotea', { body, tag: `${msg.kind}:${msg.s}` });
     note.onclick = () => globalThis.focus();
   } catch { /* Android Chrome requires a service worker for this; the toast already showed */ }
 }

@@ -560,7 +560,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
           {/* Enabled for EVERY entry — folders and binaries included. Reveal
               only selects the item in Explorer, and "open in the default app"
               is the one action that is MORE useful on a file wmux cannot
-              render itself. `viewable` means "wmux can show this as text",
+              render itself. `viewable` means "remotea can show this as text",
               which was never the right question for either. */}
           <div
             className="ctx-menu__item"
@@ -578,7 +578,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
           </div>
           {!contextMenu.row.entry.viewable && contextMenu.row.entry.kind === 'file' && (
             <div className="explorer-panel__ctx-hint">
-              {t('explorer.notViewable', 'wmux can only open text files')}
+              {t('explorer.notViewable', 'remotea can only open text files')}
             </div>
           )}
         </div>

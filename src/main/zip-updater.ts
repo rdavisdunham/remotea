@@ -295,7 +295,7 @@ export function buildApplyUpdateCmd(): string {
     // itself. The title is re-set inside the loop because Windows renames a
     // console after whichever child is currently running in it — which is how
     // this window came to be reported as "findstr.exe".
-    'title wmux update',
+    'title remotea update',
     'set "SYS=%SystemRoot%\\System32"',
     'set "PID=%~1"',
     'set "SRC=%~2"',
@@ -317,13 +317,13 @@ export function buildApplyUpdateCmd(): string {
     'set "KEEPSRC="',
     // No pid is no way to know when the old wmux let go of its files, and
     // copying over a live install is how a half-written wmux.exe happens.
-    'if not defined PID set "SKIPCOPY=there is no wmux process to wait for"',
+    'if not defined PID set "SKIPCOPY=there is no remotea process to wait for"',
     'if not exist "%SRC%\\wmux.exe" set "SKIPCOPY=the downloaded files are no longer on disk"',
     'echo.',
-    'echo   Installing the wmux update.',
+    'echo   Installing the remotea update.',
     'echo   This window closes by itself. Leave it open; nothing to type here.',
     'echo.',
-    'echo   Waiting for wmux to close...',
+    'echo   Waiting for remotea to close...',
     // The liveness probe goes through a FILE, never a pipe (#300). With
     // `tasklist | findstr`, findstr returns only on EOF, and EOF only comes
     // once every copy of the pipe's write end is closed. On the reporter's
@@ -340,7 +340,7 @@ export function buildApplyUpdateCmd(): string {
     // keep the payload, since the next attempt needs it.
     'set /a WAITED=0',
     ':wait',
-    'title wmux update',
+    'title remotea update',
     // waitfor, not timeout: this script is spawned with stdio 'ignore', so its
     // stdin is NUL, and timeout.exe refuses a redirected stdin outright
     // ("ERROR: Input redirection is not supported") — measured at 66 ms for a
@@ -356,12 +356,12 @@ export function buildApplyUpdateCmd(): string {
     'if errorlevel 1 goto waited',
     'set /a WAITED+=1',
     'if %WAITED% LSS 120 goto wait',
-    'set "SKIPCOPY=wmux did not close within two minutes"',
+    'set "SKIPCOPY=remotea did not close within two minutes"',
     'set "KEEPSRC=1"',
     ':waited',
     'del "%LIST%" >nul 2>nul',
     '"%SYS%\\waitfor.exe" /t 2 wmuxUpdateWait >nul 2>nul',
-    'title wmux update',
+    'title remotea update',
     // The wait happens whatever SKIPCOPY says. It costs a second or two
     // and it is what keeps `start "" "%EXE%"` from racing a wmux that has
     // not finished quitting; only the copy is worth skipping. The reason
@@ -401,7 +401,7 @@ export function buildApplyUpdateCmd(): string {
     // reclaims it within the hour either way.
     ':copyfailed',
     'echo   Some files could not be replaced, so this update is incomplete.',
-    'echo   wmux is starting anyway. Please install the update again.',
+    'echo   remotea is starting anyway. Please install the update again.',
     'set "KEEPSRC=1"',
     // The relaunch itself stays unconditional, including after a failed copy.
     // wmux has already quit by the time this runs, so bailing out here is the

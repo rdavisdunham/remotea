@@ -139,12 +139,12 @@ const wmuxRequest = (method, params, timeoutMs) => {
         const pipe = process.env.WMUX_PIPE;
         const token = process.env.WMUX_PIPE_TOKEN;
         if (!pipe || !token) {
-            reject(new Error('Outside wmux'));
+            reject(new Error('Outside remotea'));
             return;
         }
         const socket = net_1.default.connect(pipe);
         let data = '';
-        const timer = setTimeout(() => finish(new WmuxBusyError('wmux did not respond')), timeoutMs);
+        const timer = setTimeout(() => finish(new WmuxBusyError('remotea did not respond')), timeoutMs);
         const finish = (error, result) => {
             clearTimeout(timer);
             socket.destroy();
@@ -157,7 +157,7 @@ const wmuxRequest = (method, params, timeoutMs) => {
         socket.on('data', chunk => {
             data += chunk.toString();
             if (data.length > 64 * 1024) {
-                finish(new Error('Invalid wmux response'));
+                finish(new Error('Invalid remotea response'));
                 return;
             }
             const line = data.split('\n')[0];
@@ -171,11 +171,11 @@ const wmuxRequest = (method, params, timeoutMs) => {
                     finish(undefined, response.result);
             }
             catch {
-                finish(new Error('Invalid wmux response'));
+                finish(new Error('Invalid remotea response'));
             }
         });
         socket.on('error', error => finish(error));
-        socket.on('end', () => finish(new WmuxBusyError('wmux disconnected')));
+        socket.on('end', () => finish(new WmuxBusyError('remotea disconnected')));
     });
 };
 /**
@@ -311,14 +311,14 @@ async function startRelay(options) {
         return await createCodexRelay(options);
     }
     catch (error) {
-        console.error(`[wmux] Codex session restore is unavailable (${error.message}). Starting Codex normally.`);
+        console.error(`[remotea] Codex session restore is unavailable (${error.message}). Starting Codex normally.`);
         return null;
     }
 }
 async function runWmuxCodex(args = process.argv.slice(2)) {
     const executable = process.env.WMUX_CODEX_EXE;
     if (!executable || !path_1.default.isAbsolute(executable))
-        throw new Error('wmux could not locate the native Codex executable');
+        throw new Error('remotea could not locate the native Codex executable');
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
     const surfaceId = process.env.WMUX_SURFACE_ID;
@@ -329,22 +329,22 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
     try {
         enabled = (await wmuxRequestPatiently('pane.codex_restore_config', { surfaceId }, {
             ...CONFIG_PATIENCE,
-            onWait: () => console.error('[wmux] wmux is busy; waiting for it before starting Codex with session restore...'),
+            onWait: () => console.error('[remotea] remotea is busy; waiting for it before starting Codex with session restore...'),
         })).enabled === true;
     }
     catch (error) {
         // An older/offline wmux leaves the CLI usable. Say so when wmux was there
         // but never answered: that pane is about to run without session capture.
         if (isTransientWmuxError(error))
-            console.error('[wmux] wmux did not answer; starting Codex without session restore.');
+            console.error('[remotea] remotea did not answer; starting Codex without session restore.');
     }
     if (!enabled)
         return runCli(executable, args, env);
     const remote = await supportsRemote(executable, env);
     if (remote !== true) {
         console.error(remote === null
-            ? '[wmux] Codex did not answer `codex --help` in time; starting it without session restore.'
-            : '[wmux] This Codex version cannot record sessions for automatic restore. Starting Codex normally.');
+            ? '[remotea] Codex did not answer `codex --help` in time; starting it without session restore.'
+            : '[remotea] This Codex version cannot record sessions for automatic restore. Starting Codex normally.');
         return runCli(executable, args, env);
     }
     // Serialize reports so a delayed response cannot stamp an older thread last.
@@ -391,7 +391,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
 }
 if (require.main === module) {
     runWmuxCodex().then(code => { process.exitCode = code; }).catch(error => {
-        console.error('[wmux] Could not launch Codex:', error.message);
+        console.error('[remotea] Could not launch Codex:', error.message);
         process.exitCode = 1;
     });
 }

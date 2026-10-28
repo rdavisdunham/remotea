@@ -1,25 +1,25 @@
 <!-- wmux:start — AUTO-MANAGED BY wmux. Do not edit this section manually. -->
 
-# wmux
+# remotea
 
-wmux is a terminal multiplexer with a browser panel on the right that the user
+remotea is a terminal multiplexer with a browser panel on the right that the user
 watches in real time. It writes this section into a **global** agent-context
 file, so every session on this machine loads it — including sessions that are
-not running inside wmux at all (a desktop app, a plain terminal, CI, an SSH
+not running inside remotea at all (a desktop app, a plain terminal, CI, an SSH
 session, a scheduled run). Whether it applies to you is a fact about *your*
 session, so check it rather than assume it:
 
 ```bash
-wmux ping     # "pong" → wmux is here
+wmux ping     # "pong" → remotea is here
 ```
 
 **If `wmux ping` answers `pong`**, everything below is available and preferred.
 
 **If it answers anything else — command not found, an error, no output — do not
-conclude yet.** wmux puts `wmux` on PATH only for terminals it starts itself, so
+conclude yet.** remotea puts `wmux` on PATH only for terminals it starts itself, so
 any session it did not spawn — a desktop app, a plain terminal, an SSH session, a
-scheduled run, anything already open before wmux started — will not find it there
-even while wmux is running normally. And a different program also called `wmux`
+scheduled run, anything already open before remotea started — will not find it there
+even while remotea is running normally. And a different program also called `wmux`
 may be on PATH (another app by that name puts its own `wmux` command there), so a
 bare `wmux` can be the wrong one. Ask this install directly:
 
@@ -27,8 +27,8 @@ bare `wmux` can be the wrong one. Ask this install directly:
 "{{WMUX_CLI_BIN}}/wmux" ping
 ```
 
-If that answers `pong`, wmux is running: use that absolute path in place of bare
-`wmux` for every command below. If it too does not answer `pong`, wmux is not
+If that answers `pong`, remotea is running: use that absolute path in place of bare
+`wmux` for every command below. If it too does not answer `pong`, remotea is not
 running for this session. Ignore the whole section and use your normal tools.
 Nothing here is a restriction on what you may otherwise do.
 
@@ -40,7 +40,7 @@ fails immediately when nothing is listening.
 For web browsing, prefer the `wmux browser` commands over Playwright, Firecrawl
 or WebSearch: those open windows the user cannot see, while the browser panel
 lets them watch what you are doing. Use whichever tool the user explicitly asks
-for, and use your own web tools when `wmux ping` says wmux is absent.
+for, and use your own web tools when `wmux ping` says remotea is absent.
 
 ```bash
 wmux browser open <url>          # navigate
@@ -78,7 +78,7 @@ Relative paths resolve against your current working directory. Only text/markdow
 ## Asking the user something
 
 When you stop to ask the user a question — a permission prompt, a choice, a
-confirmation — tell wmux, and tell it what the answers are. The sidebar then
+confirmation — tell remotea, and tell it what the answers are. The sidebar then
 shows **"Needs you"** on your pane (so a user with ten panes open can see which
 one is waiting), and renders your answers as buttons they can click **without
 switching to your pane**.
@@ -92,7 +92,7 @@ wmux report-agent --blocked "Run the migration against prod?" --choices '[
 
 Each choice needs an `id`, a human-readable `label`, and **exactly what to send**
 — either `key` (a key name: `enter`, `esc`, `1`, `y`, …) or `text` (sent
-literally). wmux relays those bytes verbatim; it does not know how to answer
+literally). remotea relays those bytes verbatim; it does not know how to answer
 your prompt and will never guess. A choice with neither is dropped, and the
 reply tells you how many were kept.
 
