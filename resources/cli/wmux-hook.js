@@ -192,6 +192,10 @@ let stdinTimer = null;
  * the user's ~/.claude and an old copy can outlive an upgrade.
  */
 const MAX_PROMPT = 4000;
+/** The most of a turn's final response forwarded (Eridani's turn text limit). */
+const MAX_LAST_MESSAGE = 16_000;
+/** A provider turn id: an identifier, never free text. */
+const TURN_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 /**
  * How far into a payload that would not parse the salvage below looks, in
  * characters.
@@ -441,6 +445,7 @@ function parsePayload(raw) {
     const out = {
         file: '', message: '', sessionId: '', toolName: '', prompt: '', notificationType: '', subagent: false,
         agentId: '', agentType: '', bgTask: '', bgTaskDetail: '', bgTasksEnded: '', freshSession: false,
+        lastAssistantMessage: '', lastAssistantTruncated: false, turnId: '', transcriptPath: '',
     };
     if (!raw.trim())
         return out;
@@ -526,6 +531,28 @@ function readPayloadFields(data, out) {
         out.prompt = data.prompt.slice(0, MAX_PROMPT);
     }
     readBackgroundTasks(data, toolInput, toolName, out);
+    // The turn's final response, for a remotea server's turn capture. Stop only,
+    // and only toward a remotea server: the local wmux has no use for it.
+    if (remote && event === 'Stop')
+        readTurnFields(data, out);
+}
+function readTurnFields(data, out) {
+    const msg = data.last_assistant_message ?? data.lastAssistantMessage;
+    if (typeof msg === 'string' && msg) {
+        if (msg.length > MAX_LAST_MESSAGE) {
+            const points = Array.from(msg);
+            out.lastAssistantTruncated = points.length > MAX_LAST_MESSAGE;
+            out.lastAssistantMessage = out.lastAssistantTruncated ? points.slice(0, MAX_LAST_MESSAGE).join('') : msg;
+        }
+        else {
+            out.lastAssistantMessage = msg;
+        }
+    }
+    const turnId = data.turn_id ?? data.turnId;
+    if (typeof turnId === 'string' && TURN_ID_RE.test(turnId))
+        out.turnId = turnId;
+    if (isCodex && typeof data.transcript_path === 'string' && data.transcript_path.length <= 1024)
+        out.transcriptPath = data.transcript_path;
 }
 /**
  * The event wmux is told about for the hook that fired, or null for none.
@@ -564,6 +591,10 @@ function hookParams(fields) {
     const optional = {
         event, tool, file, message, notificationType, prompt, agentId, agentType, surfaceId,
         bgTask, bgTaskDetail, bgTasksEnded, freshSession: fields.freshSession ? '1' : '',
+        lastAssistantMessage: fields.lastAssistantMessage,
+        lastAssistantTruncated: fields.lastAssistantTruncated ? '1' : '',
+        turnId: fields.turnId,
+        transcriptPath: fields.transcriptPath,
         // Not under Grok (it sets GROK_HOOK_EVENT on every hook process). Grok
         // 1.0.44 sends `session_id` alongside `sessionId`, and an id recorded here
         // ends up on a `claude --resume` command line at restore — naming a session

@@ -126,3 +126,81 @@ export function resolveBind(entries: string[], ifaces = os.networkInterfaces()):
   }
   return { addresses: [...new Set(addresses)], pending };
 }
+
+// ── Eridani link (eridani-link.ts) ─────────────────────────────────────────
+
+export type CollectorMode = 'parity' | 'off';
+
+export interface EridaniConfig {
+  enabled: boolean;
+  /** wss://…/api/v1/external/agents/link */
+  url: string;
+  /** Machine name sent with every session report; defaults to the hostname. */
+  machine?: string;
+  /** 'parity' (stage B default): reports are compared by Eridani, not stored. */
+  collector: CollectorMode;
+}
+
+export const ERIDANI_FILE = 'eridani.json';
+export const ERIDANI_TOKEN_FILE = 'eridani-token';
+/** `remotea eridani collect` drops this; the running server picks it up and scans. */
+export const ERIDANI_COLLECT_REQUEST = 'eridani-collect-request';
+export const ERIDANI_KEY_RE = /^eri_bot_[A-Za-z0-9_-]{8,256}$/;
+
+/** The link's config, or null when it was never set up (or is unreadable). */
+export function loadEridaniConfig(dir: string): EridaniConfig | null {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dir, ERIDANI_FILE), 'utf8')) as Partial<EridaniConfig>;
+    if (!raw || typeof raw !== 'object' || typeof raw.url !== 'string') return null;
+    return {
+      enabled: raw.enabled === true,
+      url: raw.url,
+      machine: typeof raw.machine === 'string' && raw.machine.trim() ? raw.machine.trim().slice(0, 100) : undefined,
+      collector: raw.collector === 'off' ? 'off' : 'parity',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveEridaniConfig(dir: string, cfg: EridaniConfig): void {
+  ensureDir(dir);
+  const file = path.join(dir, ERIDANI_FILE);
+  const tmp = `${file}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
+  fs.renameSync(tmp, file);
+}
+
+export function readEridaniToken(dir: string): string | null {
+  try {
+    const v = fs.readFileSync(path.join(dir, ERIDANI_TOKEN_FILE), 'utf8').trim();
+    return ERIDANI_KEY_RE.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeEridaniToken(dir: string, key: string): void {
+  if (!ERIDANI_KEY_RE.test(key)) throw new Error('an Eridani link key starts with eri_bot_');
+  ensureDir(dir);
+  const file = path.join(dir, ERIDANI_TOKEN_FILE);
+  fs.writeFileSync(file, key + '\n', { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
+}
+
+export function forgetEridaniToken(dir: string): void {
+  fs.rmSync(path.join(dir, ERIDANI_TOKEN_FILE), { force: true });
+}
+
+/** mtimes of the link's config and key: main.ts restarts the link when either changes. */
+export function eridaniConfigStamp(dir: string): string {
+  const stamp = (f: string) => {
+    try {
+      const st = fs.statSync(path.join(dir, f));
+      return `${st.mtimeMs}:${st.size}`;
+    } catch {
+      return '-';
+    }
+  };
+  return `${stamp(ERIDANI_FILE)}|${stamp(ERIDANI_TOKEN_FILE)}`;
+}

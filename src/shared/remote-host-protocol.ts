@@ -104,6 +104,38 @@ export interface SessionRecord {
   lastActivityAt?: number;
   /** Devices that chose "Hide on this device" for this session. */
   hiddenBy: DeviceId[];
+  /**
+   * Bumped each time a lost session is respawned under the same id, so a
+   * report about the old process can be told from one about the new one.
+   * Absent = 0 (records written before it existed).
+   */
+  incarnation?: number;
+  /** The agent's state as the server derives it from hooks and input (remote-server/src/agent-state.ts). */
+  agentState?: AgentStateInfo;
+  /** Agent turns captured in this session so far (turn-capture.ts). */
+  turnSeq?: number;
+  /** Where turn capture is in the current conversation (turn-capture.ts). */
+  turnCursor?: TurnCursor;
+}
+
+export type AgentStateName = 'working' | 'needs_you' | 'idle' | 'exited';
+
+export interface AgentStateInfo {
+  state: AgentStateName;
+  /** When this state began, epoch ms. */
+  since: number;
+  reason?: string;
+}
+
+export interface TurnCursor {
+  provider: string;
+  sessionId: string;
+  /** Turns opened (UserPromptSubmit) in this conversation on this surface. */
+  opened: number;
+  /** The turn number the last captured Stop belonged to. */
+  captured: number;
+  /** Recent provider turn ids already captured, newest last. */
+  recent: string[];
 }
 
 export interface Tombstone {
@@ -226,7 +258,7 @@ export type ServerMsg =
   | { t: 'exit'; id: RemoteSurfaceId; code: number; signal?: number }
   /** The terminal's size; `owner`: this device sets it. `ownerName`: the device that does, if any. */
   | { t: 'size'; id: RemoteSurfaceId; cols: number; rows: number; owner: boolean; ownerName?: string }
-  | { t: 'meta'; id: RemoteSurfaceId; cwd?: string; fg?: string; agent?: AgentHandle | null }
+  | { t: 'meta'; id: RemoteSurfaceId; cwd?: string; fg?: string; agent?: AgentHandle | null; agentState?: AgentStateInfo }
   | { t: 'sessionAdded'; session: SessionRecord }
   | { t: 'sessionUpdated'; session: SessionRecord }
   | { t: 'sessionClosed'; id: RemoteSurfaceId; by: DeviceId; reason: 'closed' | 'group-closed' }

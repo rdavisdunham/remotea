@@ -15,6 +15,8 @@
  *   remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
  *                                  diagnostics the apps sent (connection, reattach, agent state; no content)
  *   remotea screen <surf-id>       print what a session's screen shows right now
+ *   remotea eridani connect|status|disconnect|collect
+ *                                  the link to Eridani (see eridani-cli.ts)
  *
  * `status --json` is a stable contract for other tools (STATUS_VERSION below).
  * Additions are backwards compatible; a breaking change bumps the version.
@@ -29,7 +31,8 @@ import { configDir, ensureToken, loadConfig, rotateToken } from './config';
 import { diagDir } from './diag-log';
 import { hooksStatus, installHooks, removeHooks, type HookTarget } from './hooks-install';
 import type { RegistryData } from './registry';
-import { PROTO, parseServerMsg, type ServerMsg, type SessionRecord } from '../../src/shared/remote-host-protocol';
+import { eridaniCommand, statusBlock } from './eridani-cli';
+import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord } from '../../src/shared/remote-host-protocol';
 
 export const STATUS_VERSION = 1;
 
@@ -49,6 +52,10 @@ export interface StatusSession {
   lastActivityAt: number | null;
   exitCode: number | null;
   hiddenOn: string[];
+  /** Added with the Eridani link (additive): the server's agent state, and the process generation. */
+  agentState: AgentStateInfo | null;
+  incarnation: number;
+  turnSeq: number;
 }
 
 export interface StatusOutput {
@@ -60,6 +67,7 @@ export interface StatusOutput {
     port: number;
     running: boolean;
     epoch: string | null;
+    eridani: { enabled: boolean; state: string; unacked: number; lastAckAt: number | null };
   };
   groups: Array<{ id: string; name: string; color: string | null }>;
   sessions: StatusSession[];
@@ -111,11 +119,15 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
     lastActivityAt: s.lastActivityAt ?? null,
     exitCode: s.exitCode ?? null,
     hiddenOn: s.hiddenBy.map((d) => reg?.devices[d]?.name ?? d),
+    agentState: s.agentState ?? null,
+    incarnation: s.incarnation ?? 0,
+    turnSeq: s.turnSeq ?? 0,
   }));
   sessions.sort((a, b) => a.createdAt - b.createdAt);
+  const running = await healthy(config.port);
   return {
     version: STATUS_VERSION,
-    server: { serverId, hostname: os.hostname(), configDir: dir, port: config.port, running: await healthy(config.port), epoch: reg?.epoch ?? null },
+    server: { serverId, hostname: os.hostname(), configDir: dir, port: config.port, running, epoch: reg?.epoch ?? null, eridani: statusBlock(dir, running) },
     groups: groups.map((g) => ({ id: g.id, name: g.name, color: g.color ?? null })),
     sessions,
   };
@@ -403,7 +415,8 @@ const USAGE = `usage:
   remotea rotate-token
   remotea hooks install|remove|status [--json]
   remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
-  remotea screen <surf-id>`;
+  remotea screen <surf-id>
+  remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]`;
 
 export async function main(argv: string[]): Promise<number> {
   const dir = configDir();
@@ -454,6 +467,8 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(`── ${rest[0]} (${shot.cols}x${shot.rows}) ──\n${shot.lines.join('\n')}\n`);
       return 0;
     }
+    case 'eridani':
+      return eridaniCommand(dir, rest, () => healthy(loadConfig(dir).port));
     case 'rotate-token':
       process.stdout.write(rotateToken(dir) + '\n');
       process.stderr.write('token rotated: update it in every app\'s Settings → Remote hosts\n');
