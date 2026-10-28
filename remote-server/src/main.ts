@@ -55,7 +55,15 @@ async function main(): Promise<void> {
     hooks: { status: () => toAgentStatus(hooksStatus()), install: () => toAgentStatus(installHooks()) },
     fs: runFsOp,
   });
-  const bridge = new HookBridge({ secret: hookSecret, relay: (id, method, params) => hub.relayRpc(id, method, params), log });
+  // The bridge comes up before the Eridani runtime exists; its held methods answer as "not remote" until then.
+  let eridaniRt: EridaniRuntime | null = null;
+  const bridge = new HookBridge({
+    secret: hookSecret,
+    relay: (id, method, params) => hub.relayRpc(id, method, params),
+    question: (id, params, closed) => eridaniRt?.questions.hold(id, params, closed) ?? Promise.resolve({ reason: 'not-remote' }),
+    context: (id, params) => eridaniRt?.context.sessionStart(id, params) ?? Promise.resolve(''),
+    log,
+  });
   if (config.hookPort) {
     // Loopback only. Sessions started before the bridge came up still report once it does.
     bridge.listen(config.hookPort).then(
@@ -107,8 +115,9 @@ async function main(): Promise<void> {
   const collectorHome = process.env.REMOTEA_COLLECTOR_HOME || undefined;
   const eridani = new EridaniRuntime({
     dir, hub, registry, serverId, bootId, hostname: os.hostname(), version: serverVersion(), log,
-    collectorHome, windowsUsers: collectorHome ? null : undefined,
+    collectorHome, windowsUsers: collectorHome ? null : undefined, resumeAgents: config.resumeAgents,
   });
+  eridaniRt = eridani;
   eridani.start();
 
   const lagTimer = setInterval(() => hub.pumpLagging(), 250);

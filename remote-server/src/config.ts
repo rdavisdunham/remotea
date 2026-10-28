@@ -129,7 +129,21 @@ export function resolveBind(entries: string[], ifaces = os.networkInterfaces()):
 
 // ── Eridani link (eridani-link.ts) ─────────────────────────────────────────
 
-export type CollectorMode = 'parity' | 'off';
+/**
+ * 'parity' (stage B default): reports carry `parity: true`; Eridani compares
+ * them with what the Python collector stored and keeps nothing.
+ * 'authoritative' (stage E cutover): reports are stored; the Python collector
+ * is meant to be off (status --json turns v2, which it does not read).
+ * 'off': no collector at all.
+ */
+export type CollectorMode = 'parity' | 'authoritative' | 'off';
+/** The one command that stops the Python collector (its install.sh enables this timer). */
+export const LEGACY_TIMER_HINT = 'systemctl --user disable --now eridani-collector.timer';
+export const COLLECTOR_MODES: readonly CollectorMode[] = ['parity', 'authoritative', 'off'];
+
+export function parseCollectorMode(v: unknown): CollectorMode {
+  return v === 'authoritative' || v === 'off' ? v : 'parity';
+}
 
 export interface EridaniConfig {
   enabled: boolean;
@@ -137,7 +151,7 @@ export interface EridaniConfig {
   url: string;
   /** Machine name sent with every session report; defaults to the hostname. */
   machine?: string;
-  /** 'parity' (stage B default): reports are compared by Eridani, not stored. */
+  /** See CollectorMode; 'parity' unless switched with `remotea eridani collector`. */
   collector: CollectorMode;
 }
 
@@ -146,6 +160,24 @@ export const ERIDANI_TOKEN_FILE = 'eridani-token';
 /** `remotea eridani collect` drops this; the running server picks it up and scans. */
 export const ERIDANI_COLLECT_REQUEST = 'eridani-collect-request';
 export const ERIDANI_KEY_RE = /^eri_bot_[A-Za-z0-9_-]{8,256}$/;
+
+/**
+ * Why a link URL is refused, or null. The key travels in the handshake on
+ * every reconnect, so cleartext `ws://` is allowed only to this machine
+ * (a local test); everything else must be `wss://` (L10, stage F).
+ */
+export function linkUrlError(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return 'the link URL is not a URL';
+  }
+  if (u.protocol === 'wss:') return null;
+  if (u.protocol !== 'ws:') return 'the link URL starts with wss://';
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' ? null : 'ws:// is allowed only for localhost, 127.0.0.1 or ::1; use wss://';
+}
 
 /** The link's config, or null when it was never set up (or is unreadable). */
 export function loadEridaniConfig(dir: string): EridaniConfig | null {
@@ -156,19 +188,34 @@ export function loadEridaniConfig(dir: string): EridaniConfig | null {
       enabled: raw.enabled === true,
       url: raw.url,
       machine: typeof raw.machine === 'string' && raw.machine.trim() ? raw.machine.trim().slice(0, 100) : undefined,
-      collector: raw.collector === 'off' ? 'off' : 'parity',
+      collector: parseCollectorMode(raw.collector),
     };
   } catch {
     return null;
   }
 }
 
-export function saveEridaniConfig(dir: string, cfg: EridaniConfig): void {
+/** The file as written, unknown keys included (execution targets live beside the link settings). */
+export function readEridaniFile(dir: string): Record<string, unknown> {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dir, ERIDANI_FILE), 'utf8')) as unknown;
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeEridaniFile(dir: string, data: Record<string, unknown>): void {
   ensureDir(dir);
   const file = path.join(dir, ERIDANI_FILE);
   const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
   fs.renameSync(tmp, file);
+}
+
+/** Write the link settings; every other key in the file (targets) is kept. */
+export function saveEridaniConfig(dir: string, cfg: EridaniConfig): void {
+  writeEridaniFile(dir, { ...readEridaniFile(dir), ...cfg });
 }
 
 export function readEridaniToken(dir: string): string | null {
@@ -192,15 +239,20 @@ export function forgetEridaniToken(dir: string): void {
   fs.rmSync(path.join(dir, ERIDANI_TOKEN_FILE), { force: true });
 }
 
-/** mtimes of the link's config and key: main.ts restarts the link when either changes. */
+/**
+ * What the link depends on: its settings and the key file. The runtime
+ * restarts the link when this changes. Execution targets are not in it:
+ * dispatch reads them from the file on every spawn, so `remotea eridani
+ * targets add` never drops the connection.
+ */
 export function eridaniConfigStamp(dir: string): string {
-  const stamp = (f: string) => {
-    try {
-      const st = fs.statSync(path.join(dir, f));
-      return `${st.mtimeMs}:${st.size}`;
-    } catch {
-      return '-';
-    }
-  };
-  return `${stamp(ERIDANI_FILE)}|${stamp(ERIDANI_TOKEN_FILE)}`;
+  const cfg = loadEridaniConfig(dir);
+  let key = '-';
+  try {
+    const st = fs.statSync(path.join(dir, ERIDANI_TOKEN_FILE));
+    key = `${st.mtimeMs}:${st.size}`;
+  } catch {
+    /* no key */
+  }
+  return `${cfg ? JSON.stringify([cfg.enabled, cfg.url, cfg.machine ?? null, cfg.collector]) : '-'}|${key}`;
 }

@@ -12,14 +12,26 @@
  *   remotea hooks install|remove|status
  *                                  register wmux's hook helper with Claude Code and Codex in this WSL,
  *                                  so agents report their status to the apps (see hook-bridge.ts)
+ *   remotea hooks --remove-legacy-collector [--dry-run]
+ *                                  collector cutover: strip only the Python collector's SessionStart hook
  *   remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
  *                                  diagnostics the apps sent (connection, reattach, agent state; no content)
  *   remotea screen <surf-id>       print what a session's screen shows right now
- *   remotea eridani connect|status|disconnect|collect
+ *   remotea eridani connect|status|disconnect|collect|collector|targets|worktrees
  *                                  the link to Eridani (see eridani-cli.ts)
  *
  * `status --json` is a stable contract for other tools (STATUS_VERSION below).
  * Additions are backwards compatible; a breaking change bumps the version.
+ *
+ * The version is also the collector cutover's interlock (stage E). While
+ * `eridani.json.collector` is `authoritative`, status --json says version 2;
+ * otherwise 1. The Python collector (~/jarvis/scripts/session_collector)
+ * reads only version 1: on v2 it keeps its last known terminals and says
+ * "remotea status unavailable" on every run. So a forgotten Python timer
+ * after the cutover cannot learn about new remotea terminals, and the
+ * message in its journal points at the timer that should be off. It is a
+ * tripwire, not a lock: disabling the timer is still the cutover's step.
+ * v2 has the same fields as v1; nothing else changes.
  */
 import fs from 'fs';
 import os from 'os';
@@ -27,14 +39,22 @@ import path from 'path';
 import crypto from 'crypto';
 import http from 'http';
 import WebSocket from 'ws';
-import { configDir, ensureToken, loadConfig, rotateToken } from './config';
+import { LEGACY_TIMER_HINT, configDir, ensureToken, loadConfig, loadEridaniConfig, rotateToken, type CollectorMode } from './config';
 import { diagDir } from './diag-log';
-import { hooksStatus, installHooks, removeHooks, type HookTarget } from './hooks-install';
+import { hooksStatus, installHooks, removeHooks, removeLegacyCollectorHooks, type HookTarget, type LegacyRemoval } from './hooks-install';
 import type { RegistryData } from './registry';
 import { eridaniCommand, statusBlock } from './eridani-cli';
-import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord } from '../../src/shared/remote-host-protocol';
+import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord, type VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
 
-export const STATUS_VERSION = 1;
+/** status --json while the collector is authoritative (the cutover interlock, above). */
+export const STATUS_VERSION = 2;
+/** status --json otherwise: what the Python collector reads. */
+export const STATUS_VERSION_PARITY = 1;
+
+/** The version status --json reports for this collector mode (null: no Eridani link set up). */
+export function statusVersion(mode: CollectorMode | null | undefined): number {
+  return mode === 'authoritative' ? STATUS_VERSION : STATUS_VERSION_PARITY;
+}
 
 export interface StatusSession {
   id: string;
@@ -56,6 +76,14 @@ export interface StatusSession {
   agentState: AgentStateInfo | null;
   incarnation: number;
   turnSeq: number;
+  /** Stage C (additive): the Eridani run this session belongs to, null for any other session. */
+  eridani: { runId: string; generation: number; taskId: string | null } | null;
+  worktree: string | null;
+  branch: string | null;
+  /** A stop Eridani requested and the process has not yet been seen to exit. */
+  stopRequested: { at: number; mode: 'interrupt' | 'kill' } | null;
+  /** Stage D (additive): the latest verification attempt, null when none ran. */
+  verify: { attemptId: string; state: VerifyAttemptStatus['state']; startedAt: number | null } | null;
 }
 
 export interface StatusOutput {
@@ -68,6 +96,8 @@ export interface StatusOutput {
     running: boolean;
     epoch: string | null;
     eridani: { enabled: boolean; state: string; unacked: number; lastAckAt: number | null };
+    /** Stage E (additive): `eridani.json.collector`, null when the link was never set up. */
+    collector: CollectorMode | null;
   };
   groups: Array<{ id: string; name: string; color: string | null }>;
   sessions: StatusSession[];
@@ -122,12 +152,18 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
     agentState: s.agentState ?? null,
     incarnation: s.incarnation ?? 0,
     turnSeq: s.turnSeq ?? 0,
+    eridani: s.eridani ? { runId: s.eridani.runId, generation: s.eridani.generation, taskId: s.eridani.taskId } : null,
+    worktree: s.eridani?.worktree ?? null,
+    branch: s.eridani?.branch ?? null,
+    stopRequested: s.eridani?.stopRequested ? { at: s.eridani.stopRequested.at, mode: s.eridani.stopRequested.mode } : null,
+    verify: s.verify ? { attemptId: s.verify.attemptId, state: s.verify.state, startedAt: s.verify.startedAt } : null,
   }));
   sessions.sort((a, b) => a.createdAt - b.createdAt);
   const running = await healthy(config.port);
+  const collector = loadEridaniConfig(dir)?.collector ?? null;
   return {
-    version: STATUS_VERSION,
-    server: { serverId, hostname: os.hostname(), configDir: dir, port: config.port, running, epoch: reg?.epoch ?? null, eridani: statusBlock(dir, running) },
+    version: statusVersion(collector),
+    server: { serverId, hostname: os.hostname(), configDir: dir, port: config.port, running, epoch: reg?.epoch ?? null, eridani: statusBlock(dir, running), collector },
     groups: groups.map((g) => ({ id: g.id, name: g.name, color: g.color ?? null })),
     sessions,
   };
@@ -398,6 +434,22 @@ function fmtHooks(rows: HookTarget[]): string {
   return rows.map((r) => `${r.agent.padEnd(7)} ${!r.present ? 'not installed here' : r.entries ? `${r.entries} remotea hook entries` : 'no remotea hooks'}  ${r.file}`).join('\n') + '\n';
 }
 
+/** What `remotea hooks --remove-legacy-collector` did, and the timer step it leaves to the person. */
+export function fmtLegacyRemoval(r: LegacyRemoval): string {
+  const lines: string[] = [];
+  if (!r.removed.length) lines.push(`no Python collector hook in ${r.file}`);
+  else {
+    lines.push(`${r.dryRun ? 'would remove' : 'removed'} from SessionStart in ${r.file}:`);
+    for (const c of r.removed) lines.push(`  ${c}`);
+    if (!r.dryRun) lines.push(`(the file before the first remotea change is kept as ${r.file}.remotea-backup)`);
+  }
+  if (r.timerUnit) {
+    lines.push(`the Python collector's timer is installed (${r.timerUnit}); turn it off with:`);
+    lines.push(`  ${LEGACY_TIMER_HINT}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
 function fmtAge(ms: number | null): string {
   if (!ms) return '-';
   const s = Math.round((Date.now() - ms) / 1000);
@@ -414,9 +466,13 @@ const USAGE = `usage:
   remotea token
   remotea rotate-token
   remotea hooks install|remove|status [--json]
+  remotea hooks --remove-legacy-collector [--dry-run]             cutover: strip the Python collector's SessionStart hook
   remotea logs [-f] [--device <name>] [--surf <id>] [--kind <prefix>] [--since <10m>] [--json]
   remotea screen <surf-id>
-  remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]`;
+  remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]
+  remotea eridani collector [parity|authoritative]              show or switch the collector mode (prints the cutover checklist)
+  remotea eridani targets list [--json] | add … | remove <id>     where Eridani may start work
+  remotea eridani worktrees [--json]                            managed worktrees and unmerged work (never removes)`;
 
 export async function main(argv: string[]): Promise<number> {
   const dir = configDir();
@@ -449,6 +505,10 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(ensureToken(dir) + '\n');
       return 0;
     case 'hooks': {
+      if (rest.includes('--remove-legacy-collector')) {
+        process.stdout.write(fmtLegacyRemoval(removeLegacyCollectorHooks(undefined, { dryRun: rest.includes('--dry-run') })));
+        return 0;
+      }
       const sub = rest[0] ?? 'status';
       if (sub === 'install') {
         const rows = installHooks();
@@ -456,7 +516,7 @@ export async function main(argv: string[]): Promise<number> {
         process.stdout.write('new agent sessions in remotea terminals now report their status to the apps\n');
       } else if (sub === 'remove') process.stdout.write(fmtHooks(removeHooks()));
       else if (sub === 'status') process.stdout.write(rest.includes('--json') ? JSON.stringify(hooksStatus()) + '\n' : fmtHooks(hooksStatus()));
-      else throw new Error('usage: remotea hooks install|remove|status');
+      else throw new Error('usage: remotea hooks install|remove|status | --remove-legacy-collector [--dry-run]');
       return 0;
     }
     case 'logs':

@@ -80,6 +80,14 @@ else
   fi
 fi
 
+# The Python session collector's SessionStart hook: only mentioned, never removed here.
+# Removing it is a step of the collector cutover (docs/remotea/eridani-link.md).
+if cli hooks --remove-legacy-collector --dry-run | grep -q '^would remove'; then
+  say "The Python session collector's SessionStart hook is still in ~/.claude/settings.json."
+  echo "  After the collector cutover (remotea eridani collector authoritative), remove it with:"
+  echo "    remotea hooks --remove-legacy-collector"
+fi
+
 unit_dir="$HOME/.config/systemd/user"
 mkdir -p "$unit_dir"
 sed -e "s#@NODE@#$node_bin#g" -e "s#@WORKDIR@#$here#g" -e "s#@PATH@#$(dirname "$node_bin"):/usr/local/bin:/usr/bin:/bin#g" \

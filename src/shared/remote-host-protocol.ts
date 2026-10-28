@@ -116,6 +116,59 @@ export interface SessionRecord {
   turnSeq?: number;
   /** Where turn capture is in the current conversation (turn-capture.ts). */
   turnCursor?: TurnCursor;
+  /** Set when Eridani started this session for a run (remote-server/src/dispatch.ts). */
+  eridani?: EridaniBinding;
+  /** Stage D: the latest verification attempt (remote-server/src/verify-attempts.ts). */
+  verify?: VerifyAttemptStatus;
+}
+
+/**
+ * An Eridani run executing in a session. No secrets: the run token and the
+ * spawn's ERIDANI_* environment live in the server's own eridani-runs.json.
+ */
+export interface EridaniBinding {
+  runId: string;
+  /** The run generation this process currently serves (advanced by steer / runs.snapshot). */
+  generation: number;
+  attempt: number;
+  taskId: string | null;
+  /** The execution target id (eridani.json targets[]). */
+  target: string;
+  harness: 'claude' | 'codex';
+  model: string;
+  worktree: string;
+  branch: string;
+  base: string;
+  /** The base commit the worktree was created from (null when it was reused). */
+  baseSha: string | null;
+  /** op_id of the spawn command. */
+  spawnOp: string;
+  /** A stop was accepted; cleared only by the process exiting. Never resumed while set. */
+  stopRequested?: { at: number; mode: 'interrupt' | 'kill'; op: string | null };
+  /** Stage D: verify after each root turn with this target verify id (from the spawn, a verify command or runs.snapshot). */
+  verify?: { verifyId: string; planRevision: number };
+  /**
+   * Stage D (F07): the generation of the input Eridani typed (spawn prompt,
+   * queued input, steer), persisted before it was typed. The next prompt the
+   * agent accepts binds to it, then it is consumed.
+   */
+  acceptedInput?: { generation: number; at: number };
+}
+
+/** Stage D: the latest verification attempt on a surface (verify-attempts.ts). */
+export interface VerifyAttemptStatus {
+  attemptId: string;
+  state: 'pending' | 'running' | 'passed' | 'failed' | 'timed_out' | 'canceled' | 'error' | 'interrupted';
+  /** When the run began (null while pending). */
+  startedAt: number | null;
+  finishedAt?: number;
+  runId: string;
+  generation: number;
+  turnSeq: number;
+  planRevision: number;
+  verifyId: string;
+  initiator: 'host' | 'eridani';
+  staleWorkspace?: boolean;
 }
 
 export type AgentStateName = 'working' | 'needs_you' | 'idle' | 'exited';
@@ -136,6 +189,9 @@ export interface TurnCursor {
   captured: number;
   /** Recent provider turn ids already captured, newest last. */
   recent: string[];
+  /** The run generation the open turn was bound to when its prompt was accepted (F07). */
+  generation?: number;
+  runId?: string | null;
 }
 
 export interface Tombstone {

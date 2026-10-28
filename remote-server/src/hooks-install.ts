@@ -108,13 +108,27 @@ function readJson(file: string): Json | null {
   }
 }
 
-/** Atomic write; the first time remotea changes a file, the original is kept beside it. */
+/**
+ * Atomic write; the first time remotea changes a file, the original is kept
+ * beside it. The file keeps its mode (settings.json is 0600 and can carry API
+ * keys in `env`; the process umask must not widen it), a new one is 0600, and
+ * the backup is always 0600 (stage F, L12).
+ */
 function writeJson(file: string, value: Json): void {
   const backup = `${file}.remotea-backup`;
+  let mode = 0o600;
+  try {
+    mode = fs.statSync(file).mode & 0o777;
+  } catch {
+    /* new file */
+  }
   if (fs.existsSync(file) && !fs.existsSync(backup)) fs.copyFileSync(file, backup);
+  if (fs.existsSync(backup)) fs.chmodSync(backup, 0o600);
   const tmp = `${file}.remotea-tmp-${process.pid}`;
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n');
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n', { mode });
+  // writeFileSync's mode is filtered by the umask; set it exactly.
+  fs.chmodSync(tmp, mode);
   fs.renameSync(tmp, file);
 }
 
@@ -177,7 +191,7 @@ function targets(p: HookPaths): Target[] {
   const res = (...parts: string[]) => path.resolve(p.sourceDir, '..', ...parts);
   const h = (...parts: string[]) => path.join(p.home, ...parts);
   return [
-    { agent: 'claude', dir: h('.claude'), file: h('.claude', 'settings.json'), kind: 'settings', apply: applyWmuxHooks, remove: removeWmuxHooks },
+    { agent: 'claude', dir: h('.claude'), file: h('.claude', 'settings.json'), kind: 'settings', apply: (c, script) => applyWmuxHooks(c, script, { questions: true }), remove: removeWmuxHooks },
     { agent: 'codex', dir: h('.codex'), file: h('.codex', 'hooks.json'), kind: 'settings', apply: applyCodexHooks, remove: removeCodexHooks },
     { agent: 'opencode', dir: h('.config', 'opencode'), file: h('.config', 'opencode', 'plugin', 'wmux.js'), kind: 'plugin', source: res('opencode-plugin', 'wmux.js') },
     { agent: 'pi', dir: h('.pi'), file: h('.pi', 'agent', 'extensions', 'wmux.js'), kind: 'plugin', source: res('pi-extension', 'wmux.js') },
@@ -269,4 +283,120 @@ export function removeHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
     }
   }
   return hooksStatus(p);
+}
+
+// ── The Python session collector's hook (stage E cutover) ──────────────────
+
+/** Where the Python collector's SessionStart hook lives, relative to the home. */
+export const LEGACY_COLLECTOR_HOOK = path.join('jarvis', 'scripts', 'session_collector', 'session_hook.py');
+/** Its timer: the one unit the cutover disables. */
+export const LEGACY_COLLECTOR_TIMER = 'eridani-collector.timer';
+
+/** Split a hook command into words; null when it is anything but plain words (a pipe, `;`, `$(…)`, a redirect). */
+function shellWords(command: string): string[] | null {
+  const words: string[] = [];
+  let cur = '';
+  let inWord = false;
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i];
+    if (c === "'") {
+      const end = command.indexOf("'", i + 1);
+      if (end < 0) return null;
+      cur += command.slice(i + 1, end);
+      i = end;
+      inWord = true;
+    } else if (c === '"') {
+      let j = i + 1;
+      for (; j < command.length && command[j] !== '"'; j++) {
+        if (command[j] === '\\' && j + 1 < command.length) j++;
+        else if (command[j] === '`' || (command[j] === '$' && command[j + 1] === '(')) return null;
+      }
+      if (j >= command.length) return null;
+      cur += command.slice(i + 1, j).replace(/\\(["\\$`])/g, '$1');
+      i = j;
+      inWord = true;
+    } else if (/\s/.test(c)) {
+      if (inWord) words.push(cur);
+      cur = '';
+      inWord = false;
+    } else if (/[;&|<>()`\\]/.test(c)) {
+      return null;
+    } else {
+      cur += c;
+      inWord = true;
+    }
+  }
+  if (inWord) words.push(cur);
+  return words;
+}
+
+/**
+ * Is `command` exactly the Python collector's SessionStart hook? Ownership is
+ * the script's full path, not its file name: `session_hook.py` anywhere else is
+ * somebody else's. Accepted shapes are the ones a person or installer writes:
+ * `<path>`, `python3 <path>` (any python/pythonX.Y, by name or absolute path),
+ * `/usr/bin/env python3 <path>`, with `~/`, `$HOME/` or `${HOME}/` spelled out
+ * or not. Arguments after the path, or anything compound, are not ours.
+ */
+export function isLegacyCollectorCommand(command: unknown, home: string): boolean {
+  if (typeof command !== 'string') return false;
+  const words = shellWords(command.trim());
+  if (!words?.length) return false;
+  const expand = (w: string) => w.replace(/^(~|\$HOME|\$\{HOME\})(?=\/)/, home);
+  const target = path.join(home, LEGACY_COLLECTOR_HOOK);
+  const isPython = (w: string) => /^python(\d+(\.\d+)?)?$/.test(path.posix.basename(w)) && (!w.includes('/') || path.posix.isAbsolute(w));
+  let rest = words.map(expand);
+  if (rest[0] === '/usr/bin/env' || rest[0] === 'env') rest = rest.slice(1);
+  if (rest.length === 2 && isPython(rest[0])) rest = rest.slice(1);
+  return rest.length === 1 && path.posix.normalize(rest[0]) === target;
+}
+
+export interface LegacyRemoval {
+  file: string;
+  /** The commands taken out (or that would be, with dryRun). */
+  removed: string[];
+  /** The timer's unit file when it exists here, else null. */
+  timerUnit: string | null;
+  dryRun: boolean;
+}
+
+/**
+ * Strip the Python collector's SessionStart hook from ~/.claude/settings.json.
+ * Handler by handler: another handler in the same group stays, a group left
+ * empty goes, every other event and key is untouched. Never run on its own:
+ * `remotea hooks --remove-legacy-collector` is the cutover's step.
+ */
+export function removeLegacyCollectorHooks(p: HookPaths = defaultHookPaths(), opts: { dryRun?: boolean } = {}): LegacyRemoval {
+  const file = path.join(p.home, '.claude', 'settings.json');
+  // XDG_CONFIG_HOME only for the real home (collector install.sh's rule); a scratch home has its own.
+  const configHome = (p.home === os.homedir() && process.env.XDG_CONFIG_HOME) || path.join(p.home, '.config');
+  const unit = path.join(configHome, 'systemd', 'user', LEGACY_COLLECTOR_TIMER);
+  const result: LegacyRemoval = { file, removed: [], timerUnit: fs.existsSync(unit) ? unit : null, dryRun: !!opts.dryRun };
+  const config = readJson(file);
+  const groups = config?.hooks?.SessionStart;
+  if (!Array.isArray(groups)) return result;
+  const kept: unknown[] = [];
+  for (const group of groups) {
+    const handlers = (group as { hooks?: unknown })?.hooks;
+    if (!Array.isArray(handlers)) {
+      kept.push(group);
+      continue;
+    }
+    const rest = handlers.filter((h: any) => {
+      if (!isLegacyCollectorCommand(h?.command, p.home)) return true;
+      result.removed.push(h.command);
+      return false;
+    });
+    if (rest.length === handlers.length) kept.push(group);
+    else if (rest.length) kept.push({ ...group, hooks: rest });
+  }
+  if (!result.removed.length || opts.dryRun) return result;
+  const hooks: Json = { ...config!.hooks };
+  if (kept.length) hooks.SessionStart = kept;
+  else delete hooks.SessionStart;
+  const next: Json = { ...config! };
+  if (Object.keys(hooks).length) next.hooks = hooks;
+  else delete next.hooks;
+  writeJson(file, next);
+  return result;
 }

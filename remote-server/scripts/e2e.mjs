@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 import WebSocket, { WebSocketServer } from 'ws';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -18,6 +19,9 @@ const MAIN = path.join(root, 'dist/remote-server/src/main.js');
 const CLI = path.join(root, 'dist/remote-server/src/cli.js');
 const proto = await import(path.join(root, 'dist/src/shared/remote-host-protocol.js'));
 const { decodeFrame, encodeInput } = proto.default ?? proto;
+const linkProto = await import(path.join(root, 'dist/src/shared/eridani-link-protocol.js'));
+const { canonicalJson, semanticPayload } = linkProto.default ?? linkProto;
+const digestOf = (body) => crypto.createHash('sha256').update(canonicalJson(semanticPayload(body))).digest('hex');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-e2e-'));
 const freePort = () => new Promise((r) => {
@@ -54,6 +58,10 @@ class FakeEridani {
         const f = JSON.parse(String(data));
         this.frames.push(f);
         if (f.t === 'hello') this.send(ws, { t: 'welcome', host_id: 'host-e2e', conn_epoch: ++this.epoch, server_time: Date.now(), replay_horizon: 604800 });
+        else if (f.t === 'context.request') {
+          const text = this.contextText?.(f);
+          if (text) this.send(ws, { t: 'context.response', req_id: f.req_id, text, run_token: 'e2e-run-token' });
+        }
         else if (f.op_id && f.t !== 'ack') {
           if (this.hold(f)) this.held.push({ ws, f });
           else this.send(ws, { t: 'ack', acked_id: f.id, op_id: f.op_id, ok: true });
@@ -69,6 +77,13 @@ class FakeEridani {
   }
   send(ws, body) {
     if (ws.readyState === 1) ws.send(JSON.stringify({ v: 1, id: `eri-${Math.random().toString(36).slice(2)}`, conn_epoch: this.epoch, at: Date.now(), ...body }));
+  }
+  /** Send a command as Eridani does: stable op_id + digest, the envelope around it. */
+  command(body) {
+    const full = { expires_at: Date.now() + 10 * 60_000, ...body };
+    const digest = digestOf(full);
+    this.send(this.sockets.at(-1), { ...full, digest });
+    return { ...full, digest };
   }
   of(t, pred = () => true) {
     return this.frames.filter((f) => f.t === t && pred(f));
@@ -368,6 +383,12 @@ try {
   ok(w3.sessions.find((s) => s.id === S3)?.groupId === 'grp-two', 'the respawned session keeps its group');
   A3.close();
   B3.close();
+
+  // 10. Stage C: Eridani starts and steers work (dispatch.ts), with a stub `claude`.
+  await stageC();
+  await stageD();
+  await stageE();
+  if (process.env.E2E_REAL_CLAUDE === '1') await realQuestion();
 } catch (err) {
   failures++;
   console.error(`FAIL ${err.stack ?? err}`);
@@ -380,4 +401,304 @@ try {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 console.log(failures ? `\n${failures} failure(s)` : '\nall e2e checks passed');
+
+function git(cwd, ...args) {
+  return execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, GIT_AUTHOR_NAME: 'e2e', GIT_AUTHOR_EMAIL: 'e2e@x', GIT_COMMITTER_NAME: 'e2e', GIT_COMMITTER_EMAIL: 'e2e@x' } });
+}
+
+/** A throwaway repo with one commit; `.claude/settings.json` committed when hooks are given. */
+function throwawayRepo(at, claudeSettings) {
+  fs.mkdirSync(at, { recursive: true });
+  git(at, 'init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(at, 'README.md'), '# e2e\n');
+  if (claudeSettings) {
+    fs.mkdirSync(path.join(at, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(at, '.claude', 'settings.json'), JSON.stringify(claudeSettings, null, 2));
+  }
+  git(at, 'add', '.');
+  git(at, 'commit', '-q', '-m', 'init');
+  return at;
+}
+
+function outcome(op, pred = () => true) {
+  return eri.waitFor('command.outcome', (f) => f.command_id === op && pred(f), 30_000);
+}
+
+/** The command as sent: its envelope id is what remotea's ack names. */
+function sendCommand(body) {
+  const before = new Set(eri.frames.map((f) => f.id));
+  const cmd = eri.command(body);
+  return { cmd, waitAck: () => eri.waitFor('ack', (f) => f.op_id === cmd.op_id && !before.has(f.id), 15_000) };
+}
+
+async function stageC() {
+  const repo = throwawayRepo(path.join(dir, 'repo'));
+  const wtRoot = path.join(dir, 'worktrees');
+  const starts = path.join(dir, 'stub-starts.log');
+  // A post-checkout hook that makes `git worktree add` slow for one branch,
+  // so the server can be killed between accept and outcome.
+  fs.writeFileSync(path.join(repo, '.git', 'hooks', 'post-checkout'), '#!/bin/sh\ncase "$(git rev-parse --abbrev-ref HEAD)" in *slow*) sleep 4;; esac\n', { mode: 0o755 });
+
+  // The stub agent: shows its argv and ERIDANI_* env, runs the real hook helper
+  // (SessionStart prints Eridani's context, Stop marks it idle), echoes input,
+  // and leaves on Ctrl-C.
+  const stub = path.join(dir, 'bin', 'claude');
+  fs.mkdirSync(path.dirname(stub), { recursive: true });
+  const hook = (ev, json) => `printf '%s' "${json}" | '${process.execPath}' '${HOOK_JS}' --event ${ev}`;
+  fs.writeFileSync(stub, `#!/bin/bash
+echo "start $*" >> '${starts}'
+for a in "$@"; do echo "STUB ARG [$a]"; done
+env | grep '^ERIDANI_' | grep -v '^ERIDANI_PROMPT=' | sort | sed 's/^/STUB ENV /'
+SID=$(cat /proc/sys/kernel/random/uuid)
+[ "$1" = "--resume" ] && SID="$2"
+${hook('SessionStart', '{\\"session_id\\":\\"$SID\\",\\"source\\":\\"startup\\"}')}
+${hook('Stop', '{\\"session_id\\":\\"$SID\\",\\"last_assistant_message\\":\\"stub ready\\"}')}
+trap 'echo STUB_INTERRUPTED; exit 130' INT
+while IFS= read -r line; do
+  echo "GOT:$line"
+  ${hook('UserPromptSubmit', '{\\"session_id\\":\\"$SID\\",\\"prompt\\":\\"typed by eridani\\"}')}
+  ${hook('Stop', '{\\"session_id\\":\\"$SID\\",\\"last_assistant_message\\":\\"echoed\\"}')}
+done
+`, { mode: 0o755 });
+
+  cli('eridani', 'targets', 'add', '--json', JSON.stringify({
+    id: 'e2e', repo, worktreeRoot: wtRoot, base: 'main',
+    launch: { claude: { bin: stub } },
+    verify: [{ id: 'ls', argv: ['ls', '-1'], timeout: 30 }, { id: 'slowls', argv: ['sh', '-c', 'sleep 3; ls -1'], timeout: 30 }],
+  }));
+  ok(/e2e .*harnesses claude/.test(cli('eridani', 'targets', 'list')), 'remotea eridani targets add/list');
+  eri.contextText = (f) => `ERIDANI CONTEXT for ${f.surf} run ${f.run_id} g${f.generation}`;
+
+  const A = new Client('alpha-c');
+  await A.connect();
+
+  // spawn → accepted (ack carries surf + incarnation) → executed; the stub shows argv and env.
+  const prompt = 'Fix it; echo "$HOME" && rm -rf / # not a shell';
+  const sp = sendCommand({ t: 'spawn', op_id: 'op-e2e-spawn-1', run_id: 'run-e2e-1', generation: 1, attempt: 1, harness: 'claude', model: 'sonnet', target: { id: 'e2e', branch: 'eri/e2e-1' }, task_id: 'task-e2e', prompt, env: { ERIDANI_EXTRA: 'yes' }, run_token: 'tok-e2e' });
+  const spAck = await sp.waitAck();
+  ok(spAck.ok && spAck.outcome?.state === 'accepted' && /^surf-eri-/.test(spAck.outcome.surf) && spAck.outcome.incarnation >= 0, 'spawn is acked accepted with its surf and incarnation');
+  const surf = spAck.outcome.surf;
+  const spOut = await outcome('op-e2e-spawn-1');
+  ok(spOut.state === 'executed' && spOut.kind === 'spawn' && spOut.result?.branch === 'eri/e2e-1' && spOut.result?.worktree === path.join(fs.realpathSync(wtRoot), 'eri--e2e-1'), 'spawn executed in the managed worktree for its branch');
+  await A.wait((m) => m.t === 'sessionAdded' && m.session.id === surf);
+  A.send({ t: 'open', rid: A.rid++, id: surf, cols: 120, rows: 40 });
+  const op = await A.wait((m) => m.t === 'opened' && m.id === surf);
+  const screen = () => (op.snapshot ?? '') + A.text(surf);
+  const waitScreen = async (needle, ms = 10_000) => {
+    const end = Date.now() + ms;
+    while (!screen().includes(needle)) {
+      if (Date.now() > end) throw new Error(`no "${needle}" on ${surf}:\n${screen().slice(-800)}`);
+      await sleep(30);
+    }
+  };
+  await waitScreen('STUB ARG [auto]');
+  ok(screen().includes('STUB ARG [--model]') && screen().includes('STUB ARG [sonnet]') && screen().includes('STUB ARG [--permission-mode]'), 'the harness gets --model sonnet --permission-mode auto');
+  ok(screen().includes(`STUB ARG [${prompt}]`), 'the prompt arrives as one argv word, never parsed by the shell');
+  ok(screen().includes('STUB ENV ERIDANI_RUN_ID=run-e2e-1') && screen().includes('STUB ENV ERIDANI_EXTRA=yes') && screen().includes('STUB ENV ERIDANI_RUN_TOKEN=tok-e2e'), 'ERIDANI_* env and the run token reach the agent');
+  await waitScreen('ERIDANI CONTEXT for');
+  ok(screen().includes(`ERIDANI CONTEXT for ${surf} run run-e2e-1 g1`) && screen().includes('Eridani run token: e2e-run-token'), 'SessionStart: context.request → context.response printed for the agent');
+  const ctxReq = eri.of('context.request', (f) => f.surf === surf)[0];
+  ok(ctxReq?.provider === 'claude' && ctxReq.task_id === 'task-e2e' && ctxReq.incarnation >= 1, 'context.request carries the session and run fences');
+
+  // input (queue): delivered once the agent is idle.
+  const inc = spAck.outcome.incarnation;
+  const fence = { surf, incarnation: inc, run_id: 'run-e2e-1', generation: 1 };
+  const stale = sendCommand({ t: 'input', op_id: 'op-e2e-in-stale', mode: 'queue', text: 'never', ...fence, incarnation: inc + 5 });
+  ok((await stale.waitAck()).outcome?.state === 'rejected', 'input with a stale incarnation is rejected');
+  // Stage F: text is a paste, never keystrokes; and every effectful command expires.
+  const escaped = sendCommand({ t: 'input', op_id: 'op-e2e-in-esc', mode: 'queue', text: 'hi\x1b[20\x1b[201~1~\r!touch /tmp/pwned', ...fence });
+  ok((await escaped.waitAck()).outcome?.state === 'rejected', 'input carrying control characters (a nested paste end) is rejected');
+  const slash = sendCommand({ t: 'input', op_id: 'op-e2e-in-slash', mode: 'queue', text: '/clear', ...fence });
+  ok((await slash.waitAck()).outcome?.state === 'rejected', 'input starting with a slash command is rejected');
+  const noExp = sendCommand({ t: 'input', op_id: 'op-e2e-in-noexp', mode: 'queue', text: 'late', ...fence, expires_at: undefined });
+  ok((await noExp.waitAck()).outcome?.detail === 'expires_at required', 'input without expires_at is rejected');
+  sendCommand({ t: 'input', op_id: 'op-e2e-in-1', mode: 'queue', text: 'hello from eridani', ...fence });
+  const inOut = await outcome('op-e2e-in-1');
+  ok(inOut.state === 'executed', 'queued input executed');
+  await waitScreen('GOT:');
+  ok(screen().includes('hello from eridani') && !screen().includes('GOT:never'), 'the input bytes reach the agent');
+
+  // A turn from the stub's Stop is bound to the run.
+  const t1 = await eri.waitFor('turn', (f) => f.surf === surf && f.text === 'echoed', 10_000).catch(() => null);
+  ok(t1?.run_id === 'run-e2e-1' && t1.generation === 1, 'turns from an Eridani session carry run_id and generation');
+
+  // verify: a configured id, run in the worktree.
+  sendCommand({ t: 'verify', op_id: 'op-e2e-verify', attempt_id: 'att-1', run_id: 'run-e2e-1', generation: 1, turn_seq: 1, plan_revision: 1, verify_id: 'ls' });
+  const vr = await eri.waitFor('verify.result', (f) => f.attempt_id === 'att-1', 15_000).catch(() => null);
+  ok(vr?.exit_code === 0 && vr.tail.includes('README.md') && /^[0-9a-f]{40}:[0-9a-f]{64}$/.test(vr.workspace_fingerprint), 'verify runs the allowlisted command in the worktree and reports a fingerprint');
+
+  // status --json: the additive fields.
+  const st = JSON.parse(cli('status', '--json')).sessions.find((x) => x.id === surf);
+  ok(st?.eridani?.runId === 'run-e2e-1' && st.eridani.generation === 1 && st.eridani.taskId === 'task-e2e' && st.branch === 'eri/e2e-1' && st.worktree && st.stopRequested === null, 'status --json: eridani, worktree, branch, stopRequested');
+
+  // stop → Ctrl-C → exit observed → outcome; never resumed afterwards.
+  sendCommand({ t: 'stop', op_id: 'op-e2e-stop', mode: 'interrupt', ...fence });
+  const stOut = await outcome('op-e2e-stop');
+  ok(stOut.state === 'executed' && stOut.result?.exited === true, 'stop: Ctrl-C, the exit is observed, then the outcome');
+  await waitScreen('STUB_INTERRUPTED');
+  const ex = await eri.waitFor('exit', (f) => f.surf === surf, 5000).catch(() => null);
+  ok(!!ex, 'the exit reaches Eridani');
+
+  // worktrees.report lists the managed worktree (never removed).
+  const wr = await eri.waitFor('worktrees.report', (f) => f.worktrees.some((w) => w.branch === 'eri/e2e-1'), 15_000).catch(() => null);
+  ok(!!wr, 'worktrees.report lists the managed worktree');
+  ok(/eri\/e2e-1/.test(cli('eridani', 'worktrees')), 'remotea eridani worktrees lists it');
+
+  // A second run stays running across the crash below (resume on boot).
+  const sp3 = sendCommand({ t: 'spawn', op_id: 'op-e2e-spawn-3', run_id: 'run-e2e-3', generation: 1, attempt: 1, harness: 'claude', model: 'sonnet', target: { id: 'e2e', branch: 'eri/e2e-3' }, prompt: 'keep going' });
+  const surf3 = (await sp3.waitAck()).outcome.surf;
+  await outcome('op-e2e-spawn-3');
+  // Its SessionStart reports the session id the resume needs.
+  const t3 = Date.now();
+  while (!JSON.parse(cli('status', '--json')).sessions.find((x) => x.id === surf3)?.agent && Date.now() - t3 < 10_000) await sleep(100);
+
+  // SIGKILL between accept and outcome: the slow worktree holds the spawn open.
+  const sp2 = sendCommand({ t: 'spawn', op_id: 'op-e2e-spawn-2', run_id: 'run-e2e-2', generation: 1, attempt: 1, harness: 'claude', model: 'sonnet', target: { id: 'e2e', branch: 'eri/slow-2' }, prompt: 'slow one' });
+  const ack2 = await sp2.waitAck();
+  ok(ack2.outcome?.state === 'accepted', 'the slow spawn is accepted');
+  await sleep(600);
+  A.close();
+  await sleep(700); // registry save debounce
+  server.kill('SIGKILL');
+  await sleep(4500); // let the orphaned git finish
+  await startServer();
+  const settled = await outcome('op-e2e-spawn-2').catch(() => null);
+  ok(settled?.state === 'failed', `the interrupted spawn is settled from the journal (${settled?.state}: ${settled?.detail})`);
+  // Eridani resends the same spawn: the recorded outcome, and no process.
+  const dup = sendCommand({ ...sp2.cmd });
+  const dupAck = await dup.waitAck();
+  ok(dupAck.ok && dupAck.outcome?.state === 'failed', 'a duplicate spawn returns the recorded outcome');
+  await sleep(1500);
+  const lines = fs.readFileSync(starts, 'utf8').trim().split('\n');
+  ok(!lines.some((l) => l.includes('slow one')), 'no process was started for the interrupted spawn');
+  ok(lines.filter((l) => l.includes('Fix it')).length === 1, 'the stopped run was not started again');
+  const t4 = Date.now();
+  while (!fs.readFileSync(starts, 'utf8').includes('start --resume') && Date.now() - t4 < 10_000) await sleep(100);
+  ok(/start --resume \S+ --model sonnet --permission-mode auto/.test(fs.readFileSync(starts, 'utf8')), 'the running run is resumed on boot with its model and permission mode');
+  const snap = await eri.waitFor('sessions.snapshot', (f) => f.surfaces?.some((x) => x.surf === surf3 && x.run_id === 'run-e2e-3'), 10_000).catch(() => null);
+  ok(!!snap, 'the reconnect snapshot carries the run binding');
+}
+
+/**
+ * Stage D: a run spawned with a verify config verifies after every root turn
+ * on its own (`local:` attempt ids), and a newer turn cancels a running attempt.
+ */
+async function stageD() {
+  const surfOf = (op) => eri.waitFor('ack', (f) => f.op_id === op, 15_000).then((a) => a.outcome);
+  sendCommand({ t: 'spawn', op_id: 'op-e2e-spawn-4', run_id: 'run-e2e-4', generation: 1, attempt: 1, harness: 'claude', model: 'sonnet', target: { id: 'e2e', branch: 'eri/e2e-4' }, prompt: 'verify me', verify: { verify_id: 'slowls', plan_revision: 5 } });
+  const { surf, incarnation } = await surfOf('op-e2e-spawn-4');
+  await outcome('op-e2e-spawn-4');
+  // The stub's first Stop is turn 1: 2 s later the configured verify runs.
+  const v1 = await eri.waitFor('verify.result', (f) => f.run_id === 'run-e2e-4' && f.turn_seq === 1, 20_000).catch(() => null);
+  ok(v1 && /^local:[0-9a-f-]{36}$/.test(v1.attempt_id) && v1.generation === 1 && v1.plan_revision === 5 && v1.verify_id === 'slowls' && v1.initiator === 'host'
+    && v1.exit_code === 0 && v1.tail.includes('README.md') && v1.stale_workspace === false && v1.workspace?.branch === 'eri/e2e-4', `a root turn triggers verify → verify.result with the turn's tuple (${JSON.stringify(v1 && { ...v1, tail: undefined })})`);
+  const st1 = JSON.parse(cli('status', '--json')).sessions.find((x) => x.id === surf);
+  ok(st1?.verify?.attemptId === v1?.attempt_id && st1.verify.state === 'passed' && typeof st1.verify.startedAt === 'number', 'status --json: verify {attemptId, state, startedAt}');
+
+  // Turn 2 → its attempt starts; turn 3 arrives while it runs and cancels it.
+  const fence = { surf, incarnation, run_id: 'run-e2e-4', generation: 1 };
+  sendCommand({ t: 'input', op_id: 'op-e2e-d-in-1', mode: 'queue', text: 'second turn', ...fence });
+  await outcome('op-e2e-d-in-1');
+  const t0 = Date.now();
+  let running = null;
+  while (Date.now() - t0 < 15_000) {
+    const v = JSON.parse(cli('status', '--json')).sessions.find((x) => x.id === surf)?.verify;
+    if (v?.state === 'running' && v.attemptId !== v1?.attempt_id) {
+      running = v;
+      break;
+    }
+    await sleep(100);
+  }
+  ok(!!running, 'the second turn\'s attempt is running');
+  sendCommand({ t: 'input', op_id: 'op-e2e-d-in-2', mode: 'queue', text: 'third turn', ...fence });
+  const canceled = await eri.waitFor('verify.result', (f) => f.run_id === 'run-e2e-4' && f.turn_seq === 2, 15_000).catch(() => null);
+  ok(canceled?.canceled === true && canceled.attempt_id === running?.attemptId, 'a newer turn cancels the running attempt (verify.result canceled:true)');
+  const v3 = await eri.waitFor('verify.result', (f) => f.run_id === 'run-e2e-4' && f.turn_seq === 3, 20_000).catch(() => null);
+  ok(v3?.exit_code === 0 && v3.canceled === false && v3.attempt_id !== canceled?.attempt_id, 'the newer turn is verified');
+  const turns = [...new Map(eri.of('turn', (f) => f.surf === surf).map((f) => [f.op_id, f.seq])).values()];
+  ok(JSON.stringify(turns) === '[1,2,3]', `one turn per logical turn (${turns})`);
+
+  // An Eridani verify for the turn just verified, tree unchanged: the result again under Eridani's id, no second run.
+  sendCommand({ t: 'verify', op_id: 'op-e2e-d-verify', attempt_id: 'att-d-3', run_id: 'run-e2e-4', generation: 1, turn_seq: 3, plan_revision: 5, verify_id: 'slowls' });
+  const again = await eri.waitFor('verify.result', (f) => f.attempt_id === 'att-d-3', 15_000).catch(() => null);
+  ok(again?.adopted === v3?.attempt_id && again.initiator === 'eridani' && again.duration_ms === v3?.duration_ms, 'an Eridani verify for the same tuple reuses the host attempt');
+
+  sendCommand({ t: 'stop', op_id: 'op-e2e-d-stop', mode: 'interrupt', ...fence });
+  await outcome('op-e2e-d-stop');
+}
+
+/**
+ * E2E_REAL_CLAUDE=1: one short real `claude --model sonnet` session, started
+ * by a spawn, asks AskUserQuestion; the fake Eridani answers it. Project-level
+ * hooks only (the throwaway repo's .claude/settings.json); the repo lives under
+ * the stage A spike's trusted folder so no trust dialog is needed.
+ */
+/** Stage E: the collector cutover through the CLI, against the running server (config watch, ≤30 s). */
+async function stageE() {
+  ok(JSON.parse(cli('status', '--json')).version === 1, 'status --json is v1 while the collector is in parity mode');
+  const before = eri.frames.length;
+  const out = cli('eridani', 'collector', 'authoritative');
+  ok(/parity → authoritative/.test(out) && out.includes('systemctl --user disable --now eridani-collector.timer'), 'remotea eridani collector authoritative switches and prints the checklist');
+  const st = JSON.parse(cli('status', '--json'));
+  ok(st.version === 2 && st.server.collector === 'authoritative', 'status --json turns v2 (the Python collector refuses it)');
+  const hello = await eri.waitFor('hello', (f) => eri.frames.indexOf(f) >= before, 40_000).catch(() => null);
+  ok(hello?.caps.includes('collector.authoritative'), 'the server reconnects advertising collector.authoritative');
+  const stored = await eri.waitFor('session.report', (f) => eri.frames.indexOf(f) >= before && f.parity === false, 20_000).catch(() => null);
+  ok(stored?.report?.machine === 'e2e-box', 'every source is sent again without the parity flag');
+  cli('eridani', 'collector', 'parity');
+  ok(JSON.parse(cli('status', '--json')).version === 1, 'back to parity: status --json v1');
+}
+
+async function realQuestion() {
+  const { applyWmuxHooks } = await import(path.join(root, 'dist/src/shared/claude-hooks.js'));
+  const base = process.env.E2E_REAL_ROOT || '/home/davin/remotea/spike-stage-a/testrepo';
+  const at = fs.mkdtempSync(path.join(base, 'stagec-e2e-'));
+  try {
+    const repo = throwawayRepo(path.join(at, 'repo'), applyWmuxHooks({}, HOOK_JS, { questions: true }));
+    cli('eridani', 'targets', 'add', '--json', JSON.stringify({ id: 'real', repo, worktreeRoot: path.join(at, 'wt'), base: 'main', launch: { claude: {} }, verify: [] }));
+    const prompt = 'Use the AskUserQuestion tool exactly once to ask me "Which colour should we use?" with the options Red and Blue (single choice). After I answer, reply with only the colour I chose, then stop.';
+    const sp = sendCommand({ t: 'spawn', op_id: 'op-real-1', run_id: 'run-real-1', generation: 1, attempt: 1, harness: 'claude', model: 'sonnet', target: { id: 'real', branch: 'eri/real-1' }, prompt });
+    const surf = (await sp.waitAck()).outcome.surf;
+    const so = await outcome('op-real-1');
+    ok(so.state === 'executed', 'real: claude spawned');
+    // Watch the screen; accept a workspace-trust dialog once if the folder is new to Claude.
+    const W = new Client('watch-real');
+    await W.connect();
+    W.send({ t: 'open', rid: W.rid++, id: surf, cols: 120, rows: 40 });
+    await W.wait((m) => m.t === 'opened' && m.id === surf);
+    let trusted = false;
+    const watcher = setInterval(() => {
+      // The screen is drawn with cursor moves, so spaces may be missing; "No, exit" is preselected.
+      if (!trusted && /Yes,\s*I\s*trust\s*this\s*folder/i.test(W.text(surf).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ''))) {
+        trusted = true;
+        W.input(surf, '\x1b[B');
+        setTimeout(() => W.input(surf, '\r'), 300);
+      }
+    }, 500);
+    const q = await eri.waitFor('question', (f) => f.surf === surf, 120_000).catch(() => null);
+    ok(q?.provider === 'claude' && q.items?.[0]?.choices?.length >= 2, 'real: AskUserQuestion held and sent as question');
+    if (!q) {
+      clearInterval(watcher);
+      console.log(`real: screen tail:\n${W.text(surf).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').slice(-2500)}`);
+      return;
+    }
+    const blue = q.items[0].choices.find((c) => /blue/i.test(c.label)) ?? q.items[0].choices[1];
+    sendCommand({ t: 'answer', op_id: 'op-real-ans', question_id: q.question_id, provider_request_id: q.provider_request_id, answers: [{ item_id: q.items[0].id, choice_ids: [blue.id] }] });
+    const ao = await outcome('op-real-ans');
+    ok(ao.state === 'executed' && ao.result?.state === 'submitted', 'real: answer submitted to the held hook');
+    const res = await eri.waitFor('question.resolved', (f) => f.question_id === q.question_id, 60_000).catch(() => null);
+    ok(res?.outcome === 'accepted', `real: PostToolUse confirmed the answer (${res?.outcome})`);
+    const turn = await eri.waitFor('turn', (f) => f.surf === surf && /blue/i.test(f.text), 120_000).catch(() => null);
+    ok(!!turn, 'real: the final answer names the chosen colour');
+    sendCommand({ t: 'stop', op_id: 'op-real-stop', mode: 'interrupt', surf, incarnation: (await sp.waitAck()).outcome.incarnation, run_id: 'run-real-1', generation: q.generation });
+    const stopped = await outcome('op-real-stop').catch(() => null);
+    if (stopped?.state !== 'executed') sendCommand({ t: 'stop', op_id: 'op-real-kill', mode: 'kill', surf, incarnation: (await sp.waitAck()).outcome.incarnation, run_id: 'run-real-1', generation: q.generation });
+    clearInterval(watcher);
+    if (process.env.E2E_REAL_SCREEN) fs.writeFileSync(process.env.E2E_REAL_SCREEN, W.text(surf));
+    W.close();
+  } finally {
+    // The worktree is git-registered in the throwaway repo, which goes with it.
+    fs.rmSync(at, { recursive: true, force: true });
+  }
+}
 process.exit(failures ? 1 : 0);

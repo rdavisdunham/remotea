@@ -45,7 +45,7 @@ export interface HubEventSink {
 }
 
 /** Hook fields that exist for the server alone: never relayed to apps (they can be 16k each). */
-const SERVER_ONLY_PARAMS = ['lastAssistantMessage', 'lastAssistantTruncated', 'transcriptPath', 'turnId'];
+const SERVER_ONLY_PARAMS = ['lastAssistantMessage', 'lastAssistantTruncated', 'transcriptPath', 'turnId', 'backgroundTasks', 'permissionMode', 'toolUseId', 'answered', 'annotations', 'answerEcho', 'promptId', 'source'];
 
 export interface HubConfig {
   /** Respawn a lost session's agent with its resume command (`claude --resume <id>`). */
@@ -103,6 +103,22 @@ export interface HubDeps {
   sink?: HubEventSink | null;
 }
 
+/** What the Eridani side plugs into the hub (dispatch.ts); every member optional. */
+export interface HubEridaniHooks {
+  /** Extra environment for a session (a run's ERIDANI_* and token). Applied under the hook identity. */
+  env?(id: string): Record<string, string> | undefined;
+  /** The command that reopens a lost session, before the default `claude --resume <id>`. */
+  resumeCommand?(rec: SessionRecord): string | null | undefined;
+  /** A session's process ended (also during shutdown is NOT reported). */
+  exited?(id: string, code: number): void;
+  /** A hook event was relayed for a live session. */
+  hook?(id: string, params: Record<string, unknown>): void;
+  /** Extra snapshot fields for a surface (open question ids). */
+  snapshot?(id: string): Partial<SnapshotSurface>;
+  /** A root turn was captured (stage D: verification after turns). */
+  turn?(t: TurnFields): void;
+}
+
 export interface HubConn extends ConnLike {
   /** Set by hello. Messages before it are rejected. */
   device: { id: string; name: string } | null;
@@ -120,6 +136,9 @@ export class Hub {
   readonly agentState: AgentStateTracker;
   readonly turns: TurnCapture;
   private sink: HubEventSink | null;
+  private eridani: HubEridaniHooks = {};
+  /** The last `permission_mode` a hook reported, per surface (effective_permission_mode). */
+  private readonly permissionMode = new Map<string, string>();
   /** Status revisions: monotonic across restarts (seeded from the clock), so a spooled older one never wins. */
   private statusRev: number;
 
@@ -144,13 +163,27 @@ export class Hub {
           since: info.since,
           ...(info.reason ? { reason: info.reason } : {}),
           ...(rec.agent ? { provider: rec.agent.provider, provider_session_id: rec.agent.sessionId } : {}),
+          ...(this.permissionMode.has(surf) ? { effective_permission_mode: this.permissionMode.get(surf) } : {}),
         });
       },
     });
     this.turns = new TurnCapture({
       session: (id) => this.registry.session(id),
       update: (id, patch) => void this.registry.updateSession(id, patch),
-      emit: (t) => this.sink?.turn(t),
+      emit: (t) => {
+        this.sink?.turn(t);
+        this.eridani.turn?.(t);
+      },
+      binding: (id) => {
+        const b = this.registry.session(id)?.eridani;
+        return b ? { runId: b.runId, generation: b.generation, ...(b.acceptedInput ? { accepted: b.acceptedInput } : {}) } : null;
+      },
+      consumeAccepted: (id) => {
+        const b = this.registry.session(id)?.eridani;
+        if (!b?.acceptedInput) return;
+        const { acceptedInput: _used, ...rest } = b;
+        this.registry.updateSession(id, { eridani: rest });
+      },
       now: this.now,
       log: (m) => this.log(m),
     });
@@ -158,6 +191,10 @@ export class Hub {
 
   setSink(sink: HubEventSink | null): void {
     this.sink = sink;
+  }
+
+  setEridani(hooks: HubEridaniHooks | null): void {
+    this.eridani = hooks ?? {};
   }
 
   /** Every session the registry knows, for the Eridani reconcile snapshot. */
@@ -174,8 +211,16 @@ export class Hub {
       title: r.title ?? null,
       cwd: r.lastCwd ?? r.cwd,
       turn_seq: r.turnSeq ?? 0,
-      run_id: null,
-      generation: 0,
+      run_id: r.eridani?.runId ?? null,
+      generation: r.eridani?.generation ?? 0,
+      ...(r.eridani ? {
+        task_id: r.eridani.taskId,
+        target: r.eridani.target,
+        worktree: r.eridani.worktree,
+        branch: r.eridani.branch,
+        stop_requested: !!r.eridani.stopRequested,
+      } : {}),
+      ...this.eridani.snapshot?.(r.id),
     }));
   }
 
@@ -316,10 +361,14 @@ export class Hub {
       const provider = params.provider === 'codex' ? 'codex' : params.provider ? null : 'claude';
       if (provider) this.noteAgent(id, { provider, sessionId: params.sessionId, seenAt: this.now() });
     }
+    if (method === 'hook.event' && typeof params.permissionMode === 'string' && /^[A-Za-z]{1,32}$/.test(params.permissionMode)) {
+      this.permissionMode.set(id, params.permissionMode);
+    }
     this.agentState.rpc(id, method, params);
     if (method === 'hook.event') {
       const captured = this.turns.hook(id, params);
       if (captured) this.sink?.turnCaptured?.(captured.provider, captured.sessionId);
+      this.eridani.hook?.(id, params);
     }
     return true;
   }
@@ -412,16 +461,30 @@ export class Hub {
       incarnation: (rec?.incarnation ?? 0) + 1,
       turnSeq: rec?.turnSeq,
       turnCursor: rec?.turnCursor,
+      eridani: rec?.eridani,
     };
     this.agentState.reset(msg.id);
     // Resuming the agent that was running beats re-running the original
-    // command: a lost Claude session comes back as `claude --resume <id>`.
-    const resume = wasLost && this.cfg.resumeAgents && rec?.agent ? resumeCommand(rec.agent) : null;
-    const spawnCmd = resume && record.cmd ? resume : record.cmd;
-    const startup = resume && !record.cmd ? [resume] : spec.startupCommands;
+    // command: a lost Claude session comes back as `claude --resume <id>`
+    // (an Eridani run's keeps its model and permission mode: dispatch.ts).
+    // `null` from the Eridani hook means "do not resume": the run is left
+    // exited (above), never the original command (it would start the run over).
+    const custom = wasLost && rec ? this.eridani.resumeCommand?.(rec) : undefined;
+    if (wasLost && rec?.eridani && custom === null) {
+      // D4 (stage F): a run that cannot be resumed stays exited. A bare shell
+      // carrying the run binding would type Eridani's next input as a command.
+      const done = this.exitLost(msg.id, 'the run could not be resumed') ?? rec;
+      const dead = this.makeSession(done, null, msg.cols, msg.rows);
+      dead.exitCode = done.exitCode;
+      dead.attach(conn, { ...attach, created: false });
+      return;
+    }
+    const resume = custom !== undefined ? custom : wasLost && this.cfg.resumeAgents && rec?.agent ? resumeCommand(rec.agent) : null;
+    const spawnCmd = custom !== undefined ? custom ?? undefined : resume && record.cmd ? resume : record.cmd;
+    const startup = custom !== undefined ? undefined : resume && !record.cmd ? [resume] : spec.startupCommands;
     let session: TermSession;
     try {
-      session = this.makeSession(record, this.deps.spawn, msg.cols, msg.rows, startup, spawnCmd);
+      session = this.makeSession(record, this.deps.spawn, msg.cols, msg.rows, startup, spawnCmd, wasLost ? undefined : spec.env);
     } catch (err) {
       conn.sendJson({ t: 'openError', rid: msg.rid, id: msg.id, code: 'spawn-failed', message: err instanceof Error ? err.message : String(err) });
       return;
@@ -432,7 +495,13 @@ export class Hub {
     this.log(`${wasLost ? 'respawned' : 'created'} ${msg.id} for ${conn.device!.name}`);
   }
 
-  private makeSession(rec: SessionRecord, spawn: SpawnFn | null, cols: number, rows: number, startupCommands?: string[], cmd = rec.cmd): TermSession {
+  /**
+   * The environment: the client's spec.env (a new session only; it is not
+   * persisted, so a respawn does not see it), then the run's ERIDANI_* (from
+   * dispatch), then the hook identity, which nothing can override.
+   */
+  private makeSession(rec: SessionRecord, spawn: SpawnFn | null, cols: number, rows: number, startupCommands?: string[], cmd = rec.cmd, specEnv?: Record<string, string>): TermSession {
+    const env = { ...specEnv, ...this.eridani.env?.(rec.id), ...this.deps.sessionEnv?.(rec.id) };
     const session = new TermSession({
       id: rec.id,
       bootId: this.deps.bootId,
@@ -442,7 +511,7 @@ export class Hub {
       snapshotScrollback: this.cfg.snapshotScrollback,
       ringBytes: this.cfg.ringBytes,
       spawn,
-      spawnRequest: { cmd, cwd: rec.cwd, env: this.deps.sessionEnv?.(rec.id) },
+      spawnRequest: { cmd, cwd: rec.cwd, env: Object.keys(env).length ? env : undefined },
       startupCommands,
       theme: () => this.theme,
       timers: this.deps.timers,
@@ -451,6 +520,25 @@ export class Hub {
     });
     this.sessions.set(rec.id, session);
     return session;
+  }
+
+  /**
+   * End a lost session without a process: the record becomes `exited`
+   * (code -1), apps see it, and Eridani gets an `exit` with the reason.
+   */
+  exitLost(id: string, reason: string): SessionRecord | undefined {
+    const rec = this.registry.session(id);
+    if (!rec || rec.state !== 'lost' || this.sessions.has(id)) return undefined;
+    const exitedAt = this.now();
+    const updated = this.registry.updateSession(id, { state: 'exited', exitCode: -1, exitedAt });
+    if (!updated) return undefined;
+    this.registry.saveNow();
+    this.broadcast({ t: 'sessionUpdated', session: updated });
+    this.agentState.exit(id, -1);
+    this.sink?.exit({ surf: id, incarnation: updated.incarnation ?? 0, code: -1, exited_at: exitedAt, reason: reason.slice(0, 300) });
+    this.eridani.exited?.(id, -1);
+    this.log(`${id}: ${reason}; left exited`);
+    return updated;
   }
 
   private onSessionExit(id: RemoteSurfaceId, code: number): void {
@@ -462,7 +550,35 @@ export class Hub {
     const updated = this.registry.updateSession(id, { state: 'exited', exitCode: code, exitedAt });
     if (updated) this.broadcast({ t: 'sessionUpdated', session: updated });
     this.agentState.exit(id, code);
+    this.permissionMode.delete(id);
     if (updated) this.sink?.exit({ surf: id, incarnation: updated.incarnation ?? 0, code, exited_at: exitedAt });
+    this.eridani.exited?.(id, code);
+  }
+
+  /**
+   * Write to a live session's terminal on Eridani's behalf. Not a person's
+   * input: it claims no size, and it never clears a question (C07).
+   */
+  inject(id: string, data: string): boolean {
+    const s = this.sessions.get(id);
+    if (!s || s.state !== 'live') return false;
+    s.write(data);
+    return true;
+  }
+
+  /** End a session's process tree (SIGHUP, SIGKILL after a grace) without closing the session. */
+  killProcess(id: string): boolean {
+    const s = this.sessions.get(id);
+    if (!s || s.state !== 'live') return false;
+    s.kill();
+    return true;
+  }
+
+  /** Persist and announce a record change made outside a client request (dispatch.ts). */
+  updateRecord(id: string, patch: Partial<SessionRecord>): SessionRecord | undefined {
+    const updated = this.registry.updateSession(id, patch);
+    if (updated) this.broadcast({ t: 'sessionUpdated', session: updated });
+    return updated;
   }
 
   /** Close everywhere. Idempotent; a second close of the same id is acked without a broadcast. */
