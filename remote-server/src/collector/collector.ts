@@ -6,7 +6,9 @@
  * Stage B runs it in PARITY mode: every report goes out with `parity: true`,
  * Eridani compares it field by field with what the Python collector stored,
  * and nothing is upserted. The Python collector stays authoritative until the
- * parity report has been clean for long enough (plan decision 23).
+ * parity report has been clean for long enough (plan decision 23); then
+ * `remotea eridani collector authoritative` makes this one the store's source
+ * (stage E). The mode is the runtime's business: this class only scans.
  *
  *   scan()          every source (Claude transcripts, Codex threads; WSL and
  *                   the Windows side under /mnt/c), reporting what changed
@@ -142,7 +144,7 @@ export class Collector {
     } catch {
       status = null;
     }
-    if (!status || status.version !== 1) return known;
+    if (!status || (status.version !== 1 && status.version !== 2)) return known;
     const { live, groups } = remoteaTerminals(status);
     known.installed = true;
     known.live = live;

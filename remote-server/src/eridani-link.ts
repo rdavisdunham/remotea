@@ -167,8 +167,10 @@ export interface EridaniLinkDeps {
   onRunsSnapshot?: (runs: RunsSnapshotBody['runs']) => void;
   /** An event left the spool acknowledged (the collector advances its fingerprint here). */
   onDelivered?: (entry: SpoolEntry) => void;
-  /** An event was evicted or refused for good: its entity must be re-read. */
+  /** An event was evicted before delivery: its entity must be re-read. */
   onDirty?: (entity: string) => void;
+  /** Eridani refused an event for good (no retry); it is out of the spool. */
+  onRefused?: (entry: SpoolEntry) => void;
   onReady?: () => void;
   timers?: LinkTimers;
   now?: () => number;
@@ -309,9 +311,14 @@ export class EridaniLink {
 
   // ── Upward events ────────────────────────────────────────────────────────
 
-  /** A collector report. Returns false when it could not be queued (the source stays unrecorded). */
+  /**
+   * A collector report. Returns false when it could not be queued (the source stays unrecorded).
+   * The spool revision carries the mode, so an authoritative report is never
+   * coalesced into a parity one of the same fingerprint still in the outbox
+   * (that one would be compared, not stored). The wire revision is the fingerprint.
+   */
   report(r: { entity: string; revision: string; tool: SessionTool; session_id: string; report: SessionReportInput }, parity: boolean): boolean {
-    return this.enqueue({ t: 'session.report', entity: r.entity, revision: r.revision, parity, tool: r.tool, session_id: r.session_id, report: r.report }, 2, r.entity, r.revision);
+    return this.enqueue({ t: 'session.report', entity: r.entity, revision: r.revision, parity, tool: r.tool, session_id: r.session_id, report: r.report }, 2, r.entity, `${parity ? 'parity' : 'store'}:${r.revision}`);
   }
 
   turn(t: Omit<TurnBody, 't' | 'op_id' | 'digest'>): boolean {
@@ -658,6 +665,7 @@ export class EridaniLink {
           this.lastRejection = `${entry.body.t}: ${String(a.error ?? 'refused').slice(0, ERIDANI_LIMITS.reasonChars)}`;
           // A refused report would be refused again unchanged; it goes again only when its source changes.
           this.log(`eridani: refused ${this.lastRejection}`);
+          this.deps.onRefused?.(entry);
         }
       }
     }

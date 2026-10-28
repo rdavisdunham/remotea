@@ -1,11 +1,13 @@
-# The Eridani link (stages B and C)
+# The Eridani link (stages B to E)
 
 remotea-server can keep one outbound WebSocket to Eridani. In stage B the link
 is **read-only**: it reports what agents in remotea terminals are doing (state,
 finished turns, exits) and runs the session collector in **parity mode**.
 Stage C adds the commands Eridani may send (start an agent in a worktree, type
 into it, stop it, answer its question, run a configured verification) and
-SessionStart context; see [Stage C](#stage-c-dispatch) below.
+SessionStart context; see [Stage C](#stage-c-dispatch) below. Stage E makes the
+collector authoritative and retires the Python one; see
+[Collector cutover](#stage-e-collector-cutover).
 
 The design is in `docs/remotea/plan.md` and the mission-control plan (v2,
 "Unified link protocol"). The code is:
@@ -40,7 +42,9 @@ Both files live in the server's config dir (`~/.config/remotea`, or
 ```
 
 - `machine` (optional) is the name reports carry; it defaults to the hostname.
-- `collector` is `"parity"` (default) or `"off"`.
+- `collector` is `"parity"` (default), `"authoritative"` (stage E, see
+  [Collector cutover](#stage-e-collector-cutover)) or `"off"`. Anything else
+  reads as `"parity"`.
 
 `eridani-token` holds the link key (`eri_bot_…`), mode 0600. The key is sent
 only in the `Authorization` header. It is never logged, never written to the
@@ -56,6 +60,7 @@ remotea eridani connect [--url <wss://…>] [--machine <name>] [--no-probe]
 remotea eridani status [--json]
 remotea eridani disconnect [--forget]
 remotea eridani collect [--dry-run] [--days N]
+remotea eridani collector [parity|authoritative]
 ```
 
 - `connect` asks for the key without echoing it (or reads it from stdin when
@@ -70,8 +75,11 @@ remotea eridani collect [--dry-run] [--days N]
 - `collect --dry-run` prints what the collector would report, in the same table
   as `collector.py --dry-run`. Without `--dry-run`, it asks the running server
   to scan now (picked up within 30 s).
+- `collector` with no argument prints the mode; with one, switches it (the
+  rest of `eridani.json` is kept) and prints the cutover checklist or the
+  rollback steps. The server follows within 30 s.
 
-`remotea status --json` gains, additively (`version` stays 1):
+`remotea status --json` gains, additively (`version` stays 1 until the collector cutover, which makes it 2: see [Collector cutover](#stage-e-collector-cutover)):
 `sessions[].agentState`, `sessions[].incarnation`, `sessions[].turnSeq`, and
 `server.eridani {enabled, state, unacked, lastAckAt}`.
 
@@ -203,9 +211,9 @@ The Python collector stays authoritative during stage B. To compare:
 3. Check the comparison on the Eridani side. Locally,
    `remotea eridani collect --dry-run` and `collector.py --dry-run` print the
    same table for the same sources.
-4. Only after the parity report has been clean for long enough does stage C
-   switch the collector to authoritative and retire the Python one. That is not
-   done here.
+4. Only after the parity report has been clean for long enough is the
+   collector switched to authoritative and the Python one retired: see
+   [Collector cutover](#stage-e-collector-cutover).
 
 The collector scans when the link becomes ready and every 2 minutes. It also
 rescans one conversation right after each of its turns. Scans are skipped
@@ -451,9 +459,109 @@ generation that produced them. A duplicate Stop for the same logical turn
 state: pending|running|passed|failed|timed_out|canceled|error|interrupted,
 startedAt}` (null when none ran).
 
+## Stage E: collector cutover
+
+The Python collector (`~/jarvis/scripts/session_collector`, a systemd user
+timer every 2 minutes) and this server's collector report the same sessions.
+In parity mode only the Python one is stored. The cutover makes this one the
+store's source and stops the other; never both at once (C10: no dual
+authoritative reporting with different freshness rules).
+
+**Modes.** `eridani.json.collector`:
+
+| | `parity` (default) | `authoritative` |
+|---|---|---|
+| `session.report` | `parity: true`: compared, not stored | `parity: false`: stored (Eridani's `report`) |
+| Delivered fingerprints | `eridani-collector.json` | `eridani-collector-authoritative.json` |
+| hello caps | stage D's | stage D's + `collector.authoritative` (informational) |
+| `remotea status --json` | `version: 1` | `version: 2` |
+
+**Fingerprint after delivery.** As in collector.py, a source's fingerprint is
+recorded only once Eridani acked the report that carried it. Authoritative
+mode adds three rules so that "recorded" always means "stored":
+
+- Each mode has its own fingerprint file. A report acked as a comparison says
+  nothing about what Eridani stored, so the first authoritative scan sends
+  every source once, and a rollback to parity resumes from the parity record.
+- An ack advances a fingerprint only when the acked report's `parity` flag
+  matches the current mode. A parity report still in the outbox at the switch
+  (it is resent after the reconnect) advances nothing. In the outbox an
+  authoritative report replaces a queued parity one of the same fingerprint
+  (the spool revision is `parity:<fp>` / `store:<fp>`; the wire revision stays
+  the fingerprint).
+- A report Eridani refuses for good is forgotten, so the next scan (2 min)
+  sends it again, as collector.py retries a failed PUT on its next run. In
+  parity mode a refusal still waits for the source to change.
+
+A scan that was running when the config changed sends nothing through the
+new link.
+
+**The status v2 interlock.** `remotea status --json` reports `version: 2`
+exactly while `collector` is `authoritative`, and `version: 1` otherwise. v2
+has the same fields as v1, plus `server.collector`, which v1 also carries
+(additive). The Python collector reads only `version == 1`: on v2 it keeps its
+last known terminals and logs "remotea status unavailable; keeping the last
+known terminals" on every run. So a Python timer that was forgotten after the
+cutover stops learning about remotea terminals, and its journal says why. It
+is a tripwire, not a lock: the Python collector still sends its other
+reports, so disabling its timer is a required step. Tested against the real
+collector.py (`tests/collector-cutover.test.ts`, skipped where ~/jarvis is
+absent).
+
+**Legacy hook cleanup.** `remotea hooks --remove-legacy-collector [--dry-run]`
+removes the Python collector's Claude Code `SessionStart` hook from
+`~/.claude/settings.json`, and nothing else:
+
+- A handler is the collector's only when its command is exactly the script
+  `~/jarvis/scripts/session_collector/session_hook.py`, bare or behind
+  `python`/`python3`/`pythonX.Y` (by name or absolute path) or
+  `/usr/bin/env python3`, with `~`, `$HOME` or `${HOME}` spelled out or not.
+  The same file name elsewhere, extra arguments, or a compound command
+  (`;`, `|`, `$(…)`, `bash -c …`) is not the collector's.
+- Handler by handler: other handlers in the same `SessionStart` group stay, a
+  group left empty is dropped, other events are untouched. The first remotea
+  change to the file keeps the original as `settings.json.remotea-backup`.
+- It prints what it removed and, when
+  `~/.config/systemd/user/eridani-collector.timer` exists,
+  `systemctl --user disable --now eridani-collector.timer`. It never runs
+  systemctl itself, and nothing runs it automatically; `install.sh` only
+  mentions it when the hook is present.
+- What the hook did: it told a Claude session its own session id for the
+  `session_link` MCP tool. Sessions in remotea terminals get that line from
+  SessionStart context (context.ts) whenever the link is enabled. A Claude
+  session started outside remotea in this WSL no longer gets it.
+
+**Steps** (mirror Eridani's retirement steps in
+`~/jarvis/scripts/session_collector/README.md` § Retirement;
+`remotea eridani collector authoritative` prints them):
+
+1. Before. Eridani's parity summary shows "ready for cutover" (7 consecutive
+   clean days), and this release is the one installed and running.
+2. `remotea eridani collector authoritative`. Within 30 s the link reconnects
+   with `collector.authoritative`, `status --json` turns v2, and every source
+   is sent once more, without the parity flag.
+3. `systemctl --user disable --now eridani-collector.timer`.
+4. `remotea hooks --remove-legacy-collector --dry-run`, then without
+   `--dry-run`.
+5. Watch one cycle. `remotea eridani status` shows the link ready, no
+   refusals, the outbox draining. A new or resumed session appears in Eridani
+   with its resume hint. The agents' MCP key (`cli-agents`) still works: it is
+   not part of the cutover.
+6. One release later, after a clean cutover: remove the collector's units
+   (`~/.config/systemd/user/eridani-collector.{service,timer}`, then
+   `systemctl --user daemon-reload`) and `~/.config/eridani-collector`, and
+   revoke the old collector credential in Eridani (Settings → Integrations →
+   Connected agents). Never the link key or `cli-agents`.
+
+**Rollback** (any time before step 6): `remotea eridani collector parity`,
+then `systemctl --user enable --now eridani-collector.timer`, and put the
+SessionStart hook back by hand if you want it
+(`python3 ~/jarvis/scripts/session_collector/session_hook.py`). The parity
+fingerprints were kept, so going back sends nothing new.
+
 ## Not yet implemented (stage E and later)
 
 - Answering permission prompts (captured only) and Codex questions (no hook).
 - Removing worktrees (nominate only, by design).
-- Switching the collector from parity to authoritative, and removing the
-  Python collector's hooks.
+- Deleting the Python collector's code, units and credential: Davin's step,
+  one release after a clean cutover (below), not code here.

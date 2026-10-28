@@ -129,7 +129,21 @@ export function resolveBind(entries: string[], ifaces = os.networkInterfaces()):
 
 // ── Eridani link (eridani-link.ts) ─────────────────────────────────────────
 
-export type CollectorMode = 'parity' | 'off';
+/**
+ * 'parity' (stage B default): reports carry `parity: true`; Eridani compares
+ * them with what the Python collector stored and keeps nothing.
+ * 'authoritative' (stage E cutover): reports are stored; the Python collector
+ * is meant to be off (status --json turns v2, which it does not read).
+ * 'off': no collector at all.
+ */
+export type CollectorMode = 'parity' | 'authoritative' | 'off';
+/** The one command that stops the Python collector (its install.sh enables this timer). */
+export const LEGACY_TIMER_HINT = 'systemctl --user disable --now eridani-collector.timer';
+export const COLLECTOR_MODES: readonly CollectorMode[] = ['parity', 'authoritative', 'off'];
+
+export function parseCollectorMode(v: unknown): CollectorMode {
+  return v === 'authoritative' || v === 'off' ? v : 'parity';
+}
 
 export interface EridaniConfig {
   enabled: boolean;
@@ -137,7 +151,7 @@ export interface EridaniConfig {
   url: string;
   /** Machine name sent with every session report; defaults to the hostname. */
   machine?: string;
-  /** 'parity' (stage B default): reports are compared by Eridani, not stored. */
+  /** See CollectorMode; 'parity' unless switched with `remotea eridani collector`. */
   collector: CollectorMode;
 }
 
@@ -156,7 +170,7 @@ export function loadEridaniConfig(dir: string): EridaniConfig | null {
       enabled: raw.enabled === true,
       url: raw.url,
       machine: typeof raw.machine === 'string' && raw.machine.trim() ? raw.machine.trim().slice(0, 100) : undefined,
-      collector: raw.collector === 'off' ? 'off' : 'parity',
+      collector: parseCollectorMode(raw.collector),
     };
   } catch {
     return null;

@@ -10,6 +10,13 @@
  *     the outbox is over 80% full (the spool is for live events first).
  *   - A collector fingerprint advances only when Eridani acks the report
  *     (onDelivered); an evicted report marks its entity dirty and is re-read.
+ *   - Collector mode (stage E): `parity` reports are compared by Eridani,
+ *     `authoritative` ones are stored. Each mode keeps its own fingerprints
+ *     (COLLECTOR_STATE_FILES), so nothing acked as a comparison ever counts as
+ *     stored: the first authoritative scan sends every source once. Only an ack
+ *     for a report of the CURRENT mode advances a fingerprint, and in
+ *     authoritative mode a report Eridani refuses is forgotten so the next
+ *     scan sends it again (collector.py's rule: no fingerprint without a store).
  *   - `remotea eridani collect` drops a request file; it is picked up on the
  *     same 30 s tick.
  *   - Stage C: Eridani's commands (dispatch.ts), held Claude questions
@@ -23,12 +30,13 @@
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { ERIDANI_TIMING, STAGE_D_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_TIMING, STAGE_D_CAPS, STAGE_E_AUTHORITATIVE_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
   eridaniConfigStamp,
   loadEridaniConfig,
   readEridaniToken,
+  type CollectorMode,
   type EridaniConfig,
 } from './config';
 import { EridaniLink, type EridaniLinkDeps } from './eridani-link';
@@ -45,6 +53,11 @@ import { loadTargets } from './eridani-targets';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 
 export const COLLECTOR_STATE_FILE = 'eridani-collector.json';
+/** Delivered fingerprints per mode: a parity ack says nothing about what Eridani stored. */
+export const COLLECTOR_STATE_FILES: Record<Exclude<CollectorMode, 'off'>, string> = {
+  parity: COLLECTOR_STATE_FILE,
+  authoritative: 'eridani-collector-authoritative.json',
+};
 /** collector.py's Windows side. */
 export const WINDOWS_USERS = '/mnt/c/Users';
 const CHECK_MS = 30_000;
@@ -212,8 +225,10 @@ export class EridaniRuntime {
     }
     this.cfg = cfg;
     const machine = cfg!.machine || this.deps.hostname;
-    this.state = new CollectorState(path.join(this.deps.dir, COLLECTOR_STATE_FILE));
-    this.collector = cfg!.collector === 'off' ? null : new Collector({
+    const mode = cfg!.collector;
+    const parity = mode !== 'authoritative';
+    this.state = new CollectorState(path.join(this.deps.dir, COLLECTOR_STATE_FILES[mode === 'off' ? 'parity' : mode]));
+    const collector: Collector | null = mode === 'off' ? null : new Collector({
       home: this.deps.collectorHome,
       windowsUsers: this.deps.windowsUsers === undefined ? WINDOWS_USERS : this.deps.windowsUsers,
       machine,
@@ -225,9 +240,11 @@ export class EridaniRuntime {
         },
         this.deps.hostname,
       ),
-      send: (r) => this.link?.report(r, true) ?? false,
+      // A scan still running from before a reconfigure (a mode switch) sends nothing through the new link.
+      send: (r) => (this.collector === collector ? this.link?.report(r, parity) ?? false : false),
       warn: (m) => this.deps.log(`eridani collector: ${m}`),
     });
+    this.collector = collector;
     const link = new EridaniLink({
       url: cfg!.url,
       token: () => readEridaniToken(this.deps.dir),
@@ -253,16 +270,21 @@ export class EridaniRuntime {
       precheck: (cmd) => this.dispatch.precheck(cmd),
       recover: (rec) => this.dispatch.recover(rec),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
-      caps: () => STAGE_D_CAPS,
+      caps: () => (mode === 'authoritative' ? STAGE_E_AUTHORITATIVE_CAPS : STAGE_D_CAPS),
       targets: () => this.helloTargets(),
       onRunsSnapshot: (runs) => {
         this.dispatch.applyRunsSnapshot(runs);
         this.replay();
       },
       onDelivered: (entry) => {
-        if (entry.body.t === 'session.report' && entry.entity && typeof entry.revision === 'string') {
-          this.state?.delivered(entry.entity, entry.revision);
+        const b = entry.body as { t?: unknown; parity?: unknown; revision?: unknown };
+        // A report queued under the other mode (still in the outbox across a switch) advances nothing.
+        if (b.t === 'session.report' && entry.entity && typeof b.revision === 'string' && b.parity === parity) {
+          this.state?.delivered(entry.entity, b.revision);
         }
+      },
+      onRefused: (entry) => {
+        if (!parity && entry.body.t === 'session.report' && entry.entity) this.state?.dirty(entry.entity);
       },
       onDirty: (entity) => {
         if (entity === WORKTREES_ENTITY) this.worktreesSent = '';

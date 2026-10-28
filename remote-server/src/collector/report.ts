@@ -14,7 +14,7 @@ export const LIMITS: Record<string, number> = { title: 500, first_prompt: 4000, 
 export const AGENTS: Record<string, string[]> = { claude: ['claude_code', 'claude_desktop'], codex: ['codex_cli'] };
 export const RESUME: Record<string, string> = { claude_code: 'claude --resume', claude_desktop: 'claude --resume', codex_cli: 'codex resume' };
 
-/** The slice of `remotea status --json` (v1) the collector reads. */
+/** The slice of `remotea status --json` the collector reads (the same fields in v1 and v2). */
 export interface StatusLike {
   version: number;
   server?: { hostname?: string | null } | null;

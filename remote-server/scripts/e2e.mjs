@@ -387,6 +387,7 @@ try {
   // 10. Stage C: Eridani starts and steers work (dispatch.ts), with a stub `claude`.
   await stageC();
   await stageD();
+  await stageE();
   if (process.env.E2E_REAL_CLAUDE === '1') await realQuestion();
 } catch (err) {
   failures++;
@@ -625,6 +626,22 @@ async function stageD() {
  * hooks only (the throwaway repo's .claude/settings.json); the repo lives under
  * the stage A spike's trusted folder so no trust dialog is needed.
  */
+/** Stage E: the collector cutover through the CLI, against the running server (config watch, ≤30 s). */
+async function stageE() {
+  ok(JSON.parse(cli('status', '--json')).version === 1, 'status --json is v1 while the collector is in parity mode');
+  const before = eri.frames.length;
+  const out = cli('eridani', 'collector', 'authoritative');
+  ok(/parity → authoritative/.test(out) && out.includes('systemctl --user disable --now eridani-collector.timer'), 'remotea eridani collector authoritative switches and prints the checklist');
+  const st = JSON.parse(cli('status', '--json'));
+  ok(st.version === 2 && st.server.collector === 'authoritative', 'status --json turns v2 (the Python collector refuses it)');
+  const hello = await eri.waitFor('hello', (f) => eri.frames.indexOf(f) >= before, 40_000).catch(() => null);
+  ok(hello?.caps.includes('collector.authoritative'), 'the server reconnects advertising collector.authoritative');
+  const stored = await eri.waitFor('session.report', (f) => eri.frames.indexOf(f) >= before && f.parity === false, 20_000).catch(() => null);
+  ok(stored?.report?.machine === 'e2e-box', 'every source is sent again without the parity flag');
+  cli('eridani', 'collector', 'parity');
+  ok(JSON.parse(cli('status', '--json')).version === 1, 'back to parity: status --json v1');
+}
+
 async function realQuestion() {
   const { applyWmuxHooks } = await import(path.join(root, 'dist/src/shared/claude-hooks.js'));
   const base = process.env.E2E_REAL_ROOT || '/home/davin/remotea/spike-stage-a/testrepo';

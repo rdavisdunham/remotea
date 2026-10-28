@@ -95,7 +95,9 @@ export type LinkCap =
   | 'runs.snapshot'
   | 'worktrees.report'
   // Stage D: the host verifies after each root turn on its own (`local:` attempt ids).
-  | 'verify.auto';
+  | 'verify.auto'
+  // Stage E: this host's collector is authoritative (reports carry parity: false). Informational.
+  | 'collector.authoritative';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -108,6 +110,9 @@ export const STAGE_C_CAPS: readonly LinkCap[] = Object.freeze([
 
 /** Stage D: everything in C, plus automatic verification after turns. */
 export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 'verify.auto']);
+
+/** Stage E, advertised only while `eridani.json.collector` is `authoritative`. */
+export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
 /** What one harness can do on this host (the capability matrix, C15). Advertise only what is verified. */
 export interface HarnessCaps {
