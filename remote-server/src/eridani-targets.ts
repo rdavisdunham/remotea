@@ -20,6 +20,11 @@
  * trust boundary is stated plainly in docs/remotea/eridani-link.md: this is
  * policy against Eridani-originated text becoming commands, not a sandbox.
  *
+ * A verify entry runs with a minimal environment (verify-runner.ts): PATH,
+ * HOME, LANG, CI=1, TERM=dumb, plus only what its own `env` names, e.g.
+ * `"env": { "NODE_OPTIONS": "--max-old-space-size=4096" }`. Nothing else
+ * from the server's environment reaches it.
+ *
  * Read from disk on every use, so `remotea eridani targets add` takes effect
  * at once and never restarts the link.
  */
@@ -42,6 +47,8 @@ export interface VerifySpec {
   cwd?: string;
   /** Seconds. */
   timeout: number;
+  /** Extra environment for the run (stage F): the base is minimal, so a test that needs a variable names it here. */
+  env?: Record<string, string>;
 }
 
 export interface ExecutionTarget {
@@ -88,6 +95,12 @@ export function targetError(t: unknown): string | null {
     if (!Array.isArray(vo.argv) || !vo.argv.length || vo.argv.length > 64 || !vo.argv.every(ARG_OK)) return `verify ${vo.id}: argv`;
     if (vo.cwd !== undefined && !(typeof vo.cwd === 'string' && !path.isAbsolute(vo.cwd) && !vo.cwd.split(/[\\/]/).includes('..'))) return `verify ${vo.id}: cwd is relative to the worktree`;
     if (typeof vo.timeout !== 'number' || !(vo.timeout > 0 && vo.timeout <= 6 * 3600)) return `verify ${vo.id}: timeout in seconds (≤ 6 h)`;
+    if (vo.env !== undefined) {
+      if (!vo.env || typeof vo.env !== 'object' || Array.isArray(vo.env) || Object.keys(vo.env).length > 32) return `verify ${vo.id}: env is an object`;
+      for (const [k, val] of Object.entries(vo.env as Record<string, unknown>)) {
+        if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(k) || typeof val !== 'string' || val.length > 4096 || /[\0\r\n]/.test(val)) return `verify ${vo.id}: env ${k.slice(0, 40)}`;
+      }
+    }
   }
   return null;
 }
@@ -99,7 +112,7 @@ function normalize(t: Record<string, unknown>): ExecutionTarget {
     worktreeRoot: path.resolve(t.worktreeRoot as string),
     base: typeof t.base === 'string' ? t.base : 'main',
     launch: t.launch as ExecutionTarget['launch'],
-    verify: ((t.verify as VerifySpec[] | undefined) ?? []).map((v) => ({ id: v.id, argv: [...v.argv], ...(v.cwd ? { cwd: v.cwd } : {}), timeout: v.timeout })),
+    verify: ((t.verify as VerifySpec[] | undefined) ?? []).map((v) => ({ id: v.id, argv: [...v.argv], ...(v.cwd ? { cwd: v.cwd } : {}), timeout: v.timeout, ...(v.env ? { env: { ...v.env } } : {}) })),
   };
 }
 

@@ -505,6 +505,13 @@ done
   const fence = { surf, incarnation: inc, run_id: 'run-e2e-1', generation: 1 };
   const stale = sendCommand({ t: 'input', op_id: 'op-e2e-in-stale', mode: 'queue', text: 'never', ...fence, incarnation: inc + 5 });
   ok((await stale.waitAck()).outcome?.state === 'rejected', 'input with a stale incarnation is rejected');
+  // Stage F: text is a paste, never keystrokes; and every effectful command expires.
+  const escaped = sendCommand({ t: 'input', op_id: 'op-e2e-in-esc', mode: 'queue', text: 'hi\x1b[20\x1b[201~1~\r!touch /tmp/pwned', ...fence });
+  ok((await escaped.waitAck()).outcome?.state === 'rejected', 'input carrying control characters (a nested paste end) is rejected');
+  const slash = sendCommand({ t: 'input', op_id: 'op-e2e-in-slash', mode: 'queue', text: '/clear', ...fence });
+  ok((await slash.waitAck()).outcome?.state === 'rejected', 'input starting with a slash command is rejected');
+  const noExp = sendCommand({ t: 'input', op_id: 'op-e2e-in-noexp', mode: 'queue', text: 'late', ...fence, expires_at: undefined });
+  ok((await noExp.waitAck()).outcome?.detail === 'expires_at required', 'input without expires_at is rejected');
   sendCommand({ t: 'input', op_id: 'op-e2e-in-1', mode: 'queue', text: 'hello from eridani', ...fence });
   const inOut = await outcome('op-e2e-in-1');
   ok(inOut.state === 'executed', 'queued input executed');

@@ -108,13 +108,27 @@ function readJson(file: string): Json | null {
   }
 }
 
-/** Atomic write; the first time remotea changes a file, the original is kept beside it. */
+/**
+ * Atomic write; the first time remotea changes a file, the original is kept
+ * beside it. The file keeps its mode (settings.json is 0600 and can carry API
+ * keys in `env`; the process umask must not widen it), a new one is 0600, and
+ * the backup is always 0600 (stage F, L12).
+ */
 function writeJson(file: string, value: Json): void {
   const backup = `${file}.remotea-backup`;
+  let mode = 0o600;
+  try {
+    mode = fs.statSync(file).mode & 0o777;
+  } catch {
+    /* new file */
+  }
   if (fs.existsSync(file) && !fs.existsSync(backup)) fs.copyFileSync(file, backup);
+  if (fs.existsSync(backup)) fs.chmodSync(backup, 0o600);
   const tmp = `${file}.remotea-tmp-${process.pid}`;
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n');
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n', { mode });
+  // writeFileSync's mode is filtered by the umask; set it exactly.
+  fs.chmodSync(tmp, mode);
   fs.renameSync(tmp, file);
 }
 

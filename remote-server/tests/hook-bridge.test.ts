@@ -291,6 +291,24 @@ describe('hooks install', () => {
     expect(read(path.join(home, '.codex', 'hooks.json'))).toEqual(codex);
   });
 
+  it('keeps the settings file\'s mode whatever the umask, and the backup is 0600 (L12)', () => {
+    const { home, paths } = tempHome();
+    const settings = path.join(home, '.claude', 'settings.json');
+    fs.chmodSync(settings, 0o600);
+    fs.chmodSync(path.join(home, '.codex', 'hooks.json'), 0o640);
+    const old = process.umask(0o022);
+    try {
+      installHooks(paths);
+      removeHooks(paths);
+    } finally {
+      process.umask(old);
+    }
+    expect(fs.statSync(settings).mode & 0o777).toBe(0o600);
+    expect(fs.statSync(`${settings}.remotea-backup`).mode & 0o777).toBe(0o600);
+    expect(fs.statSync(path.join(home, '.codex', 'hooks.json')).mode & 0o777).toBe(0o640);
+    expect(fs.statSync(path.join(home, '.codex', 'hooks.json.remotea-backup')).mode & 0o777).toBe(0o600);
+  });
+
   it('OpenCode: installs wmux\'s plugin and the CLI it runs; leaves someone else\'s plugin of that name alone', () => {
     const { home, paths } = tempHome();
     fs.mkdirSync(path.join(home, '.config', 'opencode'), { recursive: true });

@@ -30,10 +30,11 @@
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { ERIDANI_TIMING, STAGE_D_CAPS, STAGE_E_AUTHORITATIVE_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_TIMING, STAGE_F_AUTHORITATIVE_CAPS, STAGE_F_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
   eridaniConfigStamp,
+  linkUrlError,
   loadEridaniConfig,
   readEridaniToken,
   type CollectorMode,
@@ -174,6 +175,7 @@ export class EridaniRuntime {
       enabled: () => this.link !== null,
       request: (body, ms) => this.link?.request(body, ms) ?? Promise.resolve(null),
       runToken: (id) => this.dispatch.runToken(id),
+      scoped: () => this.link?.peerHas('context.scope') ?? false,
       timeoutMs: deps.contextMs ?? ERIDANI_TIMING.contextMs,
       log: deps.log,
     });
@@ -223,6 +225,12 @@ export class EridaniRuntime {
       if (cfg?.enabled && !key) this.deps.log('eridani: enabled but no link key; not connecting');
       return;
     }
+    const urlError = linkUrlError(cfg!.url);
+    if (urlError) {
+      // Checked again here: eridani.json can be edited by hand, and the key must never go out in cleartext.
+      this.deps.log(`eridani: not connecting: ${urlError}`);
+      return;
+    }
     this.cfg = cfg;
     const machine = cfg!.machine || this.deps.hostname;
     const mode = cfg!.collector;
@@ -270,7 +278,7 @@ export class EridaniRuntime {
       precheck: (cmd) => this.dispatch.precheck(cmd),
       recover: (rec) => this.dispatch.recover(rec),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
-      caps: () => (mode === 'authoritative' ? STAGE_E_AUTHORITATIVE_CAPS : STAGE_D_CAPS),
+      caps: () => (mode === 'authoritative' ? STAGE_F_AUTHORITATIVE_CAPS : STAGE_F_CAPS),
       targets: () => this.helloTargets(),
       onRunsSnapshot: (runs) => {
         this.dispatch.applyRunsSnapshot(runs);

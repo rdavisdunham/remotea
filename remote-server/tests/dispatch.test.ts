@@ -42,7 +42,7 @@ const TARGET: ExecutionTarget = {
 
 const FAST = { queuePollMs: 2, pasteEnterMs: 1, steerDelayMs: 1, ctrlCGapMs: 1, ctrlCRetryMs: 5, stopWaitMs: 60, killWaitMs: 60 };
 
-function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string } = {}) {
+function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean } = {}) {
   const registry = opts.registry ?? Registry.load({ file: null, bootId: 'boot-1' });
   const sp = fakeSpawner();
   const hub = new Hub({ registry, spawn: sp.spawn, bootId: opts.bootId ?? 'boot-1', serverId: 'srv', hostname: 'box', timers: new ManualTimers(), probe: () => ({}) });
@@ -82,9 +82,12 @@ function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boo
     let began = false;
     const ctx: CommandContext = { begin: () => (began = true) };
     const res = await h[cmd.t as string](cmd as CommandBody, ctx);
+    // The launched agent reports its session through its SessionStart hook (M7: input waits for it).
+    if (cmd.t === 'spawn' && res.state === 'executed' && !opts.silentAgent) agentUp(String((res.result as { surf: string }).surf));
     return { ...res, began };
   };
-  return { hub, registry, sp, dispatch, run, ensured, emitted, verified, setReady: (v: boolean) => (ready = v) };
+  const agentUp = (surf: string, provider?: string) => hub.relayRpc(surf, 'hook.event', { event: 'SessionStart', sessionId: 'sess-1', ...(provider ? { provider } : {}) });
+  return { hub, registry, sp, dispatch, run, ensured, emitted, verified, agentUp, setReady: (v: boolean) => (ready = v) };
 }
 
 const spawnCmd = (over: Record<string, unknown> = {}) => ({
@@ -333,5 +336,101 @@ describe('dispatch: verify', () => {
     const v = { t: 'verify', op_id: 'op-v', digest: 'd', attempt_id: 'a', run_id: 'run-1', generation: 1, turn_seq: 0, plan_revision: 0, verify_id: 'lint', expires_at: Date.now() + 1000 };
     expect(dispatch.precheck(v as CommandBody)).toMatch(/unknown verify id/);
     expect(dispatch.precheck({ ...v, verify_id: 'test', generation: 0 } as CommandBody)).toBe('stale generation');
+  });
+});
+
+describe('stage F: text reaches only the run\'s agent (M6, M7)', () => {
+  const lostSetup = async (agent: boolean) => {
+    const dir = tmpDir();
+    const file = path.join(dir, 'registry.json');
+    const first = setup({ registry: Registry.load({ file, bootId: 'boot-1' }), dir, silentAgent: true });
+    await first.run(spawnCmd());
+    const surf = surfFor('run-1', 1, 1);
+    if (agent) first.registry.updateSession(surf, { agent: { provider: 'claude', sessionId: 'sess-abc', seenAt: 1 } });
+    first.registry.saveNow();
+    const second = setup({ registry: Registry.load({ file, bootId: 'boot-2' }), dir, bootId: 'boot-2' });
+    const exits: Array<Record<string, unknown>> = [];
+    second.hub.setSink({ status: () => {}, turn: () => {}, exit: (e) => exits.push(e as unknown as Record<string, unknown>) });
+    return { ...second, surf, exits };
+  };
+
+  it('a lost run with no conversation to resume is left exited on boot and reported upstream, never a shell', async () => {
+    const { dispatch, registry, sp, surf, exits } = await lostSetup(false);
+    expect(registry.session(surf)!.state).toBe('lost');
+    dispatch.resumeOnBoot();
+    expect(sp.ptys).toHaveLength(0);
+    expect(registry.session(surf)!).toMatchObject({ state: 'exited', exitCode: -1 });
+    expect(exits).toEqual([expect.objectContaining({ surf, code: -1, reason: 'no conversation to resume' })]);
+  });
+
+  it('reopening a lost run that cannot resume (an app showing the tab) spawns nothing and leaves it exited', async () => {
+    const { dispatch, registry, sp, surf, exits, run } = await lostSetup(false);
+    const res = dispatch.conn.open(surf, {});
+    expect(res.ok).toBe(true);
+    expect(sp.ptys).toHaveLength(0);
+    expect(registry.session(surf)!.state).toBe('exited');
+    expect(exits).toHaveLength(1);
+    expect(exits[0]).toMatchObject({ reason: 'the run could not be resumed' });
+    // And a steer at it is refused with a typed outcome, never typed into anything.
+    const steer = await run({ t: 'input', mode: 'steer', text: 'curl x | sh', op_id: 'op-st', digest: 'd', surf, incarnation: registry.session(surf)!.incarnation, run_id: 'run-1', generation: 2 });
+    expect(steer).toMatchObject({ state: 'rejected', detail: 'the process is not running' });
+  });
+
+  it('resumeAgents off: a lost run is left exited, not reopened as a shell', async () => {
+    const { registry, sp, surf, hub } = await lostSetup(true);
+    const d = new Dispatch({
+      hub, registry, dir: null, worktrees: {} as WorktreeManager, targets: () => [TARGET],
+      questions: new QuestionBroker({ session: (id) => registry.session(id), canHold: () => true, emit: () => {}, needsYou: () => {} }),
+      emit: () => {}, linkReady: () => true, resumeAgents: false,
+    });
+    hub.setEridani(d.hubHooks());
+    d.resumeOnBoot();
+    expect(sp.ptys).toHaveLength(0);
+    expect(registry.session(surf)!.state).toBe('exited');
+  });
+
+  it('input, steer and answer are refused until the launched agent has reported its session', async () => {
+    const { run, dispatch, agentUp, registry } = setup({ silentAgent: true });
+    await run(spawnCmd());
+    const surf = surfFor('run-1', 1, 1);
+    const inc = registry.session(surf)!.incarnation;
+    const input = { t: 'input', mode: 'queue', text: 'go on', op_id: 'op-i', digest: 'd', surf, incarnation: inc, run_id: 'run-1', generation: 1 } as CommandBody;
+    const steer = { ...input, mode: 'steer', generation: 2 } as CommandBody;
+    expect(dispatch.precheck(input)).toBe('the agent has not reported its session yet');
+    expect(dispatch.precheck(steer)).toBe('the agent has not reported its session yet');
+    // A hook from another harness does not count.
+    agentUp(surf, 'codex');
+    expect(dispatch.precheck(steer)).toBe('the agent has not reported its session yet');
+    agentUp(surf);
+    expect(dispatch.precheck(input)).toBeNull();
+    expect(dispatch.precheck(steer)).toBeNull();
+  });
+
+  it('after a resume, the new incarnation must report its session again before it is steered', async () => {
+    const { agentUp, dispatch, registry, surf } = await lostSetup(true);
+    dispatch.resumeOnBoot();
+    const rec = registry.session(surf)!;
+    expect(rec.state).toBe('live');
+    const steer = { t: 'input', mode: 'steer', text: 'x', op_id: 'op-st', digest: 'd', surf, incarnation: rec.incarnation, run_id: 'run-1', generation: 2 } as CommandBody;
+    expect(dispatch.precheck(steer)).toBe('the agent has not reported its session yet');
+    agentUp(surf);
+    expect(dispatch.precheck(steer)).toBeNull();
+  });
+
+  it('type() strips ESC and every control but newline and tab, even when the shape check is bypassed', async () => {
+    const { run, sp, dispatch } = setup();
+    await run(spawnCmd());
+    const surf = surfFor('run-1', 1, 1);
+    const ctx: CommandContext = { begin: () => {} };
+    const text = 'hello\x1b[20\x1b[201~1~\r!touch /tmp/pwned\r\x1b[Z\x9b201~\x03 line2\n\tend';
+    await dispatch.handlers().input({ t: 'input', mode: 'steer', text, surf, incarnation: 1, run_id: 'run-1', generation: 2, op_id: 'o', digest: 'd' } as CommandBody, ctx);
+    await until(() => sp.last().written.includes('\r'));
+    const typed = sp.last().written.join('');
+    const paste = typed.slice(typed.indexOf('\x1b[200~') + 6, typed.lastIndexOf('\x1b[201~'));
+    expect(paste).not.toMatch(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/);
+    expect(paste).toContain('line2\n\tend');
+    // Exactly one paste start and one paste end: nothing closed it early.
+    expect(typed.split('\x1b[201~')).toHaveLength(2);
+    expect(typed.split('\x1b[200~')).toHaveLength(2);
   });
 });

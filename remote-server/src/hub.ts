@@ -467,9 +467,18 @@ export class Hub {
     // Resuming the agent that was running beats re-running the original
     // command: a lost Claude session comes back as `claude --resume <id>`
     // (an Eridani run's keeps its model and permission mode: dispatch.ts).
-    // `null` from the Eridani hook means "do not resume": a login shell in the
-    // worktree, never the original command (it would start the run over).
+    // `null` from the Eridani hook means "do not resume": the run is left
+    // exited (above), never the original command (it would start the run over).
     const custom = wasLost && rec ? this.eridani.resumeCommand?.(rec) : undefined;
+    if (wasLost && rec?.eridani && custom === null) {
+      // D4 (stage F): a run that cannot be resumed stays exited. A bare shell
+      // carrying the run binding would type Eridani's next input as a command.
+      const done = this.exitLost(msg.id, 'the run could not be resumed') ?? rec;
+      const dead = this.makeSession(done, null, msg.cols, msg.rows);
+      dead.exitCode = done.exitCode;
+      dead.attach(conn, { ...attach, created: false });
+      return;
+    }
     const resume = custom !== undefined ? custom : wasLost && this.cfg.resumeAgents && rec?.agent ? resumeCommand(rec.agent) : null;
     const spawnCmd = custom !== undefined ? custom ?? undefined : resume && record.cmd ? resume : record.cmd;
     const startup = custom !== undefined ? undefined : resume && !record.cmd ? [resume] : spec.startupCommands;
@@ -511,6 +520,25 @@ export class Hub {
     });
     this.sessions.set(rec.id, session);
     return session;
+  }
+
+  /**
+   * End a lost session without a process: the record becomes `exited`
+   * (code -1), apps see it, and Eridani gets an `exit` with the reason.
+   */
+  exitLost(id: string, reason: string): SessionRecord | undefined {
+    const rec = this.registry.session(id);
+    if (!rec || rec.state !== 'lost' || this.sessions.has(id)) return undefined;
+    const exitedAt = this.now();
+    const updated = this.registry.updateSession(id, { state: 'exited', exitCode: -1, exitedAt });
+    if (!updated) return undefined;
+    this.registry.saveNow();
+    this.broadcast({ t: 'sessionUpdated', session: updated });
+    this.agentState.exit(id, -1);
+    this.sink?.exit({ surf: id, incarnation: updated.incarnation ?? 0, code: -1, exited_at: exitedAt, reason: reason.slice(0, 300) });
+    this.eridani.exited?.(id, -1);
+    this.log(`${id}: ${reason}; left exited`);
+    return updated;
   }
 
   private onSessionExit(id: RemoteSurfaceId, code: number): void {

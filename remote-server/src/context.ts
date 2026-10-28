@@ -15,6 +15,14 @@
  *   - The link is not enabled at all: nothing. A machine that never set up
  *     Eridani sees no change in its agents' context.
  *
+ * D6 (stage F): the full text goes only to a surface bound to a run. An
+ * unbound session (Davin's own, in a ruled folder) gets the short candidate
+ * list, which Eridani marks `scope: "candidates"`; remotea prints at most
+ * UNBOUND_CHARS of it and drops anything marked `scope: "run"`. When the
+ * welcome advertised `context.scope`, an unscoped answer to an unbound
+ * surface is dropped too; an older Eridani's unscoped answer is printed as
+ * before (it can lag one release).
+ *
  * Claude drops SessionStart output silently when the hook times out and does
  * not block input meanwhile (stage A); the hook's timeout is set to 10 s in
  * claude-hooks.ts, well above this budget plus node start-up.
@@ -25,6 +33,8 @@ import type { SessionRecord } from '../../src/shared/remote-host-protocol';
 
 const SESSION_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 const SOURCES = new Set(['startup', 'resume', 'clear', 'compact']);
+/** The most an unbound session is shown (the candidate task list). */
+export const UNBOUND_CHARS = 4_000;
 
 export interface ContextDeps {
   session(id: string): SessionRecord | undefined;
@@ -33,6 +43,8 @@ export interface ContextDeps {
   request(body: Record<string, unknown> & { t: string; req_id: string }, ms: number): Promise<Record<string, unknown> | null>;
   /** The run token the spawn carried, for a surface Eridani started. */
   runToken?(id: string): string | null;
+  /** Eridani's welcome advertised `context.scope` (it scopes every answer). */
+  scoped?(): boolean;
   timeoutMs?: number;
   log?: (m: string) => void;
 }
@@ -65,13 +77,24 @@ export class ContextService {
       generation: b?.generation ?? 0,
       task_id: b?.taskId ?? null,
     }, this.deps.timeoutMs ?? ERIDANI_TIMING.contextMs);
-    const token = (typeof res?.run_token === 'string' && /^[\x21-\x7e]{1,512}$/.test(res.run_token) ? res.run_token : null) ?? this.deps.runToken?.(surf) ?? null;
+    const scope = res?.scope === 'run' || res?.scope === 'candidates' ? res.scope : null;
+    let text = res && typeof res.text === 'string' ? res.text : '';
+    if (!b && text) {
+      if (scope === 'candidates' || (scope === null && !this.deps.scoped?.())) {
+        if (scope === 'candidates') text = truncateText(text, UNBOUND_CHARS).text;
+      } else {
+        this.deps.log?.(`context for ${surf}: dropped ${scope ?? 'unscoped'} text for a surface with no run`);
+        text = '';
+      }
+    }
+    const runToken = b && typeof res?.run_token === 'string' && /^[\x21-\x7e]{1,512}$/.test(res.run_token) ? res.run_token : null;
+    const token = runToken ?? this.deps.runToken?.(surf) ?? null;
     const tool = provider === 'codex' ? 'codex_cli' : 'claude_code';
     const lines: string[] = [];
-    if (res && typeof res.text === 'string' && res.text.trim()) {
-      lines.push(truncateText(res.text, ERIDANI_LIMITS.contextChars).text.trimEnd());
+    if (text.trim()) {
+      lines.push(truncateText(text, ERIDANI_LIMITS.contextChars).text.trimEnd());
     } else {
-      this.deps.log?.(`context for ${surf}: no answer from Eridani in time`);
+      if (!res) this.deps.log?.(`context for ${surf}: no answer from Eridani in time`);
       lines.push(`remotea: this is ${tool} session ${sessionId || '(unknown)'} on ${surf}${b ? `, Eridani run ${b.runId} (generation ${b.generation})` : ''}. Eridani's context was not available.`);
     }
     if (token) lines.push(`Eridani run token: ${token} (pass it as run_token to Eridani's task tools)`);

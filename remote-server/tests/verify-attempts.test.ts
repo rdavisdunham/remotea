@@ -393,9 +393,10 @@ describe('F07: turn → generation binding', () => {
   });
 
   it('a steer persists the new generation as accepted before typing', async () => {
-    const { run, registry } = setup();
+    const { run, registry, hook } = setup();
     await run(spawnCmd());
     const surf = surfFor('run-1', 1, 1);
+    hook(surf, { event: 'SessionStart' });
     const p = run({ t: 'input', op_id: 'op-steer', digest: 'd', surf, incarnation: registry.session(surf)!.incarnation, run_id: 'run-1', generation: 3, text: 'redo', mode: 'steer' });
     expect(registry.session(surf)!.eridani).toMatchObject({ generation: 3, acceptedInput: { generation: 3 } });
     void p;

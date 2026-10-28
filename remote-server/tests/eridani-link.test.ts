@@ -19,6 +19,8 @@ class FakeEridani {
   status = 101;
   autoAck = true;
   epoch = 0;
+  /** Called with the socket just before welcome goes out (stage F: frames before welcome are ignored). */
+  beforeWelcome: ((ws: WebSocket) => void) | null = null;
   constructor() {
     this.wss = new WebSocketServer({
       port: 0,
@@ -35,6 +37,7 @@ class FakeEridani {
         if (!f) throw new Error(`bad frame ${String(data)}`);
         this.frames.push(f);
         if (f.t === 'hello') {
+          this.beforeWelcome?.(ws);
           this.send(ws, { t: 'welcome', host_id: 'host-1', conn_epoch: ++this.epoch, server_time: Date.now() });
         } else if (this.autoAck && 'op_id' in f && f.t !== 'ack') {
           this.ack(ws, f.id, true);
@@ -224,7 +227,7 @@ describe('EridaniLink', () => {
     const { eri, link } = await setup();
     link.start();
     await until(() => link.ready);
-    eri.send(eri.sockets[0], { t: 'prompt.inject', op_id: 'op-x', id: 'c1', digest: 'x' });
+    eri.send(eri.sockets[0], { t: 'prompt.inject', op_id: 'op-x', id: 'c1', digest: digestOf({ t: 'prompt.inject', op_id: 'op-x' }) });
     await until(() => eri.of('command.outcome').length === 1);
     expect(eri.of('command.outcome')[0]).toMatchObject({ command_id: 'op-x', state: 'rejected', detail: 'unsupported' });
   });
@@ -524,5 +527,68 @@ describe('EridaniLink: stage C commands', () => {
     eri.send(ws, { t: 'runs.snapshot', part: { of: 'x', i: 1, n: 2 }, runs: [{ run_id: 'r1', generation: 3, desired: 'continue' }] });
     await until(() => got.length === 1);
     expect((got[0] as Array<{ run_id: string }>).map((r) => r.run_id)).toEqual(['r1', 'r2']);
+  });
+
+  describe('stage F: inbound frames', () => {
+    const exp = () => Date.now() + 60_000;
+    const input = (over: Record<string, unknown> = {}) => ({ t: 'input', op_id: `op-${Math.random()}`, surf: 'surf-1', incarnation: 1, run_id: 'r', generation: 1, mode: 'queue', text: 'go on', ...over });
+    const signed = (cmd: Record<string, unknown>) => ({ ...cmd, digest: digestOf(cmd) });
+
+    it('every effectful command needs expires_at within the replay horizon (L11)', async () => {
+      let runs = 0;
+      const executed = async () => (runs++, { state: 'executed' as const });
+      const { eri, link } = await setup({ handlers: { input: executed, stop: executed, answer: executed, verify: executed, spawn: executed } });
+      link.start();
+      await until(() => link.ready);
+      const ws = eri.sockets[0];
+      const cmds = [
+        input({ op_id: 'no-exp' }),
+        { t: 'stop', op_id: 'stop-no-exp', surf: 's', incarnation: 1, run_id: 'r', generation: 1, mode: 'kill' },
+        { t: 'answer', op_id: 'ans-no-exp', question_id: 'q', provider_request_id: 'p', answers: [{ item_id: 'q1', text: 'yes' }] },
+        { t: 'verify', op_id: 'ver-no-exp', attempt_id: 'a', run_id: 'r', generation: 1, turn_seq: 1, plan_revision: 1, verify_id: 'test' },
+        input({ op_id: 'far', expires_at: Date.now() + 8 * 24 * 3600_000 }),
+      ];
+      for (const c of cmds) eri.send(ws, { ...signed(c), id: `c-${c.op_id}` });
+      await until(() => eri.of('command.outcome').length === cmds.length);
+      const by = (id: string) => eri.of('command.outcome').find((o) => (o as { command_id: string }).command_id === id) as { state: string; detail: string };
+      for (const id of ['no-exp', 'stop-no-exp', 'ans-no-exp', 'ver-no-exp']) expect(by(id)).toMatchObject({ state: 'rejected', detail: 'expires_at required' });
+      expect(by('far')).toMatchObject({ state: 'rejected', detail: 'expires beyond the replay horizon' });
+      expect(runs).toBe(0);
+      eri.send(ws, { ...signed(input({ op_id: 'ok', expires_at: exp() })), id: 'c-ok' });
+      await until(() => runs === 1);
+    });
+
+    it('the digest is recomputed: a body that does not match its digest is refused and never journaled', async () => {
+      let runs = 0;
+      const { eri, link } = await setup({ handlers: { input: async () => (runs++, { state: 'executed' }) } });
+      link.start();
+      await until(() => link.ready);
+      const ws = eri.sockets[0];
+      const cmd = input({ op_id: 'op-d', expires_at: exp() });
+      eri.send(ws, { ...cmd, text: 'something else', digest: digestOf(cmd), id: 'c-bad' });
+      await until(() => eri.of('ack').some((a) => (a as { acked_id: string }).acked_id === 'c-bad'));
+      expect(eri.of('ack').find((a) => (a as { acked_id: string }).acked_id === 'c-bad')).toMatchObject({ ok: false, error: 'DIGEST_MISMATCH' });
+      // The genuine body under the same op_id still runs: the forged one left no record.
+      eri.send(ws, { ...signed(cmd), id: 'c-good' });
+      await until(() => runs === 1);
+      expect(eri.of('command.outcome')).toHaveLength(1);
+    });
+
+    it('frames before welcome and frames from another conn_epoch are ignored', async () => {
+      let runs = 0;
+      const { eri, link } = await setup({ handlers: { input: async () => (runs++, { state: 'executed' }) } });
+      eri.beforeWelcome = (ws) => eri.send(ws, { ...signed(input({ op_id: 'early', expires_at: exp() })), id: 'c-early', conn_epoch: eri.epoch + 1 });
+      link.start();
+      await until(() => link.ready);
+      const ws = eri.sockets[0];
+      eri.send(ws, { ...signed(input({ op_id: 'stale', expires_at: exp() })), id: 'c-stale', conn_epoch: eri.epoch - 1 });
+      eri.send(ws, { ...signed(input({ op_id: 'none', expires_at: exp() })), id: 'c-none', conn_epoch: null });
+      eri.send(ws, { ...signed(input({ op_id: 'now', expires_at: exp() })), id: 'c-now' });
+      await until(() => runs === 1);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(runs).toBe(1);
+      const acked = eri.of('ack').map((a) => (a as { acked_id: string }).acked_id);
+      expect(acked).toEqual(['c-now']);
+    });
   });
 });

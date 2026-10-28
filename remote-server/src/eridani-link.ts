@@ -30,6 +30,7 @@ import {
   STAGE_B_CAPS,
   canonicalJson,
   chunkItems,
+  EFFECTFUL_COMMANDS,
   commandShapeError,
   parseDownFrame,
   semanticPayload,
@@ -212,6 +213,8 @@ export class EridaniLink {
   private readonly log: (msg: string) => void;
   private hostId: string | null = null;
   private connEpoch: number | null = null;
+  /** What Eridani's welcome advertised (stage F: `context.scope`). */
+  private peerCaps = new Set<string>();
   private lastConnectedAt: number | null = null;
   private lastAckAt: number | null = null;
   private rejected = 0;
@@ -523,6 +526,7 @@ export class EridaniLink {
 
   private onDown(): void {
     this.connEpoch = null;
+    this.peerCaps.clear();
     this.spool.dropEphemeral();
     this.runParts.clear();
     for (const [id, w] of this.waiting) {
@@ -530,6 +534,11 @@ export class EridaniLink {
       this.waiting.delete(id);
       w.resolve(null);
     }
+  }
+
+  /** Did the current connection's welcome advertise this capability? */
+  peerHas(cap: string): boolean {
+    return this.peerCaps.has(cap);
   }
 
   /**
@@ -610,11 +619,16 @@ export class EridaniLink {
   }
 
   private onFrame(f: DownFrame): void {
+    if (f.t !== 'welcome') {
+      // Until welcome nothing else counts, and after it only this connection's epoch does.
+      if (this.connEpoch === null || f.conn_epoch !== this.connEpoch) return;
+    }
     switch (f.t) {
       case 'welcome': {
-        const w = f as DownFrame & { host_id: string; conn_epoch: number };
+        const w = f as DownFrame & { host_id: string; conn_epoch: number; caps?: unknown };
         this.hostId = w.host_id;
         this.connEpoch = w.conn_epoch;
+        this.peerCaps = new Set(Array.isArray(w.caps) ? w.caps.filter((c): c is string => typeof c === 'string') : []);
         this.log(`eridani: welcome host ${w.host_id} epoch ${w.conn_epoch}`);
         this.dispatch({ type: 'welcome' });
         return;
@@ -697,7 +711,12 @@ export class EridaniLink {
    *      journaled, then reported as `command.outcome`.
    */
   private async onCommand(cmd: CommandBody & { id: string }): Promise<void> {
-    const digest = typeof cmd.digest === 'string' && cmd.digest ? cmd.digest : digestOf(cmd as unknown as Record<string, unknown>);
+    // The digest is recomputed, never trusted: a body that does not match it is refused outright.
+    const digest = digestOf(cmd as unknown as Record<string, unknown>);
+    if (typeof cmd.digest === 'string' && cmd.digest && cmd.digest !== digest) {
+      this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: false, error: 'DIGEST_MISMATCH' });
+      return;
+    }
     const prior = this.journal.get(cmd.op_id);
     if (prior) {
       if (prior.digest !== digest) {
@@ -733,7 +752,7 @@ export class EridaniLink {
       if (expires < this.now()) return 'expired';
       // An op must not outlive the memory of its id, or a late duplicate could run twice.
       if (expires > this.now() + ERIDANI_LIMITS.replayHorizonMs) return 'expires beyond the replay horizon';
-    } else if (cmd.t === 'spawn') return 'spawn needs expires_at';
+    } else if (EFFECTFUL_COMMANDS.has(cmd.t)) return 'expires_at required';
     return this.deps.precheck?.(cmd) ?? null;
   }
 

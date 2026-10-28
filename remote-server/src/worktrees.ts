@@ -157,6 +157,23 @@ export class WorktreeManager {
     return r.code === 0 ? r.stdout.trim() : null;
   }
 
+  /**
+   * The commit a base names, or null. A base is a local branch, a tag, or a
+   * commit id of the target's repository; a remote-tracking ref only for the
+   * target's own configured base (`origin/main` when main is not checked
+   * out). Never an arbitrary ref such as `origin/<someone's PR>` (M8, stage F).
+   */
+  async resolveBase(target: ExecutionTarget, base: string): Promise<string | null> {
+    if (!BRANCH_RE.test(base)) return null;
+    const local = (await this.revParse(target.repo, `refs/heads/${base}`)) ?? (await this.revParse(target.repo, `refs/tags/${base}`));
+    if (local) return local;
+    if (/^[0-9a-f]{7,64}$/.test(base)) {
+      const sha = await this.revParse(target.repo, base);
+      if (sha?.startsWith(base)) return sha;
+    }
+    return base === target.base ? this.revParse(target.repo, `refs/remotes/origin/${base}`) : null;
+  }
+
   /** The worktree for `branch` on `target`: reused when it exists, created from `base` when not. */
   ensure(target: ExecutionTarget, branch: string, base = target.base): Promise<EnsuredWorktree> {
     return this.serial(target.repo, async () => {
@@ -164,6 +181,8 @@ export class WorktreeManager {
       if (branch === base || branch === target.base) throw new Error(`refusing to run on the base branch ${branch}`);
       const fmt = await this.git(['check-ref-format', '--branch', branch], target.repo, { readOnly: true });
       if (fmt.code !== 0) throw new Error(`invalid branch name ${branch}`);
+      const resolvedBase = await this.resolveBase(target, base);
+      if (!resolvedBase) throw new Error(`base ${base} is not a branch, tag or commit of ${target.repo}`);
       const root = realOr(target.worktreeRoot);
       const records = readWorktreeRecords(this.opts.dir);
 
@@ -172,7 +191,7 @@ export class WorktreeManager {
         if (!within(root, realOr(existing.path))) throw new Error(`branch ${branch} is checked out at ${existing.path}, outside ${target.worktreeRoot}`);
         if (!fs.existsSync(existing.path)) throw new Error(`the worktree for ${branch} at ${existing.path} is missing (git worktree prune?)`);
         const rec = records[existing.path];
-        const baseSha = rec?.baseSha ?? (await this.mergeBase(target.repo, base, branch));
+        const baseSha = rec?.baseSha ?? (await this.mergeBase(target.repo, resolvedBase, branch));
         return { path: existing.path, branch, base: rec?.base ?? base, baseSha, created: false };
       }
 
@@ -184,11 +203,10 @@ export class WorktreeManager {
       let baseSha: string | null;
       let args: string[];
       if (await this.revParse(target.repo, `refs/heads/${branch}`)) {
-        baseSha = await this.mergeBase(target.repo, base, branch);
+        baseSha = await this.mergeBase(target.repo, resolvedBase, branch);
         args = ['worktree', 'add', want, branch];
       } else {
-        baseSha = (await this.revParse(target.repo, base)) ?? (await this.revParse(target.repo, `origin/${base}`));
-        if (!baseSha) throw new Error(`unknown base ${base} in ${target.repo}`);
+        baseSha = resolvedBase;
         args = ['worktree', 'add', '-b', branch, want, baseSha];
       }
       const add = await this.git(args, target.repo, { timeoutMs: 5 * 60_000 });
@@ -200,7 +218,7 @@ export class WorktreeManager {
   }
 
   private async mergeBase(repo: string, base: string, branch: string): Promise<string | null> {
-    const r = await this.git(['merge-base', base, branch], repo, { readOnly: true });
+    const r = await this.git(['merge-base', base, `refs/heads/${branch}`], repo, { readOnly: true });
     return r.code === 0 ? r.stdout.trim() || null : null;
   }
 
