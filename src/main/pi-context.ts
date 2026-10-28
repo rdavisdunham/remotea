@@ -124,9 +124,9 @@ export function ensurePiContext(): void {
     // Don't churn the mtime when nothing changed — pi reloads these on /reload.
     if (next === existing) return;
     fs.writeFileSync(contextPath, next, 'utf-8');
-    console.log('[wmux] Updated wmux context in', contextPath);
+    console.log('[remotea] Updated remotea context in', contextPath);
   } catch (err) {
-    console.warn('[wmux] Failed to update pi context:', err);
+    console.warn('[remotea] Failed to update pi context:', err);
   }
 }
 
@@ -152,9 +152,9 @@ export function removePiContext(): void {
       if (next === null || next === existing) continue;
       if (next.trim() === '') fs.unlinkSync(contextPath);
       else fs.writeFileSync(contextPath, next, 'utf-8');
-      console.log('[wmux] Removed wmux context from', contextPath);
+      console.log('[remotea] Removed remotea context from', contextPath);
     } catch (err) {
-      console.warn('[wmux] Failed to remove pi context:', err);
+      console.warn('[remotea] Failed to remove pi context:', err);
     }
   }
 }
@@ -188,7 +188,7 @@ export function ensurePiExtension(): void {
   try {
     const srcPath = getPiExtensionSrcPath();
     if (!fs.existsSync(srcPath)) {
-      console.warn('[wmux] pi extension source not found at', srcPath);
+      console.warn('[remotea] pi extension source not found at', srcPath);
       return;
     }
     const src = fs.readFileSync(srcPath, 'utf-8');
@@ -197,9 +197,9 @@ export function ensurePiExtension(): void {
     if (!pluginNeedsUpdate(src, target)) return;
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, src, 'utf-8');
-    console.log('[wmux] Installed the wmux pi extension to', dest);
+    console.log('[remotea] Installed the remotea pi extension to', dest);
   } catch (err) {
-    console.warn('[wmux] Failed to install the pi extension:', err);
+    console.warn('[remotea] Failed to install the pi extension:', err);
   }
 }
 
@@ -217,8 +217,8 @@ export function removePiExtension(): void {
     if (!fs.existsSync(dest)) return;
     if (!isWmuxPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
     fs.unlinkSync(dest);
-    console.log('[wmux] Removed the wmux pi extension from', dest);
+    console.log('[remotea] Removed the remotea pi extension from', dest);
   } catch (err) {
-    console.warn('[wmux] Failed to remove the pi extension:', err);
+    console.warn('[remotea] Failed to remove the pi extension:', err);
   }
 }

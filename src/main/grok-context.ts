@@ -153,21 +153,21 @@ function writeOwnedFile(filePath: string, content: string, isOurs: (s: string) =
   if (fs.existsSync(filePath)) {
     const current = fs.readFileSync(filePath, 'utf-8');
     if (!isOurs(current)) {
-      console.warn(`[wmux] ${filePath} exists and is not wmux-managed — leaving it alone`);
+      console.warn(`[remotea] ${filePath} exists and is not wmux-managed — leaving it alone`);
       return;
     }
     if (current === content) return; // already current; don't churn the mtime
   }
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf-8');
-  console.log(`[wmux] Updated ${filePath}`);
+  console.log(`[remotea] Updated ${filePath}`);
 }
 
 function removeOwnedFile(filePath: string, isOurs: (s: string) => boolean): void {
   if (!fs.existsSync(filePath)) return;
   if (!isOurs(fs.readFileSync(filePath, 'utf-8'))) return;
   fs.unlinkSync(filePath);
-  console.log(`[wmux] Removed ${filePath}`);
+  console.log(`[remotea] Removed ${filePath}`);
 }
 
 function isDirectory(p: string): boolean {
@@ -241,7 +241,7 @@ export function ensureGrokContext(): void {
     if (rendered === null) return;
     writeOwnedFile(getGrokRulesPath(), rendered.trimEnd() + '\n', isOurRules);
   } catch (err) {
-    console.warn('[wmux] Failed to update Grok context:', err);
+    console.warn('[remotea] Failed to update Grok context:', err);
   }
 }
 
@@ -249,7 +249,7 @@ export function removeGrokContext(): void {
   try {
     for (const home of grokHomes()) removeOwnedFile(rulesPathIn(home), isOurRules);
   } catch (err) {
-    console.warn('[wmux] Failed to remove Grok context:', err);
+    console.warn('[remotea] Failed to remove Grok context:', err);
   }
 }
 
@@ -258,7 +258,7 @@ export function ensureGrokHooks(): void {
     const content = JSON.stringify(buildGrokHooks(getHookScriptPath()), null, 2) + '\n';
     writeOwnedFile(getGrokHooksPath(), content, isWmuxHooksFile);
   } catch (err) {
-    console.warn('[wmux] Failed to update Grok hooks:', err);
+    console.warn('[remotea] Failed to update Grok hooks:', err);
   }
 }
 
@@ -266,6 +266,6 @@ export function removeGrokHooks(): void {
   try {
     for (const home of grokHomes()) removeOwnedFile(hooksPathIn(home), isWmuxHooksFile);
   } catch (err) {
-    console.warn('[wmux] Failed to remove Grok hooks:', err);
+    console.warn('[remotea] Failed to remove Grok hooks:', err);
   }
 }

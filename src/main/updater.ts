@@ -97,9 +97,9 @@ function currentInstallIsScoop(): boolean {
 function tellScoopUser(): UpdateTriggerResult {
   dialog.showMessageBox({
     type: 'info',
-    title: 'wmux update',
-    message: 'This copy of wmux is managed by Scoop.',
-    detail: 'Update it with:\n\n    scoop update wmux\n\nthen restart wmux.',
+    title: 'remotea update',
+    message: 'This copy of remotea is managed by Scoop.',
+    detail: 'Update it with:\n\n    scoop update remotea\n\nthen restart wmux.',
     buttons: ['OK'],
   }).catch(() => { /* the answer is informational; a dismissed dialog loses nothing */ });
   return { handled: true };
@@ -393,7 +393,7 @@ async function promptToInstall(version: string): Promise<void> {
   if (installPrompted) return;
   installPrompted = true;
   const elevationNote = updateNeedsElevation()
-    ? '\n\nThis install is under a directory wmux cannot write to, so Windows ' +
+    ? '\n\nThis install is under a directory remotea cannot write to, so Windows ' +
       'will ask for administrator rights. If you cannot grant them, download ' +
       'the installer from the releases page instead.'
     : '';
@@ -407,7 +407,7 @@ async function promptToInstall(version: string): Promise<void> {
     // needs a deliberate click — the same reasoning as the close guard (#227).
     defaultId: 1,
     cancelId: 1,
-    title: 'wmux update ready',
+    title: 'remotea update ready',
     message: `wmux ${version} has been downloaded.`,
     detail: 'Review the release notes on GitHub before installing. Install now?' + elevationNote,
   });

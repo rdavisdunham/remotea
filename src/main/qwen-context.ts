@@ -87,9 +87,9 @@ export function ensureQwenContext(): void {
     const next = injectWmuxBlock(existing, wmuxBlock, stripLegacyBlocks);
     if (next === existing) return; // already current; don't churn the mtime
     fs.writeFileSync(contextPath, next, 'utf-8');
-    console.log('[wmux] Updated wmux context in', contextPath);
+    console.log('[remotea] Updated remotea context in', contextPath);
   } catch (err) {
-    console.warn('[wmux] Failed to update Qwen context:', err);
+    console.warn('[remotea] Failed to update Qwen context:', err);
   }
 }
 
@@ -104,9 +104,9 @@ export function removeQwenContext(): void {
       if (next === null || next === existing) continue;
       if (next.trim() === '') fs.unlinkSync(contextPath);
       else fs.writeFileSync(contextPath, next, 'utf-8');
-      console.log('[wmux] Removed wmux context from', contextPath);
+      console.log('[remotea] Removed remotea context from', contextPath);
     } catch (err) {
-      console.warn('[wmux] Failed to remove Qwen context:', err);
+      console.warn('[remotea] Failed to remove Qwen context:', err);
     }
   }
 }
@@ -291,7 +291,7 @@ function updateQwenSettings(
   }
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch {
-    console.warn(`[wmux] ${settingsPath} is not plain JSON (comments?) — leaving it alone`);
+    console.warn(`[remotea] ${settingsPath} is not plain JSON (comments?) — leaving it alone`);
     return false;
   }
   if (!isRecord(parsed)) return false;
@@ -307,10 +307,10 @@ export function ensureQwenHooks(): void {
     if (!isDirectory(getQwenHome())) return;
     const hookScript = ensureQwenHookStub(getQwenHome(), getHookScriptPath());
     if (updateQwenSettings(getQwenSettingsPath(), s => applyQwenHooks(s, hookScript), true)) {
-      console.log(`[wmux] Configured ${QWEN_HOOK_EVENTS.join('/')} hooks in`, getQwenSettingsPath());
+      console.log(`[remotea] Configured ${QWEN_HOOK_EVENTS.join('/')} hooks in`, getQwenSettingsPath());
     }
   } catch (err) {
-    console.warn('[wmux] Failed to update Qwen hooks:', err);
+    console.warn('[remotea] Failed to update Qwen hooks:', err);
   }
 }
 
@@ -318,11 +318,11 @@ export function removeQwenHooks(): void {
   for (const home of qwenHomes()) {
     try {
       if (updateQwenSettings(settingsPathIn(home), removeQwenHooksFrom, false)) {
-        console.log('[wmux] Removed wmux hooks from', settingsPathIn(home));
+        console.log('[remotea] Removed wmux hooks from', settingsPathIn(home));
       }
       removeQwenHookStub(home);
     } catch (err) {
-      console.warn('[wmux] Failed to remove Qwen hooks:', err);
+      console.warn('[remotea] Failed to remove Qwen hooks:', err);
     }
   }
 }
@@ -337,9 +337,9 @@ export function ensureQwenMcp(): void {
   try {
     if (!isDirectory(getQwenHome())) return;
     const changed = updateQwenSettings(getQwenSettingsPath(), s => applyChromeDevtoolsMcp(s).next, true);
-    if (changed) console.log('[wmux] Configured chrome-devtools-mcp in', getQwenSettingsPath(), '→ localhost:9222');
+    if (changed) console.log('[remotea] Configured chrome-devtools-mcp in', getQwenSettingsPath(), '→ localhost:9222');
   } catch (err) {
-    console.warn('[wmux] Failed to update chrome-devtools-mcp for Qwen:', err);
+    console.warn('[remotea] Failed to update chrome-devtools-mcp for Qwen:', err);
   }
 }
 
@@ -347,10 +347,10 @@ export function removeQwenMcp(): void {
   for (const home of qwenHomes()) {
     try {
       if (updateQwenSettings(settingsPathIn(home), s => stripChromeDevtoolsMcp(s).next, false)) {
-        console.log('[wmux] Removed chrome-devtools-mcp from', settingsPathIn(home));
+        console.log('[remotea] Removed chrome-devtools-mcp from', settingsPathIn(home));
       }
     } catch (err) {
-      console.warn('[wmux] Failed to remove chrome-devtools-mcp for Qwen:', err);
+      console.warn('[remotea] Failed to remove chrome-devtools-mcp for Qwen:', err);
     }
   }
 }

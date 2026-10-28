@@ -120,7 +120,7 @@ export function renderInstructions(raw: string, cliBinDir = getCliBinDirForInstr
 export function readRenderedInstructions(): string | null {
   const instructionsPath = getInstructionsPath();
   if (!fs.existsSync(instructionsPath)) {
-    console.warn('[wmux] claude-instructions.md not found at', instructionsPath);
+    console.warn('[remotea] claude-instructions.md not found at', instructionsPath);
     return null;
   }
   return renderInstructions(fs.readFileSync(instructionsPath, 'utf-8'));

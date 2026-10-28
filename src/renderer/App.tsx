@@ -908,7 +908,7 @@ export default function App() {
       addNotification({
         surfaceId: '' as SurfaceId,
         workspaceId: ws.id,
-        title: t('notification.iconChanged.title', 'wmux has a new icon'),
+        title: t('notification.iconChanged.title', 'remotea has a new icon'),
         text: t('notification.iconChanged.text',
           'If the taskbar or a pinned button still shows the old one, use Settings → General → Refresh taskbar icons.'),
       });
@@ -936,7 +936,7 @@ export default function App() {
       addNotification({
         surfaceId: '' as SurfaceId,
         workspaceId: ws.id,
-        title: t('notification.gpuRestarted.title', 'wmux restarted its graphics process'),
+        title: t('notification.gpuRestarted.title', 'remotea restarted its graphics process'),
         text: t('notification.gpuRestarted.text',
           'The window had stopped painting while you were using it. Terminals and agents were not affected.'),
       });
@@ -1488,7 +1488,7 @@ export default function App() {
     } else if (action === 'openGitPanel') {
       if (activeWorkspaceId) openGitView(useStore.getState(), activeWorkspaceId, focusedPaneId);
     } else {
-      console.log(`[wmux] Command palette action: ${action}`);
+      console.log(`[remotea] Command palette action: ${action}`);
     }
     setCommandPaletteOpen(false);
   }, [workspaces, activeWorkspaceId, focusedPaneId, handleToggleExplorer]);

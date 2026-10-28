@@ -141,8 +141,8 @@ export function ensurePowerShellShim(dir = getPsShimPath()): Promise<boolean> {
     shimDir = ok ? dir : null;
     console.log(
       ok
-        ? `[wmux] PowerShell shim enabled: ${dir}`
-        : '[wmux] PowerShell shim disabled (execution policy or Mark of the Web) — falling back to wmux.cmd',
+        ? `[remotea] PowerShell shim enabled: ${dir}`
+        : '[remotea] PowerShell shim disabled (execution policy or Mark of the Web) — falling back to wmux.cmd',
     );
     return ok;
   })();

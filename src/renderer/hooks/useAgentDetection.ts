@@ -183,7 +183,7 @@ export function useAgentDetection(enabled: boolean): void {
         manifests.current = loaded.manifests as Manifest[];
       }
       for (const warning of loaded?.warnings ?? []) {
-        console.warn('[wmux] detection manifest:', warning);
+        console.warn('[remotea] detection manifest:', warning);
       }
     })();
 

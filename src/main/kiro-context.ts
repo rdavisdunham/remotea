@@ -73,7 +73,7 @@ export function ensureKiroContext(): void {
     if (fs.existsSync(steeringPath)) {
       const current = fs.readFileSync(steeringPath, 'utf-8');
       if (!isWmuxManaged(current)) {
-        console.warn('[wmux] ~/.kiro/steering/wmux.md exists and is not wmux-managed — leaving it alone');
+        console.warn('[remotea] ~/.kiro/steering/wmux.md exists and is not wmux-managed — leaving it alone');
         return;
       }
       if (current === block) return; // already current; don't churn the mtime
@@ -81,9 +81,9 @@ export function ensureKiroContext(): void {
 
     fs.mkdirSync(path.dirname(steeringPath), { recursive: true });
     fs.writeFileSync(steeringPath, block, 'utf-8');
-    console.log('[wmux] Updated wmux steering in ~/.kiro/steering/wmux.md');
+    console.log('[remotea] Updated remotea steering in ~/.kiro/steering/wmux.md');
   } catch (err) {
-    console.warn('[wmux] Failed to update Kiro context:', err);
+    console.warn('[remotea] Failed to update Kiro context:', err);
   }
 }
 
@@ -100,8 +100,8 @@ export function removeKiroContext(): void {
     if (!fs.existsSync(steeringPath)) return;
     if (!isWmuxManaged(fs.readFileSync(steeringPath, 'utf-8'))) return;
     fs.unlinkSync(steeringPath);
-    console.log('[wmux] Removed wmux steering from ~/.kiro/steering/wmux.md');
+    console.log('[remotea] Removed remotea steering from ~/.kiro/steering/wmux.md');
   } catch (err) {
-    console.warn('[wmux] Failed to remove Kiro context:', err);
+    console.warn('[remotea] Failed to remove Kiro context:', err);
   }
 }

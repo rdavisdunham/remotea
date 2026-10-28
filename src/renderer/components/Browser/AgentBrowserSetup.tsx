@@ -128,7 +128,7 @@ export default function AgentBrowserSetup({ reason, onInstalled, onRetry, onCanc
         )}
         {failed && (
           <p className="browser-pane__setup-error">
-            {t('agentBrowser.installFailed', 'wmux could not open a terminal pane for the install. Run the two commands above in any terminal, then switch back to agent.')}
+            {t('agentBrowser.installFailed', 'remotea could not open a terminal pane for the install. Run the two commands above in any terminal, then switch back to agent.')}
           </p>
         )}
         <div className="browser-pane__setup-actions">

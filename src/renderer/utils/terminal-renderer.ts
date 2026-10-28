@@ -42,7 +42,7 @@ export function attachVisibleRenderer(terminal: Terminal): RendererHandle {
     webgl = new WebglAddon();
     terminal.loadAddon(webgl);
   } catch (err) {
-    console.warn('[wmux] WebGL renderer unavailable, staying on DOM renderer:', err);
+    console.warn('[remotea] WebGL renderer unavailable, staying on DOM renderer:', err);
     return DOM_RENDERER_HANDLE;
   }
   activeWebglCount++;
@@ -68,7 +68,7 @@ export function attachVisibleRenderer(terminal: Terminal): RendererHandle {
     // exactly when panes are split/resized and several terminals flip visible at
     // once). Downgrade this terminal to the DOM renderer instead of leaving it
     // frozen.
-    console.warn('[wmux] WebGL context lost, downgrading terminal to DOM renderer');
+    console.warn('[remotea] WebGL context lost, downgrading terminal to DOM renderer');
     release();
     try { webgl.dispose(); } catch { /* no-op */ }
     handle.kind = DOM_RENDERER_HANDLE.kind;

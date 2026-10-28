@@ -104,7 +104,7 @@ describe('what a committed file may not do', () => {
   });
 
   it('WMUX_* variables belong to wmux', () => {
-    expect(errorsOf({ version: 1, panes: [{ run: ['x'], env: { WMUX_SURFACE_ID: 'x' } }] }).join()).toMatch(/belong to wmux/);
+    expect(errorsOf({ version: 1, panes: [{ run: ['x'], env: { WMUX_SURFACE_ID: 'x' } }] }).join()).toMatch(/belong to remotea/);
   });
 
   it('a credential written literally is a warning that names the fix', () => {

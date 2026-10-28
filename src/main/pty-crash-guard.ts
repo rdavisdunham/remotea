@@ -108,7 +108,7 @@ export function guardExitCallback(
 }
 
 function defaultOnError(err: unknown): void {
-  console.warn('[wmux] node-pty exit callback threw (contained, see #150):', err);
+  console.warn('[remotea] node-pty exit callback threw (contained, see #150):', err);
 }
 
 /** Minimal shape of the EventEmitter side of node-pty's Terminal. */
@@ -155,12 +155,12 @@ export function installPtyCrashGuard(): boolean {
     };
     const proto = mod?.WindowsPtyAgent?.prototype;
     if (!proto) {
-      console.warn('[wmux] could not reach WindowsPtyAgent — #150 exit guard not installed');
+      console.warn('[remotea] could not reach WindowsPtyAgent — #150 exit guard not installed');
       return false;
     }
     return guardExitCallback(proto);
   } catch (err) {
-    console.warn('[wmux] #150 exit guard not installed:', err);
+    console.warn('[remotea] #150 exit guard not installed:', err);
     return false;
   }
 }

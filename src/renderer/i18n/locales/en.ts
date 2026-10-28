@@ -944,7 +944,7 @@ export const en = {
   'agentNavigator.silent': 'reports no state',
   'agentNavigator.fromScreen': 'read from the screen',
   'settings.workspacePanel.detectAgentScreens': 'Read agent screens to infer state',
-  'settings.workspacePanel.detectAgentScreensHint': 'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\wmux\\agent-detection, and use `wmux detect explain` to see which rule fired.',
+  'settings.workspacePanel.detectAgentScreensHint': 'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `wmux detect explain` to see which rule fired.',
   'agentNavigator.silentProbed': 'detected — reports no state',
   'agentNavigator.hint': '↑↓ move · enter jump · a/b/q/w/i/u filter · esc close',
   'agentNavigator.workspacesWithAgents': 'workspaces',

@@ -101,7 +101,7 @@ export default function AgentIntegrationSettings() {
 
       <div className="settings-row">
         <label className="settings-label">
-          {t('settings.integration.enable', 'Let wmux configure Claude Code, OpenCode, Kiro, omp, pi and Grok')}
+          {t('settings.integration.enable', 'Let remotea configure Claude Code, OpenCode, Kiro, omp, pi and Grok')}
         </label>
         <input
           type="checkbox"
@@ -115,7 +115,7 @@ export default function AgentIntegrationSettings() {
       <p className="settings-hint">
         {t(
           'settings.integration.hint',
-          'wmux edits files in your home directory so coding agents can drive its browser panel, markdown views and sidebar status. Turning something off here also removes what it wrote.',
+          'remotea edits files in your home directory so coding agents can drive its browser panel, markdown views and sidebar status. Turning something off here also removes what it wrote.',
         )}
       </p>
 

@@ -138,7 +138,7 @@ export async function queryProcesses(pids: number[]): Promise<LiveProcess[]> {
     // in .NET and the CIM assemblies can take well past 15s. Timing out there
     // means reaping nothing, which is precisely the case this exists for.
     timeoutMs: PROBE_TIMEOUT_MS,
-    onFailure: (cause) => console.warn('[wmux] orphan scan failed, reaping nothing:', cause),
+    onFailure: (cause) => console.warn('[remotea] orphan scan failed, reaping nothing:', cause),
   });
   return parseProcessLines(stdout);
 }
@@ -235,7 +235,7 @@ export class PtyLedger {
       // A ledger we cannot write is a ledger we must not read next launch, or
       // we would reap against a stale list. Go inert rather than half-correct.
       this.enabled = false;
-      console.warn('[wmux] PTY ledger disabled (write failed):', (err as Error).message);
+      console.warn('[remotea] PTY ledger disabled (write failed):', (err as Error).message);
     }
   }
 }
@@ -263,7 +263,7 @@ export async function reapOrphans(candidates: LedgerEntry[]): Promise<number[]> 
   const live = await queryProcesses(candidates.map((e) => e.pid));
   const orphans = selectOrphans(candidates, live);
   if (orphans.length === 0) return [];
-  console.warn(`[wmux] reaping ${orphans.length} process tree(s) orphaned by a previous crash (issue #139)`);
+  console.warn(`[remotea] reaping ${orphans.length} process tree(s) orphaned by a previous crash (issue #139)`);
   for (const pid of orphans) treeKill(pid);
   return orphans;
 }

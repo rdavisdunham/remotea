@@ -38,7 +38,7 @@ describe('global agent-context block (issue #152)', () => {
 
   it('says what to do when the check fails, so a false premise has an exit', () => {
     // \s+ because the source is hard-wrapped — the sentence may straddle a line.
-    expect(BLOCK).toMatch(/wmux is not\s+running for this\s+session/i);
+    expect(BLOCK).toMatch(/remotea is not\s+running for this\s+session/i);
     expect(BLOCK).toMatch(/use your (normal|own)\s+tools/i);
   });
 
@@ -53,7 +53,7 @@ describe('global agent-context block (issue #152)', () => {
     expect(BLOCK).toMatch(/anything else[^]*do not\s+conclude yet/i);
     expect(BLOCK).toMatch(/different program also called `wmux`/i);
     const absolute = BLOCK.indexOf('{{WMUX_CLI_BIN}}/wmux" ping');
-    const conclusion = BLOCK.search(/wmux is not\s+running for this\s+session/i);
+    const conclusion = BLOCK.search(/remotea is not\s+running for this\s+session/i);
     expect(absolute).toBeGreaterThan(-1);
     expect(conclusion).toBeGreaterThan(absolute);
   });

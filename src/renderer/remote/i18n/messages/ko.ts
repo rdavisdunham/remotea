@@ -10,7 +10,7 @@ export const ko: Readonly<Record<string, string>> = {
   'loading': '연결 중…',
 
   'pair.title': '이 기기 페어링',
-  'pair.body': '컴퓨터가 이 브라우저를 wmux 원격 콘솔과 페어링하려고 합니다. 이 코드를 방금 직접 스캔한 경우에만 계속하세요.',
+  'pair.body': '컴퓨터가 이 브라우저를 remotea 원격 콘솔과 페어링하려고 합니다. 이 코드를 방금 직접 스캔한 경우에만 계속하세요.',
   'pair.nameLabel': '기기 이름',
   'pair.namePlaceholder': '컴퓨터에서 정한 이름',
   'pair.confirm': '페어링',
@@ -64,7 +64,7 @@ export const ko: Readonly<Record<string, string>> = {
   'attach.loading': '화면 불러오는 중…',
   'attach.exited': '프로세스가 종료됨 ({code})',
   'attach.lag': '따라잡는 중…',
-  'attach.errNoTerminal': '이 터미널은 어떤 wmux 창에서도 열려 있지 않습니다.',
+  'attach.errNoTerminal': '이 터미널은 어떤 remotea 창에서도 열려 있지 않습니다.',
   'attach.errTimeout': '컴퓨터가 제시간에 응답하지 않았습니다.',
   'attach.errGone': '이 터미널은 닫혔습니다.',
   'attach.closedTerminal': '닫힌 터미널',

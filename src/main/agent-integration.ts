@@ -105,18 +105,18 @@ export const DEFAULT_CONSENT: IntegrationConsent = { decision: 'unset', features
 
 /** Exact disclosure shown before wmux writes outside its own data directory. */
 export const INTEGRATION_CONSENT_DETAIL =
-  'wmux can teach your coding agents to drive its browser panel, markdown views ' +
+  'remotea can teach your coding agents to drive its browser panel, markdown views ' +
   'and sidebar status. Doing so edits files in your home directory:\n\n' +
   '  • ~/.claude/CLAUDE.md, ~/.config/opencode/AGENTS.md, ~/.omp/agent/AGENTS.md\n' +
   '    and ~/.pi/agent/AGENTS.md\n' +
-  '      a wmux section, between markers, leaving your own text untouched\n' +
+  '      a remotea section, between markers, leaving your own text untouched\n' +
   '  • ~/.kiro/steering/wmux.md\n' +
-  '      a steering file of wmux\'s own; your other Kiro steering is untouched\n' +
+  '      a steering file of remotea\'s own; your other Kiro steering is untouched\n' +
   '  • ~/.grok/rules/wmux.md and ~/.grok/hooks/wmux.json (only if Grok is installed)\n' +
-  '      files of wmux\'s own; the rules file only when Grok is not already\n' +
+  '      files of remotea\'s own; the rules file only when Grok is not already\n' +
   '      reading the ~/.claude/CLAUDE.md section\n' +
   '  • ~/.qwen/QWEN.md and ~/.qwen/settings.json (only if Qwen Code is installed)\n' +
-  '      a wmux section in QWEN.md; in settings.json the same status hooks as\n' +
+  '      a remotea section in QWEN.md; in settings.json the same status hooks as\n' +
   '      Claude Code below, plus chrome-devtools-mcp — your own keys untouched\n' +
   '  • ~/.claude/settings.json\n' +
   '      eight hook families: PostToolUse, Notification, Stop, SubagentStop,\n' +
@@ -126,9 +126,9 @@ export const INTEGRATION_CONSENT_DETAIL =
   '  • ~/.omp/agent/extensions/wmux.js\n' +
   '      an omp extension that reports foreground and background job state\n' +
   '  • ~/.gemini/config/plugins/wmux/ (only if the Antigravity CLI is installed)\n' +
-  '      an agy plugin of wmux\'s own that reports each pane\'s conversation\n' +
+  '      an agy plugin of remotea\'s own that reports each pane\'s conversation\n' +
   '  • ~/.config/opencode/plugin/wmux.js\n' +
-  '      the wmux orchestrator plugin for OpenCode\n' +
+  '      the remotea orchestrator plugin for OpenCode\n' +
   '  • ~/.claude/settings.json\n' +
   '      a pinned chrome-devtools-mcp pointed at the browser panel instead of its own Chrome\n\n' +
   '"Not now" asks again next launch. "Never" writes nothing and removes anything ' +
@@ -254,7 +254,7 @@ export async function promptForConsent(parent?: Electron.BrowserWindow): Promise
       buttons: ['Enable integration', 'Not now', 'Never'],
       defaultId: 0,
       cancelId: 1,
-      title: 'wmux — agent integration',
+      title: 'remotea — agent integration',
       message: 'Let wmux set up Claude Code, Qwen Code, OpenCode, Kiro, omp, pi and Grok?',
       detail: INTEGRATION_CONSENT_DETAIL,
       noLink: true,
@@ -268,7 +268,7 @@ export async function promptForConsent(parent?: Electron.BrowserWindow): Promise
     if (result.response === 2) return 'declined';
     return null; // "Not now" — leave it unset and ask again next launch
   } catch (err) {
-    console.warn('[wmux] Could not ask about agent integration:', err);
+    console.warn('[remotea] Could not ask about agent integration:', err);
     return null;
   }
 }

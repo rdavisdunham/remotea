@@ -35,13 +35,13 @@ export interface RecoveryCopy {
 export function rendererRecoveryCopy(kind: RendererTrouble): RecoveryCopy {
   if (kind === 'gone') {
     return {
-      message: 'The wmux window stopped working.',
+      message: 'The remotea window stopped working.',
       detail: 'Your terminals are still running. Reload the window to get them back.',
       buttons: ['Reload window', 'Close'],
     };
   }
   return {
-    message: 'The wmux window is not responding.',
+    message: 'The remotea window is not responding.',
     detail: 'Your terminals are still running. Reloading the window reconnects to them; '
       + 'only changes made in the last few seconds may be lost.',
     buttons: ['Reload window', 'Wait'],

@@ -110,7 +110,7 @@ export default function NewWorkspaceButton({
       (window as any).wmux?.notification?.fire({
         surfaceId: '',
         text: t('palette.saveCurrentLayoutFailed', 'No active workspace to save as a layout.'),
-        title: 'wmux',
+        title: 'remotea',
       });
     }
   };

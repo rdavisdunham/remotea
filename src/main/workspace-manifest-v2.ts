@@ -60,7 +60,7 @@ async function confirmTrust(plan: WorkspacePlan, text: string, changed: { added:
     message: changed
       ? `"${plan.name}" changed. Run its commands?`
       : `Run the commands in "${plan.name}"?`,
-    detail: `${trustDialogText(text, changed)}\n\nOnly continue if you trust where this file came from. wmux will ask again if it changes.`,
+    detail: `${trustDialogText(text, changed)}\n\nOnly continue if you trust where this file came from. remotea will ask again if it changes.`,
     buttons: ['Run commands', 'Open without running', 'Cancel'],
     defaultId: 2,
     cancelId: 2,

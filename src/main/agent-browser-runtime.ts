@@ -434,7 +434,7 @@ export async function closeSessionByName(
     null,
   );
   if (res?.ok) return true;
-  deps.warn?.(`[wmux] agent-browser: could not close session ${sessionName}`);
+  deps.warn?.(`[remotea] agent-browser: could not close session ${sessionName}`);
   return false;
 }
 
@@ -561,7 +561,7 @@ export async function reconcileOrphanSessions(
     if (await closeSessionByName(name, deps)) closed.push(name);
   }
   if (closed.length > 0) {
-    deps.warn?.(`[wmux] closed ${closed.length} agent-browser session(s) orphaned by a previous run (issue #139)`);
+    deps.warn?.(`[remotea] closed ${closed.length} agent-browser session(s) orphaned by a previous run (issue #139)`);
   }
   return closed;
 }

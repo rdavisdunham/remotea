@@ -344,7 +344,7 @@ export function resolveShell(shell: string | undefined): string {
   if (shell) {
     const resolved = resolveExistingShellPath(shell);
     if (resolved) return resolved;
-    console.warn(`[wmux] Shell not found: "${shell}", falling back to ${getDefaultShell()}`);
+    console.warn(`[remotea] Shell not found: "${shell}", falling back to ${getDefaultShell()}`);
   }
   return getDefaultShell();
 }
@@ -437,7 +437,7 @@ export function resolveShellForCwd(shell: string, cwd: string | undefined): stri
   const shellType = getShellType(shell);
   if (shellType !== 'powershell' && shellType !== 'cmd') return shell;
   if (!shellEnv.hasWsl()) return shell;
-  console.warn(`[wmux] cwd is a POSIX path, using wsl.exe instead of ${shell}: ${cwd}`);
+  console.warn(`[remotea] cwd is a POSIX path, using wsl.exe instead of ${shell}: ${cwd}`);
   return 'wsl.exe';
 }
 
@@ -486,9 +486,9 @@ export function resolveSpawnCwd(raw: string | undefined): string {
   // that exists but is a FILE — CreateProcess wants a directory.
   try {
     if (fs.statSync(cwd).isDirectory()) return cwd;
-    console.warn(`[wmux] cwd is not a directory, falling back to ${fallback}: ${cwd}`);
+    console.warn(`[remotea] cwd is not a directory, falling back to ${fallback}: ${cwd}`);
   } catch {
-    console.warn(`[wmux] cwd does not exist, falling back to ${fallback}: ${cwd}`);
+    console.warn(`[remotea] cwd does not exist, falling back to ${fallback}: ${cwd}`);
   }
   return fallback;
 }
@@ -508,7 +508,7 @@ function buildShellArgs(
       env.WMUX_PS1_SCRIPT = script;
       return ['-NoLogo', '-ExecutionPolicy', 'Bypass', '-NoExit', '-Command', '. $env:WMUX_PS1_SCRIPT'];
     }
-    console.warn(`[wmux] shell-integration not found at: ${script} — starting PowerShell without integration`);
+    console.warn(`[remotea] shell-integration not found at: ${script} — starting PowerShell without integration`);
     return ['-NoLogo'];
   }
   if (shellType === 'cmd') {
@@ -799,7 +799,7 @@ export class PtyManager {
     try {
       ptyProcess = pty.spawn(shell, args, spawnOptions);
     } catch (err) {
-      console.warn('[wmux] spawn with bundled conpty.dll failed, retrying with inbox ConPTY:', err);
+      console.warn('[remotea] spawn with bundled conpty.dll failed, retrying with inbox ConPTY:', err);
       ptyProcess = pty.spawn(shell, args, { ...spawnOptions, useConptyDll: false });
     }
 
@@ -809,7 +809,7 @@ export class PtyManager {
     // process and every other pane with it (issue #150). Claim the error here
     // and let the pane die alone.
     attachErrorSink(ptyProcess as unknown as Parameters<typeof attachErrorSink>[0], (err) => {
-      console.warn(`[wmux] pty ${id} socket error (contained):`, err);
+      console.warn(`[remotea] pty ${id} socket error (contained):`, err);
     });
 
     const entry: PtyEntry = {
@@ -883,7 +883,7 @@ export class PtyManager {
         isAlive: () => entry.alive,
         setTimeout: (fn, ms) => setTimeout(fn, ms),
         clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
-        log: (message) => console.log(`[wmux] pty ${id}: ${message}`),
+        log: (message) => console.log(`[remotea] pty ${id}: ${message}`),
       },
       commands,
     );

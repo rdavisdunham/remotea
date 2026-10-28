@@ -329,7 +329,7 @@ export class CDPProxy {
       ws.on('close', cleanup);
       ws.on('error', cleanup);
 
-      console.log('[wmux] CDP proxy: client connected');
+      console.log('[remotea] CDP proxy: client connected');
     });
 
     // Safety nets: never let an 'error' event become an uncaught exception.
@@ -370,7 +370,7 @@ export class CDPProxy {
           this.server!.once('listening', onListening);
           this.server!.listen(p, '127.0.0.1');
         });
-        console.log(`[wmux] CDP proxy listening on localhost:${p}`);
+        console.log(`[remotea] CDP proxy listening on localhost:${p}`);
         return;
       } catch {
         continue;
@@ -383,7 +383,7 @@ export class CDPProxy {
     // rejection anyway — it is the STATE that has to be truthful, not the
     // control flow.
     console.warn(
-      `[wmux] CDP proxy: all ports ${DEFAULT_PORT}-${MAX_PORT} busy — browser automation is unavailable`,
+      `[remotea] CDP proxy: all ports ${DEFAULT_PORT}-${MAX_PORT} busy — browser automation is unavailable`,
     );
   }
 

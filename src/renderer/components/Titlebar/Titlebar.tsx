@@ -88,12 +88,12 @@ export default function Titlebar({
       <div className="titlebar__left">
         <img
           src={logoSrc}
-          alt="wmux"
+          alt="remotea"
           className="titlebar__logo"
           draggable={false}
           style={{ cursor: 'pointer' }}
-          onClick={() => window.wmux?.system?.openExternal?.('https://wmux.org') }
-          title="wmux.org"
+          onClick={() => window.wmux?.system?.openExternal?.("https://github.com/rdavisdunham/remotea") }
+          title="remotea on GitHub"
         />
         <button
           className="titlebar__btn"

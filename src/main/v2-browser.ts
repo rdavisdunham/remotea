@@ -219,7 +219,7 @@ function agentTargetFor(surfaceId: string): BrowserTarget {
   // Deliberately NOT awaited — see above. `.catch` is what keeps an unawaited
   // rejection from surfacing as an unhandled promise rejection.
   acquireDashboardFor(surfaceId).catch((err: Error) => {
-    console.warn('[wmux] agent-browser dashboard did not start:', err?.message);
+    console.warn('[remotea] agent-browser dashboard did not start:', err?.message);
   });
   return { kind: 'agent', session: sessionRegistry.ensure(surfaceId as SurfaceId) };
 }
@@ -460,7 +460,7 @@ export async function runBrowserCommandForTarget(
 ): Promise<any> {
   if (target.kind === 'agent') {
     const warning = unrepresentableWaitTimeout(method, params);
-    if (warning) console.warn(`[wmux] agent-browser: ${warning}`);
+    if (warning) console.warn(`[remotea] agent-browser: ${warning}`);
     // Built FIRST, before anything is spawned: an unsupported verb must cost a
     // rejected message, not a Chrome round-trip. `toAgentBrowserArgv` throws
     // the identical -32601 the web switch below does, which is what makes the

@@ -157,7 +157,7 @@ export async function openManifest(input: { path: string; dryRun?: boolean; newC
   const answer = await askTrust(manifestPath, plan, hash, trustLines, deps);
   if (answer === 'cancel') return { ok: true, cancelled: true };
   const workspaceId = await launch(manifestPath, plan, answer === 'run', deps);
-  if (!workspaceId) return { ok: false, errors: ['no wmux window could create the workspace'], warnings };
+  if (!workspaceId) return { ok: false, errors: ['no remotea window could create the workspace'], warnings };
   openedWorkspaces.set(key, workspaceId);
   return { ok: true, workspaceId, ranCommands: answer === 'run', warnings };
 }

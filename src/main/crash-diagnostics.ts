@@ -64,7 +64,7 @@ export function logDiagnostic(event: string, fields: Record<string, unknown> = {
     // Say it once to the console we may or may not have, then stay quiet.
     if (!warned) {
       warned = true;
-      console.warn('[wmux] could not write diagnostics log:', err);
+      console.warn('[remotea] could not write diagnostics log:', err);
     }
   }
 }

@@ -91,12 +91,12 @@ export function ensureAgyPlugin(home = os.homedir(), scriptSrc = getHookScriptSr
     if (!isDirectory(agyHome(home))) return;
     const src = readOrNull(scriptSrc);
     if (src === null) {
-      console.warn('[wmux] agy plugin source not found at', scriptSrc);
+      console.warn('[remotea] agy plugin source not found at', scriptSrc);
       return;
     }
     const dir = getAgyPluginDir(home);
     if (isDirectory(dir) && !ownsPluginDir(dir)) {
-      console.warn(`[wmux] ${dir} exists and is not wmux-managed — leaving it alone`);
+      console.warn(`[remotea] ${dir} exists and is not wmux-managed — leaving it alone`);
       return;
     }
     fs.mkdirSync(dir, { recursive: true });
@@ -109,9 +109,9 @@ export function ensureAgyPlugin(home = os.homedir(), scriptSrc = getHookScriptSr
       fs.writeFileSync(scriptPath, src, 'utf-8');
       changed = true;
     }
-    if (changed) console.log('[wmux] Installed the wmux agy plugin to', dir);
+    if (changed) console.log('[remotea] Installed the remotea agy plugin to', dir);
   } catch (err) {
-    console.warn('[wmux] Failed to install agy plugin:', err);
+    console.warn('[remotea] Failed to install agy plugin:', err);
   }
 }
 
@@ -128,8 +128,8 @@ export function removeAgyPlugin(home = os.homedir()): void {
     }
     fs.unlinkSync(path.join(dir, HOOK_SCRIPT));
     if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
-    console.log('[wmux] Removed the wmux agy plugin from', dir);
+    console.log('[remotea] Removed the remotea agy plugin from', dir);
   } catch (err) {
-    console.warn('[wmux] Failed to remove agy plugin:', err);
+    console.warn('[remotea] Failed to remove agy plugin:', err);
   }
 }

@@ -458,7 +458,7 @@ export default function TerminalSettings() {
       <p className="settings-hint">
         {t(
           'settings.terminalPanel.bellStyleHint',
-          'What a bell does in a pane you can see — shells ring it on Backspace at an empty prompt or a Tab with no match. A bell in a background tab, another workspace or while wmux is in the background raises a notification instead (Settings → Notifications).',
+          'What a bell does in a pane you can see — shells ring it on Backspace at an empty prompt or a Tab with no match. A bell in a background tab, another workspace or while remotea is in the background raises a notification instead (Settings → Notifications).',
         )}
       </p>
 

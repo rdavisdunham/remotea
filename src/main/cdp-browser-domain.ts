@@ -194,7 +194,7 @@ function handleSessionTargetDomain(
     default:
       // Including `attachToTarget`: there is nothing under this page to attach
       // to, and inventing a second session is how the loop above started.
-      return fail(`'${method}' is not available on a wmux page session`, -32601);
+      return fail(`'${method}' is not available on a remotea page session`, -32601);
   }
 }
 
@@ -291,7 +291,7 @@ function handleTargetDomain(
       // Incognito. There is one webview and it has the app's session; pretending
       // otherwise would hand a client a context that silently shares cookies
       // with the default one.
-      return fail('wmux exposes a single browser context', -32601);
+      return fail('remotea exposes a single browser context', -32601);
 
     default:
       return null;

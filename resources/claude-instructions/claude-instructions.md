@@ -1,8 +1,8 @@
 <!-- wmux:start — AUTO-MANAGED BY wmux. Do not edit this section manually. -->
 
-# wmux
+# remotea
 
-You are running inside wmux, a terminal multiplexer with a browser panel on the right side that the user can see in real-time.
+You are running inside remotea, a terminal multiplexer with a browser panel on the right side that the user can see in real-time.
 
 ## Browser
 

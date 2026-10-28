@@ -98,9 +98,9 @@ export function ensureOmpContext(): void {
     // Don't churn the mtime when nothing changed — omp watches these files.
     if (next === existing) return;
     fs.writeFileSync(agentsPath, next, 'utf-8');
-    console.log('[wmux] Updated wmux context in', agentsPath);
+    console.log('[remotea] Updated remotea context in', agentsPath);
   } catch (err) {
-    console.warn('[wmux] Failed to update omp context:', err);
+    console.warn('[remotea] Failed to update omp context:', err);
   }
 }
 
@@ -124,9 +124,9 @@ export function removeOmpContext(): void {
     if (next === null || next === existing) return;
     if (next.trim() === '') fs.unlinkSync(agentsPath);
     else fs.writeFileSync(agentsPath, next, 'utf-8');
-    console.log('[wmux] Removed wmux context from', agentsPath);
+    console.log('[remotea] Removed remotea context from', agentsPath);
   } catch (err) {
-    console.warn('[wmux] Failed to remove omp context:', err);
+    console.warn('[remotea] Failed to remove omp context:', err);
   }
 }
 
@@ -147,14 +147,14 @@ export function ensureOmpExtension(): void {
     const dest = getOmpExtensionPath();
     const target = fs.existsSync(dest) ? fs.readFileSync(dest, 'utf-8') : null;
     if (target !== null && !isWmuxPluginFile(target)) {
-      console.warn('[wmux] Refusing to overwrite the user-owned omp extension:', dest);
+      console.warn('[remotea] Refusing to overwrite the user-owned omp extension:', dest);
       return;
     }
     if (!pluginNeedsUpdate(src, target)) return;
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, src, 'utf-8');
   } catch (err) {
-    console.warn('[wmux] Failed to install the omp extension:', err);
+    console.warn('[remotea] Failed to install the omp extension:', err);
   }
 }
 
@@ -165,6 +165,6 @@ export function removeOmpExtension(): void {
     if (!fs.existsSync(dest) || !isWmuxPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
     fs.unlinkSync(dest);
   } catch (err) {
-    console.warn('[wmux] Failed to remove the omp extension:', err);
+    console.warn('[remotea] Failed to remove the omp extension:', err);
   }
 }

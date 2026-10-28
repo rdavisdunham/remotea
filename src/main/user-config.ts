@@ -189,7 +189,7 @@ function warnConfig(filePath: string, problem: string): void {
   const key = `${filePath}\0${problem}`;
   if (warnedConfigProblems.has(key)) return;
   warnedConfigProblems.add(key);
-  console.warn(`[wmux] ${filePath}: ${problem} — see \`wmux config show\``);
+  console.warn(`[remotea] ${filePath}: ${problem} — see \`wmux config show\``);
 }
 
 /**

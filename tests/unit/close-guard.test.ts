@@ -46,9 +46,9 @@ describe('decideClose', () => {
 describe('closeDialogCopy', () => {
   it('says "quit" for the last window and names the cost', () => {
     const copy = closeDialogCopy({ lastWindow: true, ptyCount: 4 });
-    expect(copy.message).toBe('Quit wmux?');
+    expect(copy.message).toBe('Quit remotea?');
     expect(copy.detail).toContain('4 terminal sessions');
-    expect(copy.confirmLabel).toBe('Quit wmux');
+    expect(copy.confirmLabel).toBe('Quit remotea');
   });
 
   it('singularises one session', () => {
@@ -65,7 +65,7 @@ describe('closeDialogCopy', () => {
     const copy = closeDialogCopy({ lastWindow: false, ptyCount: 9 });
     expect(copy.message).toBe('Close this window?');
     expect(copy.detail).not.toContain('9');
-    expect(copy.detail).toContain('Other wmux windows stay open');
+    expect(copy.detail).toContain('Other remotea windows stay open');
     expect(copy.confirmLabel).toBe('Close window');
   });
 });

@@ -128,7 +128,7 @@ export default function AddressBar({
             className={`browser-address-bar__engine-btn${!isAgent ? ' browser-address-bar__engine-btn--active' : ''}`}
             aria-pressed={!isAgent}
             onClick={() => onEngineChange('web')}
-            title={t('addressBar.engineWebTitle', 'Browse in this panel. wmux drives the page itself \u2014 no extra install.')}
+            title={t('addressBar.engineWebTitle', 'Browse in this panel. remotea drives the page itself \u2014 no extra install.')}
           >
             {t('addressBar.engineWeb', 'web')}
           </button>
@@ -137,7 +137,7 @@ export default function AddressBar({
             className={`browser-address-bar__engine-btn${isAgent ? ' browser-address-bar__engine-btn--active' : ''}`}
             aria-pressed={isAgent}
             onClick={() => onEngineChange('agent')}
-            title={t('addressBar.engineAgentTitle', 'Hand this tab to a real Chrome outside wmux, and watch what your agent does to it here. Needs a one-time install.')}
+            title={t('addressBar.engineAgentTitle', 'Hand this tab to a real Chrome outside remotea, and watch what your agent does to it here. Needs a one-time install.')}
           >
             {'\u2726 '}{t('addressBar.engineAgent', 'agent')}
           </button>
