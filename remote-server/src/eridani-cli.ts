@@ -13,6 +13,10 @@
  *   collect [--dry-run] [--days N]
  *       --dry-run prints what the collector would report (like collector.py
  *       --dry-run); without it, asks the running server for a scan now
+ *   collector [parity|authoritative]
+ *       shows or switches the collector mode and prints what to do around
+ *       the switch (the cutover checklist, or the rollback). The running
+ *       server follows within 30 s; status --json turns v2 in authoritative.
  *
  * The key never appears in output, logs or the status file.
  */
@@ -24,6 +28,7 @@ import WebSocket from 'ws';
 import {
   ERIDANI_COLLECT_REQUEST,
   ERIDANI_KEY_RE,
+  LEGACY_TIMER_HINT,
   ensureServerId,
   forgetEridaniToken,
   loadEridaniConfig,
@@ -196,6 +201,39 @@ function readRegistry(dir: string): RegistryData | null {
   }
 }
 
+/**
+ * What to do around a switch (docs/remotea/eridani-link.md § Collector
+ * cutover, mirroring Eridani's retirement steps in
+ * ~/jarvis/scripts/session_collector/README.md).
+ */
+export function collectorChecklist(mode: 'parity' | 'authoritative'): string {
+  if (mode === 'authoritative') {
+    return [
+      'Collector cutover checklist (this host now reports to the store; status --json is v2):',
+      '  before  [ ] Eridani\'s parity summary says "ready for cutover" (7 consecutive clean days)',
+      '          [ ] this release is the one installed and running (systemctl --user status remotea)',
+      '  now     [ ] stop the Python collector:  ' + LEGACY_TIMER_HINT,
+      '          [ ] remove its SessionStart hook:  remotea hooks --remove-legacy-collector  (--dry-run first)',
+      '          [ ] within 2 min: remotea eridani status shows the link ready, no refusals, outbox draining',
+      '          [ ] a new or resumed session appears in Eridani with its resume hint',
+      '          [ ] the agents\' MCP key ("cli-agents") still works: it is not part of the cutover',
+      '  later   [ ] one release on, after a clean cutover: remove the collector\'s units and',
+      '              ~/.config/eridani-collector, then revoke the old collector credential in Eridani',
+      '              (Settings → Integrations → Connected agents). Never the link key or cli-agents.',
+      'Rollback: remotea eridani collector parity, then systemctl --user enable --now eridani-collector.timer',
+      '',
+    ].join('\n');
+  }
+  return [
+    'Collector back in parity mode (reports are compared, not stored; status --json is v1).',
+    'If this is a rollback, the Python collector must report again:',
+    '  [ ] systemctl --user enable --now eridani-collector.timer',
+    '  [ ] its SessionStart hook, if you removed it and want it back: add',
+    '      `python3 ~/jarvis/scripts/session_collector/session_hook.py` to SessionStart in ~/.claude/settings.json',
+    '',
+  ].join('\n');
+}
+
 function fmtTime(ms: number | null | undefined): string {
   return ms ? new Date(ms).toISOString() : '-';
 }
@@ -273,12 +311,31 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
       out.write('scan requested; the server runs it within 30 s\n');
       return 0;
     }
+    case 'collector': {
+      const prev = loadEridaniConfig(dir);
+      const want = rest[0];
+      if (want === undefined) {
+        out.write(`collector ${prev?.collector ?? 'parity'}${prev ? '' : ' (no link set up)'}\n`);
+        return 0;
+      }
+      if (want !== 'parity' && want !== 'authoritative') throw new Error('usage: remotea eridani collector [parity|authoritative]');
+      if (!prev) throw new Error('the link is not set up: run `remotea eridani connect --url wss://…` first');
+      if (prev.collector === want) out.write(`collector already ${want}\n`);
+      else {
+        saveEridaniConfig(dir, { ...prev, collector: want });
+        out.write(`collector ${prev.collector} → ${want}; the server follows within 30 s\n`);
+      }
+      if (want === 'authoritative' && !prev.enabled) out.write('note: the link is disabled, so nothing reports until `remotea eridani connect`\n');
+      out.write(collectorChecklist(want));
+      return 0;
+    }
     case 'targets':
       return targetsCommand(dir, rest, out);
     case 'worktrees':
       return worktreesCommand(dir, rest, out);
     default:
       process.stderr.write(`usage: remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]
+       remotea eridani collector [parity|authoritative]
        remotea eridani targets list [--json] | add --id <id> --repo <path> --worktree-root <path> [--base <branch>] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>] | add --json '<target>' | remove <id>
        remotea eridani worktrees [--json]\n`);
       return sub === undefined ? 0 : 2;
