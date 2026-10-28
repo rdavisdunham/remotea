@@ -161,6 +161,24 @@ export const ERIDANI_TOKEN_FILE = 'eridani-token';
 export const ERIDANI_COLLECT_REQUEST = 'eridani-collect-request';
 export const ERIDANI_KEY_RE = /^eri_bot_[A-Za-z0-9_-]{8,256}$/;
 
+/**
+ * Why a link URL is refused, or null. The key travels in the handshake on
+ * every reconnect, so cleartext `ws://` is allowed only to this machine
+ * (a local test); everything else must be `wss://` (L10, stage F).
+ */
+export function linkUrlError(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return 'the link URL is not a URL';
+  }
+  if (u.protocol === 'wss:') return null;
+  if (u.protocol !== 'ws:') return 'the link URL starts with wss://';
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' ? null : 'ws:// is allowed only for localhost, 127.0.0.1 or ::1; use wss://';
+}
+
 /** The link's config, or null when it was never set up (or is unreadable). */
 export function loadEridaniConfig(dir: string): EridaniConfig | null {
   try {

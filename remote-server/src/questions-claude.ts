@@ -39,6 +39,7 @@
 import crypto from 'crypto';
 import { ERIDANI_LIMITS, ERIDANI_TIMING, type AnswerCommand, type QuestionBody, type QuestionItem, type QuestionOutcome, type QuestionResolvedBody } from '../../src/shared/eridani-link-protocol';
 import type { SessionRecord } from '../../src/shared/remote-host-protocol';
+import { redact } from './collector/redact';
 
 type Up<T> = Omit<T, 'op_id' | 'digest'>;
 
@@ -96,6 +97,16 @@ const TOOL_USE_RE = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_ITEMS = 8;
 const MAX_CHOICES = 16;
 const OPEN: ReadonlySet<QState> = new Set(['held', 'submitted', 'timed_out']);
+
+/** A question item as it is sent to Eridani: every free-text field redacted. */
+export function redactItem(it: QuestionItem): QuestionItem {
+  return {
+    ...it,
+    text: redact(it.text),
+    ...(it.header ? { header: redact(it.header) } : {}),
+    ...(it.choices ? { choices: it.choices.map((c) => ({ ...c, label: redact(c.label), ...(c.description ? { description: redact(c.description) } : {}) })) } : {}),
+  };
+}
 
 /** AskUserQuestion's `questions` → items. Null when the shape is not one we can answer. */
 export function toItems(questions: unknown): QuestionItem[] | null {
@@ -230,10 +241,11 @@ export class QuestionBroker {
         provider_turn_id: promptId,
         kind: 'ask',
         group_id: toolUseId,
-        items,
+        // L6: what leaves the machine is redacted; the held copy keeps the exact text the answer is keyed by.
+        items: items.map(redactItem),
         hold_until: q.openedAt + this.holdMs,
       });
-      this.deps.needsYou(surf, `Question: ${items[0].text}`);
+      this.deps.needsYou(surf, `Question: ${redact(items[0].text)}`);
       this.deps.log?.(`question ${q.id} held for ${surf} (${items.length} item(s))`);
     });
   }
@@ -329,7 +341,7 @@ export class QuestionBroker {
       still_open: stillOpen,
       remote_answerable: false,
       ...(detail ? { detail } : {}),
-      ...(echo ? { answer_echo: echo } : {}),
+      ...(echo ? { answer_echo: Object.fromEntries(Object.entries(echo).map(([k, v]) => [redact(k), redact(v)])) } : {}),
     });
     this.deps.log?.(`question ${q.id}: ${outcome}${stillOpen ? ' (still open in the terminal)' : ''}`);
   }

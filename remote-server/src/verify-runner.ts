@@ -3,7 +3,13 @@
  * attempt runs, and under which id, is verify-attempts.ts.
  *
  *   - only a `verify.id` from the run's execution target: fixed argv, no
- *     shell, cwd inside the worktree, the target's timeout;
+ *     shell, cwd inside the worktree (after resolving symlinks), the
+ *     target's timeout;
+ *   - a minimal environment (stage F): PATH, HOME, LANG, CI=1, TERM=dumb and
+ *     the verify entry's own `env`; never the server's environment. NOT a
+ *     sandbox: what runs is the worktree's code (package.json scripts,
+ *     conftest.py), which the agent edits, with network and Davin's
+ *     privileges. Sandboxing is deferred (docs/remotea/eridani-link.md);
  *   - the workspace fingerprint is taken BEFORE the run: `<HEAD>:<sha256>` of
  *     the branch, the status, the diff against HEAD and every untracked
  *     file's content, so a result can be tied to exactly the tree it tested.
@@ -53,6 +59,14 @@ export interface VerifyRunOptions {
   spawn?: (cmd: string, args: string[], opts: SpawnOptions) => ChildProcess;
   now?: () => number;
   env?: NodeJS.ProcessEnv;
+}
+
+/** The environment a verify run gets: a few basics from `from`, then the entry's own `env`. */
+export function verifyEnv(spec: VerifySpec, from: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const env: Record<string, string> = { PATH: from.PATH || '/usr/local/bin:/usr/bin:/bin' };
+  if (from.HOME) env.HOME = from.HOME;
+  env.LANG = from.LANG || 'C.UTF-8';
+  return { ...env, CI: '1', TERM: 'dumb', ...spec.env };
 }
 
 const MAX_UNTRACKED_FILES = 2000;
@@ -143,6 +157,14 @@ export async function runVerify(o: VerifyRunOptions): Promise<VerifyOutcome> {
   if (!fs.existsSync(o.worktree)) return fail('none:', 'the worktree is missing');
   const cwd = o.spec.cwd ? path.resolve(o.worktree, o.spec.cwd) : o.worktree;
   if (!within(o.worktree, cwd)) return fail('none:', 'cwd escapes the worktree');
+  // The lexical check is not enough: a symlinked folder in the worktree could point anywhere.
+  if (fs.existsSync(cwd)) {
+    try {
+      if (!within(fs.realpathSync(o.worktree), fs.realpathSync(cwd))) return fail('none:', 'cwd escapes the worktree');
+    } catch {
+      return fail('none:', 'cannot resolve cwd');
+    }
+  }
   const state = async (): Promise<(WorkspaceFacts & { fingerprint: string }) | null> => {
     try {
       return await workspaceState(o.worktree, o.git);
@@ -171,7 +193,7 @@ export async function runVerify(o: VerifyRunOptions): Promise<VerifyOutcome> {
     try {
       child = (o.spawn ?? nodeSpawn)(o.spec.argv[0], o.spec.argv.slice(1), {
         cwd,
-        env: { ...(o.env ?? process.env), CI: '1' },
+        env: verifyEnv(o.spec, o.env ?? process.env),
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false,
         windowsHide: true,

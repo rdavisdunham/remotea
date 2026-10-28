@@ -18,7 +18,9 @@
  *           disconnected host invents no continuation); `steer` interrupts
  *           (Esc) and starts a new turn with the text: the generation
  *           advances first, so the new turn is bound to it (F07). Text is
- *           typed as a bracketed paste, then Enter. Injected input never
+ *           typed as a bracketed paste, then Enter; it carries no control
+ *           character but newline and tab (refused at the shape check and
+ *           stripped again here), so nothing can end the paste early. Injected input never
  *           counts as a person answering (agent-state.ts is not told).
  *   stop    durable desired state: `stopRequested` is persisted on the
  *           binding before anything is sent and cleared only when the process
@@ -39,8 +41,14 @@
  * Recovery: on boot, every Eridani session the restart lost is respawned
  * with its conversation resumed (`claude --resume <id> --model <m>
  * --permission-mode auto`, `codex resume --disable daemon_auto_start -m <m>
- * <id>`), unless a stop was requested. `runs.snapshot` applies Eridani's
- * desired state (stop, a newer generation).
+ * <id>`), unless a stop was requested. A run that cannot be resumed (no
+ * conversation was reported, or resuming is off) is left exited and reported
+ * as `exit`, never respawned as a bare shell (D4, stage F). `runs.snapshot`
+ * applies Eridani's desired state (stop, a newer generation).
+ *
+ * Stage F: `input` (queue and steer) and `answer` act only on the run's own
+ * agent: the current incarnation was launched by this dispatch with the run's
+ * command, and that agent reported its session through its hook (fence).
  */
 import crypto from 'crypto';
 import fs from 'fs';
@@ -220,6 +228,13 @@ export class Dispatch {
   private readonly exitWaiters = new Map<string, Array<(code: number) => void>>();
   readonly attempts: VerifyAttempts;
   private readonly spawning = new Set<string>();
+  /**
+   * M7: the incarnation of each surface dispatch itself launched with the
+   * run's agent command (spawn or resume line), and whether that agent has
+   * since reported its session through its hook. In memory on purpose: a
+   * server restart ends every process, so nothing survives it to vouch for.
+   */
+  private readonly launchedWith = new Map<string, { incarnation: number; agentSeen: boolean }>();
 
   constructor(private readonly deps: DispatchDeps) {
     this.timers = deps.timers ?? realTimers;
@@ -265,7 +280,10 @@ export class Dispatch {
       resumeCommand: (rec) => this.resumeCommand(rec),
       exited: (id, code) => this.onExit(id, code),
       turn: (t: TurnFields) => this.attempts.onTurn(t),
-      hook: (id, params) => this.deps.questions.hook(id, params),
+      hook: (id, params) => {
+        this.noteHook(id, params);
+        this.deps.questions.hook(id, params);
+      },
       snapshot: (id): Partial<SnapshotSurface> => {
         const qs = this.deps.questions.openIds(id);
         return qs.length ? { questions: qs } : {};
@@ -310,8 +328,15 @@ export class Dispatch {
       }
       case 'stop':
         return this.fence(cmd as unknown as StopCommand, 'stop');
-      case 'answer':
-        return this.deps.questions.precheck(cmd as unknown as AnswerCommand);
+      case 'answer': {
+        const c = cmd as unknown as AnswerCommand;
+        const pre = this.deps.questions.precheck(c);
+        if (pre) return pre;
+        // The answer is delivered to the hook that asked; that hook must belong to the run's agent.
+        const surf = this.deps.questions.get(c.question_id)?.surf;
+        const rec = surf ? this.deps.registry.session(surf) : undefined;
+        return rec?.eridani ? this.agentPresent(rec) : 'the surface is not bound to a run';
+      }
       case 'verify': {
         const c = cmd as unknown as VerifyCommand;
         const rec = this.boundSession(c.run_id);
@@ -339,7 +364,32 @@ export class Dispatch {
     if (kind === 'stop') return null;
     if (b.stopRequested) return 'stopping';
     if (!this.deps.hub.isLive(c.surf)) return 'the process is not running';
+    return this.agentPresent(rec);
+  }
+
+  /**
+   * Text is typed only into the run's agent (M7): the current incarnation
+   * was launched with the run's own command (the spawn's launcher, or its
+   * resume line) and the agent has reported its session. Anything else (a
+   * shell, an agent that never started) would run the text as a command.
+   */
+  private agentPresent(rec: SessionRecord): string | null {
+    const b = rec.eridani!;
+    const launched = this.launchedWith.get(rec.id);
+    if (!launched || launched.incarnation !== (rec.incarnation ?? 0)) return 'the run\'s agent was not launched in this incarnation';
+    if (!launched.agentSeen || !rec.agent) return 'the agent has not reported its session yet';
+    if (rec.agent.provider !== b.harness) return 'the surface is not running the run\'s agent';
     return null;
+  }
+
+  /** A hook event from the surface: its agent (of the run's harness) is up in this incarnation. */
+  private noteHook(id: string, params: Record<string, unknown>): void {
+    const launched = this.launchedWith.get(id);
+    const rec = this.deps.registry.session(id);
+    if (!launched || !rec?.eridani || launched.incarnation !== (rec.incarnation ?? 0)) return;
+    if (params.event === 'SessionEnd' || typeof params.sessionId !== 'string' || !params.sessionId) return;
+    const provider = params.provider === 'codex' ? 'codex' : params.provider ? null : 'claude';
+    if (provider === rec.eridani.harness) launched.agentSeen = true;
   }
 
   /** The newest session bound to a run. */
@@ -448,6 +498,7 @@ export class Dispatch {
         return { state: 'failed', detail: `spawn: ${res.message}` };
       }
       const rec = this.deps.hub.updateRecord(surf, { eridani: binding });
+      this.launchedWith.set(surf, { incarnation: rec?.incarnation ?? 1, agentSeen: false });
       this.deps.registry.saveNow();
       this.deps.changed?.();
       this.log(`eridani: spawned ${cmd.harness} for run ${cmd.run_id} g${cmd.generation} in ${wt.path} (${surf})`);
@@ -460,7 +511,10 @@ export class Dispatch {
   // ── input ────────────────────────────────────────────────────────────────
 
   private type(surf: string, text: string): void {
-    const clean = text.replace(/\x1b\[20[01]~/g, '');
+    // M6: no ESC (or C1 CSI) reaches the terminal, so nothing can end the
+    // paste early or arrive as a key (commandShapeError already refuses them).
+    // eslint-disable-next-line no-control-regex -- removing control characters is the point
+    const clean = text.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '');
     this.deps.hub.inject(surf, `\x1b[200~${clean}\x1b[201~`);
     this.timers.setTimeout(() => this.deps.hub.inject(surf, '\r'), this.timing.pasteEnterMs);
   }
@@ -654,7 +708,10 @@ export class Dispatch {
     if (!b) return undefined;
     if (b.stopRequested || this.deps.resumeAgents === false || !rec.agent) return null;
     const t = this.target(b.target);
-    return resumeLine(b, t?.launch[b.harness], rec.agent.sessionId);
+    const line = resumeLine(b, t?.launch[b.harness], rec.agent.sessionId);
+    // The hub respawns with this line as the next incarnation.
+    if (line) this.launchedWith.set(rec.id, { incarnation: (rec.incarnation ?? 0) + 1, agentSeen: false });
+    return line;
   }
 
   /**
@@ -671,8 +728,9 @@ export class Dispatch {
         this.finishLost(rec, 'stopped (the process ended with the server restart)');
         continue;
       }
-      if (!rec.agent) {
-        this.log(`eridani: ${rec.id} (run ${rec.eridani.runId}) has no conversation to resume; left lost`);
+      if (!rec.agent || this.deps.resumeAgents === false) {
+        // D4: no conversation to resume is an ended run, never a bare shell.
+        this.deps.hub.exitLost(rec.id, rec.agent ? 'resuming agents is turned off' : 'no conversation to resume');
         continue;
       }
       const res = this.conn.open(rec.id, {});
@@ -682,9 +740,8 @@ export class Dispatch {
 
   private finishLost(rec: SessionRecord, why: string): void {
     const { stopRequested: _s, ...rest } = rec.eridani!;
-    this.deps.hub.updateRecord(rec.id, { state: 'exited', exitCode: -1, exitedAt: this.now(), eridani: rest });
-    this.deps.registry.saveNow();
-    this.log(`eridani: ${rec.id} ${why}`);
+    this.deps.hub.updateRecord(rec.id, { eridani: rest });
+    this.deps.hub.exitLost(rec.id, why);
   }
 
   /**

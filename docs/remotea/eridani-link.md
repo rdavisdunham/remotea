@@ -1,4 +1,4 @@
-# The Eridani link (stages B to E)
+# The Eridani link (stages B to F)
 
 remotea-server can keep one outbound WebSocket to Eridani. In stage B the link
 is **read-only**: it reports what agents in remotea terminals are doing (state,
@@ -140,7 +140,10 @@ Eridani sends:
   journaled, acked, and answered with `command.outcome` `rejected` /
   `unsupported`. A repeated `op_id` with the same digest gets the recorded
   outcome again. A repeated `op_id` with a different digest gets
-  `ack ok:false error:"DIGEST_MISMATCH"`.
+  `ack ok:false error:"DIGEST_MISMATCH"`. Since stage F the digest is
+  recomputed for every inbound command, so a body that does not match its own
+  digest is refused the same way and never journaled. Frames before welcome,
+  and frames whose `conn_epoch` is not the welcome's, are ignored.
 
 ## Delivery and the outbox
 
@@ -259,6 +262,8 @@ shell as **one argv word**; it is never parsed as shell text, and a prompt
 starting with `-` is refused. `env` accepts only `ERIDANI_*` keys with
 one-line values. This is policy against Eridani's text becoming commands. It
 is not a sandbox: the agent itself runs with `--permission-mode auto` as you.
+Stage F tightened `input`, the lost-run respawn and verify. See
+[Stage F: security model](#stage-f-security-model).
 
 ### Worktrees
 
@@ -282,16 +287,18 @@ recovery ref first (`refs/remotea/recovery/<branch>`), then
 | `t` | Fields | Effect |
 |---|---|---|
 | `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
-| `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text` | `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then the text. Typed as a bracketed paste and Enter. Never counts as a person answering. |
+| `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then the text. Typed as a bracketed paste and Enter. Never counts as a person answering. |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
-| `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, `CI=1`, the target's timeout), then sends `verify.result`. Shares the attempt machinery of [stage D](#stage-d-verification-after-turns). |
+| `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id, expires_at` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, a minimal environment, the target's timeout), then sends `verify.result`. Shares the attempt machinery of [stage D](#stage-d-verification-after-turns). |
 
 Every command needs a fence that matches: an `input`/`stop` names the surface
 and its `incarnation`, the run, and the generation (a queued input must match
-the current generation; steer and stop may name a newer one). A command whose
-`expires_at` is past, or more than 7 days out (the replay horizon), is
-rejected.
+the current generation; steer and stop may name a newer one). Every effectful
+command (`spawn`, `input`, `answer`, `stop`, `verify`) must carry
+`expires_at`. A missing one is rejected (`expires_at required`, since stage
+F), and so is one that is past or more than 7 days out (the replay horizon,
+the time the journal remembers an `op_id`).
 
 **Journal.** For every command: `accepted` is written and fsynced (with the
 command body) **before** the ack goes out; `executing` is written when its
@@ -313,7 +320,12 @@ their conversation (`claude --resume <id> --model <m> --permission-mode auto`,
 `codex resume --disable daemon_auto_start -m <m> <id>`), with the run's env
 from `eridani-runs.json` (0600; the run token and env never go into the
 registry). A lost session whose stop was requested is marked exited instead.
-This happens whether or not the link is enabled.
+So is one that cannot be resumed: no conversation was ever reported, or
+`resumeAgents` is off (stage F, D4). Such a session is reported upstream as
+`exit {code: -1, reason}` and is never respawned as a bare shell. That rule
+holds whether the server notices it on boot or an app reopens the tab. To get
+a shell there, open a new tab in the worktree yourself. It is not bound to the
+run. This happens whether or not the link is enabled.
 
 **runs.snapshot** (Eridani → remotea, after welcome, chunked like the
 snapshot): `runs [{run_id, generation, desired: continue|stop|none,
@@ -358,6 +370,18 @@ printed for the agent, followed by `Eridani run token: <token>` when there is
 one. With no answer in time, one line naming the tool, session and run is
 printed instead; a late response is dropped. Nothing is printed when the link
 is not enabled.
+
+Since stage F (D6), `context.response` carries `scope: "run" | "candidates"`.
+The full text (`run`) is printed only for a surface bound to a run. An unbound
+session, meaning one of Davin's own in a folder an Eridani rule covers, gets
+only the short fenced candidate-task list (`candidates`), at most 4 000
+characters. remotea drops `run` text and any run token sent for an unbound
+surface. The handling of an unscoped answer depends on Eridani's welcome:
+
+- If the welcome advertised `context.scope`, an unscoped answer to an unbound
+  surface is dropped too.
+- If it did not (an older Eridani), the answer is printed as before. This keeps
+  the two sides able to lag one release apart.
 
 ### Other frames
 
@@ -559,8 +583,120 @@ SessionStart hook back by hand if you want it
 (`python3 ~/jarvis/scripts/session_collector/session_hook.py`). The parity
 fingerprints were kept, so going back sends nothing new.
 
-## Not yet implemented (stage E and later)
+## Stage F: security model
 
+Stage F fixed the remotea items of the 2026-10-28 security audit. This
+section states what the trust boundary is now, including what it still does
+not cover.
+
+**Who can drive a terminal.**
+
+- remotea is a same-user system. The hub token (`~/.config/remotea/token`) is
+  shell access: any process running as Davin can read it and type into every
+  remotea terminal, including Davin's own sessions with a cached `sudo` or an
+  SSH login.
+- That includes an agent. A Claude in auto mode, or any unsandboxed agent,
+  can drive every remotea terminal, not only its own. Sandboxed Codex can read
+  the file but cannot connect, because it has no network.
+- Windows processes reach 7717 and 7718 through mirrored loopback, but still
+  need the token.
+
+**Where the hub listens.**
+
+- The hub binds `127.0.0.1` **and `tailscale0`** by default (`config.bind`),
+  so every tailnet device can reach 7717.
+- That is acceptable: the 256-bit token and the 10-failures-per-minute ban
+  hold. Restricting 7717 to your own devices with Tailscale ACLs adds depth,
+  and is recommended.
+- The hook bridge (7718) is loopback only.
+
+**What Eridani's text can become.**
+
+- `input` text is a bracketed paste and nothing else.
+  - `commandShapeError` refuses C0/C1 controls other than newline and tab
+    (ESC, CSI U+009B, CR, Ctrl-C), so a nested `\x1b[201~` cannot end the
+    paste early. `\x1b[Z` (Shift+Tab, which cycles the permission mode) cannot
+    arrive as a key either.
+  - Text that starts with `/` (a slash command) or `!` (Claude Code's shell
+    mode) is refused.
+  - `type()` also strips every such control before typing, as defence in
+    depth.
+- `input`, `steer` and `answer` are accepted only when two things hold for the
+  surface's **current incarnation**:
+  - remotea launched it with the run's own agent command (the spawn line or
+    the resume line);
+  - that agent has reported its session through its hook.
+
+  A shell, or an agent that never started, gets a typed `rejected` outcome
+  (`the agent has not reported its session yet`, …). A lost run that cannot
+  be resumed stays exited (above).
+
+**Verify.**
+
+- Verify runs the worktree's code: `package.json` scripts, test files,
+  `conftest.py`. The agent edits that code freely. It runs **outside the
+  agent's sandbox**, with network and Davin's privileges, 2 s after every
+  root turn, so a sandboxed Codex agent's edits run unsandboxed and a
+  Claude agent's commands skip the auto-mode classifier.
+- Stage F does the cheap parts:
+  - The child gets a minimal environment: `PATH`, `HOME`, `LANG`, `CI=1`,
+    `TERM=dumb`, plus only what the verify entry's own `env` names
+    (`"env": {"NODE_OPTIONS": "…"}`). Keys follow shell variable rules, with
+    at most 32 one-line values. The server's environment (keys, tokens,
+    `SSH_AUTH_SOCK`) never reaches it.
+  - The cwd is resolved with `realpath` before the containment check, so a
+    symlinked folder cannot point outside the worktree.
+  - A spawn's `target.base` must be a local branch, a tag or a commit id of
+    the target's repository. A remote-tracking ref is accepted only for the
+    target's own configured base. An arbitrary ref such as
+    `origin/<someone's PR>` is refused.
+- Running verify inside a sandbox (bubblewrap or `codex sandbox`, no network)
+  is **deferred**. Automatic verify stays on. See the list below.
+
+**What leaves the machine.**
+
+- Verify tails and errors, question items, the answer echo and the
+  `needs_you` reason go through the shared redaction list
+  ([redaction.md](redaction.md)). Turns and session reports already did.
+- Eridani redacts every host free-text field again on ingestion.
+
+**Claims, not facts.**
+
+- A session's own hook token can report its hook events, so the following are
+  claims made by the agent, not facts the host verified:
+  `effective_permission_mode` on `status`, turn text, Stop, and idle. An agent
+  can claim `default` while it runs in `bypassPermissions`, or fake a Stop
+  for its own surface (only its own).
+- Eridani should treat these fields as agent claims.
+
+**SessionStart text.** Full Eridani context reaches only run-bound surfaces.
+Other sessions see at most the fenced candidate list (D6, above).
+
+**Link URL.**
+
+- `ws://` is accepted only for `localhost`, `127.0.0.1` and `::1`.
+- The CLI refuses anything else. The server checks again when it reads
+  `eridani.json`, because the file can be edited by hand. The key is sent in
+  every handshake.
+
+**Hook files.** `remotea hooks install/remove` keeps the mode of
+`settings.json` / `hooks.json`, whatever the umask. The
+`.remotea-backup` copy is always 0600.
+
+**Capabilities.** hello adds `digest` (every op frame carries its digest, so
+Eridani may require it) and `context.scope`. The lag rules:
+
+- Eridani refuses an `op_id` frame without a digest only from a host that
+  advertises `digest`.
+- remotea scopes context strictly only when Eridani advertises
+  `context.scope`.
+
+## Not yet implemented (stage F and later)
+
+- **Verify sandboxing** (deferred in stage F): run verify inside the agent's
+  sandbox, through bubblewrap or `codex sandbox linux`, with no network, or
+  make automatic verify opt-in per target. Until then verify runs agent-edited
+  code unsandboxed (see the security model above).
 - Answering permission prompts (captured only) and Codex questions (no hook).
 - Removing worktrees (nominate only, by design).
 - Deleting the Python collector's code, units and credential: Davin's step,

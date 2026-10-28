@@ -31,7 +31,8 @@
  * command journal (`failed`, interrupted by a server restart).
  */
 import crypto from 'crypto';
-import type { VerifyCommand, VerifyResultBody } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_LIMITS, type VerifyCommand, type VerifyResultBody } from '../../src/shared/eridani-link-protocol';
+import { redact } from './collector/redact';
 import type { SessionRecord, VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
 import type { TurnFields } from './turn-capture';
 import type { VerifySpec } from './eridani-targets';
@@ -238,6 +239,14 @@ export class VerifyAttempts {
       }
     }
     const turnFingerprint = tf && tf.seq === a.tuple.turn_seq ? await tf.fp : null;
+    // L6: a failing test prints configs and headers; secrets never leave the machine.
+    const tail = redact(out.tail);
+    out = {
+      ...out,
+      tail: tail.slice(-ERIDANI_LIMITS.verifyTailChars),
+      truncated: out.truncated || tail.length > ERIDANI_LIMITS.verifyTailChars,
+      ...(out.error ? { error: redact(out.error) } : {}),
+    };
     const result: VerifyResultFields = {
       t: 'verify.result',
       attempt_id: a.id,

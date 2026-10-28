@@ -31,6 +31,7 @@ import {
   LEGACY_TIMER_HINT,
   ensureServerId,
   forgetEridaniToken,
+  linkUrlError,
   loadEridaniConfig,
   readEridaniToken,
   saveEridaniConfig,
@@ -245,7 +246,8 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
       const prev = loadEridaniConfig(dir);
       const url = flag(rest, '--url') ?? prev?.url;
       if (!url) throw new Error('usage: remotea eridani connect --url wss://<eridani>/api/v1/external/agents/link [--machine <name>]');
-      if (!/^wss?:\/\//.test(url)) throw new Error('the link URL starts with wss:// (ws:// only for a local test)');
+      const urlError = linkUrlError(url);
+      if (urlError) throw new Error(urlError);
       const machine = flag(rest, '--machine') ?? prev?.machine;
       const key = await readKey();
       if (!ERIDANI_KEY_RE.test(key)) throw new Error('that is not an Eridani link key (it starts with eri_bot_)');

@@ -97,7 +97,11 @@ export type LinkCap =
   // Stage D: the host verifies after each root turn on its own (`local:` attempt ids).
   | 'verify.auto'
   // Stage E: this host's collector is authoritative (reports carry parity: false). Informational.
-  | 'collector.authoritative';
+  | 'collector.authoritative'
+  // Stage F: every op frame carries its digest (Eridani may then require it), and
+  // context.response's `scope` is honoured (D6: full text only for run-bound surfaces).
+  | 'digest'
+  | 'context.scope';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -113,6 +117,10 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 
 /** Stage E, advertised only while `eridani.json.collector` is `authoritative`. */
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
+
+/** Stage F: everything in D, plus `digest` and `context.scope`. */
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope']);
+export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /** What one harness can do on this host (the capability matrix, C15). Advertise only what is verified. */
 export interface HarnessCaps {
@@ -280,6 +288,8 @@ export interface ExitBody extends OpFields {
   incarnation: number;
   code: number;
   exited_at: number;
+  /** Why the host ended it itself (stage F: a lost run that could not be resumed is left exited, never a bare shell). */
+  reason?: string;
 }
 
 export interface SnapshotSurface {
@@ -488,6 +498,11 @@ export interface ContextResponseBody {
   t: 'context.response';
   req_id: string;
   text: string;
+  /**
+   * Stage F (D6): `run` is the full grounding for a run-bound surface;
+   * `candidates` is the short fenced task list an unbound session may see.
+   */
+  scope?: 'run' | 'candidates';
   /** A short-lived token the agent's Eridani tools present to bind calls to the run. */
   run_token?: string;
 }
@@ -752,6 +767,16 @@ const isInt = (v: unknown, min = 0): v is number => typeof v === 'number' && Num
 const isExpiry = (v: unknown) => v === undefined || isNum(v) || (typeof v === 'string' && !Number.isNaN(Date.parse(v)));
 // eslint-disable-next-line no-control-regex -- matching control characters is the point
 const noControl = (s: string) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(s);
+/**
+ * Text typed into an agent's terminal (`input`): no C0 or C1 control
+ * character except newline and tab. ESC, CSI (U+009B) and CR are what turn a
+ * bracketed paste into keystrokes (M6, stage F).
+ */
+// eslint-disable-next-line no-control-regex -- matching control characters is the point
+export const isPasteSafe = (s: string) => !/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/.test(s);
+
+/** Effectful commands: each must carry `expires_at` within the replay horizon (L11, stage F). */
+export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify']);
 
 /**
  * Validate a stage C command's body. Returns null when it is well formed,
@@ -787,7 +812,10 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
     case 'input':
       if (!isStr(m.surf, 120) || !isInt(m.incarnation) || !isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
       if (m.mode !== 'queue' && m.mode !== 'steer') return 'bad mode';
-      if (typeof m.text !== 'string' || !m.text.trim() || m.text.length > ERIDANI_LIMITS.promptInChars || m.text.includes('\u0000')) return 'bad text';
+      if (typeof m.text !== 'string' || !m.text.trim() || m.text.length > ERIDANI_LIMITS.promptInChars) return 'bad text';
+      if (!isPasteSafe(m.text)) return 'text may not contain control characters (only newline and tab)';
+      // A leading `/` is a slash command and `!` is Claude Code's shell mode: input is a message, never either.
+      if (/^[/!]/.test(m.text.trimStart())) return 'text may not start with "/" or "!"';
       return null;
     case 'answer':
       if (!isStr(m.question_id, 200) || !isStr(m.provider_request_id, 200)) return 'bad question';
