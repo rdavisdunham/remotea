@@ -23,7 +23,7 @@
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { ERIDANI_TIMING, STAGE_C_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_TIMING, STAGE_D_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
   eridaniConfigStamp,
@@ -253,7 +253,7 @@ export class EridaniRuntime {
       precheck: (cmd) => this.dispatch.precheck(cmd),
       recover: (rec) => this.dispatch.recover(rec),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
-      caps: () => STAGE_C_CAPS,
+      caps: () => STAGE_D_CAPS,
       targets: () => this.helloTargets(),
       onRunsSnapshot: (runs) => {
         this.dispatch.applyRunsSnapshot(runs);

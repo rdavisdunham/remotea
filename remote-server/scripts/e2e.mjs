@@ -386,6 +386,7 @@ try {
 
   // 10. Stage C: Eridani starts and steers work (dispatch.ts), with a stub `claude`.
   await stageC();
+  await stageD();
   if (process.env.E2E_REAL_CLAUDE === '1') await realQuestion();
 } catch (err) {
   failures++;
@@ -462,7 +463,7 @@ done
   cli('eridani', 'targets', 'add', '--json', JSON.stringify({
     id: 'e2e', repo, worktreeRoot: wtRoot, base: 'main',
     launch: { claude: { bin: stub } },
-    verify: [{ id: 'ls', argv: ['ls', '-1'], timeout: 30 }],
+    verify: [{ id: 'ls', argv: ['ls', '-1'], timeout: 30 }, { id: 'slowls', argv: ['sh', '-c', 'sleep 3; ls -1'], timeout: 30 }],
   }));
   ok(/e2e .*harnesses claude/.test(cli('eridani', 'targets', 'list')), 'remotea eridani targets add/list');
   eri.contextText = (f) => `ERIDANI CONTEXT for ${f.surf} run ${f.run_id} g${f.generation}`;
@@ -568,6 +569,54 @@ done
   ok(/start --resume \S+ --model sonnet --permission-mode auto/.test(fs.readFileSync(starts, 'utf8')), 'the running run is resumed on boot with its model and permission mode');
   const snap = await eri.waitFor('sessions.snapshot', (f) => f.surfaces?.some((x) => x.surf === surf3 && x.run_id === 'run-e2e-3'), 10_000).catch(() => null);
   ok(!!snap, 'the reconnect snapshot carries the run binding');
+}
+
+/**
+ * Stage D: a run spawned with a verify config verifies after every root turn
+ * on its own (`local:` attempt ids), and a newer turn cancels a running attempt.
+ */
+async function stageD() {
+  const surfOf = (op) => eri.waitFor('ack', (f) => f.op_id === op, 15_000).then((a) => a.outcome);
+  sendCommand({ t: 'spawn', op_id: 'op-e2e-spawn-4', run_id: 'run-e2e-4', generation: 1, attempt: 1, harness: 'claude', model: 'sonnet', target: { id: 'e2e', branch: 'eri/e2e-4' }, prompt: 'verify me', verify: { verify_id: 'slowls', plan_revision: 5 } });
+  const { surf, incarnation } = await surfOf('op-e2e-spawn-4');
+  await outcome('op-e2e-spawn-4');
+  // The stub's first Stop is turn 1: 2 s later the configured verify runs.
+  const v1 = await eri.waitFor('verify.result', (f) => f.run_id === 'run-e2e-4' && f.turn_seq === 1, 20_000).catch(() => null);
+  ok(v1 && /^local:[0-9a-f-]{36}$/.test(v1.attempt_id) && v1.generation === 1 && v1.plan_revision === 5 && v1.verify_id === 'slowls' && v1.initiator === 'host'
+    && v1.exit_code === 0 && v1.tail.includes('README.md') && v1.stale_workspace === false && v1.workspace?.branch === 'eri/e2e-4', `a root turn triggers verify → verify.result with the turn's tuple (${JSON.stringify(v1 && { ...v1, tail: undefined })})`);
+  const st1 = JSON.parse(cli('status', '--json')).sessions.find((x) => x.id === surf);
+  ok(st1?.verify?.attemptId === v1?.attempt_id && st1.verify.state === 'passed' && typeof st1.verify.startedAt === 'number', 'status --json: verify {attemptId, state, startedAt}');
+
+  // Turn 2 → its attempt starts; turn 3 arrives while it runs and cancels it.
+  const fence = { surf, incarnation, run_id: 'run-e2e-4', generation: 1 };
+  sendCommand({ t: 'input', op_id: 'op-e2e-d-in-1', mode: 'queue', text: 'second turn', ...fence });
+  await outcome('op-e2e-d-in-1');
+  const t0 = Date.now();
+  let running = null;
+  while (Date.now() - t0 < 15_000) {
+    const v = JSON.parse(cli('status', '--json')).sessions.find((x) => x.id === surf)?.verify;
+    if (v?.state === 'running' && v.attemptId !== v1?.attempt_id) {
+      running = v;
+      break;
+    }
+    await sleep(100);
+  }
+  ok(!!running, 'the second turn\'s attempt is running');
+  sendCommand({ t: 'input', op_id: 'op-e2e-d-in-2', mode: 'queue', text: 'third turn', ...fence });
+  const canceled = await eri.waitFor('verify.result', (f) => f.run_id === 'run-e2e-4' && f.turn_seq === 2, 15_000).catch(() => null);
+  ok(canceled?.canceled === true && canceled.attempt_id === running?.attemptId, 'a newer turn cancels the running attempt (verify.result canceled:true)');
+  const v3 = await eri.waitFor('verify.result', (f) => f.run_id === 'run-e2e-4' && f.turn_seq === 3, 20_000).catch(() => null);
+  ok(v3?.exit_code === 0 && v3.canceled === false && v3.attempt_id !== canceled?.attempt_id, 'the newer turn is verified');
+  const turns = [...new Map(eri.of('turn', (f) => f.surf === surf).map((f) => [f.op_id, f.seq])).values()];
+  ok(JSON.stringify(turns) === '[1,2,3]', `one turn per logical turn (${turns})`);
+
+  // An Eridani verify for the turn just verified, tree unchanged: the result again under Eridani's id, no second run.
+  sendCommand({ t: 'verify', op_id: 'op-e2e-d-verify', attempt_id: 'att-d-3', run_id: 'run-e2e-4', generation: 1, turn_seq: 3, plan_revision: 5, verify_id: 'slowls' });
+  const again = await eri.waitFor('verify.result', (f) => f.attempt_id === 'att-d-3', 15_000).catch(() => null);
+  ok(again?.adopted === v3?.attempt_id && again.initiator === 'eridani' && again.duration_ms === v3?.duration_ms, 'an Eridani verify for the same tuple reuses the host attempt');
+
+  sendCommand({ t: 'stop', op_id: 'op-e2e-d-stop', mode: 'interrupt', ...fence });
+  await outcome('op-e2e-d-stop');
 }
 
 /**

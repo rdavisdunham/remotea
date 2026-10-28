@@ -23,7 +23,10 @@
  *             `truncated` set. Never called a transcript.
  *
  *   generation  The run generation is bound when the turn's prompt is
- *             accepted (UserPromptSubmit), persisted on the cursor and stamped
+ *             accepted (UserPromptSubmit): the generation of the input Eridani
+ *             typed (persisted by dispatch before typing, `acceptedInput`,
+ *             consumed here), else the run's current one. It is persisted on
+ *             the cursor and stamped
  *             on the Stop that ends it, so a Stop arriving after a steer keeps
  *             the generation that produced it (F07). A synthetic hand-back
  *             prompt (`<agent-message from=…>`, a background subagent
@@ -44,6 +47,8 @@ import { redact } from './collector/redact';
 export type TurnFields = Omit<TurnBody, 't' | 'op_id' | 'digest'>;
 
 const RECENT_IDS = 32;
+/** How long an input Eridani typed may wait for the agent to accept it as a prompt (F07). */
+export const ACCEPTED_INPUT_MS = 60_000;
 const TAIL_BYTES = 512 * 1024;
 const SESSION_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 const TURN_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -53,7 +58,9 @@ export interface TurnCaptureDeps {
   update(id: string, patch: Partial<SessionRecord>): void;
   emit(turn: TurnFields): void;
   /** The Eridani run the surface serves now, or null. */
-  binding?(id: string): { runId: string; generation: number } | null;
+  binding?(id: string): { runId: string; generation: number; accepted?: { generation: number; at: number } } | null;
+  /** The accepted input's generation was bound to a prompt: forget it. */
+  consumeAccepted?(id: string): void;
   now?: () => number;
   /** Rollout reader (tests inject one). */
   readTail?: (file: string, bytes: number) => string;
@@ -137,8 +144,13 @@ export class TurnCapture {
       cursor.opened += 1;
       if (!synthetic || cursor.generation === undefined) {
         const b = this.deps.binding?.(surf) ?? null;
-        cursor.generation = b?.generation ?? 0;
+        // F07: a prompt Eridani typed belongs to the generation it was accepted
+        // under, even if the run moved on before the agent took it. A prompt
+        // typed in the terminal (nothing accepted recently) takes the current one.
+        const acc = b?.accepted && this.now() - b.accepted.at <= ACCEPTED_INPUT_MS ? b.accepted.generation : undefined;
+        cursor.generation = acc ?? b?.generation ?? 0;
         cursor.runId = b?.runId ?? null;
+        if (!synthetic && b?.accepted) this.deps.consumeAccepted?.(surf);
       }
       this.prompts.set(surf, { sessionId, text, synthetic });
       this.deps.update(surf, { turnCursor: cursor });

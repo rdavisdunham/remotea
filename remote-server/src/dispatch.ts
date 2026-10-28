@@ -25,7 +25,16 @@
  *           is seen to exit; a stopped run is never resumed. interrupt = Ctrl-C
  *           twice (once more after 1.5 s); kill = the process tree.
  *   answer  questions-claude.ts.
- *   verify  verify-runner.ts, on an explicit command only.
+ *   verify  verify-attempts.ts (stage D): after every root turn of a run
+ *           that carries a verify config, and on an explicit command; one
+ *           attempt machinery for both, run by verify-runner.ts.
+ *
+ * F07: the generation of every input Eridani types (the spawn prompt, a
+ * queued input, a steer) is persisted on the binding (`acceptedInput`)
+ * BEFORE it is typed; the agent's next accepted prompt binds its turn to it
+ * (turn-capture.ts), so the turn, its questions, their resolutions and the
+ * verify attempt after it all carry the generation that produced them, even
+ * when runs.snapshot advanced the run in between.
  *
  * Recovery: on boot, every Eridani session the restart lost is respawned
  * with its conversation resumed (`claude --resume <id> --model <m>
@@ -45,7 +54,6 @@ import type {
   SpawnCommand,
   StopCommand,
   VerifyCommand,
-  VerifyResultBody,
 } from '../../src/shared/eridani-link-protocol';
 import type { CreateSpec, EridaniBinding, RemoteSurfaceId, ServerMsg, SessionRecord } from '../../src/shared/remote-host-protocol';
 import type { Hub, HubConn, HubEridaniHooks } from './hub';
@@ -55,7 +63,9 @@ import type { JournalRecord } from './eridani-journal';
 import type { ExecutionTarget, LaunchSpec } from './eridani-targets';
 import type { WorktreeManager } from './worktrees';
 import type { QuestionBroker } from './questions-claude';
-import { runVerify, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
+import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
+import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
+import type { TurnFields } from './turn-capture';
 
 export const RUNS_FILE = 'eridani-runs.json';
 export const ERIDANI_DEVICE = { id: 'eridani', name: 'Eridani' };
@@ -164,7 +174,7 @@ export interface DispatchDeps {
   targets: () => ExecutionTarget[];
   questions: QuestionBroker;
   /** Send an upward event (verify.result) through the link. */
-  emit: (body: Omit<VerifyResultBody, 'op_id' | 'digest'>) => void;
+  emit: (body: VerifyResultFields) => void;
   /** The set of worktrees or their activity changed (worktrees.report). */
   changed?: () => void;
   /** Is the link up (queued input is held while it is not)? */
@@ -174,6 +184,8 @@ export interface DispatchDeps {
   now?: () => number;
   log?: (m: string) => void;
   verify?: (o: VerifyRunOptions) => Promise<VerifyOutcome>;
+  /** Tests: the workspace fingerprint (default: verify-runner's). */
+  fingerprint?: (dir: string) => Promise<string>;
   timing?: Partial<typeof DEFAULT_TIMING>;
 }
 
@@ -190,6 +202,8 @@ export const DEFAULT_TIMING = {
   /** How long a stop waits for the exit before reporting failed (the stop stays requested). */
   stopWaitMs: 20_000,
   killWaitMs: 10_000,
+  /** After a root turn, how long to wait (for a newer turn) before verifying. */
+  verifyDebounceMs: 2_000,
 };
 
 export class Dispatch {
@@ -204,7 +218,7 @@ export class Dispatch {
   /** When the last queued input was typed per surface: the next waits for a fresh idle. */
   private readonly delivered = new Map<string, number>();
   private readonly exitWaiters = new Map<string, Array<(code: number) => void>>();
-  private readonly verifying = new Map<string, AbortController>();
+  readonly attempts: VerifyAttempts;
   private readonly spawning = new Set<string>();
 
   constructor(private readonly deps: DispatchDeps) {
@@ -214,6 +228,23 @@ export class Dispatch {
     this.timing = { ...DEFAULT_TIMING, ...deps.timing };
     this.secrets = this.loadSecrets();
     this.conn = new EridaniConn(deps.hub);
+    this.attempts = new VerifyAttempts({
+      session: (id) => deps.registry.session(id),
+      setStatus: (id, verify) => {
+        if (!deps.registry.session(id)) return;
+        deps.hub.updateRecord(id, { verify });
+        // A few writes per turn; `remotea status` reads the file.
+        deps.registry.saveNow();
+      },
+      spec: (rec, verifyId) => (rec.eridani ? this.target(rec.eridani.target)?.verify.find((v) => v.id === verifyId) : undefined),
+      run: deps.verify ?? runVerify,
+      fingerprint: deps.fingerprint ?? ((dir) => workspaceFingerprint(dir)),
+      emit: deps.emit,
+      timers: this.timers,
+      now: this.now,
+      log: this.log,
+      debounceMs: this.timing.verifyDebounceMs,
+    });
   }
 
   // ── Wiring ───────────────────────────────────────────────────────────────
@@ -233,6 +264,7 @@ export class Dispatch {
       env: (id) => this.secrets[id]?.env,
       resumeCommand: (rec) => this.resumeCommand(rec),
       exited: (id, code) => this.onExit(id, code),
+      turn: (t: TurnFields) => this.attempts.onTurn(t),
       hook: (id, params) => this.deps.questions.hook(id, params),
       snapshot: (id): Partial<SnapshotSurface> => {
         const qs = this.deps.questions.openIds(id);
@@ -269,6 +301,7 @@ export class Dispatch {
         if (!t.launch[c.harness]) return `${c.harness} is not enabled on target ${t.id}`;
         if (c.prompt.trimStart().startsWith('-')) return 'a prompt may not start with "-"';
         if (this.deps.registry.sessionTombstone(surfFor(c.run_id, c.generation, c.attempt))) return 'that run attempt was closed';
+        if (c.verify && !t.verify.some((v) => v.id === c.verify!.verify_id)) return `unknown verify id ${c.verify.verify_id}`;
         return null;
       }
       case 'input': {
@@ -287,7 +320,6 @@ export class Dispatch {
         const t = this.target(rec.eridani.target);
         if (!t) return 'the run\'s execution target is gone';
         if (!t.verify.some((v) => v.id === c.verify_id)) return `unknown verify id ${c.verify_id}`;
-        if (this.verifying.has(rec.eridani.worktree)) return 'busy: a verification is running in this worktree';
         return null;
       }
       default:
@@ -398,6 +430,9 @@ export class Dispatch {
         base: wt.base,
         baseSha: wt.baseSha,
         spawnOp: cmd.op_id,
+        ...(cmd.verify ? { verify: { verifyId: cmd.verify.verify_id, planRevision: cmd.verify.plan_revision } } : {}),
+        // F07: the prompt typed at launch belongs to the spawn's generation.
+        ...(prompt ? { acceptedInput: { generation: cmd.generation, at: this.now() } } : {}),
       };
       const { groupId, group } = this.groupFor(cmd.group ?? 'Eridani');
       const res = this.conn.open(surf, {
@@ -438,9 +473,10 @@ export class Dispatch {
     if (cmd.mode === 'steer') {
       const rec = this.deps.registry.session(cmd.surf)!;
       // The generation advances BEFORE the new turn starts, so its prompt binds to it.
-      this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation } });
+      this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation, acceptedInput: { generation: cmd.generation, at: this.now() } } });
       this.deps.registry.saveNow();
       this.rejectQueued(cmd.surf, 'superseded by a steer');
+      this.attempts.cancel(cmd.surf, 'steer');
       ctx.begin();
       this.deps.hub.inject(cmd.surf, '\x1b');
       await this.wait(this.timing.steerDelayMs);
@@ -477,6 +513,7 @@ export class Dispatch {
         list.shift();
         head.ctx.begin();
         this.delivered.set(surf, this.now());
+        this.acceptInput(surf, head.cmd.generation);
         this.type(surf, head.cmd.text);
         head.resolve({ state: 'executed', result: { mode: 'queue', generation: head.cmd.generation } });
       }
@@ -484,6 +521,14 @@ export class Dispatch {
       else this.queues.delete(surf);
     };
     this.pollTimers.set(surf, this.timers.setTimeout(tick, 0));
+  }
+
+  /** F07: persist the generation of the input about to be typed, before it is typed. */
+  private acceptInput(surf: string, generation: number): void {
+    const rec = this.deps.registry.session(surf);
+    if (!rec?.eridani) return;
+    this.deps.hub.updateRecord(surf, { eridani: { ...rec.eridani, acceptedInput: { generation, at: this.now() } } });
+    this.deps.registry.saveNow();
   }
 
   private rejectQueued(surf: string, detail: string): void {
@@ -510,7 +555,7 @@ export class Dispatch {
     const updated = this.deps.hub.updateRecord(surf, { eridani: b });
     this.deps.registry.saveNow();
     this.rejectQueued(surf, 'stopping');
-    this.verifying.get(b.worktree)?.abort();
+    this.attempts.cancel(surf, 'stop requested');
     return updated;
   }
 
@@ -578,6 +623,7 @@ export class Dispatch {
     this.exitWaiters.delete(surf);
     for (const w of waiters ?? []) w(code);
     this.rejectQueued(surf, 'the process exited');
+    this.attempts.cancel(surf, 'the process exited');
     this.deps.questions.surfaceExited(surf);
     // Durable until the exit is seen: now it is.
     this.clearStop(surf);
@@ -590,28 +636,15 @@ export class Dispatch {
     const rec = this.boundSession(cmd.run_id);
     const b = rec?.eridani;
     const t = b ? this.target(b.target) : undefined;
-    const spec = t?.verify.find((v) => v.id === cmd.verify_id);
-    if (!b || !spec) return { state: 'rejected', detail: 'unknown run or verify id' };
-    const ac = new AbortController();
-    this.verifying.set(b.worktree, ac);
-    ctx.begin();
-    let out: VerifyOutcome;
-    try {
-      out = await (this.deps.verify ?? runVerify)({ spec, worktree: b.worktree, signal: ac.signal });
-    } finally {
-      this.verifying.delete(b.worktree);
+    if (!rec || !b || !t?.verify.some((v) => v.id === cmd.verify_id)) return { state: 'rejected', detail: 'unknown run or verify id' };
+    // A run that never told us its verify config verifies after every turn from now on (a newer plan revision replaces it).
+    if (!b.verify || cmd.plan_revision > b.verify.planRevision) {
+      this.deps.hub.updateRecord(rec.id, { eridani: { ...b, verify: { verifyId: cmd.verify_id, planRevision: cmd.plan_revision } } });
+      this.deps.registry.saveNow();
     }
-    this.deps.emit({
-      t: 'verify.result',
-      attempt_id: cmd.attempt_id,
-      run_id: cmd.run_id,
-      generation: cmd.generation,
-      turn_seq: cmd.turn_seq,
-      plan_revision: cmd.plan_revision,
-      verify_id: cmd.verify_id,
-      ...out,
-    });
-    return { state: 'executed', result: { attempt_id: cmd.attempt_id, exit_code: out.exit_code, timed_out: out.timed_out, canceled: out.canceled } };
+    ctx.begin();
+    const out = await this.attempts.command(rec.id, cmd);
+    return out.state === 'executed' ? { state: 'executed', result: out.result } : { state: 'rejected', detail: out.detail };
   }
 
   // ── Recovery ─────────────────────────────────────────────────────────────
@@ -631,6 +664,7 @@ export class Dispatch {
    * so the stop is complete.
    */
   resumeOnBoot(): void {
+    for (const rec of this.deps.registry.sessions()) this.attempts.recover(rec);
     for (const rec of this.deps.registry.sessions()) {
       if (!rec.eridani || rec.state !== 'lost') continue;
       if (rec.eridani.stopRequested) {
@@ -661,9 +695,16 @@ export class Dispatch {
   applyRunsSnapshot(runs: RunsSnapshotEntry[]): void {
     for (const r of runs) {
       for (const rec of this.deps.registry.sessions().filter((s) => s.eridani?.runId === r.run_id)) {
-        const b = rec.eridani!;
+        let b = rec.eridani!;
         if (r.generation > b.generation && rec.state !== 'exited') {
-          this.deps.hub.updateRecord(rec.id, { eridani: { ...b, generation: r.generation } });
+          b = { ...b, generation: r.generation };
+          this.deps.hub.updateRecord(rec.id, { eridani: b });
+          this.deps.registry.saveNow();
+        }
+        if (r.verify !== undefined && rec.state !== 'exited') {
+          const { verify: _old, ...rest } = b;
+          b = r.verify ? { ...rest, verify: { verifyId: r.verify.verify_id, planRevision: r.verify.plan_revision } } : rest;
+          this.deps.hub.updateRecord(rec.id, { eridani: b });
           this.deps.registry.saveNow();
         }
         if (r.desired !== 'stop') continue;
