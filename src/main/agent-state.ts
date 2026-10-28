@@ -36,6 +36,10 @@ import { isValidAgyConversationId } from './agy-resume';
 import { isValidQwenSessionId } from './qwen-resume';
 import { isValidOmpSessionId } from './omp-resume';
 import { resolveWireChoiceId } from '../shared/remote-console-protocol';
+import { isAnsweringInput } from '../shared/agent-hook-rules';
+
+// Shared with the remotea server; re-exported so callers and tests did not move.
+export { isAnsweringInput };
 
 export type AgentRunState = 'blocked' | 'working' | 'idle' | 'unknown';
 
@@ -649,65 +653,6 @@ export function answerAgent(
   commit(record);
 
   return { ok: true, choice, ...(choice.key ? { key: choice.key } : {}), ...(choice.text ? { text: choice.text } : {}) };
-}
-
-/**
- * Does this chunk of PTY input constitute *answering* something? (issue #151)
- *
- * Arrow keys, page-up and the mouse are how a human READS a pane they were sent
- * to; they must not be mistaken for a reply. Anything that commits — a printable
- * character, Enter, or a bare Escape — is one. So: strip the CSI (`ESC [ … `)
- * and SS3 (`ESC O x`) sequences the navigation keys are made of, and judge what
- * is left.
- *
- * Exported for the tests, because the difference between "scrolled up to look"
- * and "typed 2 and hit Enter" is the entire correctness of noteHumanInput.
- */
-export function isAnsweringInput(data: string): boolean {
-  const ESC = 0x1b;
-  let i = 0;
-  while (i < data.length) {
-    const code = data.charCodeAt(i);
-
-    if (code === ESC) {
-      const skipped = skipEscapeSequence(data, i);
-      // A bare Escape is not navigation — it dismisses, denies, or cancels.
-      if (skipped === i) return true;
-      i = skipped;
-      continue;
-    }
-
-    // Enter/newline submits; Backspace, Delete and Tab are edits of an answer in
-    // progress. All are deliberate acts on whatever the pane is showing.
-    if (code === 0x0d || code === 0x0a || code === 0x08 || code === 0x7f || code === 0x09) return true;
-    // Anything printable, including non-ASCII: the human is typing a reply.
-    if (code > 0x1f && code !== 0x7f) return true;
-    i++;
-  }
-  return false;
-}
-
-/**
- * Index just past the escape sequence starting at `i`, or `i` itself when this
- * ESC does not begin one (a bare Escape keypress).
- *
- * Only the two shapes the navigation keys and the mouse actually arrive in:
- * CSI (`ESC [` params, intermediates, final byte `@`–`~`) and SS3 (`ESC O x`).
- */
-function skipEscapeSequence(data: string, i: number): number {
-  const next = data[i + 1];
-  if (next === 'O') return i + 3 <= data.length ? i + 3 : data.length;
-  if (next !== '[') return i;
-
-  let j = i + 2;
-  while (j < data.length) {
-    const code = data.charCodeAt(j);
-    // Parameter and intermediate bytes run 0x30–0x3f and 0x20–0x2f; the first
-    // byte outside those ends the sequence.
-    if (code > 0x3f) return j + 1;
-    j++;
-  }
-  return data.length;
 }
 
 /**

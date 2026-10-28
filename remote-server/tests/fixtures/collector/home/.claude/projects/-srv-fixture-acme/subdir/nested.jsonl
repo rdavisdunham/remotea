@@ -1,0 +1,1 @@
+{"type": "user", "cwd": "/srv/fixture/acme app", "gitBranch": "davin/eng-12-login", "entrypoint": "cli", "timestamp": "2026-10-20T10:00:00Z", "message": {"role": "user", "content": "never read"}}

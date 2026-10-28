@@ -1,0 +1,9 @@
+2026-10-23T09:00  claude_desktop  windows project                                   C:\Users\davin\proj                       davin/eng-12-login
+2026-10-23T08:00  claude_desktop  hello over ssh                                    /srv/app                                  davin/eng-12-login
+2026-10-22T11:00  claude_desktop  Desktop prompt                                    /srv/fixture/desk                         davin/eng-12-login
+2026-10-21T09:00  claude_code     TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT  /srv/fixture/long                         
+2026-10-20T10:09  claude_code     ENG-12 login ✓ «quotes» 'single'                  /srv/fixture/acme app                     live
+2025-10-09T09:53  codex_desktop   Desktop thread                                    sl.localhost/Ubuntu/srv/fixture/acme app  main
+2025-10-09T09:26  codex_cli       Beta tests                                        /srv/fixture/beta                         
+2025-10-09T09:03  codex_cli       Login fix                                         /srv/fixture/acme app                     eng-12-login
+8 sessions active in the last 100000 days

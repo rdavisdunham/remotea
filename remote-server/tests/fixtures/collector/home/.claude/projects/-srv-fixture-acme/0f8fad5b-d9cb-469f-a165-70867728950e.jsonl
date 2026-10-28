@@ -1,0 +1,14 @@
+{"type": "user", "cwd": "/srv/fixture/acme app", "gitBranch": "davin/eng-12-login", "entrypoint": "cli", "timestamp": "2026-10-20T10:00:00Z", "message": {"role": "user", "content": "Fix the login test. My key is sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx and ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
+{"type": "user", "cwd": "/srv/fixture/acme app", "gitBranch": "davin/eng-12-login", "entrypoint": "cli", "timestamp": "2026-10-20T10:00:00Z", "message": {"role": "user", "content": "<system-reminder>ignore</system-reminder>"}, "isMeta": true}
+{"type": "user", "cwd": "/srv/fixture/acme app", "gitBranch": "davin/eng-12-login", "entrypoint": "cli", "timestamp": "2026-10-20T10:00:00Z", "message": {"role": "user", "content": "Task finished"}, "promptSource": "system", "origin": {"kind": "task-notification"}}
+{"type": "user", "cwd": "/srv/fixture/acme app", "gitBranch": "davin/eng-12-login", "entrypoint": "cli", "timestamp": "2026-10-20T10:00:00Z", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t", "content": "ok", "is_error": false}]}}
+{"type": "user", "cwd": "/srv/fixture/acme app", "gitBranch": "davin/eng-12-login", "entrypoint": "cli", "timestamp": "2026-10-20T10:00:00Z", "message": {"role": "user", "content": "<command-name>/review</command-name>\n<command-args>PR 4</command-args>"}}
+{"type": "user", "cwd": "/srv/fixture/acme app", "gitBranch": "davin/eng-12-login", "entrypoint": "cli", "timestamp": "2026-10-20T10:00:00Z", "message": {"role": "user", "content": "side work"}, "isSidechain": true}
+{"type": "assistant", "timestamp": "2026-10-20T10:05:00.123Z", "message": {"content": [{"type": "text", "text": "Fixed it. Bearer abcdefghijklmnopqrstuvwxyz0123"}]}}
+not json at all
+{"type": "ai-title", "aiTitle": "Fix login test", "sessionId": "x"}
+{"type": "custom-title", "customTitle": "ENG-12 login \u2713 \u00abquotes\u00bb 'single'", "sessionId": "x"}
+{"type": "pr-link", "prUrl": "https://github.com/acme/app/pull/4", "prNumber": 4}
+{"type": "pr-link", "prUrl": "https://github.com/acme/app/pull/4", "prNumber": 4}
+{"type": "user", "cwd": "/srv/fixture/acme app", "gitBranch": "davin/eng-12-login", "entrypoint": "cli", "timestamp": "2026-10-20T10:07:30.5+02:00", "message": {"role": "user", "content": "<system-reminder>a\nb</system-reminder>Now   the docs, please "}}
+{"type": "assistant", "timestamp": "2026-10-20T10:09:00Z", "message": {"content": [{"type": "text", "text": "Done \u2014 see README.md \u2705"}]}}

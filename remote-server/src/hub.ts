@@ -28,6 +28,24 @@ import { DEFAULT_THEME, type ThemeColors } from './queries';
 import { probeSession, type ProbeResult } from './agent-probe';
 import type { FsRequest } from './remote-fs';
 import { childrenIndex } from './proc';
+import { AgentStateTracker } from './agent-state';
+import { TurnCapture, type TurnFields } from './turn-capture';
+import type { ExitBody, SnapshotSurface, StatusBody } from '../../src/shared/eridani-link-protocol';
+
+/**
+ * Where the hub's agent events go upward (the Eridani link, via main.ts).
+ * Every method is fire-and-forget: the hub never waits on Eridani.
+ */
+export interface HubEventSink {
+  status(s: Omit<StatusBody, 't' | 'op_id' | 'digest' | 'entity'>): void;
+  turn(t: TurnFields): void;
+  exit(e: Omit<ExitBody, 't' | 'op_id' | 'digest'>): void;
+  /** A turn was captured for this conversation: its collector report is worth refreshing. */
+  turnCaptured?(provider: 'claude' | 'codex', sessionId: string): void;
+}
+
+/** Hook fields that exist for the server alone: never relayed to apps (they can be 16k each). */
+const SERVER_ONLY_PARAMS = ['lastAssistantMessage', 'lastAssistantTruncated', 'transcriptPath', 'turnId'];
 
 export interface HubConfig {
   /** Respawn a lost session's agent with its resume command (`claude --resume <id>`). */
@@ -81,6 +99,8 @@ export interface HubDeps {
   fs?: (cwd: string | undefined, req: FsRequest) => Promise<unknown>;
   /** The agents' status hooks (hooks-install.ts); absent = the server does not offer 'hooks'. */
   hooks?: { status(): HookAgentStatus[]; install(): HookAgentStatus[] };
+  /** Upward agent events (status, turns, exits); absent = nobody listens. Settable later via setSink. */
+  sink?: HubEventSink | null;
 }
 
 export interface HubConn extends ConnLike {
@@ -97,11 +117,66 @@ export class Hub {
   private readonly cfg: HubConfig;
   private readonly now: () => number;
   private readonly log: (msg: string) => void;
+  readonly agentState: AgentStateTracker;
+  readonly turns: TurnCapture;
+  private sink: HubEventSink | null;
+  /** Status revisions: monotonic across restarts (seeded from the clock), so a spooled older one never wins. */
+  private statusRev: number;
 
   constructor(private readonly deps: HubDeps) {
     this.cfg = { ...DEFAULT_HUB_CONFIG, ...deps.config };
     this.now = deps.now ?? Date.now;
     this.log = deps.log ?? (() => {});
+    this.sink = deps.sink ?? null;
+    this.statusRev = this.now();
+    this.agentState = new AgentStateTracker({
+      now: this.now,
+      onChange: ({ surf, info }) => {
+        const rec = this.registry.updateSession(surf, { agentState: info });
+        if (!rec) return;
+        this.broadcast({ t: 'meta', id: surf as RemoteSurfaceId, agentState: info });
+        this.statusRev = Math.max(this.statusRev + 1, this.now());
+        this.sink?.status({
+          surf,
+          incarnation: rec.incarnation ?? 0,
+          revision: this.statusRev,
+          state: info.state,
+          since: info.since,
+          ...(info.reason ? { reason: info.reason } : {}),
+          ...(rec.agent ? { provider: rec.agent.provider, provider_session_id: rec.agent.sessionId } : {}),
+        });
+      },
+    });
+    this.turns = new TurnCapture({
+      session: (id) => this.registry.session(id),
+      update: (id, patch) => void this.registry.updateSession(id, patch),
+      emit: (t) => this.sink?.turn(t),
+      now: this.now,
+      log: (m) => this.log(m),
+    });
+  }
+
+  setSink(sink: HubEventSink | null): void {
+    this.sink = sink;
+  }
+
+  /** Every session the registry knows, for the Eridani reconcile snapshot. */
+  snapshot(): SnapshotSurface[] {
+    return this.registry.sessions().map((r) => ({
+      surf: r.id,
+      incarnation: r.incarnation ?? 0,
+      state: r.state === 'live' && this.isLive(r.id) ? 'live' : r.state === 'exited' ? 'exited' : 'lost',
+      agent_state: r.agentState?.state ?? null,
+      since: r.agentState?.since ?? null,
+      provider: r.agent?.provider ?? null,
+      provider_session_id: r.agent?.sessionId ?? null,
+      group: r.groupId ?? null,
+      title: r.title ?? null,
+      cwd: r.lastCwd ?? r.cwd,
+      turn_seq: r.turnSeq ?? 0,
+      run_id: null,
+      generation: 0,
+    }));
   }
 
   private get registry(): Registry {
@@ -229,12 +304,22 @@ export class Hub {
   relayRpc(id: string, method: string, params: Record<string, unknown>): boolean {
     const session = this.sessions.get(id);
     if (!session || session.state !== 'live') return false;
-    session.relayRpc(method, params);
+    let relayed = params;
+    if (method === 'hook.event' && SERVER_ONLY_PARAMS.some((k) => k in params)) {
+      relayed = { ...params };
+      for (const k of SERVER_ONLY_PARAMS) delete relayed[k];
+    }
+    session.relayRpc(method, relayed);
     // A hook's session id is the agent's own word for which conversation this
     // is — better than the /proc probe's inference, and it arrives at once.
     if (method === 'hook.event' && typeof params.sessionId === 'string' && params.event !== 'SessionEnd') {
       const provider = params.provider === 'codex' ? 'codex' : params.provider ? null : 'claude';
       if (provider) this.noteAgent(id, { provider, sessionId: params.sessionId, seenAt: this.now() });
+    }
+    this.agentState.rpc(id, method, params);
+    if (method === 'hook.event') {
+      const captured = this.turns.hook(id, params);
+      if (captured) this.sink?.turnCaptured?.(captured.provider, captured.sessionId);
     }
     return true;
   }
@@ -323,7 +408,12 @@ export class Hub {
       state: 'live',
       agent: rec?.agent,
       hiddenBy: rec?.hiddenBy ?? [],
+      // A respawn is a new process on the same surface: a new incarnation, the same turn numbering.
+      incarnation: (rec?.incarnation ?? 0) + 1,
+      turnSeq: rec?.turnSeq,
+      turnCursor: rec?.turnCursor,
     };
+    this.agentState.reset(msg.id);
     // Resuming the agent that was running beats re-running the original
     // command: a lost Claude session comes back as `claude --resume <id>`.
     const resume = wasLost && this.cfg.resumeAgents && rec?.agent ? resumeCommand(rec.agent) : null;
@@ -368,8 +458,11 @@ export class Hub {
     // stays `live` with this boot's id, so the next boot reports it `lost`
     // and clients respawn (and resume) it.
     if (this.shuttingDown) return;
-    const updated = this.registry.updateSession(id, { state: 'exited', exitCode: code, exitedAt: this.now() });
+    const exitedAt = this.now();
+    const updated = this.registry.updateSession(id, { state: 'exited', exitCode: code, exitedAt });
     if (updated) this.broadcast({ t: 'sessionUpdated', session: updated });
+    this.agentState.exit(id, code);
+    if (updated) this.sink?.exit({ surf: id, incarnation: updated.incarnation ?? 0, code, exited_at: exitedAt });
   }
 
   /** Close everywhere. Idempotent; a second close of the same id is acked without a broadcast. */
@@ -396,6 +489,7 @@ export class Hub {
 
   private killSession(id: string): void {
     const s = this.sessions.get(id);
+    this.agentState.forget(id);
     if (!s) return;
     this.sessions.delete(id);
     s.kill();
@@ -462,7 +556,10 @@ export class Hub {
   handleInput(conn: HubConn, id: string, data: string): void {
     if (!conn.device) return;
     const s = this.sessions.get(id);
-    if (s && s.hasSubscriber(conn.id)) s.input(conn.id, data);
+    if (s && s.hasSubscriber(conn.id)) {
+      s.input(conn.id, data);
+      this.agentState.humanInput(id, data);
+    }
   }
 
   // ── Periodic work ────────────────────────────────────────────────────────

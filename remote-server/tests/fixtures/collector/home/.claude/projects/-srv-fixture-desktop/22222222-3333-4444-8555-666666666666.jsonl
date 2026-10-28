@@ -1,0 +1,2 @@
+{"type": "user", "cwd": "/srv/fixture/desk", "gitBranch": "davin/eng-12-login", "entrypoint": "claude-desktop", "timestamp": "2026-10-20T10:00:00Z", "message": {"role": "user", "content": "[Request interrupted by user]"}}
+{"type": "user", "cwd": "/srv/fixture/desk", "gitBranch": "davin/eng-12-login", "entrypoint": "claude-desktop", "timestamp": "2026-10-22T11:00:00Z", "message": {"role": "user", "content": "Desktop prompt"}}

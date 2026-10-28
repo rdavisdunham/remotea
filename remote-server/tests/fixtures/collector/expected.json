@@ -1,0 +1,155 @@
+{
+  "claude_code:0f8fad5b-d9cb-469f-a165-70867728950e": {
+    "machine": "fixturepc",
+    "environment": "wsl",
+    "cwd": "/srv/fixture/acme app",
+    "repo": "",
+    "branch": "davin/eng-12-login",
+    "title": "ENG-12 login ✓ «quotes» 'single'",
+    "first_prompt": "Fix the login test. My key is [redacted] and [redacted]",
+    "last_prompt": "Now   the docs, please",
+    "excerpt": "Recent prompts:\n- Fix the login test. My key is [redacted] and [redacted]\n- /review PR 4\n- Now   the docs, please\n\nLast reply:\nDone — see README.md ✅",
+    "pr_urls": [
+      "https://github.com/acme/app/pull/4"
+    ],
+    "turn_count": 3,
+    "started_at": "2026-10-20T10:00:00+00:00",
+    "last_active_at": "2026-10-20T10:09:00+00:00",
+    "resume": {
+      "live": {
+        "state": "live",
+        "workspace": "Acme",
+        "terminal": "surf-new",
+        "host": "fixturepc"
+      },
+      "hint": "Live in remotea → Acme"
+    }
+  },
+  "claude_code:11111111-2222-4333-8444-555555555555": {
+    "machine": "fixturepc",
+    "environment": "wsl",
+    "cwd": "/srv/fixture/long",
+    "repo": "",
+    "branch": "",
+    "title": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT…",
+    "first_prompt": "Prompt number 0: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word",
+    "last_prompt": "Prompt number 4: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word",
+    "excerpt": "Recent prompts:\n- Prompt number 2: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word wo…\n- Prompt number 3: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word wo…\n- Prompt number 4: word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word wo…\n\nLast reply:\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…",
+    "pr_urls": [],
+    "turn_count": 5,
+    "started_at": "2026-10-21T00:00:00+00:00",
+    "last_active_at": "2026-10-21T09:00:00+00:00",
+    "resume": {
+      "cmd": "remotea open --group Inbox --cwd /srv/fixture/long -- claude --resume 11111111-2222-4333-8444-555555555555"
+    }
+  },
+  "claude_desktop:22222222-3333-4444-8555-666666666666": {
+    "machine": "fixturepc",
+    "environment": "wsl",
+    "cwd": "/srv/fixture/desk",
+    "repo": "",
+    "branch": "davin/eng-12-login",
+    "title": "",
+    "first_prompt": "Desktop prompt",
+    "last_prompt": "Desktop prompt",
+    "excerpt": "Recent prompts:\n- Desktop prompt",
+    "pr_urls": [],
+    "turn_count": 1,
+    "started_at": "2026-10-20T10:00:00+00:00",
+    "last_active_at": "2026-10-22T11:00:00+00:00",
+    "resume": {
+      "cmd": "remotea open --group Inbox --cwd /srv/fixture/desk -- claude --resume 22222222-3333-4444-8555-666666666666",
+      "hint": "Claude Desktop → Code → this session"
+    }
+  },
+  "claude_desktop:55555555-0000-4000-8000-000000000001": {
+    "machine": "fixturepc",
+    "environment": "ssh",
+    "cwd": "/srv/app",
+    "repo": "",
+    "branch": "davin/eng-12-login",
+    "title": "",
+    "first_prompt": "hello over ssh",
+    "last_prompt": "hello over ssh",
+    "excerpt": "Recent prompts:\n- hello over ssh",
+    "pr_urls": [],
+    "turn_count": 1,
+    "started_at": "2026-10-23T08:00:00+00:00",
+    "last_active_at": "2026-10-23T08:00:00+00:00",
+    "resume": {
+      "hint": "Claude Desktop → Code → this session"
+    }
+  },
+  "claude_desktop:55555555-0000-4000-8000-000000000002": {
+    "machine": "fixturepc",
+    "environment": "windows",
+    "cwd": "C:\\Users\\davin\\proj",
+    "repo": "",
+    "branch": "davin/eng-12-login",
+    "title": "",
+    "first_prompt": "windows project",
+    "last_prompt": "windows project",
+    "excerpt": "Recent prompts:\n- windows project",
+    "pr_urls": [],
+    "turn_count": 1,
+    "started_at": "2026-10-23T09:00:00+00:00",
+    "last_active_at": "2026-10-23T09:00:00+00:00",
+    "resume": {
+      "hint": "Claude Desktop → Code → this session"
+    }
+  },
+  "codex_cli:019a0000-0000-7000-8000-000000000001": {
+    "machine": "fixturepc",
+    "environment": "wsl",
+    "cwd": "/srv/fixture/acme app",
+    "repo": "acme-app",
+    "branch": "eng-12-login",
+    "title": "Login fix",
+    "first_prompt": "Fix login",
+    "last_prompt": "Now add a test",
+    "excerpt": "Recent prompts:\n- Fix login\n- Now add a test\n\nLast reply:\nAdded the test. [redacted]",
+    "pr_urls": [],
+    "turn_count": 2,
+    "started_at": "2025-10-09T08:53:20+00:00",
+    "last_active_at": "2025-10-09T09:03:20+00:00",
+    "resume": {
+      "cmd": "remotea open --group Inbox --cwd '/srv/fixture/acme app' -- codex resume 019a0000-0000-7000-8000-000000000001"
+    }
+  },
+  "codex_cli:t9": {
+    "machine": "fixturepc",
+    "environment": "wsl",
+    "cwd": "/srv/fixture/beta",
+    "repo": "",
+    "branch": "",
+    "title": "Beta tests",
+    "first_prompt": "Run the tests",
+    "last_prompt": "And lint",
+    "excerpt": "Recent prompts:\n- Run the tests\n- And lint\n\nLast reply:\nAll green.",
+    "pr_urls": [],
+    "turn_count": 2,
+    "started_at": "2025-10-09T09:10:00+00:00",
+    "last_active_at": "2025-10-09T09:26:40+00:00",
+    "resume": {
+      "cmd": "remotea open --group 'Beta '\"'\"'quoted'\"'\"'' --cwd /srv/fixture/beta -- codex resume t9"
+    }
+  },
+  "codex_desktop:d1": {
+    "machine": "fixturepc",
+    "environment": "wsl",
+    "cwd": "//wsl.localhost/Ubuntu/srv/fixture/acme app",
+    "repo": "web",
+    "branch": "main",
+    "title": "Desktop thread",
+    "first_prompt": "Talk to me",
+    "last_prompt": "",
+    "excerpt": "Recent prompts:",
+    "pr_urls": [],
+    "turn_count": 0,
+    "started_at": "2025-10-09T09:43:20+00:00",
+    "last_active_at": "2025-10-09T09:53:20+00:00",
+    "resume": {
+      "hint": "ChatGPT desktop → Desktop thread"
+    }
+  }
+}

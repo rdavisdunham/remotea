@@ -16,6 +16,11 @@
   "include": [
     "src/**/*.ts",
     "../src/shared/remote-host-protocol.ts",
+    "../src/shared/remote-hosts-types.ts",
+    "../src/shared/eridani-link-protocol.ts",
+    "../src/shared/agent-hook-rules.ts",
+    "../src/shared/claude-notification.ts",
+    "../src/main/remote-hosts/connection-fsm.ts",
     "../src/shared/remote-query-swallow.ts",
     "../src/main/startup-commands.ts",
     "../src/renderer/utils/mouse-modes.ts"

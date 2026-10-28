@@ -15,6 +15,7 @@ import { HookBridge, hookEnv } from './hook-bridge';
 import { DiagLog, diagDir } from './diag-log';
 import { defaultHookPaths, hooksStatus, installHooks, toAgentStatus } from './hooks-install';
 import { runFsOp } from './remote-fs';
+import { EridaniRuntime, serverVersion } from './eridani-runtime';
 
 const DAY = 24 * 60 * 60 * 1000;
 const BIND_RETRY_MS = 5_000;
@@ -101,6 +102,15 @@ async function main(): Promise<void> {
 
   log(`remotea-server ${serverId} boot ${bootId}; ${registry.sessions().length} session(s) in registry; token at ${tokenFile}`);
 
+  // The Eridani link: constructed only while eridani.json enables it; follows the file (30 s).
+  // REMOTEA_COLLECTOR_HOME points the collector at another home (tests and the e2e); it then skips /mnt/c.
+  const collectorHome = process.env.REMOTEA_COLLECTOR_HOME || undefined;
+  const eridani = new EridaniRuntime({
+    dir, hub, registry, serverId, bootId, hostname: os.hostname(), version: serverVersion(), log,
+    collectorHome, windowsUsers: collectorHome ? null : undefined,
+  });
+  eridani.start();
+
   const lagTimer = setInterval(() => hub.pumpLagging(), 250);
   const probeTimer = setInterval(() => hub.probeAgents(), 5_000);
   const pruneTimer = setInterval(() => hub.prune(), 60 * 60 * 1000);
@@ -114,6 +124,7 @@ async function main(): Promise<void> {
     clearInterval(probeTimer);
     clearInterval(pruneTimer);
     hub.shutdown();
+    eridani.stop();
     await Promise.all([server.close(), bridge.close()]);
     process.exit(0);
   };

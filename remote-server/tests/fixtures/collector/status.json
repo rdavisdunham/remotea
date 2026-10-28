@@ -1,0 +1,7 @@
+{"version": 1, "server": {"hostname": "fixturepc", "running": true}, "groups": [],
+ "sessions": [
+  {"id": "surf-old", "groupName": "Acme", "state": "lost", "lastActivityAt": 1, "createdAt": 1, "agent": {"provider": "claude", "sessionId": "0f8fad5b-d9cb-469f-a165-70867728950e"}},
+  {"id": "surf-new", "groupName": "Acme", "state": "live", "lastActivityAt": 2, "createdAt": 2, "agent": {"provider": "claude", "sessionId": "0f8fad5b-d9cb-469f-a165-70867728950e"}},
+  {"id": "surf-beta", "groupName": "Beta 'quoted'", "state": "exited", "lastActivityAt": 3, "createdAt": 3, "agent": {"provider": "codex", "sessionId": "t9"}},
+  {"id": "surf-shell", "groupName": "Shell", "state": "live", "lastActivityAt": 4, "createdAt": 4, "agent": null}
+ ]}

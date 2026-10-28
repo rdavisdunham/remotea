@@ -112,6 +112,22 @@ describe('wmux-hook.js through the bridge', () => {
     expect(relayed).toEqual([{ id: SURF, method: 'pane.report_agent_session', params: { surfaceId: SURF, sessionId: conv, provider: 'agy' } }]);
   });
 
+  it('Stop forwards the final response (≤16k, flagged when cut) and Codex\'s turn id and rollout', async () => {
+    const { relayed, env } = await bridge();
+    const sid = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    expect(await runHook(['--event', 'Stop'], env, { session_id: sid, last_assistant_message: 'All done.' })).toBe(0);
+    expect(await runHook(['--event', 'Stop'], env, { session_id: sid, last_assistant_message: 'é'.repeat(16_005) })).toBe(0);
+    expect(await runHook(['--event', 'PreToolUse'], env, { session_id: sid, last_assistant_message: 'not on other events' })).toBe(0);
+    const rollout = '/home/u/.codex/sessions/rollout-1.jsonl';
+    expect(await runHook(['--event', 'Stop', '--provider', 'codex'], env, { session_id: 'thr', turn_id: 'turn-7', transcript_path: rollout, last_assistant_message: 'codex answer' })).toBe(0);
+    expect(relayed[0].params).toMatchObject({ event: 'Stop', lastAssistantMessage: 'All done.' });
+    expect(relayed[0].params.lastAssistantTruncated).toBeUndefined();
+    expect(relayed[1].params.lastAssistantMessage).toHaveLength(16_000);
+    expect(relayed[1].params.lastAssistantTruncated).toBe('1');
+    expect(relayed[2].params.lastAssistantMessage).toBeUndefined();
+    expect(relayed[3].params).toMatchObject({ provider: 'codex', turnId: 'turn-7', transcriptPath: rollout, lastAssistantMessage: 'codex answer' });
+  });
+
   it('outside a remotea session (no bridge in the environment) the helper leaves at once', async () => {
     const t0 = Date.now();
     expect(await runHook(['--event', 'Stop'], {}, { session_id: 'x' })).toBe(0);
@@ -182,7 +198,49 @@ describe('hub relay', () => {
     const a = connect('device-aaaaaaaa');
     hub.handle(a, { t: 'open', rid: 1, id: SURF, cols: 80, rows: 24, create: {} });
     hub.relayRpc(SURF, 'hook.event', { surfaceId: SURF, event: 'SessionStart', sessionId: '019a0b1c-2d3e-7f40-8a5b-6c7d8e9f0a1b', provider: 'codex' });
-    expect(a.json('meta').at(-1)).toMatchObject({ id: SURF, agent: { provider: 'codex', sessionId: '019a0b1c-2d3e-7f40-8a5b-6c7d8e9f0a1b' } });
+    expect(a.json('meta').filter((m) => m.agent).at(-1)).toMatchObject({ id: SURF, agent: { provider: 'codex', sessionId: '019a0b1c-2d3e-7f40-8a5b-6c7d8e9f0a1b' } });
+  });
+
+  it('derives agent state, captures turns, and keeps the turn text away from apps', () => {
+    const sink = { status: [] as any[], turn: [] as any[], exit: [] as any[], captured: [] as string[] };
+    const { hub, sp, connect } = setup();
+    hub.setSink({
+      status: (s) => sink.status.push(s),
+      turn: (t) => sink.turn.push(t),
+      exit: (e) => sink.exit.push(e),
+      turnCaptured: (_p, id) => sink.captured.push(id),
+    });
+    const a = connect('device-aaaaaaaa');
+    hub.handle(a, { t: 'open', rid: 1, id: SURF, cols: 80, rows: 24, create: {} });
+    const sid = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    hub.relayRpc(SURF, 'hook.event', { surfaceId: SURF, event: 'UserPromptSubmit', sessionId: sid, prompt: 'go', at: 1 });
+    expect(a.json('meta').filter((m) => m.agentState).at(-1)).toMatchObject({ id: SURF, agentState: { state: 'working' } });
+    hub.relayRpc(SURF, 'hook.event', { surfaceId: SURF, event: 'Stop', sessionId: sid, lastAssistantMessage: 'secret-free answer', at: 2 });
+    expect(sink.status.map((s) => s.state)).toEqual(['working', 'idle']);
+    expect(sink.status[1].revision).toBeGreaterThan(sink.status[0].revision);
+    expect(sink.turn).toHaveLength(1);
+    expect(sink.turn[0]).toMatchObject({ surf: SURF, incarnation: 1, text: 'secret-free answer', prompt: 'go', seq: 1 });
+    expect(sink.captured).toEqual([sid]);
+    // Apps get the event, never the text.
+    const stop = a.json('rpc').find((m) => m.params.event === 'Stop')!;
+    expect(stop.params.lastAssistantMessage).toBeUndefined();
+    expect(hub.snapshot()[0]).toMatchObject({ surf: SURF, incarnation: 1, state: 'live', agent_state: 'idle', turn_seq: 1, provider: 'claude', provider_session_id: sid });
+    sp.last().exit(2);
+    expect(sink.exit).toEqual([{ surf: SURF, incarnation: 1, code: 2, exited_at: expect.any(Number) }]);
+    expect(sink.status.at(-1)).toMatchObject({ state: 'exited' });
+  });
+
+  it('a respawned session is a new incarnation that keeps its turn numbering', () => {
+    const registry = Registry.load({ file: null, bootId: 'b1' });
+    registry.addSession({ id: SURF, cwd: '/', createdBy: 'd', createdAt: 1, bootId: 'b0', state: 'lost', hiddenBy: [], incarnation: 3, turnSeq: 9, agentState: { state: 'working', since: 1 } } as never);
+    const hub = new Hub({ registry, spawn: fakeSpawner().spawn, bootId: 'b1', serverId: 's', hostname: 'h', timers: new ManualTimers(), probe: () => ({}) });
+    const c = new FakeConn(1);
+    hub.connect(c);
+    hub.handle(c, { t: 'hello', proto: 1, device: { id: 'device-aaaaaaaa', name: 'a' }, app: { name: 't', version: '0' } });
+    hub.handle(c, { t: 'open', rid: 1, id: SURF, cols: 80, rows: 24, create: {} });
+    const rec = registry.session(SURF)!;
+    expect(rec).toMatchObject({ incarnation: 4, turnSeq: 9, state: 'live' });
+    expect(rec.agentState).toBeUndefined();
   });
 
   it('new sessions get the bridge address and their own token', () => {
