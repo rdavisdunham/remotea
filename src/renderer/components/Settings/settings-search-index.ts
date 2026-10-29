@@ -619,7 +619,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.restoreOpencodeSessionsHint",
-      "label": "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode plugin (Agent integration on). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 is captured only when started with --standalone: its shared background server cannot tell tabs apart."
+      "label": "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode integration (the server plugin, or the TUI plugin installed with `wmux opencode-tui` for OpenCode 2). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 on a remote or shared server is captured by the TUI plugin; re-run `wmux opencode-tui` in that environment after a remotea update."
     },
     {
       "key": "settings.workspacePanel.restoreAgySessions",

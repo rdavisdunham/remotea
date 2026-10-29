@@ -10,12 +10,13 @@ import { SurfaceId } from '../shared/types';
 import { mapSurfaces } from './claude-resume';
 
 /**
- * OpenCode session ids are `ses_` + base62. Strict on purpose: the value
+ * OpenCode session ids are `ses_` + base62, or a loop session's
+ * `ses_loop_` + base62. Strict on purpose: the value
  * arrives over the pipe and ends up on a restored pane's command line, and
  * Claude's looser validator would accept one too — the prefix is what keeps
  * an OpenCode id from ever being typed after `claude --resume`.
  */
-export const OPENCODE_SESSION_ID_RE = /^ses_[A-Za-z0-9]{8,120}$/;
+export const OPENCODE_SESSION_ID_RE = /^ses_[A-Za-z0-9_]{8,120}$/;
 export function isValidOpencodeSessionId(id: unknown): id is string {
   return typeof id === 'string' && OPENCODE_SESSION_ID_RE.test(id);
 }

@@ -886,7 +886,7 @@ export const cs: Translation = {
   'settings.workspacePanel.sessionSnapshot30': '30 minut',
   'settings.workspacePanel.sessionSnapshot60': '60 minut',
   'settings.workspacePanel.restoreOpencodeSessionsHint':
-    'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje plugin remotea pro OpenCode (zapnutou integraci agentů). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. Relace OpenCode 2 lze zachytit pouze při spuštění s --standalone: jeho sdílený server na pozadí nedokáže rozlišit jednotlivé karty.',
+    'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje integraci OpenCode v remotea (serverový plugin, nebo TUI plugin nainstalovaný pomocí `wmux opencode-tui` pro OpenCode 2). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. OpenCode 2 na vzdáleném nebo sdíleném serveru zachytává TUI plugin; po aktualizaci remotea spusťte v daném prostředí znovu `wmux opencode-tui`.',
   'settings.workspacePanel.restoreQwenSessionsHint':
     'Znovu spustí Qwen Code v každé obnovené kartě, kde běžel, pomocí „qwen --resume“ v původním adresáři. Vyžaduje hooky remotea pro Qwen (zapnuté stavové hooky) a Qwen Code 0.14 nebo novější. Karty, jejichž relace už Qwen nemá, se přeskočí. Řádně ukončené relace Qwen se neobnovují.',
   'settings.workspacePanel.restoreAgySessionsHint':
