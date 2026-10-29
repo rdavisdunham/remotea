@@ -135,6 +135,11 @@ export interface HookTurnContext {
  *   - `Stop`              — the turn ended, so there is nothing left to answer
  *   - `noteHumanInput`    — the human typed in the pane (agent-state.ts)
  *   - an explicit `report-agent --unblocked` from the agent
+ *   - the MAIN thread's own tool lifecycle moving past the prompt (#399) — see
+ *     `noteToolEvent` in the desktop's agent-hook-bridge.ts. Not any tool
+ *     event: only one that carries Claude Code's `tool_use_id` and no
+ *     `agent_id`, so the thread that asked can be told from a subagent or a
+ *     sibling call, and only for a block a hook raised.
  *
  * The cost is that a prompt answered through `wmux answer-agent` — a relay, not
  * a local keystroke — keeps saying "needs you" until the turn ends rather than
@@ -245,6 +250,11 @@ export function hookToAgentReport(
     // "Running" with the prompt still on screen and no event left to correct it
     // (Claude Code arms the 60s idle nudge only after a turn ENDS, and the turn
     // is still open). See the block-ownership note above.
+    //
+    // A MAIN-thread call, paired with its start by `tool_use_id`, can still end
+    // a block a hook raised — that decision is applyHookToAgentState's, through
+    // `noteToolEvent` (#399), because it needs the calls seen so far, not just
+    // this one event.
     //
     // Absolute runDepth rather than a delta: this fires on EVERY tool call and
     // nothing decrements per-call, so `runDelta: +1` would climb forever. An
