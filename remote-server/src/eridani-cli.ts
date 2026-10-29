@@ -132,7 +132,7 @@ async function readKey(): Promise<string> {
  * One hello → welcome against `url` with `key`. Resolves with Eridani's host id;
  * rejects with a sentence a person can act on.
  */
-export function probeLink(url: string, key: string, hello: { server_id: string; machine: string; version: string }, timeoutMs: number = ERIDANI_TIMING.probeMs): Promise<{ hostId: string; connEpoch: number }> {
+export function probeLink(url: string, key: string, hello: { server_id: string; machine: string; version: string }, timeoutMs: number = ERIDANI_TIMING.probeMs): Promise<{ hostId: string | null; connEpoch: number }> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const ws = new WebSocket(url, [ERIDANI_SUBPROTOCOL], {
@@ -140,7 +140,7 @@ export function probeLink(url: string, key: string, hello: { server_id: string; 
       perMessageDeflate: false,
       handshakeTimeout: timeoutMs,
     });
-    const finish = (err: Error | null, value?: { hostId: string; connEpoch: number }) => {
+    const finish = (err: Error | null, value?: { hostId: string | null; connEpoch: number }) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -175,7 +175,7 @@ export function probeLink(url: string, key: string, hello: { server_id: string; 
       }
       const f = parseDownFrame(raw);
       if (f?.t !== 'welcome') return;
-      const w = f as unknown as { host_id: string; conn_epoch: number };
+      const w = f as unknown as { host_id: string | null; conn_epoch: number };
       try {
         ws.send(JSON.stringify({ v: 1, id: crypto.randomUUID(), conn_epoch: w.conn_epoch, at: Date.now(), t: 'bye', reason: 'probe' }));
       } catch {
@@ -253,7 +253,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
       if (!ERIDANI_KEY_RE.test(key)) throw new Error('that is not an Eridani link key (it starts with eri_bot_)');
       if (!rest.includes('--no-probe')) {
         const res = await probeLink(url, key, { server_id: ensureServerId(dir), machine: machine || os.hostname(), version: serverVersion() });
-        out.write(`Eridani accepted the key (host ${res.hostId})\n`);
+        out.write(res.hostId ? `Eridani accepted the key (host ${res.hostId})\n` : 'Eridani accepted the key (new host; it is registered when the server connects)\n');
       }
       writeEridaniToken(dir, key);
       const cfg: EridaniConfig = { enabled: true, url, machine, collector: prev?.collector ?? 'parity' };
