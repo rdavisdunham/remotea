@@ -486,8 +486,11 @@ export interface ByeBody {
 
 export interface WelcomeBody {
   t: 'welcome';
-  host_id: string;
+  /** Null only on a probe welcome for a server_id Eridani has not registered yet. */
+  host_id: string | null;
   conn_epoch: number;
+  /** Set when the hello carried a probe-* boot_id (`remotea eridani connect`); no lease was taken. */
+  probe?: boolean;
   server_time: number | string;
   /** Seconds Eridani remembers op ids for. */
   replay_horizon?: number;
@@ -678,7 +681,10 @@ export function parseDownFrame(raw: unknown): DownFrame | null {
   if (!m) return null;
   switch (m.t) {
     case 'welcome':
-      return isStr(m.host_id, 200) && isNum(m.conn_epoch) ? (m as unknown as DownFrame) : null;
+      // A probe (`remotea eridani connect`) against an Eridani that has never seen this server_id
+      // answers with host_id null: the host row is only created by a real hello.
+      return (isStr(m.host_id, 200) || (m.host_id === null && m.probe === true)) && isNum(m.conn_epoch)
+        ? (m as unknown as DownFrame) : null;
     case 'ack':
       return isStr(m.acked_id, 200) && typeof m.ok === 'boolean' ? (m as unknown as DownFrame) : null;
     case 'bye':

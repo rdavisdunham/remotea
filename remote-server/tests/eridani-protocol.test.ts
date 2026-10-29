@@ -38,6 +38,9 @@ describe('eridani link protocol', () => {
   it('parses the frames Eridani sends', () => {
     expect(parseDownFrame(env({ t: 'welcome', host_id: 'h', conn_epoch: 4, server_time: 1 }))).toMatchObject({ t: 'welcome', conn_epoch: 4 });
     expect(parseDownFrame(env({ t: 'welcome', host_id: 'h', conn_epoch: null }))).toBeNull();
+    // First-time probe: Eridani has no host row yet and answers host_id null (seen live on 2026-10-28).
+    expect(parseDownFrame(env({ t: 'welcome', host_id: null, conn_epoch: 0, server_time: 1, probe: true }))).toMatchObject({ t: 'welcome', host_id: null });
+    expect(parseDownFrame(env({ t: 'welcome', host_id: null, conn_epoch: 0, server_time: 1 }))).toBeNull();
     expect(parseDownFrame(env({ t: 'ack', acked_id: 'a', ok: true }))).toMatchObject({ ok: true });
     expect(parseDownFrame(env({ t: 'ack', acked_id: 'a' }))).toBeNull();
     expect(parseDownFrame(env({ t: 'bye', reason: 'x'.repeat(1000) }))).toMatchObject({ reason: 'x'.repeat(ERIDANI_LIMITS.reasonChars) });
