@@ -110,6 +110,8 @@ export type LinkCap =
   | 'prompt'
   // The host takes `worktrees.scan`: a fresh worktrees.report and session.report on request (the judge's PR evidence).
   | 'worktrees.scan'
+  // The host takes `terminal.focus`: bring the run's tab to the front in the connected desktop app(s).
+  | 'terminal.focus'
   // The host reports `remotea doctor`'s summary: in hello (`doctor`), and as a `doctor` frame when it changes.
   // The frame goes only to an Eridani whose welcome advertised `doctor`.
   | 'doctor';
@@ -129,8 +131,8 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 /** Stage E, advertised only while `eridani.json.collector` is `authoritative`. */
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
-/** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan` and the `doctor` summary. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'doctor']);
+/** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus` and the `doctor` summary. */
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -823,6 +825,23 @@ export interface WorktreesScanCommand extends OpFields {
   expires_at: number | string;
 }
 
+/**
+ * Bring the run's terminal tab to the front in every connected desktop app
+ * that understands it (Eridani's "Open terminal in remotea"). Not effectful
+ * on the run; short-lived (Eridani gives it 30 s), so `expires_at` is
+ * required. `executed` (`result.desktops`: how many apps got it) when at
+ * least one app was told; `rejected` `no_desktop` when none is connected (or
+ * none understands focus, or every one hid the tab), `unknown_surf` when the
+ * surface is gone or is not this run's.
+ */
+export interface TerminalFocusCommand extends OpFields {
+  t: 'terminal.focus';
+  surf: string;
+  run_id: string;
+  generation: number;
+  expires_at: number | string;
+}
+
 export const SESSION_TOOLS: ReadonlySet<string> = new Set<SessionTool>(['claude_code', 'claude_desktop', 'codex_cli', 'codex_desktop']);
 
 /** Eridani's answer to sessions.snapshot: what each run should be doing. */
@@ -1109,6 +1128,11 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
     case 'verify':
       if (!isStr(m.attempt_id, 200) || !isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad attempt';
       if (!isInt(m.turn_seq) || !isInt(m.plan_revision) || !isStr(m.verify_id, 64) || !/^[A-Za-z0-9._-]+$/.test(m.verify_id)) return 'bad verify';
+      return null;
+    case 'terminal.focus':
+      // Not effectful on the run, but short-lived: a focus nobody waits for any more is refused.
+      if (m.expires_at === undefined) return 'expires_at required';
+      if (!isStr(m.surf, 120) || !isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
       return null;
     case 'worktrees.scan':
       // Not effectful, but short-lived (2 min): a scan nobody waits for any more is refused.

@@ -188,6 +188,16 @@ export interface EridaniBinding {
    * eridani-mcp.ts), and why not. Optional: older bindings lack it. Never the key.
    */
   mcp?: { configured: boolean; reason?: string };
+  /**
+   * The Eridani web app this run belongs to (origin, no trailing slash), for
+   * the desktop's "Open in Eridani": `<webUrl>/?view=remotea&run=<runId>`.
+   * From eridani.json (`webUrl`, else derived from the link URL); bindings
+   * recorded before it existed are filled in when the link is configured.
+   * Optional: absent when the server cannot tell.
+   */
+  webUrl?: string;
+  /** The task's title as the spawn carried it (`title`), when it carried one. */
+  taskTitle?: string;
 }
 
 /** Stage D: the latest verification attempt on a surface (verify-attempts.ts). */
@@ -260,7 +270,8 @@ export interface CreateSpec {
 // ── Messages ───────────────────────────────────────────────────────────────
 
 export type ClientMsg =
-  | { t: 'hello'; proto: number; device: { id: DeviceId; name: string }; app: { name: string; version: string } }
+  /** `features`: what this app understands beyond PROTO (absent from older apps; unknown names are ignored). */
+  | { t: 'hello'; proto: number; device: { id: DeviceId; name: string }; app: { name: string; version: string }; features?: ClientFeature[] }
   | { t: 'open'; rid: number; id: RemoteSurfaceId; cols: number; rows: number; sinceSeq?: number; bootId?: string; create?: CreateSpec }
   | { t: 'detach'; ids: RemoteSurfaceId[] }
   | { t: 'close'; rid: number; id: RemoteSurfaceId }
@@ -299,7 +310,15 @@ export interface DiagEvent {
 }
 
 /** Features a server announces in `welcome`; an app uses a feature only when listed. */
-export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs';
+export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus';
+
+/**
+ * Features an app announces in `hello`. `focus`: it brings a session's tab to
+ * the front on a server `focus` message (Eridani's `terminal.focus`). The
+ * server sends `focus` only to apps that listed it.
+ */
+export type ClientFeature = 'focus';
+const MAX_CLIENT_FEATURES = 16;
 
 /** Whether an agent CLI on the server reports its status to remotea (see `remotea hooks`). */
 export interface HookAgentStatus {
@@ -365,6 +384,11 @@ export type ServerMsg =
   | { t: 'hooksStatus'; hooks: HookAgentStatus[] }
   /** The answer to an `fs` request: exactly what the app's local operation would have returned. */
   | { t: 'fsResult'; rid: number; result: unknown }
+  /**
+   * Bring session `id`'s tab to the front (Eridani's "Open terminal in
+   * remotea"). Sent only to apps whose hello listed the `focus` feature.
+   */
+  | { t: 'focus'; id: RemoteSurfaceId; runId?: string }
   | { t: 'goingAway' }
   | { t: 'pong'; n: number; serverAt: number }
   | { t: 'error'; code: string; message: string };
@@ -498,6 +522,8 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
         && isObj(m.device) && typeof m.device.id === 'string' && DEVICE_ID_RE.test(m.device.id)
         && isStr(m.device.name, LIMITS.maxName)
         && isObj(m.app) && isStr(m.app.name, 64) && isStr(m.app.version, 64)
+        && (m.features === undefined || (Array.isArray(m.features) && m.features.length <= MAX_CLIENT_FEATURES
+          && m.features.every((f) => isStr(f, 32))))
         ? (m as unknown as ClientMsg) : null;
     case 'open':
       return isRid(m.rid) && isSurfaceId(m.id)
@@ -560,7 +586,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
 const SERVER_TYPES = new Set([
   'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
   'sessionAdded', 'sessionUpdated', 'sessionClosed', 'groupUpserted', 'groupClosed',
-  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus', 'fsResult',
+  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus', 'fsResult', 'focus',
 ]);
 
 /**
@@ -582,6 +608,8 @@ export function parseServerMsg(raw: unknown): ServerMsg | null {
     case 'meta':
     case 'sessionClosed':
       return isSurfaceId(m.id) ? (m as unknown as ServerMsg) : null;
+    case 'focus':
+      return isSurfaceId(m.id) && (m.runId === undefined || isStr(m.runId, 128)) ? (m as unknown as ServerMsg) : null;
     case 'sessionAdded':
     case 'sessionUpdated':
       return isObj(m.session) && isSurfaceId(m.session.id) ? (m as unknown as ServerMsg) : null;

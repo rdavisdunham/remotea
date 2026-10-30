@@ -15,6 +15,17 @@ export function setLatestRemoteViews(views: RemoteRegistryView[] | null): void {
   useRemoteRegistry.setState({ views });
 }
 
+/** Called after every registry push (for useSyncExternalStore). Returns the unsubscribe. */
+export function subscribeRemoteViews(fn: () => void): () => void {
+  return useRemoteRegistry.subscribe(() => {
+    try {
+      fn();
+    } catch {
+      /* a listener's failure is its own */
+    }
+  });
+}
+
 /** null until the first registry push (or after a test resets it). */
 export function latestRemoteViews(): RemoteRegistryView[] | null {
   return useRemoteRegistry.getState().views;
