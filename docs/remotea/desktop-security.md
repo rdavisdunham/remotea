@@ -95,7 +95,6 @@ The phone Remote Console page (`src/renderer/remote/index.html`) is served by ma
 | CDP proxy on `127.0.0.1:9222`–`9230` | It is always on and drives the browser panel. It checks Host and Origin against DNS rebinding and web origins (`cdp-proxy.ts`), but there is no token, so any local process can drive the panel's page. Gating it on agent-browser use or adding a token is a product decision. |
 | Replace `<webview>` with `WebContentsView` | That would let `webviewTag` go off. It is a rewrite of the browser panel. |
 | Per-site permission prompts in the panel | Today it's deny-by-default. A prompt UI would bring video calls back. |
-| `release.yml` names the installer `wmux-<ver>-setup.exe` | electron-builder emits `remotea-<ver>-setup.exe` (`nsis.artifactName`), so the signing, zip, `latest.yml` and upload steps of a tag build look for a file that doesn't exist. This was noticed while writing the smoke workflow, which uses the right name, and is left for a release-pipeline change. |
 
 ## Verifying
 
