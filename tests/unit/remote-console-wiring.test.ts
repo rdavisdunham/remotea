@@ -31,6 +31,8 @@ vi.mock('electron', () => ({
   dialog: {},
   app: { getPath: () => os.tmpdir(), getVersion: () => '0.0.0' },
   nativeTheme: { on: () => {} },
+  // ipc-handlers hands it to RemoteHosts (host tokens); nothing here encrypts.
+  safeStorage: { isEncryptionAvailable: () => false },
 }));
 
 import {

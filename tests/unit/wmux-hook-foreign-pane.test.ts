@@ -32,7 +32,8 @@ async function framesFor(
     });
     socket.on('error', () => {});
   });
-  const pipe = `\\\\.\\pipe\\wmux-${instance}`;
+  // The hook's default pipe (shared/instance.ts getPipePath): remotea, not wmux, since the rename.
+  const pipe = `\\\\.\\pipe\\remotea-${instance}`;
   const env = typeof envFor === 'function' ? envFor(pipe) : envFor;
   await new Promise<void>((r) => server.listen(pipe, r));
   // A clean slate: nothing from the developer's own wmux pane may leak in.
