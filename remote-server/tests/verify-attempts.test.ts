@@ -371,6 +371,8 @@ describe('F07: turn → generation binding', () => {
       timers.advance(5);
       await flush();
     }
+    // `executed` is reported once the Enter after the paste was sent (S-N1).
+    timers.advance(1);
     expect(await p).toMatchObject({ state: 'executed' });
     expect(registry.session(surf)!.eridani!.acceptedInput).toMatchObject({ generation: 1 });
     // Eridani replans before the agent took the prompt.
