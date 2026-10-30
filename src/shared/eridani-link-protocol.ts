@@ -151,8 +151,15 @@ export interface HarnessCaps {
   observe: boolean;
   /** Final responses captured from the Stop hook. */
   capture: boolean;
-  /** Structured question answering (stage C, Claude only). */
+  /**
+   * Every `question` frame this harness produces can be answered with `answer`
+   * (harness-adapters.ts). True only when the harness's adapter was verified on
+   * the installed version and its hook is wired; `question_kinds` says which
+   * kinds. Anything else the harness asks stays in the terminal (needs_you).
+   */
   question: boolean;
+  /** The `question.kind`s that can be answered remotely (`ask`: Claude AskUserQuestion; `approval`: Codex PermissionRequest). Empty when `question` is false. */
+  question_kinds?: QuestionKind[];
   /** SessionStart context injection (stage C). */
   context: boolean;
   /** The server resumes the conversation after a restart. */
@@ -164,8 +171,14 @@ export interface HarnessCaps {
   spawn?: boolean;
   /** Stage C: how `input mode:steer` is carried out. Always 'interrupt' in v1: the turn is interrupted and the text starts a new one. */
   steer?: 'interrupt';
-  /** Stage C: permission prompts are captured (needs_you), never answered remotely in v1. */
-  permission?: 'capture';
+  /**
+   * Permission prompts: `capture` (needs_you; answer in the terminal) or
+   * `answer` (sent as a `question` of kind `approval`, answered allow once or
+   * deny; "always" is never offered).
+   */
+  permission?: 'capture' | 'answer';
+  /** Eridani can drive the run loop: turns are captured and `input` (queue/steer) continues the run. */
+  loop?: boolean;
   /** Stage C: flags every launch of this harness carries (Codex: `--disable daemon_auto_start`). */
   launch_flags?: string[];
 }
@@ -477,6 +490,9 @@ export interface CommandOutcomeBody extends OpFields {
   result?: Record<string, unknown>;
 }
 
+/** `ask`: Claude's AskUserQuestion. `approval`: Codex's PermissionRequest (choices `allow_once` / `deny`). */
+export type QuestionKind = 'ask' | 'approval';
+
 /** One question item as Eridani shows it (AskUserQuestion's `questions[i]`). */
 export interface QuestionItem {
   id: string;
@@ -486,7 +502,7 @@ export interface QuestionItem {
   multi?: boolean;
 }
 
-/** An agent asked something that can be answered remotely (Claude AskUserQuestion). */
+/** An agent asked something that can be answered remotely (Claude AskUserQuestion, Codex PermissionRequest). */
 export interface QuestionBody extends OpFields {
   t: 'question';
   question_id: string;
@@ -495,12 +511,12 @@ export interface QuestionBody extends OpFields {
   run_id: string | null;
   /** The generation the turn that asked belongs to (F07), not the run's current one. */
   generation: number;
-  provider: 'claude';
+  provider: 'claude' | 'codex';
   provider_session_id: string;
   /** Claude's `tool_use_id` for the AskUserQuestion call; `answer` must echo it. */
   provider_request_id: string;
   provider_turn_id: string | null;
-  kind: 'ask';
+  kind: QuestionKind;
   /** One AskUserQuestion call = one group; answered all at once. */
   group_id: string;
   items: QuestionItem[];

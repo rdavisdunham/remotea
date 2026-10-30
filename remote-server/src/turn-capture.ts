@@ -100,12 +100,19 @@ export function isRolloutPath(p: unknown): p is string {
   return norm === p && norm.split(path.sep).includes('.codex');
 }
 
-/** The final answer of the last turn in a Codex rollout tail, or null. */
+/**
+ * The final answer of the last turn in a Codex rollout tail, or null.
+ *
+ * Rollout shapes, newest first (checked against real 0.166.0 rollouts):
+ *   - `event_msg task_complete {turn_id, last_agent_message}` (0.166: the turn's end);
+ *   - `event_msg item_completed {turn_id, item {type: "AgentMessage", phase: "final_answer", content [{type: "Text", text}]}}` (0.166);
+ *   - `event_msg agent_message {phase: "final_answer", message}` (before 0.166; 0.166 no longer writes it).
+ */
 export function rolloutFinalAnswer(tail: string, turnId?: string): string | null {
   let found: string | null = null;
   let currentTurn: string | null = null;
   for (const line of tail.split('\n')) {
-    if (!line.includes('agent_message') && !line.includes('turn_context') && !line.includes('task_started')) continue;
+    if (!line.includes('agent_message') && !line.includes('turn_context') && !line.includes('task_started') && !line.includes('AgentMessage') && !line.includes('task_complete')) continue;
     let d: { type?: string; payload?: Record<string, unknown> };
     try {
       d = JSON.parse(line);
@@ -114,9 +121,16 @@ export function rolloutFinalAnswer(tail: string, turnId?: string): string | null
     }
     const p = d.payload && typeof d.payload === 'object' ? d.payload : {};
     if (typeof p.turn_id === 'string') currentTurn = p.turn_id;
-    if (d.type === 'event_msg' && p.type === 'agent_message' && p.phase === 'final_answer' && typeof p.message === 'string') {
-      if (turnId && currentTurn && currentTurn !== turnId) continue;
-      found = p.message;
+    if (d.type !== 'event_msg') continue;
+    if (turnId && currentTurn && currentTurn !== turnId) continue;
+    if (p.type === 'agent_message' && p.phase === 'final_answer' && typeof p.message === 'string') found = p.message;
+    else if (p.type === 'task_complete' && typeof p.last_agent_message === 'string' && p.last_agent_message) found = p.last_agent_message;
+    else if (p.type === 'item_completed' && p.item && typeof p.item === 'object') {
+      const it = p.item as { type?: unknown; phase?: unknown; content?: unknown };
+      if (it.type === 'AgentMessage' && it.phase === 'final_answer' && Array.isArray(it.content)) {
+        const text = it.content.map((c) => (c && typeof c === 'object' && typeof (c as { text?: unknown }).text === 'string' ? (c as { text: string }).text : '')).join('');
+        if (text) found = text;
+      }
     }
   }
   return found;

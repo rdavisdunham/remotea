@@ -26,7 +26,8 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { applyWmuxHooks, removeWmuxHooks } from '../../src/shared/claude-hooks';
+import { HOOK_TIMEOUTS_S, applyWmuxHooks, removeWmuxHooks } from '../../src/shared/claude-hooks';
+import type { AdapterHooks } from './harness-adapters';
 import { applyQwenHooks, removeQwenHooksFrom } from '../../src/main/qwen-context';
 import { buildGrokHooks } from '../../src/main/grok-context';
 import { ensureAgyPlugin, getAgyPluginDir, removeAgyPlugin } from '../../src/main/agy-context';
@@ -67,14 +68,68 @@ function isOurs(entry: unknown): boolean {
   return Array.isArray(hooks) && hooks.some((h: any) => typeof h?.command === 'string' && h.command.includes(MARKER));
 }
 
+/**
+ * Codex's timeout per event, in seconds. PermissionRequest is held for
+ * Eridani (questions-claude.ts, `remotea.approval`): remotea gives the prompt
+ * back to the terminal at 570 s, before Codex kills the hook at 600 s. Codex
+ * 0.166 records a trust hash per hook entry (config.toml `[hooks.state]`), so
+ * changing an entry makes Codex ask to review hooks once at its next start.
+ */
+export const CODEX_TIMEOUTS_S: Record<(typeof CODEX_EVENTS)[number], number> = {
+  SessionStart: 10,
+  UserPromptSubmit: 10,
+  PreToolUse: 10,
+  PostToolUse: 10,
+  PermissionRequest: HOOK_TIMEOUTS_S.question,
+  Stop: 10,
+  SessionEnd: 10,
+};
+
 export function applyCodexHooks(config: Json, hookScript: string): Json {
   const next: Json = { ...(config || {}) };
   next.hooks = { ...(next.hooks || {}) };
   for (const event of CODEX_EVENTS) {
     const kept = (Array.isArray(next.hooks[event]) ? next.hooks[event] : []).filter((e: unknown) => !isOurs(e));
-    next.hooks[event] = [...kept, { hooks: [{ type: 'command', command: `node "${hookScript}" --event ${event} --provider codex`, timeout: 10 }] }];
+    next.hooks[event] = [...kept, { hooks: [{ type: 'command', command: `node "${hookScript}" --event ${event} --provider codex`, timeout: CODEX_TIMEOUTS_S[event] }] }];
   }
   return next;
+}
+
+/** Our helper's handler for `event` in a hooks map (optionally only a matcher's group), or null. */
+function ourHandler(hooks: unknown, event: string, matcher?: string): { command: string; timeout?: unknown } | null {
+  const groups = hooks && typeof hooks === 'object' ? (hooks as Json)[event] : null;
+  if (!Array.isArray(groups)) return null;
+  for (const g of groups) {
+    if (matcher !== undefined && g?.matcher !== matcher) continue;
+    for (const h of Array.isArray(g?.hooks) ? g.hooks : []) {
+      if (typeof h?.command === 'string' && h.command.includes(MARKER) && h.command.includes(`--event ${matcher ?? event}`)) return h;
+    }
+  }
+  return null;
+}
+
+const longEnough = (h: { timeout?: unknown } | null): boolean => !!h && typeof h.timeout === 'number' && h.timeout >= HOOK_TIMEOUTS_S.question;
+
+/**
+ * Whether each question adapter's hook is wired the way its hold needs
+ * (harness-adapters.ts): our entry is there, synchronous, with the long
+ * timeout. Read-only; an unreadable file is "not wired".
+ */
+export function adapterHooks(p: Pick<HookPaths, 'home'> = defaultHookPaths()): AdapterHooks {
+  const read = (file: string): Json | null => {
+    try {
+      return readJson(file);
+    } catch {
+      return null;
+    }
+  };
+  const claude = read(path.join(p.home, '.claude', 'settings.json'));
+  const ask = ourHandler(claude?.hooks, 'PreToolUse', 'AskUserQuestion') as { async?: unknown; timeout?: unknown } | null;
+  const codex = read(path.join(p.home, '.codex', 'hooks.json'));
+  return {
+    claudeAsk: longEnough(ask) && ask?.async !== true,
+    codexApproval: longEnough(ourHandler(codex?.hooks, 'PermissionRequest')),
+  };
 }
 
 export function removeCodexHooks(config: Json): Json {

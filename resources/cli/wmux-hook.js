@@ -50,7 +50,13 @@ const isQwen = provider === 'qwen';
  * Notification of type permission_prompt.
  */
 const isCodex = provider === 'codex';
-if (isCodex && event === 'PermissionRequest')
+/**
+ * Codex's PermissionRequest toward a remotea server is first offered to
+ * Eridani (`remotea.approval`, held like AskUserQuestion); only when nobody
+ * holds it is it reported as the permission Notification below.
+ */
+const codexPermission = isCodex && event === 'PermissionRequest';
+if (codexPermission)
     event = 'Notification';
 /**
  * When Claude Code fired this hook, near enough (issue #151).
@@ -668,6 +674,14 @@ function sendHook() {
         holdQuestion();
         return;
     }
+    if (codexPermission && remote) {
+        holdApproval(relayHook);
+        return;
+    }
+    relayHook();
+}
+/** Report the hook event (hook.event) and leave; SessionStart then asks for context. */
+function relayHook() {
     const fields = parsePayload(stdinData);
     // A phantom SubagentStop (prompt suggestion, /compact summary) is nobody's subagent.
     if (fields.phantomSubagent)
@@ -825,6 +839,55 @@ function holdQuestion() {
             },
         };
         process.stdout.write(JSON.stringify(out), () => process.exit(0));
+    });
+}
+/**
+ * `--event PermissionRequest --provider codex` toward a remotea server: a
+ * SYNCHRONOUS hook (Codex runs it before showing its approval prompt, and
+ * shows "Running hook" meanwhile; verified on 0.166.0) that holds the request
+ * while Eridani may answer it.
+ *
+ *   - answered: print the decision, `allow` (once) or `deny` with a message;
+ *     Codex runs or blocks the call and never shows the prompt;
+ *   - anything else (not an Eridani session, link down, a subagent's call,
+ *     the adapter not verified for this Codex, the server gave up at its
+ *     570 s hold): report it as before (the permission Notification, so the
+ *     pane says needs_you) and print nothing, and Codex asks in the terminal.
+ *
+ * A signal is Codex giving up on the hook (its 600 s timeout, or Esc, which
+ * interrupts the turn): exit at once; the server sees the connection close.
+ */
+function holdApproval(fallback) {
+    for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP'])
+        process.on(sig, () => process.exit(0));
+    let data = null;
+    try {
+        data = JSON.parse(stdinData);
+    }
+    catch {
+        data = null;
+    }
+    if (!data || typeof data.session_id !== 'string' || typeof data.tool_name !== 'string' || (typeof data.agent_id === 'string' && data.agent_id)) {
+        fallback();
+        return;
+    }
+    const params = {
+        provider: 'codex',
+        sessionId: data.session_id,
+        turnId: typeof data.turn_id === 'string' ? data.turn_id : '',
+        toolName: data.tool_name,
+        toolInput: data.tool_input ?? null,
+    };
+    void bridgeRequest('remotea.approval', params, null).then((res) => {
+        const d = res && typeof res === 'object' ? res.decision : null;
+        if (!d || (d.behavior !== 'allow' && d.behavior !== 'deny')) {
+            fallback();
+            return;
+        }
+        const decision = d.behavior === 'allow'
+            ? { behavior: 'allow' }
+            : { behavior: 'deny', message: typeof d.message === 'string' && d.message ? d.message.slice(0, 1000) : 'Denied from Eridani.' };
+        process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } }), () => process.exit(0));
     });
 }
 // Read stdin (Claude Code pipes the hook payload as JSON).

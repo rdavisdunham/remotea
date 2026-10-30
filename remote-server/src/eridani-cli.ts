@@ -99,7 +99,7 @@ export function statusBlock(dir: string, serverRunning: boolean): { enabled: boo
 /** Human lines for what hello advertises: harness readiness, then each target's launchers and verify entries. */
 export function fmtAdvertised(a: Advertised): string[] {
   const lines: string[] = [];
-  const hs = Object.entries(a.harnesses).map(([h, c]) => `${h} ${c!.installed === false ? `not installed (${c!.launch_error ?? '?'})` : c!.version ?? 'installed'}${c!.spawn ? ', spawn' : ''}`);
+  const hs = Object.entries(a.harnesses).map(([h, c]) => `${h} ${c!.installed === false ? `not installed (${c!.launch_error ?? '?'})` : c!.version ?? 'installed'}${c!.spawn ? ', spawn' : ''}${c!.question ? `, answers ${(c!.question_kinds ?? []).join('/') || 'questions'}` : ''}`);
   lines.push(`build ${!a.build_sha || a.build_sha === 'unknown' ? 'unknown' : a.build_sha.slice(0, 12)}${a.build_dirty ? '+dirty' : ''}  proto ${a.proto}  caps v${a.caps_version ?? 1}  hooks ${a.hook_version ?? 'not installed'}`);
   lines.push(`harnesses: ${hs.join('; ') || 'none'}`);
   for (const t of a.targets ?? []) {
