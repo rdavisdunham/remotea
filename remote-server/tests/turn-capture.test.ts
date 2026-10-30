@@ -1,17 +1,23 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { SessionRecord } from '../../src/shared/remote-host-protocol';
-import { TurnCapture, isRolloutPath, rolloutFinalAnswer, type TurnFields } from '../src/turn-capture';
+import { TurnCapture, isRolloutPath, rolloutFinalAnswer, type PromptFields, type TurnCaptureDeps, type TurnFields } from '../src/turn-capture';
+
+type Binding = NonNullable<ReturnType<NonNullable<TurnCaptureDeps['binding']>>>;
 
 let recs: Map<string, SessionRecord>;
 let turns: TurnFields[];
+let prompts: PromptFields[];
+let bindings: Map<string, Binding>;
 let tails: Record<string, string>;
 let cap: TurnCapture;
 
-function fresh(): TurnCapture {
+function fresh(withPrompt = true): TurnCapture {
   return new TurnCapture({
     session: (id) => recs.get(id),
     update: (id, patch) => recs.set(id, { ...recs.get(id)!, ...patch }),
     emit: (t) => turns.push(t),
+    ...(withPrompt ? { prompt: (p: PromptFields) => prompts.push(p) } : {}),
+    binding: (id) => bindings.get(id) ?? null,
     now: () => 5000,
     readTail: (file) => tails[file] ?? '',
   });
@@ -20,6 +26,8 @@ function fresh(): TurnCapture {
 beforeEach(() => {
   recs = new Map([['surf-1', { id: 'surf-1', incarnation: 2 } as SessionRecord]]);
   turns = [];
+  prompts = [];
+  bindings = new Map();
   tails = {};
   cap = fresh();
 });
@@ -141,5 +149,86 @@ describe('TurnCapture', () => {
     claude('Stop', { lastAssistantMessage: 'token ghp_abcdefghijklmnopqrstuvwxyz0123456789 set' });
     expect(turns[0].text).not.toContain('ghp_abcdef');
     expect(turns[0].prompt).not.toContain('sk-ant-api03');
+  });
+
+  describe('live prompt frames', () => {
+    beforeEach(() => bindings.set('surf-1', { runId: 'run-7', generation: 3 }));
+
+    it('a root prompt on a run-bound surface is emitted at once, and its seq pairs with the turn that follows', () => {
+      claude('UserPromptSubmit', { prompt: 'first', at: 1200 });
+      expect(turns).toEqual([]);
+      expect(prompts).toEqual([{
+        surf: 'surf-1', incarnation: 2, run_id: 'run-7', generation: 3, provider: 'claude', tool: 'claude_code',
+        provider_session_id: 'sess-a', seq: 1, text: 'first', truncated: false, at: 1200,
+      }]);
+      claude('Stop', { lastAssistantMessage: 'one' });
+      claude('UserPromptSubmit', { prompt: 'second' });
+      claude('Stop', { lastAssistantMessage: 'two' });
+      expect(prompts.map((p) => [p.seq, p.text, p.at])).toEqual([[1, 'first', 1200], [2, 'second', 5000]]);
+      expect(turns.map((t) => [t.seq, t.prompt, t.run_id, t.generation])).toEqual([[1, 'first', 'run-7', 3], [2, 'second', 'run-7', 3]]);
+    });
+
+    it('the seq keeps pairing across a restart and a duplicate Stop', () => {
+      claude('UserPromptSubmit', { prompt: 'a' });
+      claude('Stop', { lastAssistantMessage: 'a' });
+      claude('Stop', { lastAssistantMessage: 'a again' });
+      cap = fresh();
+      claude('UserPromptSubmit', { prompt: 'b' });
+      claude('Stop', { lastAssistantMessage: 'b' });
+      expect(prompts.map((p) => p.seq)).toEqual([1, 2]);
+      expect(turns.map((t) => t.seq)).toEqual([1, 2]);
+    });
+
+    it('Codex prompts carry the Codex tool and thread id', () => {
+      codex('UserPromptSubmit', { prompt: 'do it' });
+      expect(prompts[0]).toMatchObject({ provider: 'codex', tool: 'codex_cli', provider_session_id: 'thr-1', run_id: 'run-7', seq: 1 });
+    });
+
+    it('F07: an accepted input binds the prompt to the generation Eridani typed it under', () => {
+      bindings.set('surf-1', { runId: 'run-7', generation: 5, accepted: { generation: 4, at: 4000 } });
+      claude('UserPromptSubmit', { prompt: 'steer' });
+      expect(prompts[0]).toMatchObject({ run_id: 'run-7', generation: 4 });
+    });
+
+    it('is not emitted for an unbound surface', () => {
+      bindings.delete('surf-1');
+      claude('UserPromptSubmit', { prompt: 'local only' });
+      claude('Stop', { lastAssistantMessage: 'x' });
+      expect(prompts).toEqual([]);
+      expect(turns[0]).toMatchObject({ prompt: 'local only', run_id: null });
+    });
+
+    it('is not emitted for a synthetic hand-back, a subagent prompt, an empty prompt, or an unknown surface', () => {
+      claude('UserPromptSubmit', { prompt: 'real' });
+      claude('Stop', { lastAssistantMessage: 'interim', backgroundTasks: '1' });
+      claude('UserPromptSubmit', { prompt: '' });
+      claude('UserPromptSubmit', { prompt: 'inside', agentId: 'agent-1' });
+      cap.hook('surf-unknown', { event: 'UserPromptSubmit', sessionId: 's', prompt: 'nowhere' });
+      claude('UserPromptSubmit', { prompt: '<agent-message from="worker">done</agent-message>' });
+      claude('Stop', { lastAssistantMessage: 'final' });
+      expect(prompts.map((p) => p.text)).toEqual(['real']);
+      // The interim turn pairs with the prompt; the hand-back's turn is a later seq with no prompt frame of its own.
+      expect(turns.map((t) => [t.seq, t.interim ?? false, t.synthetic ?? false])).toEqual([[1, true, false], [2, false, true]]);
+      expect(prompts[0].seq).toBe(1);
+    });
+
+    it('is not emitted when nobody listens (no prompt dependency), and the turn is unchanged', () => {
+      cap = fresh(false);
+      claude('UserPromptSubmit', { prompt: 'quiet' });
+      claude('Stop', { lastAssistantMessage: 'x' });
+      expect(prompts).toEqual([]);
+      expect(turns[0]).toMatchObject({ prompt: 'quiet', seq: 1, run_id: 'run-7' });
+    });
+
+    it('clips at 4000 code points with the flag and redacts secrets, like the turn\'s prompt', () => {
+      claude('UserPromptSubmit', { prompt: '😀'.repeat(4001) + ' sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123' });
+      expect(Array.from(prompts[0].text)).toHaveLength(4000);
+      expect(prompts[0].truncated).toBe(true);
+      claude('Stop', { lastAssistantMessage: 'x' });
+      expect(prompts[0].text).toBe(turns[0].prompt);
+      claude('UserPromptSubmit', { prompt: 'use key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123 now' });
+      expect(prompts[1].text).not.toContain('sk-ant-api03');
+      expect(prompts[1].truncated).toBe(false);
+    });
   });
 });

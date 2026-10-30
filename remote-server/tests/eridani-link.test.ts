@@ -4,7 +4,7 @@ import path from 'path';
 import type { IncomingMessage } from 'http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { parseUpFrame, type UpFrame } from '../../src/shared/eridani-link-protocol';
+import { STAGE_F_CAPS, parseUpFrame, type UpFrame } from '../../src/shared/eridani-link-protocol';
 import { AUTH_RETRY_MS } from '../../src/main/remote-hosts/connection-fsm';
 import { EridaniLink, OUTBOX_FILE, digestOf, type EridaniLinkDeps } from '../src/eridani-link';
 import { Spool } from '../src/eridani-spool';
@@ -21,6 +21,8 @@ class FakeEridani {
   epoch = 0;
   /** Called with the socket just before welcome goes out (stage F: frames before welcome are ignored). */
   beforeWelcome: ((ws: WebSocket) => void) | null = null;
+  /** Capabilities the welcome advertises (undefined: an older Eridani that lists none). */
+  welcomeCaps: string[] | undefined = undefined;
   constructor() {
     this.wss = new WebSocketServer({
       port: 0,
@@ -38,7 +40,7 @@ class FakeEridani {
         this.frames.push(f);
         if (f.t === 'hello') {
           this.beforeWelcome?.(ws);
-          this.send(ws, { t: 'welcome', host_id: 'host-1', conn_epoch: ++this.epoch, server_time: Date.now() });
+          this.send(ws, { t: 'welcome', host_id: 'host-1', conn_epoch: ++this.epoch, server_time: Date.now(), ...(this.welcomeCaps ? { caps: this.welcomeCaps } : {}) });
         } else if (this.autoAck && 'op_id' in f && f.t !== 'ack') {
           this.ack(ws, f.id, true);
         }
@@ -122,6 +124,20 @@ const turn = (n: number) => ({
   ended_at: 1000 + n,
 });
 
+const prompt = (n: number) => ({
+  surf: 'surf-1',
+  incarnation: 1,
+  run_id: 'run-1',
+  generation: 2,
+  provider: 'claude' as const,
+  tool: 'claude_code' as const,
+  provider_session_id: 'sess',
+  seq: n,
+  text: `prompt ${n}`,
+  truncated: false,
+  at: 900 + n,
+});
+
 describe('EridaniLink', () => {
   it('connects with the bearer key and an explicit User-Agent, no Origin, then hello → welcome → snapshot', async () => {
     const { eri, link } = await setup({ snapshot: () => [{ surf: 'surf-1', incarnation: 2, state: 'live', agent_state: 'idle', since: 5, provider: null, provider_session_id: null, group: null, title: 't', cwd: '/x', turn_seq: 0, run_id: null, generation: 0 }] });
@@ -154,6 +170,37 @@ describe('EridaniLink', () => {
     expect(f.digest).toBe(digestOf(f));
     expect(link.spool.size).toBe(0);
     expect(link.status().lastAckAt).not.toBeNull();
+  });
+
+  it('a prompt is a live-lane op frame once Eridani advertised `prompt`, and the hello offers it', async () => {
+    const delivered: string[] = [];
+    const { eri, link } = await setup({ caps: () => STAGE_F_CAPS, onDelivered: (e) => delivered.push(String(e.body.t)) });
+    eri.welcomeCaps = ['prompt'];
+    link.start();
+    await until(() => link.ready);
+    expect(link.peerHas('prompt')).toBe(true);
+    expect((eri.of('hello')[0] as UpFrame & { caps: string[] }).caps).toContain('prompt');
+    expect(link.prompt(prompt(1))).toBe(true);
+    await until(() => delivered.includes('prompt'));
+    const f = eri.of('prompt')[0] as unknown as Record<string, unknown>;
+    expect(f).toMatchObject({ t: 'prompt', surf: 'surf-1', run_id: 'run-1', generation: 2, seq: 1, text: 'prompt 1', truncated: false, at: 901, conn_epoch: 1 });
+    expect(typeof f.op_id).toBe('string');
+    expect(f.digest).toBe(digestOf(f));
+    expect(link.spool.size).toBe(0);
+  });
+
+  it('a prompt is dropped, not spooled, when Eridani did not advertise `prompt` or the link is down; turns still flow', async () => {
+    const { eri, link } = await setup();
+    expect(link.prompt(prompt(1))).toBe(false); // not connected yet: no known peer caps
+    link.start();
+    await until(() => link.ready);
+    expect(link.peerHas('prompt')).toBe(false);
+    expect(link.prompt(prompt(2))).toBe(false);
+    link.turn({ ...turn(1), prompt: 'prompt 2', prompt_truncated: false });
+    await until(() => eri.of('turn').length === 1);
+    expect(eri.of('prompt')).toEqual([]);
+    expect(link.spool.size).toBe(0);
+    expect(link.status().unacked).toBe(0);
   });
 
   it('server close → reconnect replays each unacked event exactly once, with the same op_id', async () => {
