@@ -154,7 +154,8 @@ describe('RemoteHostClient against a real server', () => {
     expect(desk.sizeOf('surf-int-13')).toMatchObject({ cols: 200, rows: 60, owner: true });
     expect(lap.sizeOf('surf-int-13')).toMatchObject({ cols: 200, rows: 60, owner: false });
     lap.write('surf-int-13', 'x');
-    await waitFor(() => desk.sizeOf('surf-int-13')?.owner === false);
+    // Two sockets: the desk hearing of the change says nothing about the lap having heard yet.
+    await waitFor(() => desk.sizeOf('surf-int-13')?.owner === false && lapSizes.at(-1)?.owner === true);
     expect(desk.sizeOf('surf-int-13')).toEqual({ cols: 80, rows: 24, owner: false, ownerName: 'device-lap00001' });
     expect(lapSizes.at(-1)).toMatchObject({ cols: 80, rows: 24, owner: true });
     desk.claim('surf-int-13');

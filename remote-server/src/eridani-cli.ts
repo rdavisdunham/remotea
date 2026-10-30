@@ -39,7 +39,7 @@ import {
   type EridaniConfig,
 } from './config';
 import { ERIDANI_PROTO, ERIDANI_SUBPROTOCOL, ERIDANI_TIMING, STAGE_B_CAPS, parseDownFrame } from '../../src/shared/eridani-link-protocol';
-import { readLinkStatus, type LinkStatus } from './eridani-link';
+import { readLinkStatus, type Advertised, type LinkStatus } from './eridani-link';
 import { Collector, formatRows } from './collector/collector';
 import { CollectorState } from './collector/state';
 import { statusFromRegistry } from './collector/report';
@@ -85,10 +85,31 @@ export function eridaniSummary(dir: string, serverRunning: boolean): EridaniSumm
   };
 }
 
-/** The additive `server.eridani` block of `remotea status --json`. */
-export function statusBlock(dir: string, serverRunning: boolean): { enabled: boolean; state: string; unacked: number; lastAckAt: number | null } {
+/**
+ * The additive `server.eridani` block of `remotea status --json`. `advertised`
+ * (S-S1/S-S5): what the running link's hello says now (build, caps,
+ * harnesses, targets with launch and verify readiness); null without a link.
+ */
+export function statusBlock(dir: string, serverRunning: boolean): { enabled: boolean; state: string; unacked: number; lastAckAt: number | null; advertised: Advertised | null } {
   const s = eridaniSummary(dir, serverRunning);
-  return { enabled: s.enabled, state: s.state, unacked: s.link?.unacked ?? 0, lastAckAt: s.link?.lastAckAt ?? null };
+  return { enabled: s.enabled, state: s.state, unacked: s.link?.unacked ?? 0, lastAckAt: s.link?.lastAckAt ?? null, advertised: s.link?.advertised ?? null };
+}
+
+/** Human lines for what hello advertises: harness readiness, then each target's launchers and verify entries. */
+export function fmtAdvertised(a: Advertised): string[] {
+  const lines: string[] = [];
+  const hs = Object.entries(a.harnesses).map(([h, c]) => `${h} ${c!.installed === false ? `not installed (${c!.launch_error ?? '?'})` : c!.version ?? 'installed'}${c!.spawn ? ', spawn' : ''}`);
+  lines.push(`build ${!a.build_sha || a.build_sha === 'unknown' ? 'unknown' : a.build_sha.slice(0, 12)}${a.build_dirty ? '+dirty' : ''}  proto ${a.proto}  caps v${a.caps_version ?? 1}  hooks ${a.hook_version ?? 'not installed'}`);
+  lines.push(`harnesses: ${hs.join('; ') || 'none'}`);
+  for (const t of a.targets ?? []) {
+    const launch = (t.enabled ?? t.harnesses).map((h) => {
+      const l = t.launch?.[h];
+      return l ? `${h} ${l.ready ? 'ready' : `NOT ready (${l.error ?? '?'})`}` : h;
+    });
+    const verify = (t.verify_status ?? t.verify.map((id) => ({ id, ready: true }))).map((v) => ('reason' in v && v.reason ? `${v.id} NOT ready (${v.reason})` : `${v.id} ${v.ready ? 'ready' : 'NOT ready'}`));
+    lines.push(`target ${t.id}: ${launch.join(', ') || 'no harness enabled'}; verify ${verify.join(', ') || 'none'}`);
+  }
+  return lines;
 }
 
 /** Read the key without echoing it (terminal) or from stdin (pipe). */
@@ -284,6 +305,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
         if (l.journal?.refused) out.write(`commands refused with journal_unavailable: ${l.journal.refused}\n`);
         if (l.error) out.write(`error: ${l.error}\n`);
         if (l.rejected) out.write(`refused by Eridani: ${l.rejected} (last: ${l.lastRejection})\n`);
+        if (l.advertised) for (const line of fmtAdvertised(l.advertised)) out.write(`${line}\n`);
       }
       return 0;
     }

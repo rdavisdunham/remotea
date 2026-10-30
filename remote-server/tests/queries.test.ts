@@ -30,6 +30,15 @@ async function settle(): Promise<void> {
   await new Promise((r) => setTimeout(r, 30));
 }
 
+/** The headless emulator parses asynchronously: wait for the reply rather than a fixed delay. */
+async function until(cond: () => boolean, ms = 3000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > end) return;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
 function session() {
   const sp = fakeSpawner();
   const s = new TermSession({
@@ -46,7 +55,7 @@ describe('server-side query replies', () => {
       pty.written = [];
       pty.emit(q);
       s.flush();
-      await settle();
+      await until(() => pty.written.join('').length > 0);
       const replies = pty.written.join('');
       expect(replies.length, `${name} got a reply`).toBeGreaterThan(0);
     }
@@ -58,7 +67,7 @@ describe('server-side query replies', () => {
     pty.emit(QUERIES.DA1);
     pty.emit(QUERIES.OSC11);
     s.flush();
-    await settle();
+    await until(() => pty.written.includes(DA1_REPLY) && pty.written.includes('\x1b]11;rgb:4444/5555/6666\x1b\\'));
     expect(pty.written).toContain(DA1_REPLY);
     expect(pty.written).toContain('\x1b]11;rgb:4444/5555/6666\x1b\\');
     s.dispose();
@@ -70,6 +79,8 @@ describe('server-side query replies', () => {
     s.attach(new FakeConn(2), { cols: 80, rows: 24, created: false });
     pty.emit(QUERIES.CPR);
     s.flush();
+    await until(() => pty.written.some((w) => /\x1b\[\d+;\d+R/.test(w)));
+    // Then long enough for a second answer to show, if there were one.
     await settle();
     expect(pty.written.filter((w) => /\x1b\[\d+;\d+R/.test(w))).toHaveLength(1);
     s.dispose();

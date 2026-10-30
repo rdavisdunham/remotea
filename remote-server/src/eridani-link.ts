@@ -21,7 +21,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import WebSocket from 'ws';
-import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
+import type { HelloBody, HelloTarget } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_LIMITS,
   ERIDANI_PROTO,
@@ -148,7 +148,12 @@ export interface LinkStatus {
   lastRejection: string | null;
   updatedAt: number;
   pid: number;
+  /** What hello advertises now (S-S1, S-S5): build, protocol, caps, harnesses and targets with their readiness. */
+  advertised?: Advertised;
 }
+
+/** hello without the connection's identity fields. */
+export type Advertised = Omit<HelloBody, 't' | 'server_id' | 'boot_id' | 'hostname' | 'machine'>;
 
 export interface EridaniLinkDeps {
   url: string;
@@ -160,6 +165,12 @@ export interface EridaniLinkDeps {
   hostname: string;
   machine: string;
   version: string;
+  /** The commit this server was built from (build-info.ts); "unknown" when absent. */
+  build?: { sha: string; dirty: boolean | null };
+  /** ERIDANI_CAPS_VERSION when `harnesses` and `targets` come from probes (eridani-runtime.ts); absent: not sent. */
+  capsVersion?: number;
+  /** The installed hook helper's version; absent: not sent. */
+  hookVersion?: () => string | null;
   harnesses?: () => CapabilityMatrix;
   /** Every surface, for the reconcile snapshot sent after each welcome. */
   snapshot?: () => SnapshotSurface[];
@@ -349,6 +360,23 @@ export class EridaniLink {
       lastRejection: this.lastRejection,
       updatedAt: this.now(),
       pid: process.pid,
+      advertised: this.advertised(),
+    };
+  }
+
+  /** The hello fields that describe this host (also in the status file, so `remotea status` shows what Eridani was told). */
+  advertised(): Advertised {
+    const build = this.deps.build;
+    return {
+      proto: ERIDANI_PROTO,
+      version: this.deps.version,
+      build_sha: build?.sha ?? 'unknown',
+      ...(typeof build?.dirty === 'boolean' ? { build_dirty: build.dirty } : {}),
+      ...(this.deps.capsVersion !== undefined ? { caps_version: this.deps.capsVersion } : {}),
+      ...(this.deps.hookVersion ? { hook_version: this.deps.hookVersion() } : {}),
+      caps: [...(this.deps.caps?.() ?? STAGE_B_CAPS)],
+      harnesses: this.deps.harnesses?.() ?? {},
+      ...(this.deps.targets ? { targets: this.deps.targets() } : {}),
     };
   }
 
@@ -481,11 +509,7 @@ export class EridaniLink {
         boot_id: this.deps.bootId,
         hostname: this.deps.hostname,
         machine: this.deps.machine,
-        proto: ERIDANI_PROTO,
-        version: this.deps.version,
-        caps: [...(this.deps.caps?.() ?? STAGE_B_CAPS)],
-        harnesses: this.deps.harnesses?.() ?? {},
-        ...(this.deps.targets ? { targets: this.deps.targets() } : {}),
+        ...this.advertised(),
         ...(this.degradedReason() ? { degraded_reason: this.degradedReason() } : {}),
       });
       this.handshakeTimer = this.timers.setTimeout(() => {
