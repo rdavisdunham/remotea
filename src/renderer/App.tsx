@@ -31,6 +31,7 @@ import type { AgentRosterEntry } from './store/agent-rollup';
 import ShortcutCheatSheet from './components/CheatSheet/ShortcutCheatSheet';
 import ConfirmCloseDialog from './components/ConfirmCloseDialog';
 import RemoteCloseDialog from './components/RemoteCloseDialog';
+import RecoveryDialog from './components/RecoveryDialog';
 import RemoteHooksPrompt from './components/RemoteHooksPrompt';
 import ConfirmWorktreeCloseDialog from './components/ConfirmWorktreeCloseDialog';
 import SaveLayoutDialog from './components/SaveLayoutDialog';
@@ -2054,6 +2055,7 @@ export default function App() {
 
       <ConfirmCloseDialog />
       <RemoteCloseDialog />
+      <RecoveryDialog />
       <RemoteHooksPrompt />
       <ConfirmWorktreeCloseDialog />
       <ConfirmCloseSurfaceDialog />

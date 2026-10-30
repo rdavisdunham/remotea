@@ -67,11 +67,11 @@ import { statusFromRegistry } from './collector/report';
 import { Dispatch, type DispatchTimers } from './dispatch';
 import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
-import { WorktreeManager, writersByPath } from './worktrees';
+import { sameWorktreeState, WorktreeManager, worktreeStateOf, writersByPath } from './worktrees';
 import { loadTargets } from './eridani-targets';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
-import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
+import type { HelloTarget, WorktreeReport } from '../../src/shared/eridani-link-protocol';
 import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn, type ProbeHarness } from './launch-caps';
 import { hookVersion, loadBuildInfo, type BuildInfo } from './build-info';
 import { adapterHooks, defaultHookPaths } from './hooks-install';
@@ -466,6 +466,7 @@ export class EridaniRuntime {
     // nominate fetches each base first (rate-limited), so the heads read the same fresh ref.
     this.worktrees.nominate(targets, (p) => writers.has(p), (p) => writers.get(p) ?? null).then(async (rows) => [rows, await this.worktrees.migrationHeads(targets)] as const).then(
       ([rows, heads]) => {
+        this.stampWorktrees(rows);
         const body = heads.length ? { t: 'worktrees.report' as const, worktrees: rows, heads } : { t: 'worktrees.report' as const, worktrees: rows };
         const text = JSON.stringify(body);
         if (!forced && text === this.worktreesSent) return this.settleWorktrees(waiters, null);
@@ -487,6 +488,23 @@ export class EridaniRuntime {
       }
     });
     return done;
+  }
+
+  /**
+   * Each Eridani session's worktree facts onto its registry record
+   * (SessionRecord.worktreeState, additive), so a desktop can offer the
+   * worktree of a run that ended with unmerged work. Only a change is
+   * written (and broadcast).
+   */
+  private stampWorktrees(rows: WorktreeReport[]): void {
+    const byPath = new Map(rows.filter((r) => r.branch).map((r) => [r.path, r]));
+    for (const rec of this.deps.registry.sessions()) {
+      const row = rec.eridani ? byPath.get(rec.eridani.worktree) : undefined;
+      if (!row) continue;
+      const next = worktreeStateOf(row);
+      if (sameWorktreeState(rec.worktreeState, next)) continue;
+      this.deps.hub.updateRecord(rec.id, { worktreeState: { ...next, at: Date.now() } });
+    }
   }
 
   private settleWorktrees(waiters: Array<{ resolve: () => void; reject: (err: Error) => void }>, err: Error | null): void {

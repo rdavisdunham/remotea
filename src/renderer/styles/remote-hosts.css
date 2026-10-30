@@ -391,3 +391,77 @@
   width: 6px;
   height: 6px;
 }
+
+/* Recovery inventory dialog (task 2eeb1e23): one row per thing that changed while away. */
+.confirm-dialog.recovery {
+  max-width: 640px;
+  width: min(640px, calc(100vw - 32px));
+}
+
+.recovery .confirm-dialog__message {
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+}
+
+.recovery__item {
+  padding: 8px 0;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.recovery__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recovery__kind {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.recovery__item[data-kind='worktree'] .recovery__kind,
+.recovery__item[data-kind='exited'] .recovery__kind {
+  color: #e0a800;
+  opacity: 1;
+}
+
+.recovery__title {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recovery__host {
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.recovery__detail {
+  font-size: 12px;
+  margin: 2px 0 6px;
+  opacity: 0.85;
+}
+
+.recovery__branch {
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+.recovery__choices {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.recovery__default {
+  font-weight: 600;
+}
+
+.recovery__copied {
+  font-size: 12px;
+  color: #3fb950;
+}

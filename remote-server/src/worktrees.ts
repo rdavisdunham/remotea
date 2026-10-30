@@ -22,7 +22,7 @@ import path from 'path';
 import { BRANCH_RE } from '../../src/shared/eridani-link-protocol';
 import type { ExecutionTarget } from './eridani-targets';
 import type { WorktreeReport, WorktreeWriter } from '../../src/shared/eridani-link-protocol';
-import type { SessionRecord } from '../../src/shared/remote-host-protocol';
+import type { SessionRecord, WorktreeStateInfo } from '../../src/shared/remote-host-protocol';
 export type { WorktreeReport, WorktreeWriter };
 
 export const WORKTREES_FILE = 'eridani-worktrees.json';
@@ -423,6 +423,17 @@ export class WorktreeManager {
   }
 }
 
+
+/** The part of a worktree report a session record carries (SessionRecord.worktreeState), without the timestamp. */
+export function worktreeStateOf(row: WorktreeReport): Omit<WorktreeStateInfo, 'at'> {
+  return { uncommitted: row.uncommitted, untracked: row.untracked, ahead: row.ahead, merged: row.merged, unpushed: row.unpushed, baseRef: row.base_ref ?? row.base };
+}
+
+/** Same facts (ignoring when they were taken)? */
+export function sameWorktreeState(a: Omit<WorktreeStateInfo, 'at'> | undefined, b: Omit<WorktreeStateInfo, 'at'>): boolean {
+  return !!a && a.uncommitted === b.uncommitted && a.untracked === b.untracked && a.ahead === b.ahead
+    && a.merged === b.merged && a.unpushed === b.unpushed && a.baseRef === b.baseRef;
+}
 
 /** The highest number among migration file names (first capture group of `pattern`), or null. */
 export function migrationHead(names: string[], pattern = DEFAULT_MIGRATION_PATTERN): number | null {

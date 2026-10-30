@@ -19,6 +19,7 @@ import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
 import { INBOX_GROUP_ID } from '../../shared/remote-host-protocol';
 import { planRemoteSync, type LocalIndex, type SyncAction } from './plan';
 import { setLatestRemoteViews } from './registry-cache';
+import { noteRegistryForRecovery } from './recovery-runtime';
 
 
 type Bridge = {
@@ -165,6 +166,8 @@ function runSync(): void {
     const confirmed = latest.views.some((v) => v.groups.some((x) => x.id === g && x.name === p.name && (x.color ?? undefined) === (p.color ?? undefined)));
     if (confirmed || now - p.at > PENDING_META_MS) pendingMeta.delete(g);
   }
+  // What happened while away, offered before sync drops anything (recovery-runtime.ts).
+  noteRegistryForRecovery(latest.views);
   const actions = planRemoteSync({
     views: latest.views,
     local: buildLocalIndex(),
