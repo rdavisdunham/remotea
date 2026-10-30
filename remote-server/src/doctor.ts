@@ -55,6 +55,7 @@ import { localReadiness, redact, serviceEnv, which } from './eridani-setup';
 import { WorktreeManager, runGit, type GitRunner } from './worktrees';
 import { COLLECTOR_STATE_FILES } from './collector/state';
 import { probeSqlite } from './collector/codex-sqlite';
+import { UploadStore, readUploadsStatus } from './upload';
 
 export const DOCTOR_VERSION = 1;
 
@@ -390,7 +391,7 @@ export function evaluate(f: DoctorFacts): DoctorItem[] {
   if (u) {
     const text = `pasted/dropped files: ${fmtBytes(u.bytes)} in ${u.files} file(s) of a ${fmtBytes(u.budget)} budget${u.source === 'measured' ? ' (counted now)' : ''}`;
     if (u.degraded) add('uploads', 'uploads.budget', 'warn', `${text}; degraded: ${u.degraded}`, 'free space in the temp folder; old drops go after their age limit');
-    else if (u.bytes > u.budget) add('uploads', 'uploads.budget', 'warn', `${text}: over budget`, 'remove old /tmp/remotea-drop-* folders no pane still needs');
+    else if (u.bytes > u.budget) add('uploads', 'uploads.budget', 'warn', `${text}: over budget`, 'remove /tmp/remotea-drop-* folders no pane still needs, or raise uploadBudgetMiB in config.json');
     else if (u.bytes > 0.9 * u.budget) add('uploads', 'uploads.budget', 'warn', `${text}: over 90%`, 'remove old /tmp/remotea-drop-* folders no pane still needs');
     else add('uploads', 'uploads.budget', 'ok', text);
   }
@@ -599,7 +600,7 @@ function readServerConfig(dir: string): { port: number; hookPort: number; upload
     /* defaults */
   }
   const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
-  return { port: num(user.port, DEFAULT_CONFIG.port), hookPort: num(user.hookPort, DEFAULT_CONFIG.hookPort), uploadBudgetMiB: num(user.uploadBudgetMiB, 2048) };
+  return { port: num(user.port, DEFAULT_CONFIG.port), hookPort: num(user.hookPort, DEFAULT_CONFIG.hookPort), uploadBudgetMiB: num(user.uploadBudgetMiB, DEFAULT_CONFIG.uploadBudgetMiB) };
 }
 
 function readRegistry(dir: string): RegistryData | null {
@@ -620,40 +621,14 @@ function pidAlive(pid: number | undefined): boolean {
   }
 }
 
-/** The running server's uploads-status.json when recent (a newer build writes it), else /tmp/remotea-drop-* counted now. */
+/** The running server's uploads-status.json when recent, else the drops measured here (upload.ts; writes nothing). */
 function uploadFacts(dir: string, tmpDir: string, budgetMiB: number, serverUp: boolean, now: number): UploadFacts {
-  if (serverUp) {
-    try {
-      const u = JSON.parse(fs.readFileSync(path.join(dir, 'uploads-status.json'), 'utf8')) as Record<string, unknown>;
-      if (typeof u.bytes === 'number' && typeof u.budget === 'number' && typeof u.at === 'number' && now - u.at < 30 * MIN) {
-        return { bytes: u.bytes, files: typeof u.files === 'number' ? u.files : 0, budget: u.budget, source: 'server', degraded: typeof u.degraded === 'string' ? u.degraded : null };
-      }
-    } catch {
-      /* count it here */
-    }
+  const u = serverUp ? readUploadsStatus(dir) : null;
+  if (u && typeof u.bytes === 'number' && typeof u.budget === 'number' && typeof u.at === 'number' && now - u.at < 30 * MIN) {
+    return { bytes: u.bytes, files: typeof u.files === 'number' ? u.files : 0, budget: u.budget, source: 'server', degraded: typeof u.degraded === 'string' ? u.degraded : null };
   }
-  let bytes = 0;
-  let files = 0;
-  let names: string[] = [];
-  try {
-    names = fs.readdirSync(tmpDir).filter((n) => n.startsWith('remotea-drop-'));
-  } catch {
-    /* none */
-  }
-  for (const n of names) {
-    try {
-      for (const f of fs.readdirSync(path.join(tmpDir, n))) {
-        const st = fs.statSync(path.join(tmpDir, n, f));
-        if (st.isFile()) {
-          bytes += st.size;
-          files++;
-        }
-      }
-    } catch {
-      /* not ours to read */
-    }
-  }
-  return { bytes, files, budget: budgetMiB * MiB, source: 'measured', degraded: null };
+  const m = new UploadStore({ tmpDir, budgetBytes: Math.max(1, budgetMiB) * MiB, statusFile: null, now: () => now }).usage();
+  return { bytes: m.bytes, files: m.files, budget: m.budget, source: 'measured', degraded: m.degraded };
 }
 
 /** git that refuses to fetch: the doctor never touches the network. */
