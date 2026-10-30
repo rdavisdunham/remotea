@@ -9,7 +9,8 @@
  *     "worktreeRoot": "/home/davin/remotea/worktrees",
  *     "base": "main",
  *     "launch": { "claude": {}, "codex": { "bin": "/home/davin/.local/bin/codex" } },
- *     "verify": [{ "id": "test", "argv": ["npm", "test"], "cwd": "remote-server", "timeout": 600 }]
+ *     "verify": [{ "id": "test", "argv": ["npm", "test"], "cwd": "remote-server", "timeout": 600 }],
+ *     "mcpKeyFile": "~/.config/remotea/eridani-mcp-token"
  *   }]
  *
  * A spawn names a target by id; nothing Eridani sends becomes a path, a
@@ -31,6 +32,7 @@
 import path from 'path';
 import { readEridaniFile, writeEridaniFile } from './config';
 import { BRANCH_RE } from '../../src/shared/eridani-link-protocol';
+import { keyFileSettingOk } from './eridani-mcp';
 
 export interface LaunchSpec {
   /** The program: a bare name found on the login shell's PATH, or an absolute path. Default: the harness name. */
@@ -68,6 +70,12 @@ export interface ExecutionTarget {
   launch: { claude?: LaunchSpec; codex?: LaunchSpec };
   verify: VerifySpec[];
   migrations?: MigrationsSpec;
+  /**
+   * The file holding the bot key a spawned agent uses for Eridani's MCP
+   * server (eridani-mcp.ts): absolute, `~/…`, or relative to the config dir.
+   * Default: eridani.json's `mcpKeyFile`, else `<config dir>/eridani-mcp-token`.
+   */
+  mcpKeyFile?: string;
 }
 
 export const TARGET_ID_RE = /^[A-Za-z0-9._-]{1,64}$/;
@@ -111,6 +119,7 @@ export function targetError(t: unknown): string | null {
       }
     }
   }
+  if (o.mcpKeyFile !== undefined && !keyFileSettingOk(o.mcpKeyFile)) return 'mcpKeyFile: a path to the MCP key file';
   const mig = o.migrations;
   if (mig !== undefined) {
     if (!mig || typeof mig !== 'object' || Array.isArray(mig)) return 'migrations: { dir, pattern? }';
@@ -136,6 +145,7 @@ function normalize(t: Record<string, unknown>): ExecutionTarget {
     base: typeof t.base === 'string' ? t.base : 'main',
     launch: t.launch as ExecutionTarget['launch'],
     verify: ((t.verify as VerifySpec[] | undefined) ?? []).map((v) => ({ id: v.id, argv: [...v.argv], ...(v.cwd ? { cwd: v.cwd } : {}), timeout: v.timeout, ...(v.env ? { env: { ...v.env } } : {}) })),
+    ...(typeof t.mcpKeyFile === 'string' ? { mcpKeyFile: t.mcpKeyFile } : {}),
     ...(t.migrations ? { migrations: { dir: (t.migrations as MigrationsSpec).dir.replace(/\/+$/, ''), ...((t.migrations as MigrationsSpec).pattern ? { pattern: (t.migrations as MigrationsSpec).pattern } : {}) } } : {}),
   };
 }

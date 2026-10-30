@@ -60,6 +60,7 @@
  */
 import crypto from 'crypto';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import type {
   AnswerCommand,
@@ -82,6 +83,7 @@ import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
 import type { TurnFields } from './turn-capture';
+import { claudeMcpConfig, codexMcpArgs, ERIDANI_MCP_DIR, MCP_TOKEN_ENV, mcpStatus, writePrivate, type McpResolution, type McpStatus } from './eridani-mcp';
 
 export const RUNS_FILE = 'eridani-runs.json';
 export const ERIDANI_DEVICE = { id: 'eridani', name: 'Eridani' };
@@ -130,23 +132,29 @@ export function freshnessNote(wt: Pick<EnsuredWorktree, 'branch' | 'base' | 'bas
   return lines.join('\n');
 }
 
-/** The command line a spawn runs (through the login shell; the prompt stays in $ERIDANI_PROMPT). */
-export function launchCommand(harness: 'claude' | 'codex', model: string, spec: LaunchSpec, withPrompt: boolean): string {
+/**
+ * The command line a spawn runs (through the login shell; the prompt stays in $ERIDANI_PROMPT).
+ * `mcpArgs` (eridani-mcp.ts) come right after the program: Claude's
+ * `--mcp-config` takes several values, so an option must follow it, never the prompt.
+ */
+export function launchCommand(harness: 'claude' | 'codex', model: string, spec: LaunchSpec, withPrompt: boolean, mcpArgs: string[] = []): string {
   const bin = q(spec.bin ?? harness);
   const extra = (spec.args ?? []).map(q);
+  const mcp = mcpArgs.map(q);
   const words = harness === 'claude'
-    ? [bin, '--model', q(model), '--permission-mode', 'auto', ...extra]
-    : [bin, '--disable', 'daemon_auto_start', '-m', q(model), ...extra];
+    ? [bin, ...mcp, '--model', q(model), '--permission-mode', 'auto', ...extra]
+    : [bin, ...mcp, '--disable', 'daemon_auto_start', '-m', q(model), ...extra];
   if (withPrompt) words.push('"$ERIDANI_PROMPT"');
   return words.join(' ');
 }
 
 /** The command that reopens a run's conversation with the same model and permission mode. */
-export function resumeLine(b: EridaniBinding, spec: LaunchSpec | undefined, sessionId: string): string | null {
+export function resumeLine(b: EridaniBinding, spec: LaunchSpec | undefined, sessionId: string, mcpArgs: string[] = []): string | null {
   if (!/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId)) return null;
   const bin = q(spec?.bin ?? b.harness);
-  if (b.harness === 'claude') return [bin, '--resume', q(sessionId), '--model', q(b.model), '--permission-mode', 'auto', ...(spec?.args ?? []).map(q)].join(' ');
-  return [bin, 'resume', '--disable', 'daemon_auto_start', '-m', q(b.model), q(sessionId)].join(' ');
+  const mcp = mcpArgs.map(q);
+  if (b.harness === 'claude') return [bin, '--resume', q(sessionId), ...mcp, '--model', q(b.model), '--permission-mode', 'auto', ...(spec?.args ?? []).map(q)].join(' ');
+  return [bin, 'resume', ...mcp, '--disable', 'daemon_auto_start', '-m', q(b.model), q(sessionId)].join(' ');
 }
 
 /** A client of the hub that is Eridani: it opens sessions and reads nothing back. */
@@ -243,6 +251,14 @@ export interface DispatchDeps {
   /** Tests: the workspace fingerprint (default: verify-runner's). */
   fingerprint?: (dir: string) => Promise<string>;
   timing?: Partial<typeof DEFAULT_TIMING>;
+  /**
+   * Eridani's MCP server for a target's agents (eridani-mcp.ts resolveMcp),
+   * read on every spawn and resume. Absent: agents are spawned without it and
+   * outcomes carry no `mcp` field.
+   */
+  mcp?: (target: ExecutionTarget) => McpResolution;
+  /** Where per-run Claude MCP configs go (default `<dir>/eridani-mcp`, or a private temp folder when dir is null). */
+  mcpDir?: string;
 }
 
 export const DEFAULT_TIMING = {
@@ -287,12 +303,16 @@ export class Dispatch {
   private readonly writes = new Map<string, PendingWrite>();
   /** Bumped each time the link becomes ready: a write begun before a reconnect writes nothing more. */
   private linkEpoch = 0;
+  /** Codex's MCP bearer token per surface, for the next launch only: never persisted (eridani-mcp.ts). */
+  private readonly mcpEnv = new Map<string, Record<string, string>>();
+  private readonly mcpDir: string;
 
   constructor(private readonly deps: DispatchDeps) {
     this.timers = deps.timers ?? realTimers;
     this.now = deps.now ?? Date.now;
     this.log = deps.log ?? (() => {});
     this.timing = { ...DEFAULT_TIMING, ...deps.timing };
+    this.mcpDir = deps.mcpDir ?? (deps.dir ? path.join(deps.dir, ERIDANI_MCP_DIR) : path.join(os.tmpdir(), `remotea-eridani-mcp-${process.getuid?.() ?? 'user'}`));
     this.secrets = this.loadSecrets();
     this.conn = new EridaniConn(deps.hub);
     this.attempts = new VerifyAttempts({
@@ -328,7 +348,13 @@ export class Dispatch {
 
   hubHooks(): HubEridaniHooks {
     return {
-      env: (id) => this.secrets[id]?.env,
+      env: (id) => {
+        const env = this.secrets[id]?.env;
+        // Consumed by the launch it was prepared for (spawn or resume).
+        const mcp = this.mcpEnv.get(id);
+        this.mcpEnv.delete(id);
+        return mcp ? { ...env, ...mcp } : env;
+      },
       resumeCommand: (rec) => this.resumeCommand(rec),
       exited: (id, code) => this.onExit(id, code),
       turn: (t: TurnFields) => this.attempts.onTurn(t),
@@ -479,7 +505,55 @@ export class Dispatch {
     return {
       surf: rec.id, incarnation: rec.incarnation ?? 0, worktree: b.worktree, branch: b.branch, base: b.base, base_sha: b.baseSha, target: b.target,
       ...(b.baseRef !== undefined ? { base_ref: b.baseRef, fetch: b.fetch ?? null, behind: b.behind ?? null, ahead: b.ahead ?? null } : {}),
+      ...(b.mcp ? { mcp: { ...b.mcp } } : {}),
     };
+  }
+
+  /** The Claude MCP config file of a surface. */
+  mcpConfigPath(surf: string): string {
+    return path.join(this.mcpDir, `${surf}.json`);
+  }
+
+  /**
+   * Eridani's MCP server for the agent about to launch on `surf`
+   * (eridani-mcp.ts): the launcher arguments, with Claude's config file
+   * written (or removed when not configured) and Codex's token set for this
+   * launch. null when MCP is not wired in (no `mcp` dep). Never logs the key.
+   */
+  private prepareMcp(surf: string, target: ExecutionTarget | undefined, harness: 'claude' | 'codex'): { status: McpStatus; args: string[] } | null {
+    this.mcpEnv.delete(surf);
+    if (!this.deps.mcp) return null;
+    const file = this.mcpConfigPath(surf);
+    let r: McpResolution;
+    try {
+      r = target ? this.deps.mcp(target) : { configured: false, reason: 'the run\'s execution target is gone' };
+    } catch (err) {
+      r = { configured: false, reason: `cannot read the MCP settings: ${(err as Error).message}` };
+    }
+    if (!r.configured) {
+      fs.rmSync(file, { force: true });
+      return { status: mcpStatus(r), args: [] };
+    }
+    if (harness === 'codex') {
+      this.mcpEnv.set(surf, { [MCP_TOKEN_ENV]: r.key });
+      return { status: { configured: true }, args: codexMcpArgs(r.url) };
+    }
+    try {
+      writePrivate(file, claudeMcpConfig(r.url, r.key));
+    } catch (err) {
+      return { status: { configured: false, reason: `cannot write the MCP config (${(err as NodeJS.ErrnoException).code ?? 'error'})` }, args: [] };
+    }
+    return { status: { configured: true }, args: ['--mcp-config', file] };
+  }
+
+  /** Forget a surface's MCP config (its session is gone, or its launch failed). */
+  private dropMcp(surf: string): void {
+    this.mcpEnv.delete(surf);
+    try {
+      fs.rmSync(this.mcpConfigPath(surf), { force: true });
+    } catch {
+      /* best effort */
+    }
   }
 
   private groupFor(name: string): { groupId: string; group: { name: string } } {
@@ -544,24 +618,28 @@ export class Dispatch {
         // F07: the prompt typed at launch belongs to the spawn's generation.
         ...(prompt ? { acceptedInput: { generation: cmd.generation, at: this.now() } } : {}),
       };
+      const mcp = this.prepareMcp(surf, target, cmd.harness);
+      if (mcp) binding.mcp = mcp.status;
       const { groupId, group } = this.groupFor(cmd.group ?? 'Eridani');
       const res = this.conn.open(surf, {
-        cmd: launchCommand(cmd.harness, cmd.model, launch, !!prompt),
+        cmd: launchCommand(cmd.harness, cmd.model, launch, !!prompt, mcp?.args),
         cwd: wt.path,
         groupId: groupId as CreateSpec['groupId'],
         group,
         title: cmd.title ?? `${cmd.harness} · ${wt.branch}`,
       });
+      this.mcpEnv.delete(surf);
       if (!res.ok) {
         delete this.secrets[surf];
         this.saveSecrets();
+        this.dropMcp(surf);
         return { state: 'failed', detail: `spawn: ${res.message}` };
       }
       const rec = this.deps.hub.updateRecord(surf, { eridani: binding });
       this.launchedWith.set(surf, { incarnation: rec?.incarnation ?? 1, agentSeen: false });
       this.deps.registry.saveNow();
       this.deps.changed?.();
-      this.log(`eridani: spawned ${cmd.harness} for run ${cmd.run_id} g${cmd.generation} in ${wt.path} (${surf})`);
+      this.log(`eridani: spawned ${cmd.harness} for run ${cmd.run_id} g${cmd.generation} in ${wt.path} (${surf})${mcp ? `; Eridani MCP ${mcp.status.configured ? 'configured' : `not configured: ${mcp.status.reason}`}` : ''}`);
       return { state: 'executed', result: this.spawnFacts(rec!) };
     } finally {
       this.spawning.delete(surf);
@@ -906,7 +984,10 @@ export class Dispatch {
     if (!b) return undefined;
     if (b.stopRequested || this.deps.resumeAgents === false || !rec.agent) return null;
     const t = this.target(b.target);
-    const line = resumeLine(b, t?.launch[b.harness], rec.agent.sessionId);
+    const mcp = this.prepareMcp(rec.id, t, b.harness);
+    if (mcp && !mcp.status.configured) this.log(`eridani: resuming ${rec.id} without Eridani MCP: ${mcp.status.reason}`);
+    const line = resumeLine(b, t?.launch[b.harness], rec.agent.sessionId, mcp?.args);
+    if (!line) this.dropMcp(rec.id);
     // The hub respawns with this line as the next incarnation.
     this.cancelWrites(rec.id, 'the process is being respawned');
     if (line) this.launchedWith.set(rec.id, { incarnation: (rec.incarnation ?? 0) + 1, agentSeen: false });
@@ -989,7 +1070,12 @@ export class Dispatch {
   private saveSecrets(): void {
     if (!this.deps.dir) return;
     // Forget runs whose sessions are gone.
-    for (const id of Object.keys(this.secrets)) if (!this.deps.registry.session(id) && !this.spawning.has(id)) delete this.secrets[id];
+    for (const id of Object.keys(this.secrets)) {
+      if (!this.deps.registry.session(id) && !this.spawning.has(id)) {
+        delete this.secrets[id];
+        this.dropMcp(id);
+      }
+    }
     const file = path.join(this.deps.dir, RUNS_FILE);
     const tmp = `${file}.tmp-${process.pid}`;
     fs.writeFileSync(tmp, JSON.stringify(this.secrets, null, 2) + '\n', { mode: 0o600 });

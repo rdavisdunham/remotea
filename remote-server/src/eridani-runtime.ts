@@ -55,6 +55,7 @@ import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
 import { WorktreeManager } from './worktrees';
 import { loadTargets } from './eridani-targets';
+import { mcpStatus, resolveMcp } from './eridani-mcp';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn } from './launch-caps';
 import { hookVersion, loadBuildInfo, type BuildInfo } from './build-info';
@@ -180,6 +181,7 @@ export class EridaniRuntime {
       dir: deps.dir,
       worktrees: (this.worktrees = new WorktreeManager({ dir: deps.dir })),
       targets: () => loadTargets(deps.dir),
+      mcp: (t) => resolveMcp(deps.dir, t),
       questions: this.questions,
       emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
       changed: () => this.reportWorktrees(),
@@ -357,7 +359,12 @@ export class EridaniRuntime {
 
   /** Execution targets for hello: ids, repos, permission, probed launchers and verify readiness; never argv or env. */
   helloTargets(): HelloTarget[] {
-    return helloTargets(loadTargets(this.deps.dir), this.probes, { env: this.deps.verifyEnv });
+    const targets = loadTargets(this.deps.dir);
+    // Whether a spawn there gets Eridani's MCP server (eridani-mcp.ts); never the key.
+    return helloTargets(targets, this.probes, { env: this.deps.verifyEnv }).map((h) => {
+      const t = targets.find((x) => x.id === h.id);
+      return t ? { ...h, mcp: mcpStatus(resolveMcp(this.deps.dir, t)) } : h;
+    });
   }
 
   /**

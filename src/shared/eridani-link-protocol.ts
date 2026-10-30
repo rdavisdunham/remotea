@@ -271,6 +271,19 @@ export interface HelloTarget {
   verify_status?: HelloVerifyStatus[];
   /** Where numbered migrations live, when configured (Eridani then reserves migration numbers). */
   migrations?: { dir: string; pattern?: string };
+  /**
+   * Whether an agent spawned here gets Eridani's MCP server (submit_plan,
+   * task_step, task_interview, session_link): the target's MCP key file is
+   * present and valid. `reason` says why not. Optional; an older host omits it.
+   */
+  mcp?: HelloMcp;
+}
+
+/** MCP readiness, in a hello target and in a spawn's `command.outcome.result`. */
+export interface HelloMcp {
+  configured: boolean;
+  /** Why not configured (never the key), e.g. "no MCP key file at …". */
+  reason?: string;
 }
 
 /** The SessionInput the HTTP collector PUTs to /sessions/{tool}/{session_id}, unchanged. */
@@ -452,7 +465,7 @@ export interface CommandOutcomeBody extends OpFields {
   detail?: string;
   /** The command's kind (spawn, input, …), when known. */
   kind?: string;
-  /** Kind-specific facts: spawn → {surf, incarnation, worktree, branch, base, base_sha, base_ref?, fetch?, behind?, ahead?}. */
+  /** Kind-specific facts: spawn → {surf, incarnation, worktree, branch, base, base_sha, base_ref?, fetch?, behind?, ahead?, mcp? {configured, reason?}}. */
   result?: Record<string, unknown>;
 }
 

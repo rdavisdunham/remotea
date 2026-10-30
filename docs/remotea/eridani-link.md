@@ -50,6 +50,12 @@ Both files live in the server's config dir (`~/.config/remotea`, or
 only in the `Authorization` header. It is never logged, never written to the
 outbox or the status file, and never put in a session's environment.
 
+`eridani-mcp-token` (optional, mode 0600) holds a **separate** bot key that
+spawned agents use for Eridani's MCP server; see
+[Eridani MCP for spawned agents](#eridani-mcp-for-spawned-agents). Two more
+optional keys in `eridani.json` go with it: `mcpKeyFile` (another path for
+that file) and `mcpUrl` (the MCP endpoint, when it is not derived from `url`).
+
 The server checks both files' mtime and size every 30 s and starts, restarts or
 stops the link to match. Nothing needs a service restart.
 
@@ -280,7 +286,7 @@ remotea eridani worktrees [--json]
 
 Targets are read on every use: adding one needs no restart and does not
 reconnect the link. `hello` lists them (`targets: [{id, repo, worktree_root,
-harnesses, enabled, launch, verify, verify_status, migrations?}]`, never argv
+harnesses, enabled, launch, verify, verify_status, migrations?, mcp?}]`, never argv
 or env) for Eridani's target picker; the next connect carries a new target,
 and its launcher is probed on the next 30 s check. What each field means is in
 [Capabilities and build identity](#capabilities-and-build-identity).
@@ -332,6 +338,58 @@ file). `remotea status` prints one line from these (`build 1a2b3c4d5e6f; on
 disk 9f8e… (restart to run it); proto 1 caps v2; hooks …`), and `remotea
 eridani status` prints the advertised harnesses and each target's launch and
 verify readiness. The server's start log line names the build too.
+A target may also name its own `mcpKeyFile` (see below).
+
+### Eridani MCP for spawned agents
+
+A run's agent reports through Eridani's MCP tools: `submit_plan`,
+`task_step`, `task_interview` and `session_link`. A fresh worktree has no
+`.mcp.json`, and the host may have no user-scope server, so every spawn (and
+every resume) brings its own. Nothing is written to the worktree or to the
+user's Claude or Codex settings.
+
+- **Claude Code**: `claude --mcp-config <config dir>/eridani-mcp/<surf>.json
+  --model … --permission-mode auto "$ERIDANI_PROMPT"`. The file (mode 0600,
+  folder 0700, removed with the session) is
+  `{"mcpServers": {"eridani": {"type": "http", "url": "<mcp url>", "headers":
+  {"Authorization": "Bearer <key>"}}}}`. There is no `--strict-mcp-config`,
+  because that would hide the user's own servers.
+- **Codex** (0.166): `codex -c 'mcp_servers.eridani.url="<mcp url>"' -c
+  'mcp_servers.eridani.bearer_token_env_var="REMOTEA_ERIDANI_MCP_TOKEN"'
+  --disable daemon_auto_start -m …`. The key is put in
+  `REMOTEA_ERIDANI_MCP_TOKEN` in the environment of that launch only. It is
+  not written to `eridani-runs.json`, and Eridani's `env` (`ERIDANI_*` only)
+  cannot set it. `codex resume` takes the same `-c` overrides.
+- The MCP URL is `https://<host of url>/api/v1/external/mcp/`. The trailing
+  slash is required. `mcpUrl` in `eridani.json` overrides it, and it must be
+  `https://` (`http://` only for localhost).
+- The key is read from the target's `mcpKeyFile`, else the global
+  `mcpKeyFile`, else `<config dir>/eridani-mcp-token`. A path may be
+  absolute, `~/…`, or relative to the config dir. It is re-read on every
+  spawn and resume, so a new key needs no restart. It must be an `eri_bot_`
+  key and **not** the link key: a file holding the link key is refused.
+- **Minting the key** (the owner, once per machine): in Eridani, Settings →
+  Connections → Bot keys, create a bot key with the scopes `agents:session`,
+  `tasks` (read/write) and `notes` (read/write). Save it as
+  `~/.config/remotea/eridani-mcp-token`, one line, mode 0600.
+- The key never appears in argv, logs, `eridani-runs.json`, the registry, the
+  journal, the outbox or the status file.
+
+**Readiness upstream.** When the key file is missing or invalid, or the URL
+cannot be formed, the agent is still spawned, but without the server. Eridani
+is told:
+
+- in the spawn's `command.outcome.result`: `mcp: {configured: boolean,
+  reason?: string}`, e.g. `{configured: false, reason: "no MCP key file at
+  /home/davin/.config/remotea/eridani-mcp-token"}`. The same field is on the
+  binding, so a replayed or "already started" spawn reports it too;
+- in each `hello` target: `mcp: {configured, reason?}`, checked at hello time.
+
+Both fields are optional; an older host omits them. The SessionStart context
+of a run's surface ends with one line: either `Eridani tools: submit_plan,
+task_step, task_interview, session_link are available via the eridani MCP
+server.`, or that they are not available and why. `remotea eridani targets
+list` prints each target's MCP state.
 
 **Trust boundary.** Nothing Eridani sends becomes a program, a path or a shell
 word, apart from three validated values: the model name
@@ -390,7 +448,7 @@ recovery ref first (`refs/remotea/recovery/<branch>`), then
 
 | `t` | Fields | Effect |
 |---|---|---|
-| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
+| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
 | `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then (800 ms later) the text. Typed as a bracketed paste and Enter (150 ms later). Never counts as a person answering. The outcome is `executed` only once Enter was sent; see [Input and steer outcomes](#input-and-steer-outcomes). |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
@@ -577,7 +635,8 @@ The SessionStart hook asks the server (`remotea.context`), which sends
 source, cwd, run_id, generation, task_id}` and waits 2.5 s for
 `context.response {req_id, text, run_token?}`. The text (≤ 16 000 chars) is
 printed for the agent, followed by `Eridani run token: <token>` when there is
-one. With no answer in time, one line naming the tool, session and run is
+one, then, for a run's surface, whether the Eridani MCP tools are available
+(see [Eridani MCP](#eridani-mcp-for-spawned-agents)). With no answer in time, one line naming the tool, session and run is
 printed instead; a late response is dropped. Nothing is printed when the link
 is not enabled.
 
@@ -910,5 +969,10 @@ sent only when Eridani advertises `prompt` back). The lag rules:
   code unsandboxed (see the security model above).
 - Answering permission prompts (captured only) and Codex questions (no hook).
 - Removing worktrees (nominate only, by design).
+- Eridani's side of `mcp.configured: false` (task 3bc2803c): remotea only
+  reports it. Eridani should show the reason on the run and on the target
+  picker, and should not wait for a `submit_plan` that cannot come. It could
+  refuse to spawn on such a target, or fall back to reading the plan from the
+  turn text.
 - Deleting the Python collector's code, units and credential: Davin's step,
   one release after a clean cutover (below), not code here.

@@ -158,6 +158,11 @@ export interface EridaniBinding {
    * agent accepts binds to it, then it is consumed.
    */
   acceptedInput?: { generation: number; at: number };
+  /**
+   * Whether the agent was launched with Eridani's MCP server (remote-server
+   * eridani-mcp.ts), and why not. Optional: older bindings lack it. Never the key.
+   */
+  mcp?: { configured: boolean; reason?: string };
 }
 
 /** Stage D: the latest verification attempt on a surface (verify-attempts.ts). */
