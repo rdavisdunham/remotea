@@ -43,7 +43,9 @@ SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the s
 
 ### 1. Server (in WSL on the machine that runs your agents)
 
-Requirements: systemd enabled in WSL (`[boot] systemd=true` in `/etc/wsl.conf`), Node ≥ 20, `make`, `g++`, `python3`.
+Requirements: systemd enabled in WSL (`[boot] systemd=true` in `/etc/wsl.conf`), **Node ≥ 22.13** (Node 22 LTS; `remote-server/.nvmrc`, so `nvm install` there picks it), `make`, `g++`, `python3`.
+
+Node 22.13 is the floor because the session collector reads Codex's databases with `node:sqlite`, which Node 22 ships unflagged from 22.13. `remote-server/package.json` `engines` states it, CI runs the server on Node 22 from `.nvmrc`, and `install.sh` checks it (`scripts/check-node.sh`) and stops before building on anything older. The running service uses the `node` that was on PATH when you ran `install.sh`, so after upgrading Node, run `install.sh` again.
 
 ```bash
 cd remote-server
@@ -64,7 +66,7 @@ remotea token             # the token the app needs
 
 ### 2. App (on each Windows machine)
 
-Requirements: Node 22 (`winget install OpenJS.NodeJS.LTS`) and git. Clone to a path **without spaces**, then:
+Requirements: git and Node, with Node 22 LTS recommended (`winget install OpenJS.NodeJS.LTS`). Node 20.19+ also works (root `package.json` `engines`: `^20.19.0 || ^22.13.0 || >=24.0.0`). Clone to a path **without spaces**, then:
 
 ```powershell
 git clone https://github.com/rdavisdunham/remotea C:\dev\remotea
@@ -76,6 +78,8 @@ npm run dev               # development run (Vite + Electron)
 ```
 
 `node-pty` ships Windows prebuilds, so no compiler is needed.
+
+The app's Node requirement is separate from the server's on purpose. Node here only runs the build tools (Vite, TypeScript, electron-builder, Vitest), and their floor is what the root `engines` states. CI and the release build use Node 20. The app itself runs on the Node that Electron bundles, and it never loads `node:sqlite`, so the server's 22.13 floor does not apply to it.
 
 Then, in **Settings → Remote hosts → Add remote host**:
 

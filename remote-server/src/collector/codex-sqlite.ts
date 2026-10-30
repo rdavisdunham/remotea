@@ -26,10 +26,31 @@ interface Db {
   close(): void;
 }
 
-let sqliteModule: { DatabaseSync: new (p: string, o?: { readOnly?: boolean }) => Db } | null = null;
+type SqliteModule = { DatabaseSync: new (p: string, o?: { readOnly?: boolean }) => Db };
+
+let sqliteModule: SqliteModule | null = null;
+
+/**
+ * The oldest Node whose node:sqlite this reader can use: Node 22 ships it
+ * unflagged from 22.13. remote-server/package.json "engines",
+ * scripts/check-node.sh and .nvmrc say the same (tests/node-version.test.ts).
+ */
+export const SQLITE_MIN_NODE = '22.13.0';
+
+/** node:sqlite could not be loaded; the message says what to do about it. */
+export class SqliteUnavailableError extends Error {
+  readonly code = 'REMOTEA_NODE_SQLITE_UNAVAILABLE';
+}
+
+export function sqliteUnavailableMessage(nodeVersion: string, cause: unknown): string {
+  const why = cause instanceof Error ? (cause as NodeJS.ErrnoException).code ?? cause.message : String(cause);
+  return `node:sqlite is not available in Node v${nodeVersion} (${why}), so Codex sessions cannot be read. `
+    + `remotea-server needs Node >= ${SQLITE_MIN_NODE}: install Node 22 LTS (e.g. \`nvm install 22\`), `
+    + 'then rerun remote-server/scripts/install.sh so remotea.service runs on it.';
+}
 
 /** node:sqlite, without its one-time ExperimentalWarning on stderr. */
-function sqlite(): NonNullable<typeof sqliteModule> {
+function sqlite(): SqliteModule {
   if (sqliteModule) return sqliteModule;
   const emit = process.emitWarning;
   process.emitWarning = ((w: string | Error, ...rest: unknown[]) => {
@@ -38,11 +59,26 @@ function sqlite(): NonNullable<typeof sqliteModule> {
   }) as typeof process.emitWarning;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    sqliteModule = require('node:sqlite') as NonNullable<typeof sqliteModule>;
+    sqliteModule = require('node:sqlite') as SqliteModule;
+  } catch (err) {
+    throw new SqliteUnavailableError(sqliteUnavailableMessage(process.versions.node, err));
   } finally {
     process.emitWarning = emit;
   }
   return sqliteModule;
+}
+
+/**
+ * The collector's activation check: null when node:sqlite loads, otherwise
+ * the actionable message (one line, no stack). `load` is the test seam.
+ */
+export function probeSqlite(load: () => unknown = sqlite): string | null {
+  try {
+    load();
+    return null;
+  } catch (err) {
+    return err instanceof SqliteUnavailableError ? err.message : sqliteUnavailableMessage(process.versions.node, err);
+  }
 }
 
 /** Per-scan database access: remembers which files need a snapshot, and cleans the snapshots up. */
@@ -78,7 +114,9 @@ export class DbReader {
         } finally {
           db.close();
         }
-      } catch {
+      } catch (err) {
+        // A missing node:sqlite is not something a snapshot would fix.
+        if (err instanceof SqliteUnavailableError) throw err;
         ok = false;
       }
       this.readable.set(file, ok ? file : this.snapshot(file));

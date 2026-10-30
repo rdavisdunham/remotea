@@ -21,10 +21,9 @@ say() { printf '\033[1m%s\033[0m\n' "$*"; }
 warn() { printf '\033[33m%s\033[0m\n' "$*" >&2; }
 die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
 
+# Node first, before anything is built: the floor (and why) is in scripts/check-node.sh.
 node_bin="$(command -v node || true)"
-[[ -n "$node_bin" ]] || die "node not found on PATH (need Node >= 20)"
-node_major="$("$node_bin" -p 'process.versions.node.split(".")[0]')"
-(( node_major >= 20 )) || die "Node >= 20 required (found $("$node_bin" --version))"
+"$here/scripts/check-node.sh" "$node_bin" || die "Stopped before building: unsupported Node (see above)."
 for tool in make g++ python3; do
   command -v "$tool" >/dev/null || die "$tool is required to build node-pty (sudo apt install build-essential python3)"
 done
