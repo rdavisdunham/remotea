@@ -24,7 +24,7 @@ SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the s
 - **Shared sessions, per-device layout.**
   - Sessions and workspaces (name and color) are shared by every device: a terminal opened on the desktop shows up on the laptop in the same workspace.
   - Each device keeps its own splits, windows and monitor layout.
-  - Closing a session anywhere closes it everywhere.
+  - **End sessions on this host** closes a session (or a whole workspace's sessions) everywhere. It always asks first, and lists what it would stop.
   - **Hide on this device** removes it from one machine only.
 - **Survives server restarts, partly.** If WSL restarts, the processes are gone, but sessions come back in their saved directories, and Claude Code sessions are resumed (`claude --resume <id>`).
 - **Everything wmux does** still works for remote panes: xterm scrollback and search, notifications, cwd tracking, and agent-state detection. The server streams raw PTY bytes, not repainted frames.
@@ -43,7 +43,9 @@ SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the s
 
 ### 1. Server (in WSL on the machine that runs your agents)
 
-Requirements: systemd enabled in WSL (`[boot] systemd=true` in `/etc/wsl.conf`), Node ≥ 20, `make`, `g++`, `python3`.
+Requirements: systemd enabled in WSL (`[boot] systemd=true` in `/etc/wsl.conf`), **Node ≥ 22.13** (Node 22 LTS; `remote-server/.nvmrc`, so `nvm install` there picks it), `make`, `g++`, `python3`.
+
+Node 22.13 is the floor because the session collector reads Codex's databases with `node:sqlite`, which Node 22 ships unflagged from 22.13. `remote-server/package.json` `engines` states it, CI runs the server on Node 22 from `.nvmrc`, and `install.sh` checks it (`scripts/check-node.sh`) and stops before building on anything older. The running service uses the `node` that was on PATH when you ran `install.sh`, so after upgrading Node, run `install.sh` again.
 
 ```bash
 cd remote-server
@@ -64,7 +66,7 @@ remotea token             # the token the app needs
 
 ### 2. App (on each Windows machine)
 
-Requirements: Node 22 (`winget install OpenJS.NodeJS.LTS`) and git. Clone to a path **without spaces**, then:
+Requirements: git and Node, with Node 22 LTS recommended (`winget install OpenJS.NodeJS.LTS`). Node 20.19+ also works (root `package.json` `engines`: `^20.19.0 || ^22.13.0 || >=24.0.0`). Clone to a path **without spaces**, then:
 
 ```powershell
 git clone https://github.com/rdavisdunham/remotea C:\dev\remotea
@@ -76,6 +78,8 @@ npm run dev               # development run (Vite + Electron)
 ```
 
 `node-pty` ships Windows prebuilds, so no compiler is needed.
+
+The app's Node requirement is separate from the server's on purpose. Node here only runs the build tools (Vite, TypeScript, electron-builder, Vitest), and their floor is what the root `engines` states. CI and the release build use Node 20. The app itself runs on the Node that Electron bundles, and it never loads `node:sqlite`, so the server's 22.13 floor does not apply to it.
 
 Then, in **Settings → Remote hosts → Add remote host**:
 
@@ -94,10 +98,10 @@ remotea uses its own named pipe and app-data folder (`%APPDATA%\remotea`), so it
 - **Opening terminals.** New terminals open on the host (when it's the default). A shell spec of `remote:<host>` or `remote:<host> claude` works anywhere a shell can be chosen: profiles, workspace shells, `wmux`-style CLI commands.
 - **Sleep, Wi-Fi loss, quitting the app.** Panes show "Reconnecting…" and catch up on their own; nothing you type while disconnected is sent later. Quitting detaches the sessions, and reopening the app reattaches them.
 - **A second device.** Every session shows up there in the same workspace (name and colour are shared). Arrange it however suits that screen; layouts are never synced.
-- **Closing.**
-  - Closing a tab ends that session on every device.
-  - Closing a workspace ends all of its sessions everywhere.
-  - **Hide on this device** (tab right-click) removes a tab from one device only. Bring it back from Settings → Remote hosts → Hidden on this device.
+- **Closing.** Closing a remote tab, pane or workspace (×, Ctrl+W, Ctrl+Shift+W, the context menu) always asks, whatever the "Confirm before closing a session" setting says. The dialog offers two commands:
+  - **Hide on this device** removes it from this device only. The sessions keep running and stay on your other devices. Bring them back from Settings → Remote hosts → Hidden on this device. Also on the tab and workspace right-click menus.
+  - **End sessions on this host** stops them on every device. For a workspace that means its whole shared group, including sessions hidden on this device and Eridani agent runs. The dialog lists the host, how many sessions are active, how many are hidden here, and the Eridani tasks and runs among them. When the host is offline, it says the counts may be stale.
+  - Closes from the CLI or agents (`wmux close-workspace`) do not ask. Quitting the app only detaches.
 - **Pasting and dropping files.** A screenshot pasted into a remote pane, or files dropped on it, are uploaded to the host and their paths there are typed in, so the agent in that pane can open them. They land in a private `/tmp/remotea-drop-…/` folder.
 - **Terminal size.** The device you're typing on, or whose window is focused on that pane, controls the size of a shared terminal.
 

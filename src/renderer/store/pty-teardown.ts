@@ -112,7 +112,7 @@ export function killDroppedSurfaces(outgoing: SplitNode[], incoming: SplitNode[]
         const remote = parseRemoteShellSpec(surface.shell);
         if (remote && surface.type === 'terminal') {
           announceSurfaceClosed(surface.id);
-          remoteSessions()?.hide?.(remote.hostId, surface.id);
+          hideRemoteSessionHere(remote.hostId, surface.id);
           continue;
         }
         killSurfacePty(surface);
@@ -135,7 +135,22 @@ function remoteSessions(): RemoteSessionsBridge | undefined {
   }
 }
 
-/** remotea: close the shared groups a workspace stands for (the inbox is shared by everyone and never closed whole). */
+/**
+ * remotea: "Hide on this device" for one remote tab — the session keeps
+ * running and stays on other devices; main stops streaming it here and
+ * records the hide on the server (queued while offline). Never a close.
+ * The caller drops the tab (and announces it) itself.
+ */
+export function hideRemoteSessionHere(hostId: string, surfaceId: string): void {
+  remoteSessions()?.hide?.(hostId, surfaceId);
+}
+
+/**
+ * remotea: close the shared groups a workspace stands for (the inbox is shared
+ * by everyone and never closed whole). Ends every session in them on every
+ * device, hidden ones and Eridani runs included — only ever reached through
+ * closeWorkspace, which user gestures reach only via the remote close dialog.
+ */
 export function closeRemoteGroups(remoteGroups: Record<string, string>): void {
   for (const [hostId, groupId] of Object.entries(remoteGroups)) {
     if (groupId !== 'grp-inbox') remoteSessions()?.groupClose?.(hostId, groupId);

@@ -18,6 +18,7 @@ import type { RegistryPayload } from '../../shared/remote-hosts-types';
 import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
 import { INBOX_GROUP_ID } from '../../shared/remote-host-protocol';
 import { planRemoteSync, type LocalIndex, type SyncAction } from './plan';
+import { setLatestRemoteViews } from './registry-cache';
 
 
 type Bridge = {
@@ -209,6 +210,7 @@ export function markRemoteLayoutReady(): void {
   ready = true;
   b.onRegistry((payload) => {
     latest = payload;
+    setLatestRemoteViews(payload.views);
     queueSync();
   });
   useStore.subscribe(() => {

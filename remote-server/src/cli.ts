@@ -42,7 +42,9 @@ import http from 'http';
 import WebSocket from 'ws';
 import { LEGACY_TIMER_HINT, configDir, ensureToken, loadConfig, loadEridaniConfig, rotateToken, type CollectorMode } from './config';
 import { diagDir } from './diag-log';
-import { hooksStatus, installHooks, removeHooks, removeLegacyCollectorHooks, type HookTarget, type LegacyRemoval } from './hooks-install';
+import { defaultHookPaths, hooksStatus, installHooks, removeHooks, removeLegacyCollectorHooks, type HookTarget, type LegacyRemoval } from './hooks-install';
+import { hookVersion, loadBuildInfo, readServerInfo, type BuildInfo, type HookVersion } from './build-info';
+import { ERIDANI_CAPS_VERSION, ERIDANI_PROTO } from '../../src/shared/eridani-link-protocol';
 import type { RegistryData } from './registry';
 import { eridaniCommand, statusBlock } from './eridani-cli';
 import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord, type VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
@@ -96,9 +98,22 @@ export interface StatusOutput {
     port: number;
     running: boolean;
     epoch: string | null;
-    eridani: { enabled: boolean; state: string; unacked: number; lastAckAt: number | null };
+    eridani: ReturnType<typeof statusBlock>;
     /** Stage E (additive): `eridani.json.collector`, null when the link was never set up. */
     collector: CollectorMode | null;
+    /**
+     * S-S5 (additive): the RUNNING server's build, from the server-info.json
+     * it wrote at start; null when it is not running or predates this.
+     * `sha` is "unknown" for a build without git (or before build-info).
+     */
+    build: (BuildInfo & { pid: number; startedAt: number; version: string }) | null;
+    /** The build on disk (dist/build-info.json): what a restart would run. Differs from `build` after a rebuild without a restart. */
+    diskBuild: BuildInfo;
+    /** The Eridani link protocol and capability shape this build speaks (hello's proto and caps_version). */
+    proto: number;
+    capsVersion: number;
+    /** The hook helper agents run (`installed`), the one this checkout ships (`bundled`), and whether they match. */
+    hooks: HookVersion;
   };
   groups: Array<{ id: string; name: string; color: string | null }>;
   sessions: StatusSession[];
@@ -162,12 +177,29 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
   sessions.sort((a, b) => a.createdAt - b.createdAt);
   const running = await healthy(config.port);
   const collector = loadEridaniConfig(dir)?.collector ?? null;
+  const info = running ? readServerInfo(dir) : null;
   return {
     version: statusVersion(collector),
-    server: { serverId, hostname: os.hostname(), configDir: dir, port: config.port, running, epoch: reg?.epoch ?? null, eridani: statusBlock(dir, running), collector },
+    server: {
+      serverId, hostname: os.hostname(), configDir: dir, port: config.port, running, epoch: reg?.epoch ?? null, eridani: statusBlock(dir, running), collector,
+      build: info ? { ...info.build, pid: info.pid, startedAt: info.startedAt, version: info.version } : null,
+      diskBuild: loadBuildInfo(),
+      proto: ERIDANI_PROTO,
+      capsVersion: ERIDANI_CAPS_VERSION,
+      hooks: hookVersion(defaultHookPaths()),
+    },
     groups: groups.map((g) => ({ id: g.id, name: g.name, color: g.color ?? null })),
     sessions,
   };
+}
+
+/** One line: the running build, the one on disk when it differs, and the hook helper. */
+export function fmtBuild(s: Pick<StatusOutput['server'], 'build' | 'diskBuild' | 'hooks' | 'proto' | 'capsVersion'>): string {
+  const short = (b: BuildInfo) => (b.sha === 'unknown' ? 'unknown' : `${b.sha.slice(0, 12)}${b.dirty ? '+dirty' : ''}`);
+  const running = s.build ? `build ${short(s.build)}` : 'build of the running server unknown';
+  const disk = !s.build || s.build.sha !== s.diskBuild.sha || s.build.dirty !== s.diskBuild.dirty ? `; on disk ${short(s.diskBuild)}${s.build ? ' (restart to run it)' : ''}` : '';
+  const hooks = s.hooks.installed ? `hooks ${s.hooks.installed}${s.hooks.current === false ? ' (stale: run `remotea hooks install`)' : ''}` : 'hooks not installed';
+  return `${running}${disk}; proto ${s.proto} caps v${s.capsVersion}; ${hooks}`;
 }
 
 /** POSIX-shell quote one argument for typing into an interactive shell. */
@@ -486,6 +518,7 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       process.stdout.write(`server ${status.server.running ? 'running' : 'NOT running'} on port ${status.server.port} (${status.server.hostname})\n`);
+      process.stdout.write(`${fmtBuild(status.server)}\n`);
       for (const s of status.sessions) {
         const what = s.agent ? `${s.agent.provider} ${s.agent.sessionId.slice(0, 8)}` : s.cmd ?? 'shell';
         process.stdout.write(`${s.state.padEnd(6)} ${(s.groupName ?? '-').slice(0, 20).padEnd(20)} ${what.slice(0, 24).padEnd(24)} active ${fmtAge(s.lastActivityAt).padStart(4)}  ${s.lastCwd ?? s.cwd}  ${s.id}\n`);

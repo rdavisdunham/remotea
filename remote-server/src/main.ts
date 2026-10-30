@@ -16,6 +16,7 @@ import { DiagLog, diagDir } from './diag-log';
 import { defaultHookPaths, hooksStatus, installHooks, toAgentStatus } from './hooks-install';
 import { runFsOp } from './remote-fs';
 import { EridaniRuntime, serverVersion } from './eridani-runtime';
+import { loadBuildInfo, serverInfo, writeServerInfo } from './build-info';
 
 const DAY = 24 * 60 * 60 * 1000;
 const BIND_RETRY_MS = 5_000;
@@ -113,13 +114,21 @@ async function main(): Promise<void> {
     }, BIND_RETRY_MS);
   }
 
-  log(`remotea-server ${serverId} boot ${bootId}; ${registry.sessions().length} session(s) in registry; token at ${tokenFile}`);
+  // What is running now (S-S5): `remotea status` compares it with the build on disk.
+  const build = loadBuildInfo();
+  const version = serverVersion();
+  try {
+    writeServerInfo(dir, serverInfo({ bootId, version, build }));
+  } catch (err) {
+    log(`cannot write server-info.json: ${(err as Error).message}`);
+  }
+  log(`remotea-server ${version} build ${build.sha}${build.dirty ? ' (dirty)' : ''} ${serverId} boot ${bootId}; ${registry.sessions().length} session(s) in registry; token at ${tokenFile}`);
 
   // The Eridani link: constructed only while eridani.json enables it; follows the file (30 s).
   // REMOTEA_COLLECTOR_HOME points the collector at another home (tests and the e2e); it then skips /mnt/c.
   const collectorHome = process.env.REMOTEA_COLLECTOR_HOME || undefined;
   const eridani = new EridaniRuntime({
-    dir, hub, registry, serverId, bootId, hostname: os.hostname(), version: serverVersion(), log,
+    dir, hub, registry, serverId, bootId, hostname: os.hostname(), version, build, log,
     collectorHome, windowsUsers: collectorHome ? null : undefined, resumeAgents: config.resumeAgents,
   });
   eridaniRt = eridani;

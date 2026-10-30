@@ -89,7 +89,12 @@ remotea eridani collector [parity|authoritative]
 
 `remotea status --json` gains, additively (`version` stays 1 until the collector cutover, which makes it 2: see [Collector cutover](#stage-e-collector-cutover)):
 `sessions[].agentState`, `sessions[].incarnation`, `sessions[].turnSeq`, and
-`server.eridani {enabled, state, unacked, lastAckAt}`.
+`server.eridani {enabled, state, unacked, lastAckAt, advertised}`
+(`advertised`: what the running link's hello says now, see
+[Capabilities and build identity](#capabilities-and-build-identity); null
+without a running link). Build identity adds `server.build`,
+`server.diskBuild`, `server.proto`, `server.capsVersion` and `server.hooks`
+(same section).
 
 ## Connection
 
@@ -122,7 +127,7 @@ remotea sends:
 
 | `t` | Lane | Coalesced by | Notes |
 |---|---|---|---|
-| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, caps, harnesses`, and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy) |
+| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)), and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy) |
 | `sessions.snapshot` | control | (per connection) | Sent after every welcome. `part {of, i, n}`, `surfaces[]`, `journal {pending, uncertain}`. Never persisted. |
 | `command.outcome` | control | `outcome:<op_id>` | Stage B only reports `rejected` (`unsupported` / `expired`). |
 | `status` | live | `status:<surf>`, numeric `revision` | `surf, incarnation, state, since, reason?, provider?, provider_session_id?` |
@@ -281,7 +286,58 @@ remotea eridani worktrees [--json]
 
 Targets are read on every use: adding one needs no restart and does not
 reconnect the link. `hello` lists them (`targets: [{id, repo, worktree_root,
-harnesses, verify, mcp?}]`, never argv or env) for Eridani's target picker.
+harnesses, enabled, launch, verify, verify_status, migrations?, mcp?}]`, never argv
+or env) for Eridani's target picker; the next connect carries a new target,
+and its launcher is probed on the next 30 s check. What each field means is in
+[Capabilities and build identity](#capabilities-and-build-identity).
+
+### Capabilities and build identity
+
+hello keeps these facts apart (S-S1); `caps_version: 2` says a host does
+(`ERIDANI_CAPS_VERSION`; absent means 1, where every harness claimed `spawn`):
+
+| Fact | Where | How it is known |
+|---|---|---|
+| Protocol support | `caps[]`; each harness's `observe, capture, question, context, resume, steer, permission?, launch_flags` | What this build implements. |
+| Installed harness | `harnesses.<h>.installed: boolean`, `version: string \| null`, `launch_error?: string` | `<bin> --version` run exactly as a spawn runs it: the login shell (`$SHELL -l -i -c`), the session environment (pty-spawn.ts), from `$HOME`. One probe per distinct `(harness, bin)`: the bare name, plus each target's `launch.<h>.bin`. The server runs under systemd with a minimal PATH, so a plain exec would prove nothing. |
+| Target permission | `targets[].enabled: ("claude"\|"codex")[]` | The target's `launch` lists the harness. |
+| Spawnable | `harnesses.<h>.spawn: boolean`; `targets[].harnesses`; `targets[].launch.<h> {ready, version, error?}` | `targets[].harnesses` is `enabled` minus launchers whose probe failed (always a subset of `enabled`). `spawn` is true only when some target enables the harness AND its launcher works. Eridani checks both (jarvis PR #91). |
+| Verification readiness | `targets[].verify: string[]`; `targets[].verify_status: [{id, ready, reason?}]`, same order | The entry's program resolves the way verify-runner.ts runs it: no shell, `verifyEnv` (the service's PATH, or the entry's own `env.PATH`); an absolute program must be executable, a relative one (`./scripts/verify.sh`) is checked in the repository; the `cwd` must exist in the repository. `reason` never contains the argv (`uv` not on the service PATH reads "its program is not on the service PATH …"). |
+
+Probes run before the link first starts, so the first hello is already
+right (a slow login shell delays the connect, by at most 20 s per probe).
+Later link starts reuse the last results and refresh them in the background;
+every launcher is probed again every 10 minutes, and a new target's on the
+next check. hello is sent once per connect, so a change shows from the next
+connect on. A probe failure is logged once per change
+(`eridani: codex launcher \`codex\`: not ready: …`).
+
+Build identity (S-S5). `npm run build` runs `scripts/build-info.mjs` after
+tsc: it writes `dist/build-info.json` (`{name, sha, dirty, built_at}`, sha from
+`git rev-parse HEAD`, `dirty` from tracked changes; `"unknown"` without git).
+The server reads it once at start, so a rebuild without a restart does not
+change what it reports.
+
+| Field | In | Type |
+|---|---|---|
+| `build_sha` | hello, status file `advertised` | `string`: 40 hex, or `"unknown"` (no build-info.json: an older build, or the sources run directly) |
+| `build_dirty` | hello | `boolean`, absent when unknown |
+| `caps_version` | hello | `number` (2) |
+| `hook_version` | hello | `string \| null`: the first 12 hex of the sha256 of the installed `~/.local/share/remotea/cli/wmux-hook.js`, null when not installed |
+| `version` | hello (unchanged) | the package version, `0.1.0`; Eridani keeps showing it, `build_sha` goes beside it |
+
+`remotea status --json` (additive, `version` unchanged):
+`server.build {sha, dirty, builtAt, pid, startedAt, version} | null` (the
+RUNNING server's, from `server-info.json`, which it writes at start; null when
+the server is not running), `server.diskBuild {sha, dirty, builtAt}` (the
+dist on disk: what a restart would run), `server.proto` (1),
+`server.capsVersion` (2), `server.hooks {installed, bundled, current}` (the
+helper agents run, the one this checkout ships, and whether they match), and
+`server.eridani.advertised` (the hello fields above, from the link's status
+file). `remotea status` prints one line from these (`build 1a2b3c4d5e6f; on
+disk 9f8e… (restart to run it); proto 1 caps v2; hooks …`), and `remotea
+eridani status` prints the advertised harnesses and each target's launch and
+verify readiness. The server's start log line names the build too.
 A target may also name its own `mcpKeyFile` (see below).
 
 ### Eridani MCP for spawned agents

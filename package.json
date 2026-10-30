@@ -7,6 +7,9 @@
   "bin": {
     "remotea": "dist/cli/wmux.js"
   },
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+  },
   "scripts": {
     "dev": "concurrently \"vite --port 5199\" \"wait-on http://localhost:5199 && electron .\"",
     "build": "tsc -p tsconfig.node.json && vite build && electron-builder",

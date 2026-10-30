@@ -26,11 +26,15 @@
  *     a restart are replayed once Eridani's `runs.snapshot` is applied (or
  *     10 s after the link is ready without one), so their fences see the
  *     reconciled state.
+ *   - What hello advertises comes from the launch environment (S-S1,
+ *     launch-caps.ts): every launcher is probed through the login shell
+ *     before the link first starts (later starts reuse the last results and
+ *     refresh them for the next hello), so `spawn` is never claimed for a
+ *     harness that would not start. hello also carries the build (S-S5).
  */
-import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { ERIDANI_TIMING, STAGE_F_AUTHORITATIVE_CAPS, STAGE_F_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_CAPS_VERSION, ERIDANI_TIMING, STAGE_F_AUTHORITATIVE_CAPS, STAGE_F_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
   eridaniConfigStamp,
@@ -53,6 +57,9 @@ import { WorktreeManager } from './worktrees';
 import { loadTargets } from './eridani-targets';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
+import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn } from './launch-caps';
+import { hookVersion, loadBuildInfo, type BuildInfo } from './build-info';
+import { defaultHookPaths } from './hooks-install';
 
 export const COLLECTOR_STATE_FILE = 'eridani-collector.json';
 /** Delivered fingerprints per mode: a parity ack says nothing about what Eridani stored. */
@@ -68,6 +75,8 @@ const MAX_FILL_FOR_SCAN = 0.8;
 /** How long after ready to wait for runs.snapshot before replaying accepted commands anyway. */
 const REPLAY_FALLBACK_MS = 10_000;
 const WORKTREES_ENTITY = 'worktrees';
+/** Launchers are probed again this often (an install or an upgrade shows in the next hello); a new target's bin on the next check. */
+const PROBE_REFRESH_MS = 10 * 60_000;
 
 export interface EridaniRuntimeDeps {
   dir: string;
@@ -90,6 +99,14 @@ export interface EridaniRuntimeDeps {
   dispatchTiming?: ConstructorParameters<typeof Dispatch>[0]['timing'];
   questionHoldMs?: number;
   contextMs?: number;
+  /** Tests: how a launcher is probed (default: `<bin> --version` through the login shell). */
+  probe?: ProbeFn;
+  /** The build hello reports (default: dist/build-info.json). */
+  build?: BuildInfo;
+  /** Where the hook helper is installed and shipped (default: hooks-install's). */
+  hookPaths?: { cliDir: string; sourceDir: string };
+  /** The service environment verify readiness is checked against (default: process.env). */
+  verifyEnv?: NodeJS.ProcessEnv;
 }
 
 /**
@@ -116,39 +133,10 @@ export function containedTimers(log: (msg: string) => void, base?: DispatchTimer
   };
 }
 
-/** `claude --version` / `codex --version`, once per link start. Never blocks the link. */
-function probeVersion(cmd: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    try {
-      execFile(cmd, ['--version'], { timeout: 5000, windowsHide: true }, (err, stdout) => {
-        if (err) return resolve(null);
-        const m = String(stdout).match(/\d+\.\d+(?:\.\d+)?[\w.-]*/);
-        resolve(m ? m[0].slice(0, 40) : null);
-      });
-    } catch {
-      resolve(null);
-    }
-  });
-}
-
 /** What each harness can do through remotea in stage B: observe and capture, nothing that acts. */
 export function stageBCaps(versions: { claude: string | null; codex: string | null }): CapabilityMatrix {
   const caps = (version: string | null): HarnessCaps => ({ version, observe: true, capture: true, question: false, context: false, resume: true });
   return { claude: caps(versions.claude), codex: caps(versions.codex) };
-}
-
-/**
- * Stage C, from the stage A capability matrix: both harnesses spawn, take
- * SessionStart context and steer by interrupt; only Claude's AskUserQuestion
- * is answerable (Codex's request_user_input has no hook), and Claude's
- * PermissionRequest is captured, not answered.
- */
-export function stageCCaps(versions: { claude: string | null; codex: string | null }): CapabilityMatrix {
-  const base = (version: string | null): HarnessCaps => ({ version, observe: true, capture: true, question: false, context: true, resume: true, spawn: true, steer: 'interrupt' });
-  return {
-    claude: { ...base(versions.claude), question: true, permission: 'capture', launch_flags: ['--permission-mode', 'auto'] },
-    codex: { ...base(versions.codex), launch_flags: ['--disable', 'daemon_auto_start'] },
-  };
 }
 
 export class EridaniRuntime {
@@ -159,7 +147,12 @@ export class EridaniRuntime {
   private collector: Collector | null = null;
   private state: CollectorState | null = null;
   private cfg: EridaniConfig | null = null;
-  private harnesses: CapabilityMatrix = stageCCaps({ claude: null, codex: null });
+  /** Launcher probes by probeKey; kept across reconfigures so a restart of the link does not wait. */
+  private readonly probes = new Map<string, LauncherProbe>();
+  /** Probes in flight by probeKey: a second request for one waits for it instead of starting another. */
+  private readonly probing = new Map<string, Promise<void>>();
+  private probedAt = 0;
+  private readonly build: BuildInfo;
   private replayTimer: NodeJS.Timeout | null = null;
   private worktreesSent = '';
   private worktreesRev = 0;
@@ -172,6 +165,7 @@ export class EridaniRuntime {
 
   constructor(private readonly deps: EridaniRuntimeDeps) {
     const { hub, registry } = deps;
+    this.build = deps.build ?? loadBuildInfo();
     this.questions = new QuestionBroker({
       session: (id) => registry.session(id),
       canHold: (id) => !!this.link?.ready && !!registry.session(id)?.eridani,
@@ -233,6 +227,7 @@ export class EridaniRuntime {
       this.stamp = stamp;
       this.reconfigure();
     }
+    if (this.link) this.refreshProbes();
     const req = path.join(this.deps.dir, ERIDANI_COLLECT_REQUEST);
     if (fs.existsSync(req)) {
       fs.rmSync(req, { force: true });
@@ -289,7 +284,10 @@ export class EridaniRuntime {
       hostname: this.deps.hostname,
       machine,
       version: this.deps.version,
-      harnesses: () => this.harnesses,
+      build: this.build,
+      capsVersion: ERIDANI_CAPS_VERSION,
+      hookVersion: () => hookVersion(this.deps.hookPaths ?? defaultHookPaths()).installed,
+      harnesses: () => this.harnesses(),
       snapshot: () => this.deps.hub.snapshot(),
       log: this.deps.log,
       onReady: () => {
@@ -340,26 +338,72 @@ export class EridaniRuntime {
         this.collector.scanOne(provider, sessionId).catch((err) => this.deps.log(`eridani collector: ${(err as Error).message}`));
       },
     });
-    this.deps.log(`eridani: link to ${cfg!.url} as ${machine} (collector ${cfg!.collector})`);
-    link.start();
-    void Promise.all([probeVersion('claude'), probeVersion('codex')]).then(([claude, codex]) => {
-      this.harnesses = stageCCaps({ claude, codex });
+    this.deps.log(`eridani: link to ${cfg!.url} as ${machine} (collector ${cfg!.collector}); build ${this.build.sha.slice(0, 12)}${this.build.dirty ? '+dirty' : ''}`);
+    // hello is sent on every connect: probe first so it never claims a harness that would not start.
+    const launchers = launchersToProbe(loadTargets(this.deps.dir));
+    const known = launchers.every((l) => this.probes.has(probeKey(l.harness, l.bin)));
+    this.probedAt = Date.now();
+    const probed = this.probeAll(launchers);
+    if (known) link.start();
+    else void probed.then(() => {
+      if (this.link === link) link.start();
     });
     this.scanTimer = setInterval(() => this.scan(), this.deps.scanMs ?? SCAN_MS);
     this.scanTimer.unref?.();
   }
 
-  /** Execution targets for hello: ids, repos, verify ids and MCP readiness only. */
+  /** The host-wide harness matrix from the latest probes (launch-caps.ts). */
+  harnesses(): CapabilityMatrix {
+    return harnessMatrix(this.probes, loadTargets(this.deps.dir));
+  }
+
+  /** Execution targets for hello: ids, repos, permission, probed launchers and verify readiness; never argv or env. */
   helloTargets(): HelloTarget[] {
-    return loadTargets(this.deps.dir).map((t) => ({
-      id: t.id,
-      repo: t.repo,
-      worktree_root: t.worktreeRoot,
-      harnesses: (['claude', 'codex'] as const).filter((h) => !!t.launch[h]),
-      verify: t.verify.map((v) => v.id),
-      ...(t.migrations ? { migrations: { ...t.migrations } } : {}),
-      // Whether a spawn here gets Eridani's MCP server (eridani-mcp.ts); never the key.
-      mcp: mcpStatus(resolveMcp(this.deps.dir, t)),
+    const targets = loadTargets(this.deps.dir);
+    // Whether a spawn there gets Eridani's MCP server (eridani-mcp.ts); never the key.
+    return helloTargets(targets, this.probes, { env: this.deps.verifyEnv }).map((h) => {
+      const t = targets.find((x) => x.id === h.id);
+      return t ? { ...h, mcp: mcpStatus(resolveMcp(this.deps.dir, t)) } : h;
+    });
+  }
+
+  /**
+   * On the check tick: targets are read from disk on every use (a new one
+   * does not reconfigure the link), so a launcher not probed yet is probed
+   * now, and all of them again every PROBE_REFRESH_MS. hello carries the
+   * results from the next connect on.
+   */
+  private refreshProbes(): void {
+    const launchers = launchersToProbe(loadTargets(this.deps.dir));
+    if (Date.now() - this.probedAt >= PROBE_REFRESH_MS) {
+      this.probedAt = Date.now();
+      void this.probeAll(launchers);
+    } else {
+      const missing = launchers.filter((l) => !this.probes.has(probeKey(l.harness, l.bin)));
+      if (missing.length) void this.probeAll(missing);
+    }
+  }
+
+  /** Probe launchers (in parallel, one at a time per launcher); a failure is a result, never a throw. */
+  private async probeAll(launchers: Array<{ harness: 'claude' | 'codex'; bin: string }>): Promise<void> {
+    const probe = this.deps.probe ?? defaultProbe;
+    await Promise.all(launchers.map(({ harness, bin }) => {
+      const key = probeKey(harness, bin);
+      const running = this.probing.get(key);
+      if (running) return running;
+      const p = (async () => {
+        let r: LauncherProbe;
+        try {
+          r = await probe(harness, bin);
+        } catch (err) {
+          r = { ok: false, version: null, error: (err as Error).message };
+        }
+        const was = this.probes.get(key);
+        this.probes.set(key, r);
+        if (!was || was.ok !== r.ok) this.deps.log(`eridani: ${harness} launcher \`${bin}\`: ${r.ok ? `ready${r.version ? ` (${r.version})` : ''}` : `not ready: ${r.error ?? 'failed'}`}`);
+      })().finally(() => this.probing.delete(key));
+      this.probing.set(key, p);
+      return p;
     }));
   }
 

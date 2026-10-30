@@ -19,7 +19,7 @@ import os from 'os';
 import path from 'path';
 import type { SessionReportInput, SessionTool } from '../../../src/shared/eridani-link-protocol';
 import { claudeSources } from './claude-jsonl';
-import { codexSources, DbReader } from './codex-sqlite';
+import { codexSources, DbReader, probeSqlite } from './codex-sqlite';
 import { repoLookup, type RepoLookup } from './git';
 import { pyDigest } from './pyjson';
 import { redact } from './redact';
@@ -53,6 +53,8 @@ export interface CollectorOptions {
   now?: () => number;
   warn?: (msg: string) => void;
   repoOf?: RepoLookup;
+  /** Test seam for the node:sqlite check made when the collector starts. */
+  probeSqlite?: () => string | null;
 }
 
 export interface ScanOptions {
@@ -82,8 +84,15 @@ function sameJson(a: unknown, b: unknown): boolean {
 
 export class Collector {
   private running: Promise<ScanResult> | null = null;
+  /** Why Codex threads are skipped (node:sqlite missing), or null when they are read. */
+  readonly codexUnavailable: string | null;
 
-  constructor(private readonly opts: CollectorOptions) {}
+  constructor(private readonly opts: CollectorOptions) {
+    // Checked once, here: an unsupported Node gets one actionable line, not a
+    // stack trace or a warning per database per scan. Claude transcripts need no SQLite.
+    this.codexUnavailable = (opts.probeSqlite ?? probeSqlite)();
+    if (this.codexUnavailable) opts.warn?.(`${this.codexUnavailable} Claude Code sessions are still collected.`);
+  }
 
   private get now(): number {
     return (this.opts.now ?? Date.now)();
@@ -124,13 +133,14 @@ export class Collector {
   private sources(reader: DbReader, repoOf: RepoLookup): Source[] {
     const home = this.opts.home ?? os.homedir();
     const warn = this.opts.warn;
+    const codex = !this.codexUnavailable;
     const out = [
       ...claudeSources(path.join(home, '.claude/projects'), 'wsl', repoOf),
-      ...codexSources(reader, path.join(home, '.codex'), 'codex_cli', repoOf, warn),
+      ...(codex ? codexSources(reader, path.join(home, '.codex'), 'codex_cli', repoOf, warn) : []),
     ];
     for (const w of this.windowsHomes()) {
       out.push(...claudeSources(path.join(w, '.claude/projects'), 'windows', repoOf));
-      out.push(...codexSources(reader, path.join(w, '.codex'), 'codex_desktop', repoOf, warn));
+      if (codex) out.push(...codexSources(reader, path.join(w, '.codex'), 'codex_desktop', repoOf, warn));
     }
     return out;
   }

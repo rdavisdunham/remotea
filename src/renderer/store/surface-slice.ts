@@ -139,6 +139,13 @@ export interface SurfaceSlice {
    * nothing is left.
    */
   closePane: (workspaceId: WorkspaceId, paneId: PaneId) => void;
+  /**
+   * The pane × button. remotea: a pane holding remote sessions — or the last
+   * pane of a workspace bound to a server group — goes to the remote close
+   * dialog (routeRemoteClose) instead of ending them; otherwise closePane.
+   * `wmux close-pane` stays on closePane and never prompts.
+   */
+  requestClosePane: (workspaceId: WorkspaceId, paneId: PaneId) => void;
 
   /**
    * Open a copy of a surface in the same pane: same type, shell, color and
@@ -439,6 +446,10 @@ export const createSurfaceSlice: StateCreator<SliceState, [], [], SurfaceSlice> 
   pendingCloseSurface: null,
 
   requestCloseSurface(workspaceId, paneId, surfaceId) {
+    // remotea: a remote tab (or the last tab of a workspace bound to a server
+    // group) never ends silently — the remote close dialog asks Hide on this
+    // device / End on this host first.
+    if (get().routeRemoteClose(workspaceId, [surfaceId])) return;
     const { workspaces, closeSurface } = get();
     const ws = workspaces.find((w) => w.id === workspaceId);
     const surface = ws && findLeaf(ws.splitTree, paneId)?.surfaces.find((s) => s.id === surfaceId);
@@ -505,6 +516,14 @@ export const createSurfaceSlice: StateCreator<SliceState, [], [], SurfaceSlice> 
     });
 
     updateSplitTree(workspaceId, updatedTree);
+  },
+
+  requestClosePane(workspaceId, paneId) {
+    const ws = get().workspaces.find((w) => w.id === workspaceId);
+    const leaf = ws && findLeaf(ws.splitTree, paneId);
+    if (!leaf) return;
+    if (get().routeRemoteClose(workspaceId, leaf.surfaces.map((s) => s.id))) return;
+    get().closePane(workspaceId, paneId);
   },
 
   closePane(workspaceId, paneId) {
