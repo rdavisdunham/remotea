@@ -42,6 +42,7 @@ import {
   type LinkCap,
   type RunsSnapshotBody,
   type ExitBody,
+  type DoctorSummary,
   type PromptBody,
   type SessionReportInput,
   type SessionTool,
@@ -150,10 +151,48 @@ export interface LinkStatus {
   pid: number;
   /** What hello advertises now (S-S1, S-S5): build, protocol, caps, harnesses and targets with their readiness. */
   advertised?: Advertised;
+  /** S-Q1 (optional): the latest doctor summary the server computed (what hello and `doctor` frames carry). */
+  doctor?: DoctorSummary | null;
+  /** S-Q1 (optional): the collector as the running server sees it. */
+  collector?: CollectorLinkStatus | null;
+}
+
+/** The collector's last scan (for `remotea doctor`'s parity age). */
+export interface CollectorLinkStatus {
+  mode: string;
+  /** When the last full scan finished, and what it did; null before the first. */
+  lastScanAt: number | null;
+  lastScan: { seen: number; queued: number; failed: number } | null;
+  lastScanError: string | null;
+  /** Why Codex threads are skipped (node:sqlite missing), or null. */
+  codexUnavailable: string | null;
 }
 
 /** hello without the connection's identity fields. */
 export type Advertised = Omit<HelloBody, 't' | 'server_id' | 'boot_id' | 'hostname' | 'machine'>;
+
+/** What a hello says about the build: the same in the link's hello and in `remotea eridani connect`'s probe. */
+export type HelloIdentity = Pick<Advertised, 'proto' | 'version' | 'build_sha' | 'build_dirty' | 'caps_version' | 'hook_version'>;
+
+/**
+ * The build identity a hello carries. `capsVersion` absent: not sent.
+ * `hookVersion` absent: not sent; null is sent (no helper installed).
+ */
+export function helloIdentity(o: { version: string; build?: { sha: string; dirty: boolean | null }; capsVersion?: number; hookVersion?: string | null }): HelloIdentity {
+  return {
+    proto: ERIDANI_PROTO,
+    version: o.version,
+    build_sha: o.build?.sha ?? 'unknown',
+    ...(typeof o.build?.dirty === 'boolean' ? { build_dirty: o.build.dirty } : {}),
+    ...(o.capsVersion !== undefined ? { caps_version: o.capsVersion } : {}),
+    ...(o.hookVersion !== undefined ? { hook_version: o.hookVersion } : {}),
+  };
+}
+
+/** A doctor summary's findings without its time: two summaries with the same key say the same thing. */
+export function doctorKey(s: DoctorSummary): string {
+  return JSON.stringify([s.ok, s.warn, s.fail, s.truncated ?? false, s.items]);
+}
 
 export interface EridaniLinkDeps {
   url: string;
@@ -190,6 +229,10 @@ export interface EridaniLinkDeps {
   targets?: () => HelloTarget[];
   /** Capabilities advertised in hello (defaults to stage B's). */
   caps?: () => readonly LinkCap[];
+  /** S-Q1: the latest doctor summary (doctor.ts), sent in hello when there is one; null: none yet. */
+  doctor?: () => DoctorSummary | null;
+  /** S-Q1: the collector's last scan, for the status file. */
+  collectorStatus?: () => CollectorLinkStatus | null;
   /** Eridani's desired state per run, after each welcome. */
   onRunsSnapshot?: (runs: RunsSnapshotBody['runs']) => void;
   /** An event left the spool acknowledged (the collector advances its fingerprint here). */
@@ -269,6 +312,11 @@ export class EridaniLink {
   private settledReported = 0;
   private journalRefused = 0;
   private probeTimer: unknown = null;
+  /** The doctor summary this connection's Eridani has (doctorKey): what hello carried, then each `doctor` frame. */
+  private doctorSent: string | null = null;
+  /** What the hello on the current socket carried, until welcome makes it `doctorSent`. */
+  private doctorInHello: string | null = null;
+  private doctorRev = 0;
 
   constructor(private readonly deps: EridaniLinkDeps) {
     this.timers = deps.timers ?? realTimers;
@@ -361,19 +409,20 @@ export class EridaniLink {
       updatedAt: this.now(),
       pid: process.pid,
       advertised: this.advertised(),
+      ...(this.deps.doctor ? { doctor: this.deps.doctor() } : {}),
+      ...(this.deps.collectorStatus ? { collector: this.deps.collectorStatus() } : {}),
     };
   }
 
   /** The hello fields that describe this host (also in the status file, so `remotea status` shows what Eridani was told). */
   advertised(): Advertised {
-    const build = this.deps.build;
     return {
-      proto: ERIDANI_PROTO,
-      version: this.deps.version,
-      build_sha: build?.sha ?? 'unknown',
-      ...(typeof build?.dirty === 'boolean' ? { build_dirty: build.dirty } : {}),
-      ...(this.deps.capsVersion !== undefined ? { caps_version: this.deps.capsVersion } : {}),
-      ...(this.deps.hookVersion ? { hook_version: this.deps.hookVersion() } : {}),
+      ...helloIdentity({
+        version: this.deps.version,
+        build: this.deps.build,
+        capsVersion: this.deps.capsVersion,
+        ...(this.deps.hookVersion ? { hookVersion: this.deps.hookVersion() } : {}),
+      }),
       caps: [...(this.deps.caps?.() ?? STAGE_B_CAPS)],
       harnesses: this.deps.harnesses?.() ?? {},
       ...(this.deps.targets ? { targets: this.deps.targets() } : {}),
@@ -405,6 +454,25 @@ export class EridaniLink {
   prompt(p: Omit<PromptBody, 't' | 'op_id' | 'digest'>): boolean {
     if (!this.peerHas('prompt')) return false;
     return this.enqueue({ t: 'prompt', ...p }, 1);
+  }
+
+  /**
+   * S-Q1: the doctor summary changed (or was recomputed). hello carries the
+   * latest one anyway; this sends a `doctor` frame only to an Eridani whose
+   * welcome advertised `doctor` (an older one would refuse a frame it does not
+   * know), and only when the findings differ from what this connection's
+   * Eridani already has (`at` alone is no change). Ephemeral and coalesced:
+   * only the newest matters, and the next hello carries it after a
+   * disconnect. Returns true when a frame was queued.
+   */
+  reportDoctor(summary: DoctorSummary | null): boolean {
+    this.writeStatus(); // the status file shows the latest summary (deps.doctor)
+    if (!summary || !this.ready || !this.peerHas('doctor')) return false;
+    const key = doctorKey(summary);
+    if (key === this.doctorSent) return false;
+    if (!this.enqueue({ t: 'doctor', ...summary }, 2, 'doctor', ++this.doctorRev, true)) return false;
+    this.doctorSent = key;
+    return true;
   }
 
   agentStatus(s: Omit<StatusBody, 't' | 'op_id' | 'digest' | 'entity'>): boolean {
@@ -503,6 +571,8 @@ export class EridaniLink {
       if (this.ws !== ws) return;
       this.lastInbound = this.now();
       this.dispatch({ type: 'opened' });
+      const doctor = this.deps.doctor?.() ?? null;
+      this.doctorInHello = doctor ? doctorKey(doctor) : null;
       this.sendFrame({
         t: 'hello',
         server_id: this.deps.serverId,
@@ -511,6 +581,8 @@ export class EridaniLink {
         machine: this.deps.machine,
         ...this.advertised(),
         ...(this.degradedReason() ? { degraded_reason: this.degradedReason() } : {}),
+        // Additive: an Eridani that does not know it ignores it (its hello model ignores extra fields).
+        ...(doctor ? { doctor } : {}),
       });
       this.handshakeTimer = this.timers.setTimeout(() => {
         this.handshakeTimer = null;
@@ -595,14 +667,18 @@ export class EridaniLink {
     this.held.clear();
     this.lastConnectedAt = this.now();
     this.spool.dropEphemeral();
+    // Eridani has what hello carried; a summary that changed during the handshake goes out now.
+    this.doctorSent = this.doctorInHello;
     this.sendSnapshot();
     this.pump();
     this.deps.onReady?.();
+    this.reportDoctor(this.deps.doctor?.() ?? null);
   }
 
   private onDown(): void {
     this.connEpoch = null;
     this.peerCaps.clear();
+    this.doctorSent = null;
     this.spool.dropEphemeral();
     this.runParts.clear();
     for (const [id, w] of this.waiting) {

@@ -23,6 +23,7 @@
  * is copied to ~/.local/share/remotea/cli, so the hooks keep working if the
  * repository moves, and it exits at once in a session that is not remotea's.
  */
+import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -338,6 +339,125 @@ export function removeHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
     }
   }
   return hooksStatus(p);
+}
+
+// ── Doctor: are the hooks of the harnesses Eridani works with current? ─────
+
+/** What `remotea doctor` checks per harness (read-only; never a key or a command line). */
+export interface AgentHookCheck {
+  agent: 'claude' | 'codex' | 'opencode';
+  file: string;
+  /** The agent's config folder exists (it is installed here). */
+  present: boolean;
+  /** remotea's entries found (the plugin counts as one). */
+  entries: number;
+  /** What `remotea hooks install` writes now. */
+  expected: number;
+  /** Every entry of ours runs the installed helper (cliDir); null when there is none. */
+  helperPath: boolean | null;
+  /** The file could not be parsed. */
+  unreadable?: boolean;
+  /** OpenCode: the plugin's content hash against the one this checkout ships. */
+  version?: { installed: string | null; bundled: string | null };
+  /**
+   * Codex 0.166+: Codex records a trust hash per hook entry in config.toml
+   * (`[hooks.state."<hooks.json>:<event>:<group>:<hook>"]`) once a person
+   * approved it. `trusted` entries of ours have a record, `disabled` ones are
+   * switched off there. null: config.toml has no hooks.state (an older Codex,
+   * or none approved yet), so trust cannot be told.
+   */
+  trust?: { trusted: number; disabled: number; total: number } | null;
+}
+
+const snake = (event: string) => event.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+
+function hashOf(file: string): string | null {
+  try {
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 12);
+  } catch {
+    return null;
+  }
+}
+
+/** Our handlers in a hooks map, with their positions: [event, group index, hook index, command]. */
+function ourHandlers(config: Json | null): Array<[string, number, number, string]> {
+  const out: Array<[string, number, number, string]> = [];
+  const hooks = config?.hooks;
+  if (!hooks || typeof hooks !== 'object') return out;
+  for (const [event, groups] of Object.entries(hooks as Json)) {
+    if (!Array.isArray(groups)) continue;
+    groups.forEach((g: any, i: number) => {
+      (Array.isArray(g?.hooks) ? g.hooks : []).forEach((h: any, j: number) => {
+        if (typeof h?.command === 'string' && h.command.includes(MARKER)) out.push([event, i, j, h.command]);
+      });
+    });
+  }
+  return out;
+}
+
+/** Codex's trust records for our handlers in `hooksFile`, from config.toml's `[hooks.state."…"]` tables. */
+export function codexTrust(configToml: string | null, hooksFile: string, handlers: Array<[string, number, number, string]>): AgentHookCheck['trust'] {
+  if (configToml === null || !/^\s*\[hooks\.state[.\]]/m.test(configToml)) return null;
+  const sections = new Map<string, string>();
+  let current: string | null = null;
+  for (const line of configToml.split('\n')) {
+    const m = /^\s*\[hooks\.state\."([^"]+)"\]\s*$/.exec(line);
+    if (m) {
+      current = m[1];
+      sections.set(current, '');
+    } else if (/^\s*\[/.test(line)) current = null;
+    else if (current) sections.set(current, sections.get(current)! + line + '\n');
+  }
+  let trusted = 0;
+  let disabled = 0;
+  for (const [event, i, j] of handlers) {
+    const body = sections.get(`${hooksFile}:${snake(event)}:${i}:${j}`);
+    if (body === undefined) continue;
+    if (/^\s*enabled\s*=\s*false\b/m.test(body)) disabled++;
+    if (/^\s*trusted_hash\s*=/m.test(body)) trusted++;
+  }
+  return { trusted, disabled, total: handlers.length };
+}
+
+/** Claude Code's, Codex's and OpenCode's remotea hooks against what an install writes now. */
+export function agentHookChecks(p: HookPaths = defaultHookPaths()): AgentHookCheck[] {
+  const script = path.join(p.cliDir, 'wmux-hook.js');
+  const all = targets(p);
+  const out: AgentHookCheck[] = [];
+  for (const agent of ['claude', 'codex'] as const) {
+    const t = all.find((x) => x.agent === agent) as Extract<Target, { kind: 'settings' }>;
+    let config: Json | null = null;
+    let unreadable = false;
+    try {
+      config = readJson(t.file);
+    } catch {
+      unreadable = true;
+    }
+    const handlers = ourHandlers(config);
+    const row: AgentHookCheck = {
+      agent,
+      file: t.file,
+      present: fs.existsSync(t.dir),
+      entries: countOurs(config),
+      expected: countOurs(t.apply({}, script)),
+      helperPath: handlers.length ? handlers.every(([, , , cmd]) => cmd.includes(script)) : null,
+      ...(unreadable ? { unreadable } : {}),
+    };
+    if (agent === 'codex') row.trust = codexTrust(readText(path.join(p.home, '.codex', 'config.toml')), t.file, handlers);
+    out.push(row);
+  }
+  const oc = all.find((x) => x.agent === 'opencode') as Extract<Target, { kind: 'plugin' }>;
+  const ours = isOurPluginFile(oc.file);
+  out.push({
+    agent: 'opencode',
+    file: oc.file,
+    present: fs.existsSync(oc.dir),
+    entries: ours ? 1 : 0,
+    expected: 1,
+    helperPath: null,
+    version: { installed: ours ? hashOf(oc.file) : null, bundled: hashOf(oc.source) },
+  });
+  return out;
 }
 
 // ── The Python session collector's hook (stage E cutover) ──────────────────
