@@ -266,6 +266,8 @@ export class EridaniRuntime {
       snapshot: () => this.deps.hub.snapshot(),
       log: this.deps.log,
       onReady: () => {
+        // A steer or input begun before a reconnect writes nothing more (runs.snapshot decides).
+        this.dispatch.linkUp();
         this.takeDirty();
         this.scan();
         this.worktreesSent = '';
