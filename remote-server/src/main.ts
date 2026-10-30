@@ -6,7 +6,7 @@
 import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
-import { configDir, ensureHookSecret, ensureServerId, ensureToken, loadConfig, resolveBind } from './config';
+import { configDir, ensureHookSecret, ensureServerId, ensureToken, loadConfig, resolveBind, watchTokenFile } from './config';
 import { Registry } from './registry';
 import { Hub } from './hub';
 import { RemoteaServer } from './server';
@@ -71,7 +71,8 @@ async function main(): Promise<void> {
       (err) => log(`hook bridge unavailable on 127.0.0.1:${config.hookPort}: ${(err as Error).message}`),
     );
   }
-  // Re-read the token on every handshake so `remotea rotate-token` takes effect without a restart.
+  // Re-read the token on every handshake so `remotea rotate-token` takes effect without a restart, and
+  // when the file changes (watchTokenFile below), so the rotation also closes sockets admitted with the old one.
   const server = new RemoteaServer({
     hub,
     token: () => {
@@ -84,6 +85,10 @@ async function main(): Promise<void> {
     },
     log,
   });
+  server.checkToken();
+  // `remotea rotate-token` only writes the file; this is how the running server learns of it. Rotation is
+  // revocation: connections admitted with the old token are closed (4401 "token rotated"), sessions stay.
+  const tokenWatch = watchTokenFile(dir, () => server.checkToken());
 
   const bindAll = async () => {
     const { addresses, pending } = resolveBind(config.bind);
@@ -132,6 +137,7 @@ async function main(): Promise<void> {
     clearInterval(lagTimer);
     clearInterval(probeTimer);
     clearInterval(pruneTimer);
+    tokenWatch.close();
     hub.shutdown();
     eridani.stop();
     await Promise.all([server.close(), bridge.close()]);

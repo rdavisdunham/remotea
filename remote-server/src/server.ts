@@ -10,6 +10,15 @@
  *   - an IP that has not failed authentication 10 times in the last minute.
  * The listeners bind only the configured addresses (loopback + Tailscale by
  * default), never every interface.
+ *
+ * Rotation is revocation. Each socket remembers the digest of the token it was
+ * admitted with. When the token in effect changes (`checkToken()`, which
+ * main.ts calls when the token file changes, and every handshake or upload,
+ * which re-read it anyway), every socket admitted with another token stops
+ * being read from or written to at once and is closed with
+ * TOKEN_ROTATED_CODE. Sessions and their PTYs are not touched: the hub only
+ * sees a disconnect, as for a laptop going to sleep, and an app that
+ * reconnects with the new token reattaches as usual.
  */
 import http from 'http';
 import crypto from 'crypto';
@@ -24,6 +33,12 @@ const HELLO_TIMEOUT_MS = 10_000;
 const PING_MS = 15_000;
 const BAN_WINDOW_MS = 60_000;
 const BAN_THRESHOLD = 10;
+
+/** Close code for a socket whose token was rotated away (4001 is the hello timeout, 4002/4003 the hub's). */
+export const TOKEN_ROTATED_CODE = 4401;
+export const TOKEN_ROTATED_REASON = 'token rotated';
+/** A revoked client that never answers the close handshake is cut off after this long. */
+const REVOKE_GRACE_MS = 2_000;
 
 const digest = (s: string) => crypto.createHash('sha256').update(s).digest();
 
@@ -59,15 +74,22 @@ export class FailureTracker {
 
 class WsConn implements HubConn {
   device: { id: string; name: string } | null = null;
-  constructor(readonly id: number, private readonly ws: WebSocket) {}
+  /** Set when the token this socket was admitted with stops being the token in effect. */
+  revoked = false;
+  constructor(
+    readonly id: number,
+    private readonly ws: WebSocket,
+    /** SHA-256 of the token this socket presented. */
+    readonly credential: Buffer,
+  ) {}
   get deviceId(): string {
     return this.device?.id ?? '';
   }
   sendJson(msg: ServerMsg): void {
-    if (this.ws.readyState === this.ws.OPEN) this.ws.send(JSON.stringify(msg));
+    if (!this.revoked && this.ws.readyState === this.ws.OPEN) this.ws.send(JSON.stringify(msg));
   }
   sendBinary(buf: Uint8Array): void {
-    if (this.ws.readyState === this.ws.OPEN) this.ws.send(buf, { binary: true });
+    if (!this.revoked && this.ws.readyState === this.ws.OPEN) this.ws.send(buf, { binary: true });
   }
   bufferedAmount(): number {
     return this.ws.bufferedAmount;
@@ -75,10 +97,20 @@ class WsConn implements HubConn {
   close(code: number, reason: string): void {
     this.ws.close(code, reason);
   }
+  /** Stop all traffic now and close; a client that does not complete the close handshake is cut off. */
+  revoke(): void {
+    if (this.revoked) return;
+    this.revoked = true;
+    this.ws.close(TOKEN_ROTATED_CODE, TOKEN_ROTATED_REASON);
+    const cutoff = setTimeout(() => this.ws.terminate(), REVOKE_GRACE_MS);
+    cutoff.unref?.();
+    this.ws.once('close', () => clearTimeout(cutoff));
+  }
 }
 
 export interface RemoteaServerOptions {
   hub: Hub;
+  /** The token in effect. Read on every handshake, upload and `checkToken()`; a new value revokes older sockets. */
   token: () => string;
   log?: (msg: string) => void;
 }
@@ -89,6 +121,9 @@ export class RemoteaServer {
   private readonly failures = new FailureTracker();
   private nextConnId = 1;
   private readonly log: (msg: string) => void;
+  private readonly conns = new Set<WsConn>();
+  /** Digest of the token in effect when last read. */
+  private current: Buffer | null = null;
 
   constructor(private readonly opts: RemoteaServerOptions) {
     this.log = opts.log ?? (() => {});
@@ -132,20 +167,46 @@ export class RemoteaServer {
     return this.servers.has(host);
   }
 
+  /**
+   * Read the token in effect and revoke every socket admitted with another one
+   * (see the header). Returns how many were revoked. Cheap: call it whenever the
+   * token might have changed.
+   */
+  checkToken(): number {
+    return this.noteToken(this.opts.token());
+  }
+
+  private noteToken(token: string): number {
+    const now = digest(token);
+    if (this.current && this.current.equals(now)) return 0;
+    const first = this.current === null;
+    this.current = now;
+    let revoked = 0;
+    for (const conn of this.conns) {
+      if (conn.revoked || conn.credential.equals(now)) continue;
+      conn.revoke();
+      revoked++;
+    }
+    if (!first) this.log(`token rotated: closed ${revoked} connection(s) admitted with the old token`);
+    return revoked;
+  }
+
   /** Who may call: the same rules as the WebSocket handshake (see the header). */
-  private admit(req: http.IncomingMessage): { ok: true } | { ok: false; status: number; text: string } {
+  private admit(req: http.IncomingMessage): { ok: true; credential: Buffer } | { ok: false; status: number; text: string } {
     const ip = req.socket.remoteAddress ?? 'unknown';
     if (this.failures.banned(ip)) return { ok: false, status: 429, text: 'Too Many Requests' };
     if (req.headers.origin !== undefined) {
       this.log(`rejected ${ip}: browser origin ${String(req.headers.origin).slice(0, 80)}`);
       return { ok: false, status: 403, text: 'Forbidden' };
     }
-    if (!tokenMatches(req.headers.authorization, this.opts.token())) {
+    const token = this.opts.token();
+    this.noteToken(token);
+    if (!tokenMatches(req.headers.authorization, token)) {
       this.failures.fail(ip);
       this.log(`rejected ${ip}: bad token`);
       return { ok: false, status: 401, text: 'Unauthorized' };
     }
-    return { ok: true };
+    return { ok: true, credential: digest(token) };
   }
 
   /** A file pasted or dropped onto a remote pane (see upload.ts). */
@@ -187,12 +248,16 @@ export class RemoteaServer {
     };
     const admitted = this.admit(req);
     if (!admitted.ok) return reject(admitted.status, admitted.text);
-    this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, ip));
+    const { credential } = admitted;
+    this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnection(ws, ip, credential));
   }
 
-  private onConnection(ws: WebSocket, ip: string): void {
-    const conn = new WsConn(this.nextConnId++, ws);
+  private onConnection(ws: WebSocket, ip: string, credential: Buffer): void {
+    const conn = new WsConn(this.nextConnId++, ws, credential);
     const hub = this.opts.hub;
+    this.conns.add(conn);
+    // The token may have changed during the upgrade.
+    if (this.current && !this.current.equals(credential)) conn.revoke();
     hub.connect(conn);
     this.log(`connection #${conn.id} from ${ip}`);
 
@@ -214,6 +279,8 @@ export class RemoteaServer {
     }, PING_MS);
 
     ws.on('message', (data: RawData, isBinary: boolean) => {
+      // Frames still in flight from a revoked socket are dropped, not acted on.
+      if (conn.revoked) return;
       const buf = Array.isArray(data) ? Buffer.concat(data) : Buffer.from(data as ArrayBuffer);
       if (isBinary) {
         if (buf.length > LIMITS.maxInputBytes + 128) return;
@@ -245,6 +312,7 @@ export class RemoteaServer {
     ws.on('close', () => {
       clearTimeout(helloTimer);
       clearInterval(pinger);
+      this.conns.delete(conn);
       hub.disconnect(conn);
       this.log(`connection #${conn.id} closed`);
     });

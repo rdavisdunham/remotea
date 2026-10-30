@@ -85,11 +85,57 @@ export function ensureToken(dir: string): string {
   return readOrCreate(path.join(dir, 'token'), () => crypto.randomBytes(32).toString('base64url'));
 }
 
+/**
+ * Issue a new token. The file is replaced atomically (write, then rename), so
+ * the running server, which re-reads it when it changes, never sees it empty.
+ * A running server then closes every connection admitted with the old token
+ * (see server.ts): rotation is revocation.
+ */
 export function rotateToken(dir: string): string {
   ensureDir(dir);
   const token = crypto.randomBytes(32).toString('base64url');
-  fs.writeFileSync(path.join(dir, 'token'), token + '\n', { mode: 0o600 });
+  const file = path.join(dir, 'token');
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, token + '\n', { mode: 0o600 });
+  fs.renameSync(tmp, file);
   return token;
+}
+
+/**
+ * Call `onChange` soon after the token file may have changed: at once through
+ * a directory watch (inotify), and every `pollMs` regardless, in case the watch
+ * is unavailable or misses an event. `onChange` must be cheap and idempotent:
+ * it re-reads the file and acts only on a real change.
+ */
+export function watchTokenFile(dir: string, onChange: () => void, pollMs = 2_000): { close(): void } {
+  const fire = () => {
+    try {
+      onChange();
+    } catch {
+      /* the next event or poll tries again */
+    }
+  };
+  let watcher: fs.FSWatcher | null = null;
+  try {
+    watcher = fs.watch(dir, { persistent: false }, (_event, name) => {
+      if (name === null || name === 'token') fire();
+    });
+    watcher.on('error', () => {
+      watcher?.close();
+      watcher = null;
+    });
+  } catch {
+    watcher = null;
+  }
+  const poll = setInterval(fire, pollMs);
+  poll.unref?.();
+  return {
+    close() {
+      clearInterval(poll);
+      watcher?.close();
+      watcher = null;
+    },
+  };
 }
 
 /**

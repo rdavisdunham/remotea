@@ -53,6 +53,11 @@ remotea token             # the token the app needs
 
 - The server listens on port **7717**, on `127.0.0.1` and WSL's Tailscale address only, never on every interface.
 - Every connection must present the token. The token is effectively shell access to that machine, so treat it like an SSH key. A Tailscale ACL that limits port 7717 to your own devices is a good second fence.
+- **Rotating the token revokes it.** `remotea rotate-token` replaces `~/.config/remotea/token`. The running server watches that file (and re-reads it on every handshake), so within a moment it closes every connection that was admitted with the old token, with WebSocket close code **4401** `token rotated`, and drops anything those sockets were still sending. No restart is needed. What clients experience:
+  - Terminals and agents keep running. Only the connections are closed; the sessions and their scrollback stay on the server.
+  - Each app shows "Reconnecting…", then "rejected the token" (Settings → Remote hosts: **Token rejected**), because the old token now gets HTTP 401.
+  - Paste the new token (`remotea token`) into Settings → Remote hosts. The app retries at once and reattaches every pane where it was.
+  - Not affected: agent status hooks on `127.0.0.1:7718` (per-session tokens from a separate secret), the outbound Eridani link (its own key), and server-side `remotea` commands, which read the file.
 - Keep WSL from idling out, or the sessions die with it. In `%UserProfile%\.wslconfig`, set `vmIdleTimeout=-1` under `[wsl2]`.
 - Logs: `journalctl --user -u remotea -f`
 - Restart: `systemctl --user restart remotea`. A restart ends running processes. The apps respawn them, and Claude Code and Codex sessions are resumed.
@@ -102,7 +107,7 @@ Server-side CLI (in WSL):
 remotea status [--json]                              # sessions, workspaces, agents (stable JSON, "version": 1)
 remotea open --group "Acme" --cwd ~/acme -- claude   # open a session in a workspace on every device
 remotea close <surf-id>                              # end a session everywhere
-remotea token | rotate-token
+remotea token | rotate-token                         # rotate-token revokes the old token: apps using it are disconnected
 remotea hooks install | remove | status              # agent status hooks (see below)
 remotea logs [-f] [--device laptop] [--since 10m]    # what the apps reported: connections, reattaches, agent state
 remotea screen <surf-id>                             # what a session's screen shows right now
