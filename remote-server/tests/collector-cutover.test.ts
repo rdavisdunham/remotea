@@ -108,6 +108,8 @@ async function runtimeSetup(mode: 'parity' | 'authoritative') {
     checkMs: 3_600_000,
     scanMs: 3_600_000,
     resumeAgents: false,
+    // Never the real login shell from a test.
+    probe: async () => ({ ok: true, version: '1.0.0' }),
   });
   cleanups.push(() => rt.stop());
   rt.start();

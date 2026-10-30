@@ -124,10 +124,27 @@ export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...
 export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
+/**
+ * The shape of `harnesses` and `targets` in hello (S-S1). 1: every harness was
+ * marked spawn-capable; 2: `spawn` means the launcher was probed through the
+ * login shell and works on some target that enables it, `installed` and
+ * `launch_error` say why not, and each target carries `enabled`, `launch` and
+ * `verify_status`. Additions never lower it.
+ */
+export const ERIDANI_CAPS_VERSION = 2;
+
 /** What one harness can do on this host (the capability matrix, C15). Advertise only what is verified. */
 export interface HarnessCaps {
   /** `claude --version` / `codex --version`, or null when not installed. */
   version: string | null;
+  /**
+   * caps_version 2: some launcher for this harness (the bare name, or a
+   * target's `bin`) answered `--version` through the login shell, with the
+   * environment a launch gets. Absent from older hosts.
+   */
+  installed?: boolean;
+  /** caps_version 2: why the harness is not installed (no launcher answered), ≤ 300 characters. */
+  launch_error?: string;
   /** Hooks installed so status and turns are observed. */
   observe: boolean;
   /** Final responses captured from the Stop hook. */
@@ -138,7 +155,10 @@ export interface HarnessCaps {
   context: boolean;
   /** The server resumes the conversation after a restart. */
   resume: boolean;
-  /** Stage C: Eridani may `spawn` this harness (a launcher is configured on some target). */
+  /**
+   * Stage C: Eridani may `spawn` this harness. caps_version 2: true only when
+   * some target enables it AND that target's launcher was probed and works.
+   */
   spawn?: boolean;
   /** Stage C: how `input mode:steer` is carried out. Always 'interrupt' in v1: the turn is interrupted and the text starts a new one. */
   steer?: 'interrupt';
@@ -192,10 +212,35 @@ export interface HelloBody {
   proto: number;
   /** remotea-server package version. */
   version: string;
+  /** The git commit the running server was built from (40 hex), or "unknown" (a build without git, or an older build script). */
+  build_sha?: string;
+  /** The build had uncommitted changes; absent when unknown. */
+  build_dirty?: boolean;
+  /** ERIDANI_CAPS_VERSION: how to read `harnesses` and `targets`. Absent: 1. */
+  caps_version?: number;
+  /** The installed hook helper (wmux-hook.js): the first 12 hex of its sha256, null when not installed. */
+  hook_version?: string | null;
   caps: LinkCap[];
   harnesses: CapabilityMatrix;
   /** Stage C: the configured execution targets (ids and repos only; never argv or env). */
   targets?: HelloTarget[];
+}
+
+/** One launcher on one target, as probed (caps_version 2). */
+export interface HelloLaunch {
+  /** `<bin> --version` answered through the login shell. */
+  ready: boolean;
+  version: string | null;
+  /** Why not ready, ≤ 300 characters. */
+  error?: string;
+}
+
+/** One verify entry's readiness (caps_version 2): its program resolves on the service PATH, its cwd exists. */
+export interface HelloVerifyStatus {
+  id: string;
+  ready: boolean;
+  /** Why not ready (never the argv). */
+  reason?: string;
 }
 
 /** One execution target as hello lists it, for Eridani's target picker. */
@@ -203,9 +248,20 @@ export interface HelloTarget {
   id: string;
   repo: string;
   worktree_root?: string;
+  /**
+   * The harnesses Eridani may spawn here. Older hosts: those the target's
+   * `launch` enables. caps_version 2: those it enables AND whose launcher
+   * probe succeeded (always a subset of `enabled`).
+   */
   harnesses: Array<'claude' | 'codex'>;
+  /** caps_version 2: the harnesses the target's `launch` enables (permission, whether or not installed). */
+  enabled?: Array<'claude' | 'codex'>;
+  /** caps_version 2: the probe of each enabled harness's launcher on this target. */
+  launch?: Partial<Record<'claude' | 'codex', HelloLaunch>>;
   /** Verification ids the target defines (`verify` commands name one). */
   verify: string[];
+  /** caps_version 2: one entry per verify id, in the same order. */
+  verify_status?: HelloVerifyStatus[];
   /** Where numbered migrations live, when configured (Eridani then reserves migration numbers). */
   migrations?: { dir: string; pattern?: string };
 }
