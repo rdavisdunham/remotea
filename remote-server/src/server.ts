@@ -17,7 +17,7 @@ import type { Duplex } from 'stream';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import { BIN_INPUT, decodeFrame, parseClientMsg, LIMITS, type ServerMsg } from '../../src/shared/remote-host-protocol';
 import type { Hub, HubConn } from './hub';
-import { receiveUpload } from './upload';
+import { MAX_UPLOAD_BYTES, receiveUpload } from './upload';
 
 export const MAX_PAYLOAD = 16 * 1024 * 1024;
 const HELLO_TIMEOUT_MS = 10_000;
@@ -110,6 +110,12 @@ export class RemoteaServer {
       res.writeHead(426, { 'content-type': 'text/plain' });
       res.end('remotea server: WebSocket only\n');
     });
+    // A client that sends `Expect: 100-continue` (the app's uploader) is checked before it sends the body, so a
+    // refusal reaches it as an answer instead of a connection closed under a write. Anything else is answered as usual.
+    server.on('checkContinue', (req, res) => {
+      if (req.method === 'POST' && req.url?.startsWith('/upload?')) void this.onUpload(req, res, true);
+      else server.emit('request', req, res);
+    });
     server.on('upgrade', (req, socket, head) => this.onUpgrade(req, socket, head));
     return new Promise((resolve, reject) => {
       server.once('error', reject);
@@ -143,27 +149,29 @@ export class RemoteaServer {
   }
 
   /** A file pasted or dropped onto a remote pane (see upload.ts). */
-  private async onUpload(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  private async onUpload(req: http.IncomingMessage, res: http.ServerResponse, expectsContinue = false): Promise<void> {
     const reply = (status: number, body: object) => {
       res.writeHead(status, { 'content-type': 'application/json', connection: 'close' });
       res.end(JSON.stringify(body));
     };
+    const refuse = (status: number, error: string) => {
+      // A client waiting for 100 Continue sends no body, so there is nothing to read.
+      if (!expectsContinue) req.resume();
+      reply(status, { error });
+    };
     const admitted = this.admit(req);
-    if (!admitted.ok) {
-      req.resume();
-      return reply(admitted.status, { error: admitted.text });
-    }
+    if (!admitted.ok) return refuse(admitted.status, admitted.text);
     const q = new URL(req.url ?? '', 'http://x').searchParams;
     const surf = q.get('surf') ?? '';
     const name = q.get('name') ?? '';
-    if (!/^surf-[A-Za-z0-9_-]{1,96}$/.test(surf) || !name || name.length > 255) {
-      req.resume();
-      return reply(400, { error: 'surf and name are required' });
-    }
+    if (!/^surf-[A-Za-z0-9_-]{1,96}$/.test(surf) || !name || name.length > 255) return refuse(400, 'surf and name are required');
     // Only for a session that is running here: the file is for the program in it.
-    if (!this.opts.hub.isLive(surf)) {
-      req.resume();
-      return reply(404, { error: 'no such live session' });
+    if (!this.opts.hub.isLive(surf)) return refuse(404, 'no such live session');
+    if (expectsContinue) {
+      const declared = Number(req.headers['content-length']);
+      if (!Number.isInteger(declared) || declared < 0) return refuse(411, 'Content-Length required');
+      if (declared > MAX_UPLOAD_BYTES) return refuse(413, `larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB`);
+      res.writeContinue();
     }
     const r = await receiveUpload(req, name);
     if (!r.ok) return reply(r.status, { error: r.error });

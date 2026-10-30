@@ -93,6 +93,41 @@ describe('upload route', () => {
   });
 });
 
+describe('upload route with Expect: 100-continue', () => {
+  /** A request that waits for 100 Continue; `continued` says whether the server asked for the body. */
+  function expecting(port: number, query: string, headers: Record<string, string | number> = {}): Promise<{ status: number; continued: boolean }> {
+    return new Promise((resolve, reject) => {
+      let continued = false;
+      const body = Buffer.alloc(1024, 1);
+      const req = http.request({ host: '127.0.0.1', port, method: 'POST', path: `/upload?${query}`, headers: { authorization: `Bearer ${TOKEN}`, 'content-length': body.length, expect: '100-continue', ...headers } }, (res) => {
+        res.resume();
+        res.on('end', () => {
+          if (!continued) req.destroy();
+          resolve({ status: res.statusCode ?? 0, continued });
+        });
+      });
+      req.on('continue', () => {
+        continued = true;
+        req.end(body);
+      });
+      req.on('error', reject);
+    });
+  }
+
+  it('refuses before the body is sent, and asks for it only when the upload is admitted', async () => {
+    const { port } = await rig();
+    expect(await expecting(port, `surf=${SURF}&name=a.txt`, { authorization: 'Bearer nope' })).toEqual({ status: 401, continued: false });
+    expect(await expecting(port, `surf=surf-nope&name=a.txt`)).toEqual({ status: 404, continued: false });
+    expect(await expecting(port, `name=a.txt`)).toEqual({ status: 400, continued: false });
+    expect(await expecting(port, `surf=${SURF}&name=a.txt`, { 'content-length': 500 * 1024 * 1024 })).toEqual({ status: 413, continued: false });
+    const ok = await expecting(port, `surf=${SURF}&name=${encodeURIComponent('continued.bin')}`);
+    expect(ok).toEqual({ status: 200, continued: true });
+    for (const f of fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith('remotea-drop-'))) {
+      if (fs.existsSync(path.join(os.tmpdir(), f, 'continued.bin'))) fs.rmSync(path.join(os.tmpdir(), f), { recursive: true, force: true });
+    }
+  });
+});
+
 describe('app uploader against the server', () => {
   it('streams a local file and returns the server path; errors come back as text', async () => {
     const { url } = await rig();
@@ -108,7 +143,10 @@ describe('app uploader against the server', () => {
       expect(path.basename(ok.path)).toBe('big image.png');
       expect(fs.readFileSync(ok.path).equals(data)).toBe(true);
     }
-    expect(await uploadFile({ hostUrl: url, token: 'wrong', surfaceId: SURF, localPath: local })).toEqual({ ok: false, error: 'Unauthorized' });
+    // A refusal is answered, never a write into a closed connection (it used to come back as `write EPIPE`).
+    for (let i = 0; i < 5; i++) {
+      expect(await uploadFile({ hostUrl: url, token: 'wrong', surfaceId: SURF, localPath: local })).toEqual({ ok: false, error: 'Unauthorized' });
+    }
     expect(await uploadFile({ hostUrl: url, token: TOKEN, surfaceId: 'surf-gone', localPath: local })).toEqual({ ok: false, error: 'no such live session' });
     expect((await uploadFile({ hostUrl: url, token: TOKEN, surfaceId: SURF, localPath: path.join(dir, 'missing.png') })).ok).toBe(false);
     expect(uploadUrl('wss://h.example:7717/x', SURF, 'a b.png').toString()).toBe(`https://h.example:7717/upload?surf=${SURF}&name=a+b.png`);
