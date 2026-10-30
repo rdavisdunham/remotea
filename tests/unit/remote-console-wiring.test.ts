@@ -182,7 +182,7 @@ describe('wmux remote status (human form)', () => {
 
   it('ui-not-built reads as a broken install, never as a developer command (#254)', () => {
     const out = formatRemoteStatus({ enabled: true, running: true, port: 9790, lastError: 'ui-not-built' });
-    expect(out).toContain('missing from this build of wmux');
+    expect(out).toContain('missing from this build of remotea');
     expect(out).not.toContain('vite');
   });
 });
