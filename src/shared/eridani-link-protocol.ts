@@ -204,6 +204,8 @@ export interface HelloTarget {
   harnesses: Array<'claude' | 'codex'>;
   /** Verification ids the target defines (`verify` commands name one). */
   verify: string[];
+  /** Where numbered migrations live, when configured (Eridani then reserves migration numbers). */
+  migrations?: { dir: string; pattern?: string };
 }
 
 /** The SessionInput the HTTP collector PUTs to /sessions/{tool}/{session_id}, unchanged. */
@@ -357,7 +359,7 @@ export interface CommandOutcomeBody extends OpFields {
   detail?: string;
   /** The command's kind (spawn, input, …), when known. */
   kind?: string;
-  /** Kind-specific facts: spawn → {surf, incarnation, worktree, branch, base, base_sha}. */
+  /** Kind-specific facts: spawn → {surf, incarnation, worktree, branch, base, base_sha, base_ref?, fetch?, behind?, ahead?}. */
   result?: Record<string, unknown>;
 }
 
@@ -533,6 +535,8 @@ export interface SpawnCommand extends OpFields {
   run_token?: string;
   /** Stage D: verify after each root turn with this target verify id, against this plan revision. */
   verify?: RunVerifyConfig | null;
+  /** The migration number Eridani reserved for this run's plan; a reused, stale worktree's prompt then says to re-point it. */
+  migration?: { number: number; dir: string } | null;
   expires_at: number | string;
 }
 
@@ -605,13 +609,17 @@ export interface WorktreeReport {
   path: string;
   branch: string | null;
   base: string;
+  /** The ref ahead/behind/merged are measured against: `origin/<base>` after a fetch, else `<base>`. Optional: older hosts. */
+  base_ref?: string;
   head: string | null;
   active: boolean;
   ahead: number | null;
   behind: number | null;
   unpushed: number | null;
   upstream: string | null;
+  /** null when it cannot be known, or when the branch has no commits of its own (then `merged_reason` says so). */
   merged: boolean | null;
+  merged_reason?: string;
   uncommitted: number;
   untracked: number;
   ignored: number;
@@ -625,6 +633,15 @@ export interface WorktreeReport {
 export interface WorktreesReportBody extends OpFields {
   t: 'worktrees.report';
   worktrees: WorktreeReport[];
+  /** Each target with `migrations` configured: its newest migration number on the fresh base ref. Optional: older hosts. */
+  heads?: MigrationHeadReport[];
+}
+
+export interface MigrationHeadReport {
+  target: string;
+  dir: string;
+  ref: string;
+  head: number | null;
 }
 
 export interface RunsSnapshotBody {
@@ -806,6 +823,10 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       if (m.group !== undefined && !(isStr(m.group, 100) && noControl(m.group) && !/[\r\n]/.test(m.group))) return 'bad group';
       if (m.task_id !== undefined && !(isStr(m.task_id, 128) && RUN_ID_RE.test(m.task_id))) return 'bad task_id';
       if (m.verify !== undefined && m.verify !== null && !isVerifyConfig(m.verify)) return 'bad verify';
+      if (m.migration !== undefined && m.migration !== null) {
+        const mg = m.migration;
+        if (!isObj(mg) || !isInt(mg.number, 1) || !isStr(mg.dir, 200) || !noControl(mg.dir) || /[\r\n]/.test(mg.dir)) return 'bad migration';
+      }
       if (m.run_token !== undefined && !(isStr(m.run_token, 512) && /^[\x21-\x7e]+$/.test(m.run_token))) return 'bad run_token';
       if (m.env !== undefined) {
         if (!isObj(m.env) || Object.keys(m.env).length > 32) return 'bad env';

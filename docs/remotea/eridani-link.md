@@ -273,11 +273,36 @@ base otherwise (`git worktree add -b <branch> <path> <base sha>`), and the base
 is recorded in `eridani-worktrees.json`. A spawn on the base branch itself is
 refused. Operations on one repo run one at a time.
 
+**Freshness.** Before basing on (or reusing a worktree of) the target's own
+`base`, the host runs `git fetch origin <base>` (30 s, non-interactive). New
+work starts from `origin/<base>`, unless local `<base>` already contains it
+(unpushed local commits), in which case local wins. When the fetch fails the
+host keeps the local branch and the prompt begins: "Could not fetch
+origin/<base> (<reason>); this worktree is based on local <base> @ <sha>,
+which may be stale." A reused branch that is behind the fresh base gets
+"Your branch … is N commit(s) behind origin/<base>. Before touching code,
+merge origin/<base> into it …" at the top of its prompt, and, when the spawn
+carries a reserved `migration`, the instruction to re-point its
+`down_revision` at the current chain head and renumber it if taken. A tag, a
+commit or a parent branch as base is never fetched. The spawn outcome adds
+`base_ref, fetch {ok, error?}, behind, ahead`.
+
+**Migrations.** A target may say where its numbered migrations live:
+`"migrations": {"dir": "migrations/versions", "pattern": "^(\\d{4})_"}`
+(pattern optional, first capture group is the number). hello lists it on the
+target, and `worktrees.report` adds `heads [{target, dir, ref, head}]`: the
+highest number in `dir` on the fresh base ref. Eridani reserves the next
+number when it freezes a plan that adds a migration. The directory is host
+configuration (like `verify`), so nothing Eridani sends becomes a path.
+
 remotea **never removes a worktree**. `remotea eridani worktrees` (and the
 `worktrees.report` frame) lists each with why removing it would lose work:
 in use by a live session, locked, uncommitted / untracked / ignored files
 (an unforced `git worktree remove` deletes ignored files such as `.env`), not
-merged into its base, unpushed or no upstream, detached. A row with no reason
+merged into its base, unpushed or no upstream, detached. Rows on the target's
+own base are measured against `origin/<base>` (`base_ref`), fetched at most
+every 5 min. A branch with no commits of its own reports `merged: null` with
+`merged_reason: "no commits of its own yet"`, not `true`. A row with no reason
 is a *candidate*, and the CLI prints the commands a person could run: a
 recovery ref first (`refs/remotea/recovery/<branch>`), then
 `git worktree remove`.
@@ -286,7 +311,7 @@ recovery ref first (`refs/remotea/recovery/<branch>`), then
 
 | `t` | Fields | Effect |
 |---|---|---|
-| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
+| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
 | `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then the text. Typed as a bracketed paste and Enter. Never counts as a person answering. |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
@@ -389,7 +414,7 @@ remotea also sends: `question`, `question.resolved`, `verify.result
 {attempt_id, run_id, generation, turn_seq, plan_revision, verify_id,
 workspace_fingerprint ("<HEAD>:<sha256 of the branch, status, diff and
 untracked contents>"), exit_code, tail (last 4000 chars), truncated, duration_ms,
-timed_out, canceled, error?}` and `worktrees.report {worktrees: [...]}` (on
+timed_out, canceled, error?}` and `worktrees.report {worktrees: [...], heads?: [...]}` (on
 ready, after a spawn or exit, and every 2 min when it changed). `turn` now
 carries the run binding taken when the turn's prompt was submitted, Claude's
 `prompt_id` as `provider_turn_id`, and `interim: true` for a Stop with

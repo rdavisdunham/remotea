@@ -31,6 +31,8 @@ vi.mock('electron', () => ({
   dialog: {},
   app: { getPath: () => os.tmpdir(), getVersion: () => '0.0.0' },
   nativeTheme: { on: () => {} },
+  // ipc-handlers hands it to RemoteHosts (host tokens); nothing here encrypts.
+  safeStorage: { isEncryptionAvailable: () => false },
 }));
 
 import {
@@ -180,7 +182,7 @@ describe('wmux remote status (human form)', () => {
 
   it('ui-not-built reads as a broken install, never as a developer command (#254)', () => {
     const out = formatRemoteStatus({ enabled: true, running: true, port: 9790, lastError: 'ui-not-built' });
-    expect(out).toContain('missing from this build of wmux');
+    expect(out).toContain('missing from this build of remotea');
     expect(out).not.toContain('vite');
   });
 });

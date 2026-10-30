@@ -127,13 +127,45 @@ export interface EnsuredWorktree {
   /** The commit the branch was created from; for a reused or pre-existing branch, the recorded one or the merge base. */
   baseSha: string | null;
   created: boolean;
+  /** The ref the branch is measured against: `origin/<base>`, or `<base>` when local is newer or the fetch failed. */
+  baseRef: string | null;
+  /** The `git fetch origin <base>` before basing; null when the base is not the target's own (a tag, a commit, a parent branch). */
+  fetch: BaseFetch | null;
+  /** Commits of `baseRef` the branch lacks, and its own; null when git could not count. */
+  behind: number | null;
+  ahead: number | null;
 }
+
+export interface BaseFetch {
+  ok: boolean;
+  error?: string;
+}
+
+/** One target's newest migration number on its base (`migrations` in eridani.json). */
+export interface MigrationHead {
+  target: string;
+  dir: string;
+  ref: string;
+  head: number | null;
+}
+
+export const FETCH_TIMEOUT_MS = 30_000;
+/** A worktrees report fetches each base at most this often. */
+export const REPORT_FETCH_MS = 5 * 60_000;
+export const DEFAULT_MIGRATION_PATTERN = '^(\\d{4})_';
 
 export class WorktreeManager {
   /** Worktree operations on one repository run one at a time. */
   private readonly locks = new Map<string, Promise<unknown>>();
 
+  /** When each repository's base was last fetched for a report (REPORT_FETCH_MS). */
+  private readonly fetchedAt = new Map<string, number>();
+
   constructor(private readonly opts: { dir: string | null; git?: GitRunner; now?: () => number }) {}
+
+  private now(): number {
+    return (this.opts.now ?? Date.now)();
+  }
 
   private get git(): GitRunner {
     return this.opts.git ?? runGit;
@@ -174,6 +206,41 @@ export class WorktreeManager {
     return base === target.base ? this.revParse(target.repo, `refs/remotes/origin/${base}`) : null;
   }
 
+  /**
+   * `git fetch origin <base>`, bounded and non-interactive. Only the target's
+   * own base is fetched (never a tag, a commit or someone's branch).
+   */
+  async fetchBase(target: ExecutionTarget, base: string): Promise<BaseFetch> {
+    const r = await this.git(['fetch', '--quiet', '--no-tags', 'origin', `+refs/heads/${base}:refs/remotes/origin/${base}`], target.repo, { timeoutMs: FETCH_TIMEOUT_MS });
+    if (r.code === 0) return { ok: true };
+    const error = r.stderr.trim().split('\n').pop()?.replace(/^fatal:\s*/, '').slice(0, 200) || `git fetch exited ${r.code}`;
+    return { ok: false, error };
+  }
+
+  /**
+   * The freshest ref for the target's own base: `origin/<base>`, unless the
+   * local branch already contains it (unpushed local commits) or there is no
+   * remote-tracking ref (offline, no origin).
+   */
+  async freshRef(repo: string, base: string): Promise<{ ref: string; sha: string } | null> {
+    const local = await this.revParse(repo, `refs/heads/${base}`);
+    const remote = await this.revParse(repo, `refs/remotes/origin/${base}`);
+    if (remote && (!local || (local !== remote && !(await this.isAncestor(repo, remote, local))))) return { ref: `origin/${base}`, sha: remote };
+    if (local) return { ref: base, sha: local };
+    return null;
+  }
+
+  private async isAncestor(repo: string, a: string, b: string): Promise<boolean> {
+    return (await this.git(['merge-base', '--is-ancestor', a, b], repo, { readOnly: true })).code === 0;
+  }
+
+  private async counts(repo: string, ref: string, branch: string): Promise<{ behind: number | null; ahead: number | null }> {
+    const r = await this.git(['rev-list', '--left-right', '--count', `${ref}...refs/heads/${branch}`], repo, { readOnly: true });
+    if (r.code !== 0) return { behind: null, ahead: null };
+    const [behind, ahead] = r.stdout.trim().split(/\s+/).map(Number);
+    return { behind, ahead };
+  }
+
   /** The worktree for `branch` on `target`: reused when it exists, created from `base` when not. */
   ensure(target: ExecutionTarget, branch: string, base = target.base): Promise<EnsuredWorktree> {
     return this.serial(target.repo, async () => {
@@ -181,8 +248,13 @@ export class WorktreeManager {
       if (branch === base || branch === target.base) throw new Error(`refusing to run on the base branch ${branch}`);
       const fmt = await this.git(['check-ref-format', '--branch', branch], target.repo, { readOnly: true });
       if (fmt.code !== 0) throw new Error(`invalid branch name ${branch}`);
-      const resolvedBase = await this.resolveBase(target, base);
+      // Freshness: the target's own base is fetched first, so new work starts from origin, not from whoever last pulled.
+      const fetch = base === target.base ? await this.fetchBase(target, base) : null;
+      // A failed fetch keeps today's choice (local first), and the prompt says the base may be stale.
+      const fresh = fetch?.ok ? await this.freshRef(target.repo, base) : null;
+      const resolvedBase = fresh?.sha ?? (await this.resolveBase(target, base));
       if (!resolvedBase) throw new Error(`base ${base} is not a branch, tag or commit of ${target.repo}`);
+      const baseRef = fresh?.ref ?? (fetch && !(await this.revParse(target.repo, `refs/heads/${base}`)) ? `origin/${base}` : base);
       const root = realOr(target.worktreeRoot);
       const records = readWorktreeRecords(this.opts.dir);
 
@@ -192,7 +264,7 @@ export class WorktreeManager {
         if (!fs.existsSync(existing.path)) throw new Error(`the worktree for ${branch} at ${existing.path} is missing (git worktree prune?)`);
         const rec = records[existing.path];
         const baseSha = rec?.baseSha ?? (await this.mergeBase(target.repo, resolvedBase, branch));
-        return { path: existing.path, branch, base: rec?.base ?? base, baseSha, created: false };
+        return { path: existing.path, branch, base: rec?.base ?? base, baseSha, created: false, baseRef, fetch, ...(await this.counts(target.repo, resolvedBase, branch)) };
       }
 
       fs.mkdirSync(target.worktreeRoot, { recursive: true });
@@ -202,7 +274,8 @@ export class WorktreeManager {
 
       let baseSha: string | null;
       let args: string[];
-      if (await this.revParse(target.repo, `refs/heads/${branch}`)) {
+      const preexisting = !!(await this.revParse(target.repo, `refs/heads/${branch}`));
+      if (preexisting) {
         baseSha = await this.mergeBase(target.repo, resolvedBase, branch);
         args = ['worktree', 'add', want, branch];
       } else {
@@ -212,9 +285,30 @@ export class WorktreeManager {
       const add = await this.git(args, target.repo, { timeoutMs: 5 * 60_000 });
       if (add.code !== 0) throw new Error(`git worktree add failed: ${add.stderr.trim().slice(0, 300)}`);
       if (!within(root, realOr(want))) throw new Error('worktree path escapes the root');
-      writeWorktreeRecord(this.opts.dir, want, { target: target.id, branch, base, baseSha, createdAt: (this.opts.now ?? Date.now)() });
-      return { path: want, branch, base, baseSha, created: true };
+      writeWorktreeRecord(this.opts.dir, want, { target: target.id, branch, base, baseSha, createdAt: this.now() });
+      const counts = preexisting ? await this.counts(target.repo, resolvedBase, branch) : { behind: 0, ahead: 0 };
+      return { path: want, branch, base, baseSha, created: true, baseRef, fetch, ...counts };
     });
+  }
+
+  /**
+   * Each target's newest migration number on its base, for targets that
+   * configure `migrations` (Eridani reserves the next one at plan freeze).
+   * Read from the tree of the fresh base ref, never from a worktree.
+   */
+  async migrationHeads(targets: ExecutionTarget[]): Promise<MigrationHead[]> {
+    const out: MigrationHead[] = [];
+    for (const t of targets) {
+      if (!t.migrations) continue;
+      const fresh = await this.freshRef(t.repo, t.base);
+      if (!fresh) {
+        out.push({ target: t.id, dir: t.migrations.dir, ref: t.base, head: null });
+        continue;
+      }
+      const ls = await this.git(['ls-tree', '--name-only', `${fresh.sha}:${t.migrations.dir}`], t.repo, { readOnly: true });
+      out.push({ target: t.id, dir: t.migrations.dir, ref: fresh.ref, head: ls.code === 0 ? migrationHead(ls.stdout.split('\n'), t.migrations.pattern) : null });
+    }
+    return out;
   }
 
   private async mergeBase(repo: string, base: string, branch: string): Promise<string | null> {
@@ -237,19 +331,26 @@ export class WorktreeManager {
         out.push({ target: t.id, path: t.repo, branch: null, base: t.base, head: null, active: false, ahead: null, behind: null, unpushed: null, upstream: null, merged: null, uncommitted: 0, untracked: 0, ignored: 0, candidate: false, reasons: [(err as Error).message] });
         continue;
       }
+      if (this.now() - (this.fetchedAt.get(t.repo) ?? -Infinity) >= REPORT_FETCH_MS) {
+        this.fetchedAt.set(t.repo, this.now()); // Also on failure: offline is not retried every tick.
+        await this.fetchBase(t, t.base);
+      }
+      const fresh = await this.freshRef(t.repo, t.base);
       const root = realOr(t.worktreeRoot);
       for (const w of entries) {
         if (w.bare || !within(root, realOr(w.path))) continue;
-        out.push(await this.inspect(t, w, records[w.path], active(w.path)));
+        out.push(await this.inspect(t, w, records[w.path], active(w.path), fresh?.ref ?? null));
       }
     }
     return out;
   }
 
-  private async inspect(t: ExecutionTarget, w: WorktreeEntry, rec: WorktreeRecord | undefined, active: boolean): Promise<WorktreeReport> {
+  private async inspect(t: ExecutionTarget, w: WorktreeEntry, rec: WorktreeRecord | undefined, active: boolean, freshBase: string | null): Promise<WorktreeReport> {
     const base = rec?.base ?? t.base;
+    // The target's own base is compared on its fresh ref (origin/<base> after a fetch); a parent branch stays local.
+    const ref = base === t.base && freshBase ? freshBase : base;
     const reasons: string[] = [];
-    const row: WorktreeReport = { target: t.id, path: w.path, branch: w.branch, base, head: w.head, active, ahead: null, behind: null, unpushed: null, upstream: null, merged: null, uncommitted: 0, untracked: 0, ignored: 0, candidate: false, reasons };
+    const row: WorktreeReport = { target: t.id, path: w.path, branch: w.branch, base, base_ref: ref, head: w.head, active, ahead: null, behind: null, unpushed: null, upstream: null, merged: null, uncommitted: 0, untracked: 0, ignored: 0, candidate: false, reasons };
     if (active) reasons.push('in use by a live session');
     if (w.locked) reasons.push('locked');
     if (!fs.existsSync(w.path)) {
@@ -269,28 +370,40 @@ export class WorktreeManager {
     if (row.untracked) reasons.push(`${row.untracked} untracked file(s)`);
     if (row.ignored) reasons.push(`${row.ignored} ignored file(s) (e.g. .env) would be deleted`);
     if (w.branch) {
-      const counts = await this.git(['rev-list', '--left-right', '--count', `${base}...${w.branch}`], t.repo, { readOnly: true });
-      if (counts.code === 0) {
-        const [behind, ahead] = counts.stdout.trim().split(/\s+/).map(Number);
-        row.behind = behind;
-        row.ahead = ahead;
+      Object.assign(row, await this.counts(t.repo, ref, w.branch));
+      if (row.ahead === 0) {
+        // Trivially an ancestor of its base: nothing to merge yet, which is not the same as merged.
+        row.merged = null;
+        row.merged_reason = 'no commits of its own yet';
+      } else {
+        row.merged = (await this.git(['merge-base', '--is-ancestor', w.branch, ref], t.repo, { readOnly: true })).code === 0;
+        if (!row.merged) reasons.push(`not merged into ${ref}${row.ahead ? ` (${row.ahead} commit(s) ahead)` : ''}`);
       }
-      const anc = await this.git(['merge-base', '--is-ancestor', w.branch, base], t.repo, { readOnly: true });
-      row.merged = anc.code === 0;
-      if (!row.merged) reasons.push(`not merged into ${base}${row.ahead ? ` (${row.ahead} commit(s) ahead)` : ''}`);
       const up = await this.git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${w.branch}@{upstream}`], t.repo, { readOnly: true });
       if (up.code === 0 && up.stdout.trim()) {
         row.upstream = up.stdout.trim();
         const un = await this.git(['rev-list', '--count', `${row.upstream}..${w.branch}`], t.repo, { readOnly: true });
         row.unpushed = un.code === 0 ? Number(un.stdout.trim()) : null;
         if (row.unpushed) reasons.push(`${row.unpushed} unpushed commit(s)`);
-      } else if (!row.merged) reasons.push('no upstream: the commits exist only here');
+      } else if (row.merged === false) reasons.push('no upstream: the commits exist only here');
     } else reasons.push('detached HEAD');
     row.candidate = reasons.length === 0;
     return row;
   }
 }
 
+
+/** The highest number among migration file names (first capture group of `pattern`), or null. */
+export function migrationHead(names: string[], pattern = DEFAULT_MIGRATION_PATTERN): number | null {
+  const re = new RegExp(pattern);
+  let head: number | null = null;
+  for (const name of names) {
+    const m = re.exec(name);
+    const n = m ? Number(m[1] ?? m[0]) : NaN;
+    if (Number.isSafeInteger(n) && (head === null || n > head)) head = n;
+  }
+  return head;
+}
 
 /** The manual commands for one row: a recovery ref first, then the removal. */
 export function cleanupCommands(repo: string, row: WorktreeReport): string[] {

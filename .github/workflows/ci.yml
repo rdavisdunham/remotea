@@ -1,0 +1,77 @@
+name: CI
+
+# Every pull request runs the same gate the release runs (release.yml: `npm test`
+# on Windows), plus the session server's own suite on Linux, where it runs (WSL).
+# Before this, nothing ran on a pull request; the first gate was a tag push.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Session server (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # 22: the collector reads Codex's state database with node:sqlite (Node 22.5+).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            remote-server/package-lock.json
+
+      # The server's typecheck reaches into ../src/main, which needs the app's
+      # packages (electron types); its tests need only its own.
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install server dependencies
+        working-directory: remote-server
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: remote-server
+        run: npm run typecheck
+
+      - name: Test
+        working-directory: remote-server
+        run: npm test
+
+  app:
+    name: App (Windows)
+    # The app's unit tests assume Windows (C:\ paths, scp.exe, %USERPROFILE%);
+    # on Linux 25 of them fail on main for that reason alone.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Fix Python distutils for node-gyp
+        run: pip install setuptools
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

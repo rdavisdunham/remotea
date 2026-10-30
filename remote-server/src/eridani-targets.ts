@@ -51,6 +51,14 @@ export interface VerifySpec {
   env?: Record<string, string>;
 }
 
+/** Where a target keeps numbered migrations (Alembic `NNNN_name.py`); Eridani reserves numbers only for targets with this. */
+export interface MigrationsSpec {
+  /** Relative to the repository root. */
+  dir: string;
+  /** File names whose first capture group is the number. Default `^(\d{4})_`. */
+  pattern?: string;
+}
+
 export interface ExecutionTarget {
   id: string;
   repo: string;
@@ -59,6 +67,7 @@ export interface ExecutionTarget {
   base: string;
   launch: { claude?: LaunchSpec; codex?: LaunchSpec };
   verify: VerifySpec[];
+  migrations?: MigrationsSpec;
 }
 
 export const TARGET_ID_RE = /^[A-Za-z0-9._-]{1,64}$/;
@@ -102,6 +111,20 @@ export function targetError(t: unknown): string | null {
       }
     }
   }
+  const mig = o.migrations;
+  if (mig !== undefined) {
+    if (!mig || typeof mig !== 'object' || Array.isArray(mig)) return 'migrations: { dir, pattern? }';
+    const mo = mig as Record<string, unknown>;
+    if (typeof mo.dir !== 'string' || !mo.dir || mo.dir.length > 200 || path.isAbsolute(mo.dir) || mo.dir.split(/[\\/]/).includes('..') || /[\0\r\n:]/.test(mo.dir)) return 'migrations.dir: a folder relative to the repository';
+    if (mo.pattern !== undefined) {
+      if (typeof mo.pattern !== 'string' || !mo.pattern || mo.pattern.length > 200) return 'migrations.pattern: a regular expression';
+      try {
+        new RegExp(mo.pattern);
+      } catch {
+        return 'migrations.pattern: not a valid regular expression';
+      }
+    }
+  }
   return null;
 }
 
@@ -113,6 +136,7 @@ function normalize(t: Record<string, unknown>): ExecutionTarget {
     base: typeof t.base === 'string' ? t.base : 'main',
     launch: t.launch as ExecutionTarget['launch'],
     verify: ((t.verify as VerifySpec[] | undefined) ?? []).map((v) => ({ id: v.id, argv: [...v.argv], ...(v.cwd ? { cwd: v.cwd } : {}), timeout: v.timeout, ...(v.env ? { env: { ...v.env } } : {}) })),
+    ...(t.migrations ? { migrations: { dir: (t.migrations as MigrationsSpec).dir.replace(/\/+$/, ''), ...((t.migrations as MigrationsSpec).pattern ? { pattern: (t.migrations as MigrationsSpec).pattern } : {}) } } : {}),
   };
 }
 

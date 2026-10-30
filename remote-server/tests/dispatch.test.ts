@@ -10,6 +10,7 @@ import type { CommandContext, CommandResult } from '../src/eridani-link';
 import type { ExecutionTarget } from '../src/eridani-targets';
 import type { WorktreeManager } from '../src/worktrees';
 import type { CommandBody } from '../../src/shared/eridani-link-protocol';
+import { commandShapeError } from '../../src/shared/eridani-link-protocol';
 import { fakeSpawner, ManualTimers } from './helpers';
 
 const cleanups: Array<() => unknown> = [];
@@ -42,7 +43,7 @@ const TARGET: ExecutionTarget = {
 
 const FAST = { queuePollMs: 2, pasteEnterMs: 1, steerDelayMs: 1, ctrlCGapMs: 1, ctrlCRetryMs: 5, stopWaitMs: 60, killWaitMs: 60 };
 
-function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean } = {}) {
+function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean; wt?: Record<string, unknown> } = {}) {
   const registry = opts.registry ?? Registry.load({ file: null, bootId: 'boot-1' });
   const sp = fakeSpawner();
   const hub = new Hub({ registry, spawn: sp.spawn, bootId: opts.bootId ?? 'boot-1', serverId: 'srv', hostname: 'box', timers: new ManualTimers(), probe: () => ({}) });
@@ -50,7 +51,7 @@ function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boo
   const worktrees = {
     ensure: async (t: ExecutionTarget, branch: string, base: string) => {
       ensured.push({ branch, base });
-      return { path: `${t.worktreeRoot}/${branch.replace(/\//g, '--')}`, branch, base, baseSha: 'abc123', created: true };
+      return { path: `${t.worktreeRoot}/${branch.replace(/\//g, '--')}`, branch, base, baseSha: 'abc123', created: true, ...opts.wt };
     },
   } as unknown as WorktreeManager;
   const emitted: Array<Record<string, unknown>> = [];
@@ -127,6 +128,34 @@ describe('dispatch: spawn', () => {
     expect(JSON.stringify(rec)).not.toContain('tok-123');
     expect(JSON.stringify(rec)).not.toContain('rm -rf');
     expect(registry.groups().find((g) => g.id === rec.groupId)?.name).toBe('Eridani');
+  });
+
+  it('a reused branch behind its base gets a merge-first note at the top of the prompt, with the migration re-point when one is reserved', async () => {
+    const { run, sp, registry } = setup({ wt: { created: false, baseRef: 'origin/main', fetch: { ok: true }, behind: 3, ahead: 2 } });
+    const res = await run(spawnCmd({ migration: { number: 34, dir: 'migrations/versions' } }));
+    expect(res.result).toMatchObject({ base_ref: 'origin/main', fetch: { ok: true }, behind: 3, ahead: 2 });
+    const prompt = String(sp.last().req.env?.ERIDANI_PROMPT);
+    expect(prompt.startsWith('Your branch eri/task-1 is 3 commit(s) behind origin/main. Before touching code, merge origin/main into it')).toBe(true);
+    expect(prompt).toContain('reserved number 0034');
+    expect(prompt).toContain('re-point its down_revision at the current chain head in migrations/versions');
+    expect(prompt.endsWith(spawnCmd().prompt)).toBe(true);
+    expect(registry.session(surfFor('run-1', 1, 1))!.eridani).toMatchObject({ baseRef: 'origin/main', behind: 3 });
+  });
+
+  it('a failed fetch warns that the base may be stale; an up-to-date worktree adds nothing', async () => {
+    const stale = setup({ wt: { baseRef: 'main', fetch: { ok: false, error: 'could not read from remote' }, behind: 0, ahead: 0 } });
+    expect((await stale.run(spawnCmd())).result).toMatchObject({ fetch: { ok: false, error: 'could not read from remote' } });
+    expect(String(stale.sp.last().req.env?.ERIDANI_PROMPT)).toMatch(/^Could not fetch origin\/main \(could not read from remote\); this worktree is based on local main @ abc123, which may be stale\./);
+    const fresh = setup({ wt: { baseRef: 'origin/main', fetch: { ok: true }, behind: 0, ahead: 0 } });
+    await fresh.run(spawnCmd({ migration: { number: 34, dir: 'migrations/versions' } }));
+    expect(fresh.sp.last().req.env?.ERIDANI_PROMPT).toBe(spawnCmd().prompt);
+  });
+
+  it('a spawn may carry a reserved migration; a malformed one fails the shape check', () => {
+    expect(commandShapeError(spawnCmd({ migration: { number: 34, dir: 'migrations/versions' } }))).toBeNull();
+    expect(commandShapeError(spawnCmd({ migration: null }))).toBeNull();
+    expect(commandShapeError(spawnCmd({ migration: { number: 0, dir: 'm' } }))).toBe('bad migration');
+    expect(commandShapeError(spawnCmd({ migration: { number: 3, dir: 'a\nb' } }))).toBe('bad migration');
   });
 
   it('is idempotent per (run, generation, attempt): a second spawn starts nothing', async () => {
