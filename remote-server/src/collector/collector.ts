@@ -12,7 +12,8 @@
  *
  *   scan()          every source (Claude transcripts, Codex threads; WSL and
  *                   the Windows side under /mnt/c), reporting what changed
- *   scanOne(p, id)  one session, right after one of its turns ended
+ *   scanOne(p, id)  one session, right after one of its turns ended (or,
+ *                   forced, on Eridani's `worktrees.scan`: sent even unchanged)
  */
 import fs from 'fs';
 import os from 'os';
@@ -62,6 +63,10 @@ export interface ScanOptions {
   days?: number;
   /** Only sources whose session id is this (scanOne). */
   only?: (sid: string) => boolean;
+  /** Only sessions of this tool (scanOne for `worktrees.scan`). */
+  tool?: SessionTool;
+  /** Report every matching session even when its fingerprint is unchanged or already queued. */
+  force?: boolean;
 }
 
 export interface ScanResult {
@@ -172,9 +177,9 @@ export class Collector {
     return run;
   }
 
-  scanOne(provider: string, sessionId: string): Promise<ScanResult> {
+  scanOne(provider: string, sessionId: string, opts: { tool?: SessionTool; force?: boolean } = {}): Promise<ScanResult> {
     if (provider !== 'claude' && provider !== 'codex') return Promise.resolve({ seen: 0, queued: 0, failed: 0, rows: [] });
-    return this.scanNow({ only: (sid) => sid === sessionId });
+    return this.scanNow({ only: (sid) => sid === sessionId, tool: opts.tool, force: opts.force });
   }
 
   private async scanNow(opts: ScanOptions): Promise<ScanResult> {
@@ -196,7 +201,7 @@ export class Collector {
         if (opts.only && !opts.only(sid)) continue;
         const version = [src.version, READER, pyDigest([terminals.installed, terminals.live[sid] ?? null, terminals.groups[sid] ?? null]).slice(0, 16)];
         const previous: Partial<typeof known[string]> = known[src.source] ?? {};
-        if (!dry && sameJson(previous.version, version) && (previous.settled || !this.settled(previous.last_active))) continue;
+        if (!dry && !opts.force && sameJson(previous.version, version) && (previous.settled || !this.settled(previous.last_active))) continue;
         let session: FoundSession | null;
         try {
           session = await src.read();
@@ -206,7 +211,7 @@ export class Collector {
         }
         const name = session ? `${session.tool}:${session.session_id}` : '';
         // Claude Desktop mirrors SSH sessions under ssh-<id> on Windows; the host's copy (read first) wins.
-        if (!session || reported.has(name)) continue;
+        if (!session || reported.has(name) || (opts.tool && session.tool !== opts.tool)) continue;
         reported.add(name);
         result.seen++;
         session.resume = resumeInRemotea(session, terminals);
@@ -218,11 +223,11 @@ export class Collector {
         }
         const fingerprint = pyDigest(body);
         const quiet = this.settled(body.last_active_at);
-        if (previous.fingerprint === fingerprint && (previous.settled || !quiet)) {
+        if (!opts.force && previous.fingerprint === fingerprint && (previous.settled || !quiet)) {
           if (known[src.source]) known[src.source].version = version;
           continue;
         }
-        if (state.pendingFingerprint(name) === fingerprint) continue;
+        if (!opts.force && state.pendingFingerprint(name) === fingerprint) continue;
         const queued = this.opts.send?.({ entity: name, revision: fingerprint, tool: session.tool, session_id: session.session_id, report: body }) ?? false;
         if (!queued) {
           result.failed++;
