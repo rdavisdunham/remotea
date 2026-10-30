@@ -10,6 +10,9 @@
  *                                  create a session in a workspace group (created if missing) and run
  *                                  <cmd…> once its shell is ready; every connected app places it as a tab
  *   remotea close <surf-id>        end a session on every device
+ *   remotea upgrade [--yes] [--timeout <s>] [--unit <name>] [--json]
+ *                                  drain, restart the server unit only, and check the PTY keeper's sessions
+ *                                  came back (S-Q5, upgrade.ts; docs/remotea/upgrade.md)
  *   remotea token                  print the access token for the app's Settings → Remote hosts
  *   remotea rotate-token           issue a new token; the running server closes every connection that used the
  *                                  old one (sessions keep running) until each app is given the new one
@@ -52,6 +55,8 @@ import { ERIDANI_CAPS_VERSION, ERIDANI_PROTO } from '../../src/shared/eridani-li
 import type { RegistryData } from './registry';
 import { eridaniCommand, statusBlock } from './eridani-cli';
 import { doctorCommand } from './doctor';
+import { fmtKeeper, observeKeeperStatus, type KeeperObservation } from './pty-backend';
+import { upgrade } from './upgrade';
 import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord, type VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
 
 /** status --json while the collector is authoritative (the cutover interlock, above). */
@@ -92,6 +97,8 @@ export interface StatusSession {
   stopRequested: { at: number; mode: 'interrupt' | 'kill' } | null;
   /** Stage D (additive): the latest verification attempt, null when none ran. */
   verify: { attemptId: string; state: VerifyAttemptStatus['state']; startedAt: number | null } | null;
+  /** S-Q5 (additive): the PTY keeper holds this session's process (it survives a server restart). */
+  inKeeper: boolean;
 }
 
 export interface StatusOutput {
@@ -119,6 +126,8 @@ export interface StatusOutput {
     capsVersion: number;
     /** The hook helper agents run (`installed`), the one this checkout ships (`bundled`), and whether they match. */
     hooks: HookVersion;
+    /** S-Q5 (additive): the PTY keeper (docs/remotea/upgrade.md), as an observer sees it. */
+    ptyKeeper: KeeperObservation;
   };
   groups: Array<{ id: string; name: string; color: string | null }>;
   sessions: StatusSession[];
@@ -182,7 +191,11 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
     branch: s.eridani?.branch ?? null,
     stopRequested: s.eridani?.stopRequested ? { at: s.eridani.stopRequested.at, mode: s.eridani.stopRequested.mode } : null,
     verify: s.verify ? { attemptId: s.verify.attemptId, state: s.verify.state, startedAt: s.verify.startedAt } : null,
+    inKeeper: false,
   }));
+  const ptyKeeper = await observeKeeperStatus(dir, config.ptyKeeper);
+  const kept = new Set(ptyKeeper.ids);
+  for (const s of sessions) s.inKeeper = kept.has(s.id);
   sessions.sort((a, b) => a.createdAt - b.createdAt);
   const running = await healthy(config.port);
   const collector = loadEridaniConfig(dir)?.collector ?? null;
@@ -196,6 +209,7 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
       proto: ERIDANI_PROTO,
       capsVersion: ERIDANI_CAPS_VERSION,
       hooks: hookVersion(defaultHookPaths()),
+      ptyKeeper,
     },
     groups: groups.map((g) => ({ id: g.id, name: g.name, color: g.color ?? null })),
     sessions,
@@ -512,9 +526,32 @@ function fmtAge(ms: number | null): string {
   return `${Math.round(s / 86400)}d`;
 }
 
+export function parseUpgradeArgs(argv: string[]): { yes: boolean; json: boolean; unit?: string; timeoutMs?: number } {
+  const out: { yes: boolean; json: boolean; unit?: string; timeoutMs?: number } = { yes: false, json: false };
+  for (let i = 0; i < argv.length; i++) {
+    const f = argv[i];
+    const val = () => {
+      const v = argv[++i];
+      if (v === undefined) throw new Error(`${f} needs a value`);
+      return v;
+    };
+    if (f === '--yes' || f === '-y') out.yes = true;
+    else if (f === '--json') out.json = true;
+    else if (f === '--unit') out.unit = val();
+    else if (f === '--timeout') {
+      const n = Number(val());
+      if (!Number.isFinite(n) || n <= 0) throw new Error('--timeout takes seconds');
+      out.timeoutMs = n * 1000;
+    } else throw new Error(`unknown option ${f} (usage: remotea upgrade [--yes] [--timeout <s>] [--unit <name>] [--json])`);
+  }
+  return out;
+}
+
 const USAGE = `usage:
   remotea status [--json]
   remotea doctor [--json] [--probe]                             readiness report (ok/warn/fail per check; exit 1 on a fail)
+  remotea upgrade [--yes] [--timeout <s>] [--unit <name>] [--json]
+                                                                drain, restart the server only, check the sessions came back
   remotea open --group <name> [--cwd <dir>] [--title <t>] [--id surf-...] [--json] -- <command...>
   remotea close <surf-id>
   remotea token
@@ -534,6 +571,17 @@ export async function main(argv: string[]): Promise<number> {
   switch (cmd) {
     case 'doctor':
       return doctorCommand(dir, rest);
+    case 'upgrade': {
+      const args = parseUpgradeArgs(rest);
+      const json = args.json;
+      const res = await upgrade({
+        dir, yes: args.yes, unit: args.unit, timeoutMs: args.timeoutMs,
+        healthy: () => healthy(loadConfig(dir).port),
+        out: json ? () => {} : (l) => process.stdout.write(l + '\n'),
+      });
+      if (json) process.stdout.write(JSON.stringify(res, null, 2) + '\n');
+      return res.ok ? 0 : 1;
+    }
     case 'status': {
       const status = await buildStatus(dir);
       if (rest.includes('--json')) {
@@ -542,6 +590,7 @@ export async function main(argv: string[]): Promise<number> {
       }
       process.stdout.write(`server ${status.server.running ? 'running' : 'NOT running'} on port ${status.server.port} (${status.server.hostname})\n`);
       process.stdout.write(`${fmtBuild(status.server)}\n`);
+      process.stdout.write(`${fmtKeeper(status.server.ptyKeeper)}\n`);
       for (const s of status.sessions) {
         const what = s.agent ? `${s.agent.provider} ${s.agent.sessionId.slice(0, 8)}` : s.cmd ?? 'shell';
         process.stdout.write(`${s.state.padEnd(6)} ${(s.groupName ?? '-').slice(0, 20).padEnd(20)} ${what.slice(0, 24).padEnd(24)} active ${fmtAge(s.lastActivityAt).padStart(4)}  ${s.lastCwd ?? s.cwd}  ${s.id}\n`);

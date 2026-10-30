@@ -93,10 +93,15 @@ export interface ServerInfo {
   build: BuildInfo;
   proto: number;
   capsVersion: number;
+  /** S-Q5 (optional): what the CLI may ask of this server; `drain` = SIGUSR2 drains (`remotea upgrade`). */
+  features?: string[];
 }
 
+/** What this build's server-info.json says it supports (`remotea upgrade` checks for `drain` before signalling). */
+export const SERVER_FEATURES: readonly string[] = ['drain'];
+
 export function serverInfo(o: { bootId: string; version: string; build: BuildInfo; now?: number; pid?: number }): ServerInfo {
-  return { pid: o.pid ?? process.pid, bootId: o.bootId, startedAt: o.now ?? Date.now(), version: o.version, build: o.build, proto: ERIDANI_PROTO, capsVersion: ERIDANI_CAPS_VERSION };
+  return { pid: o.pid ?? process.pid, bootId: o.bootId, startedAt: o.now ?? Date.now(), version: o.version, build: o.build, proto: ERIDANI_PROTO, capsVersion: ERIDANI_CAPS_VERSION, features: [...SERVER_FEATURES] };
 }
 
 export function writeServerInfo(dir: string, info: ServerInfo): void {

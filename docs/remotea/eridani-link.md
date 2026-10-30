@@ -216,7 +216,10 @@ remotea eridani collector [parity|authoritative]
 [Capabilities and build identity](#capabilities-and-build-identity); null
 without a running link). Build identity adds `server.build`,
 `server.diskBuild`, `server.proto`, `server.capsVersion` and `server.hooks`
-(same section).
+(same section). The PTY keeper (S-Q5, [upgrade.md](upgrade.md)) adds
+`server.ptyKeeper {enabled, running, socket, pid, version, proto, startedAt,
+owner, sessions, alive, ids, aliveIds}` and `sessions[].inKeeper`; the status
+file (`remotea eridani status --json`) adds `draining {reason, since} | null`.
 
 ## Connection
 
@@ -249,13 +252,14 @@ remotea sends:
 
 | `t` | Lane | Coalesced by | Notes |
 |---|---|---|---|
-| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)), and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy), and `doctor?` (the latest [doctor summary](#doctor); absent until the server has computed one) |
+| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)), and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy), and `doctor?` (the latest [doctor summary](#doctor); absent until the server has computed one), and `draining?: true` (S-Q5: only while the server drains for a restart, see [Draining for a restart](#draining-for-a-restart)) |
 | `sessions.snapshot` | control | (per connection) | Sent after every welcome. `part {of, i, n}`, `surfaces[]`, `journal {pending, uncertain}`. Never persisted. |
 | `command.outcome` | control | `outcome:<op_id>` | Stage B only reports `rejected` (`unsupported` / `expired`). |
 | `status` | live | `status:<surf>`, numeric `revision` | `surf, incarnation, state, since, reason?, provider?, provider_session_id?` |
 | `turn` | live | never | `surf, incarnation, run_id: null, generation: 0, provider, tool, provider_session_id, provider_turn_id, root: true, seq, text, truncated, missing, source, prompt?, prompt_truncated?, ended_at` |
 | `prompt` | live | never | `surf, incarnation, run_id, generation, provider, tool, provider_session_id, seq, text, truncated, at`. A root prompt as it was submitted, only for a run-bound surface and only to an Eridani whose welcome advertised `prompt` (see Turn capture). |
 | `exit` | live | never | `surf, incarnation, code, exited_at` |
+| `host.state` | control | `host.state` (ephemeral) | `draining, reason?`. S-Q5: the server started (`draining: true, reason: "restart"`) or stopped draining. Only to an Eridani whose welcome advertised `draining`; see [Draining for a restart](#draining-for-a-restart). |
 | `doctor` | bulk | `doctor` (ephemeral) | `at, ok, warn, fail, items[{id, level, summary, fix?}], truncated?`. Only to an Eridani whose welcome advertised `doctor`, and only when the findings changed (see [Doctor](#doctor)). |
 | `session.report` | bulk | `<tool>:<session_id>`, `revision` = fingerprint | `parity, tool, session_id, report` (the HTTP collector's `SessionInput`, unchanged) |
 | `ack` | | | For inbound commands. |
@@ -634,7 +638,10 @@ ack of an accepted command already says
   has been applied (or 10 s after the link is ready without one);
 - `executing` commands are settled without being run again: a `spawn` by
   whether its session exists (`executed` / `failed`), a `stop` as `executed`
-  (the process ended with the server), a `verify` as `failed`; an `input` or
+  (the process ended with the server) or, when the PTY keeper kept the
+  process, as `failed` ("interrupted by a server restart; the process
+  outlived it…": the stop stays requested and boot sends it again), a
+  `verify` as `failed`; an `input` or
   `answer` becomes `uncertain`, since its bytes may or may not have arrived;
 - a duplicate `op_id` gets its recorded outcome, never a second run.
 
@@ -697,6 +704,37 @@ So is one that cannot be resumed: no conversation was ever reported, or
 holds whether the server notices it on boot or an app reopens the tab. To get
 a shell there, open a new tab in the worktree yourself. It is not bound to the
 run. This happens whether or not the link is enabled.
+
+A session whose process the PTY keeper kept ([upgrade.md](upgrade.md), off by
+default) was not lost: it is adopted before anything else runs and stays
+`live` with the **same incarnation**, binding, generation and turn numbering,
+so the new boot's `sessions.snapshot` reports it exactly as the old one did
+(only `boot_id` in hello changes). Dispatch still vouches for its agent (M7):
+the launch record is mirrored to `eridani-launched.json` and read back only
+for a kept process in the same incarnation. A kept session with a stop
+requested is stopped again on boot. One that exited while no server ran is
+reported as a normal `exit` with its code.
+
+#### Draining for a restart
+
+`remotea upgrade` (S-Q5) asks the server to drain (SIGUSR2) before it
+restarts it. While draining:
+
+- commands are still journaled and acked `accepted`, but not run; the next
+  boot replays them after its `runs.snapshot`, with every fence checked again
+  then (the usual path for `accepted` commands after a restart);
+- no queued `input` starts; a steer or input already typing finishes;
+- the server waits (up to `--timeout`, 30 s) until no command that called
+  `begin()` is unsettled and no steer or input write is pending, then the
+  CLI restarts the unit;
+- the link says so: hello carries `draining: true`, and an Eridani whose
+  welcome advertised `draining` gets `host.state {draining: true, reason:
+  "restart"}` at once (and `{draining: false}` if the drain is abandoned).
+  An Eridani that does not advertise it is sent nothing new and sees a short
+  disconnect.
+
+A drain that no restart follows expires after its timeout plus 60 s: the
+server stops draining and runs what it held.
 
 **runs.snapshot** (Eridani → remotea, after welcome, chunked like the
 snapshot): `runs [{run_id, generation, desired: continue|stop|none,

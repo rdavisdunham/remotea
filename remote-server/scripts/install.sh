@@ -94,14 +94,22 @@ sed -e "s#@NODE@#$node_bin#g" -e "s#@WORKDIR@#$here#g" -e "s#@PATH@#$(dirname "$
 systemctl --user daemon-reload
 
 if systemctl --user is-active --quiet remotea; then
-  live="$("$node_bin" dist/remote-server/src/cli.js status --json | "$node_bin" -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).sessions.filter(x=>x.state==="live").length))')"
+  status_json="$("$node_bin" dist/remote-server/src/cli.js status --json)"
+  live="$("$node_bin" -e 'const s=JSON.parse(process.argv[1]);console.log(s.sessions.filter(x=>x.state==="live"&&!x.inKeeper).length)' "$status_json")"
+  keeper="$("$node_bin" -e 'const k=JSON.parse(process.argv[1]).server.ptyKeeper;console.log(k&&k.enabled&&k.running?1:0)' "$status_json")"
+  if (( keeper == 1 && live == 0 )); then
+    # S-Q5: the PTY keeper holds every session; drain and restart the server only (docs/remotea/upgrade.md).
+    say "Restarting the server with remotea upgrade (sessions in the PTY keeper keep running)"
+    "$node_bin" dist/remote-server/src/cli.js upgrade --yes || warn "remotea upgrade reported a problem (see above)"
+    live=-1
+  fi
   if (( live > 0 && assume_yes == 0 )); then
     warn "remotea is running with $live live session(s). Restarting ends their processes"
     warn "(apps reconnect and respawn them; Claude sessions resume). Restart now? [y/N]"
     read -r answer
     [[ "$answer" == [yY]* ]] || { say "Installed but not restarted. Run: systemctl --user restart remotea"; exit 0; }
   fi
-  systemctl --user restart remotea
+  (( live < 0 )) || systemctl --user restart remotea
 else
   systemctl --user enable --now remotea
 fi

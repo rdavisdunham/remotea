@@ -11,6 +11,9 @@ Restart=always
 RestartSec=2
 # Sessions are children of the server: stopping the service hangs them up.
 # (They come back as "lost" and are respawned/resumed by the apps.)
+# With "ptyKeeper": true in config.json they live in the PTY keeper instead,
+# its own transient unit (remotea-pty.service), which this KillMode does not
+# reach: a restart (`remotea upgrade`) keeps them. docs/remotea/upgrade.md
 KillMode=control-group
 TimeoutStopSec=15
 UMask=0077

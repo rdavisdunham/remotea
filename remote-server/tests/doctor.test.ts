@@ -507,3 +507,18 @@ describe('doctor inside the server (eridani-runtime.ts)', () => {
     expect((changed.items as Array<{ id: string }>).some((i) => i.id === 'service.active')).toBe(false);
   });
 });
+
+describe('doctor: the PTY keeper (S-Q5)', () => {
+  const k = (over: Record<string, unknown> = {}) => ({
+    enabled: true, running: true, socket: '/s', pid: 42, version: '0.1.0', proto: 1, startedAt: 1,
+    owner: { pid: 7, since: 1 }, sessions: 2, alive: 2, ids: ['surf-a', 'surf-b'], aliveIds: ['surf-a', 'surf-b'], ...over,
+  });
+  it('ok when on and attached; warns when on but missing, unattached, or off while holding sessions', () => {
+    expect(byId(evaluate(facts({ keeper: k() })), 'service.pty_keeper')).toMatchObject({ level: 'ok', summary: expect.stringMatching(/survive a server restart/) });
+    expect(byId(evaluate(facts({ keeper: k({ running: false, pid: null, owner: null, sessions: 0, alive: 0 }) })), 'service.pty_keeper')).toMatchObject({ level: 'warn' });
+    expect(byId(evaluate(facts({ keeper: k({ owner: null }) })), 'service.pty_keeper')).toMatchObject({ level: 'warn', summary: expect.stringMatching(/no server is attached/) });
+    expect(byId(evaluate(facts({ keeper: k({ enabled: false }) })), 'service.pty_keeper')).toMatchObject({ level: 'warn', summary: expect.stringMatching(/ptyKeeper is off/) });
+    expect(byId(evaluate(facts({ keeper: k({ enabled: false, running: false, sessions: 0, alive: 0 }) })), 'service.pty_keeper')).toMatchObject({ level: 'ok', summary: expect.stringMatching(/ends every session/) });
+    expect(byId(evaluate(facts({ keeper: null })), 'service.pty_keeper')).toBeUndefined();
+  });
+});
