@@ -23,6 +23,7 @@ The design is in `docs/remotea/plan.md` and the mission-control plan (v2,
 | `remote-server/src/turn-capture.ts` | One `turn` per root provider turn, from the Stop hook. |
 | `remote-server/src/collector/` | TypeScript port of `collector.py`. |
 | `remote-server/src/eridani-cli.ts` | `remotea eridani …`. |
+| `remote-server/src/eridani-setup.ts` | `remotea eridani setup`: the re-runnable wizard, MCP wiring per harness, the readiness table. |
 | `remote-server/src/dispatch.ts` | Stage C: what each command does; recovery on boot and after a reconnect. |
 | `remote-server/src/eridani-targets.ts` | Execution targets in `eridani.json`. |
 | `remote-server/src/worktrees.ts` | One worktree per branch; the nominate-only cleanup report. |
@@ -63,11 +64,113 @@ that file) and `mcpUrl` (the MCP endpoint, when it is not derived from `url`).
 The server checks both files' mtime and size every 30 s and starts, restarts or
 stops the link to match. Nothing needs a service restart.
 
+## Setup
+
+`remotea eridani setup` does the whole setup in one re-runnable command. It
+reads what is already there, changes only what differs, prints a redacted diff
+before it touches a harness's config, and ends with exactly what it changed,
+what was already right, and what it skipped and why. A second run changes
+nothing. It never starts or restarts `remotea.service`.
+
+```
+remotea eridani setup [--code <code>|-] [--url <wss://…|https://…>] [--machine <name>]
+                      [--link-key <key>|-] [--mcp-key <key>|-] [--no-probe] [--wait <s>]
+                      [--scan <dir>]… [--add-repo [<id>=]<path>]… [--claude] [--codex]
+                      [--verify <id>=<command>]… [--verify-timeout <s>]
+                      [--user-mcp | --no-user-mcp] [--replace] [--hooks]
+                      [--yes] [--dry-run] [--json]
+```
+
+On a terminal it asks for anything not given as a flag. Keys are read without
+echo. `--yes` (or a non-terminal stdin, or `--json`) never asks: every answer
+takes its flag or its default. A key given as `-` is read from stdin, one line
+each, in the order code, link key, MCP key. This keeps keys out of argv and
+shell history.
+
+1. **Link.** The URL comes from `--url`, the setup code, or `eridani.json`. An
+   Eridani origin (`https://eridani.example`) becomes its link URL. The link
+   key comes from `--link-key`, the code, or the prompt; with none of these,
+   the current `eridani-token` is kept. The key is proved with one
+   hello → welcome, as `connect` does (`--no-probe` skips this). Then the key
+   and `eridani.json` (`enabled: true`, url, machine) are written the way
+   `connect` writes them, if they differ. It prints Eridani's host id and
+   welcome caps, this build (sha, proto, caps version, link caps, hook
+   version), and whether the server is running. With `--wait <s>`, it waits
+   for the running link to report `ready`.
+2. **Targets.** It lists the configured targets and offers the git
+   repositories found two levels under `--scan` folders and under the parent
+   folders of existing targets. Worktree roots and repositories that are
+   already targets are left out. `--add-repo [<id>=]<path>` adds one without
+   asking. A new target gets these defaults:
+   - id: the folder name.
+   - base: origin's default branch, else the current branch.
+   - worktree root: `<repo>-worktrees`.
+   - launch: the harnesses whose launcher probe answers, else `claude`
+     (`--claude`/`--codex` override this).
+   - verify: one entry from `--verify`, else detected: `npm test`,
+     `make test`, `uv run pytest` / `python3 -m pytest`, `cargo test` or
+     `go test ./...`.
+
+   Existing targets are never edited (use `targets add --json`).
+3. **MCP for coding agents.** The MCP bot key (`--mcp-key`, the code, or the
+   prompt) is written to `mcpKeyFile` (default
+   `<config dir>/eridani-mcp-token`), mode 0600, for the per-spawn
+   `--mcp-config` / `-c` path ([below](#eridani-mcp-for-spawned-agents)). The
+   key must be an `eri_bot_` key and not the link key. Setup refuses the link
+   key, and a key file that holds it, before it writes anything. Then, for
+   each harness whose program is on PATH, it offers a **user-level**
+   `eridani` entry, so sessions started by hand have the tools too:
+   - Claude Code: `claude mcp add --scope user --transport http eridani
+     <origin>/api/v1/external/mcp/ --header "Authorization: Bearer <key>"`
+     (in `~/.claude.json`, or `$CLAUDE_CONFIG_DIR`).
+   - Codex: a `[mcp_servers.eridani]` table with `url` and `http_headers =
+     { Authorization = "Bearer <key>" }` in `~/.codex/config.toml` (or
+     `$CODEX_HOME`).
+   - OpenCode: `mcp.eridani = {type: "remote", url, headers, enabled: true}`
+     in its global config (`~/.config/opencode/opencode.json`, or the
+     existing `.jsonc` / `config.json`).
+
+   A harness that is not installed is skipped. An entry that already
+   matches is left alone. An `eridani` entry that differs is never replaced
+   without `--replace`. Writing needs `--user-mcp` or a yes at the prompt;
+   `--no-user-mcp` never writes. The diff names only the `eridani` entry, with
+   the key shown as `eri_bot_****`. A file remotea rewrites keeps a
+   `.remotea-backup` of its first version and is left at mode 0600, because it
+   now holds a key. Codex entries in another form (dotted keys, inline
+   tables) and OpenCode files with comments are reported, not rewritten.
+4. **Hooks.** It reports the installed helper's `hook_version`, whether it
+   matches the one this checkout ships, and which agents lack the hooks. It
+   runs `remotea hooks install` only with `--hooks`, because that edits
+   `~/.claude/settings.json`; otherwise it prints the command.
+
+Finally it prints the **readiness table**. This is the data hello sends for
+each target: the enabled harnesses with each launcher's probe (ready, version
+or error, run through the login shell the way a spawn runs it), each verify
+entry's status (checked against the service's PATH from the installed
+`remotea.service`, else install.sh's default), and `mcp`. It also prints the
+MCP wiring per harness. `--json` prints the whole report (`changed`,
+`unchanged`, `skipped`, `link`, `readiness`, `mcp`, `hooks`) and nothing else.
+`--dry-run` prints the same without writing anything.
+
+`remotea eridani status` prints the same MCP wiring and per-target readiness
+after the link lines. Launch and verify come from the running link's hello;
+without one, launchers show as `not probed` unless `--probe` runs the probes.
+
+**The one line Eridani prints.** A setup code is `eridani-setup:1:` followed
+by the base64url of `{"url": "<origin or link URL>", "link_key": "eri_bot_…",
+"mcp_key": "eri_bot_…", "machine"?: "<name>"}`
+(`encodeSetupCode` / `parseSetupCode` in eridani-setup.ts). The wizard finds
+the code anywhere in a pasted line, so pasting the whole command
+`remotea eridani setup --code eridani-setup:1:…` at its first prompt works
+too. Pasting at the prompt is better than running that command, because the
+keys then stay out of shell history.
+
 ## CLI
 
 ```
+remotea eridani setup [flags]          (see Setup above)
 remotea eridani connect [--url <wss://…>] [--machine <name>] [--no-probe]
-remotea eridani status [--json]
+remotea eridani status [--json] [--probe]
 remotea eridani disconnect [--forget]
 remotea eridani collect [--dry-run] [--days N]
 remotea eridani collector [parity|authoritative]
@@ -83,6 +186,8 @@ remotea eridani collector [parity|authoritative]
   `auth-failed`). `degraded` says why the link is degraded, the journal first;
   `journal {degraded, unrecorded, refused}` and `spool.degraded` give the
   detail (see [When the journal cannot be written](#commands)).
+- `status` also prints the MCP wiring per harness and each target's readiness
+  ([Setup](#setup)); `--json` adds them as `mcpWiring` and `readiness`.
 - `disconnect` disables the link; `--forget` deletes the key too.
 - `collect --dry-run` prints what the collector would report, in the same table
   as `collector.py --dry-run`. Without `--dry-run`, it asks the running server
