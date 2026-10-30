@@ -26,6 +26,10 @@
  *     a restart are replayed once Eridani's `runs.snapshot` is applied (or
  *     10 s after the link is ready without one), so their fences see the
  *     reconciled state.
+ *   - `worktrees.scan` (the judge's PR evidence): a fresh worktrees.report
+ *     and the named session's session.report, both sent even when nothing
+ *     changed, then `executed`. Journaled like every command; its fence is
+ *     informational (a stale scan is harmless), only `expires_at` is enforced.
  *   - What hello advertises comes from the launch environment (S-S1,
  *     launch-caps.ts): every launcher is probed through the login shell
  *     before the link first starts (later starts reuse the last results and
@@ -34,7 +38,17 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { ERIDANI_CAPS_VERSION, ERIDANI_TIMING, STAGE_F_AUTHORITATIVE_CAPS, STAGE_F_CAPS, type CapabilityMatrix, type HarnessCaps } from '../../src/shared/eridani-link-protocol';
+import {
+  ERIDANI_CAPS_VERSION,
+  ERIDANI_LIMITS,
+  ERIDANI_TIMING,
+  STAGE_F_AUTHORITATIVE_CAPS,
+  STAGE_F_CAPS,
+  type CapabilityMatrix,
+  type CommandBody,
+  type HarnessCaps,
+  type WorktreesScanCommand,
+} from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
   eridaniConfigStamp,
@@ -44,7 +58,7 @@ import {
   type CollectorMode,
   type EridaniConfig,
 } from './config';
-import { EridaniLink, type EridaniLinkDeps } from './eridani-link';
+import { EridaniLink, type CommandContext, type CommandResult, type EridaniLinkDeps } from './eridani-link';
 import type { Hub } from './hub';
 import type { Registry } from './registry';
 import { Collector } from './collector/collector';
@@ -157,6 +171,10 @@ export class EridaniRuntime {
   private worktreesRev = 0;
   private worktreesBusy = false;
   private worktreesAgain = false;
+  /** A forced report (worktrees.scan) is due: the next run sends even an unchanged list. */
+  private worktreesForce = false;
+  /** Who waits for the next run to finish (a forced report starts after its request, never joins one in flight). */
+  private worktreesWaiters: Array<{ resolve: () => void; reject: (err: Error) => void }> = [];
   private readonly worktrees: WorktreeManager;
   readonly dispatch: Dispatch;
   readonly questions: QuestionBroker;
@@ -182,7 +200,7 @@ export class EridaniRuntime {
       targets: () => loadTargets(deps.dir),
       questions: this.questions,
       emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
-      changed: () => this.reportWorktrees(),
+      changed: () => void this.reportWorktrees(),
       linkReady: () => !!this.link?.ready,
       resumeAgents: deps.resumeAgents,
       log: deps.log,
@@ -294,14 +312,15 @@ export class EridaniRuntime {
         this.takeDirty();
         this.scan();
         this.worktreesSent = '';
-        this.reportWorktrees();
+        void this.reportWorktrees();
         if (this.replayTimer) clearTimeout(this.replayTimer);
         this.replayTimer = setTimeout(() => this.replay(), REPLAY_FALLBACK_MS);
         this.replayTimer.unref?.();
       },
-      handlers: this.dispatch.handlers(),
+      handlers: { ...this.dispatch.handlers(), 'worktrees.scan': (c, ctx) => this.scanCommand(c, ctx) },
       precheck: (cmd) => this.dispatch.precheck(cmd),
-      recover: (rec) => this.dispatch.recover(rec),
+      // A scan cut off by a restart already sent whatever it sent; Eridani's hold bounds the wait.
+      recover: (rec) => (rec.t === 'worktrees.scan' ? { state: 'failed', detail: 'interrupted by a server restart' } : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
       caps: () => (mode === 'authoritative' ? STAGE_F_AUTHORITATIVE_CAPS : STAGE_F_CAPS),
       targets: () => this.helloTargets(),
@@ -404,14 +423,28 @@ export class EridaniRuntime {
    * `worktrees.report`: every managed worktree with its unmerged-work
    * reasons. Sent when the link becomes ready and whenever the list changes
    * (after a spawn, an exit, and on the scan tick); coalesced in the spool.
+   * `force` (worktrees.scan) sends it even unchanged; the promise settles when
+   * a run that started after the request has queued it (or failed). Unforced
+   * callers get a promise that never rejects.
    */
-  reportWorktrees(): void {
-    if (!this.link?.ready) return;
+  reportWorktrees(force = false): Promise<void> {
+    const done = force
+      ? new Promise<void>((resolve, reject) => this.worktreesWaiters.push({ resolve, reject }))
+      : Promise.resolve();
+    if (force) this.worktreesForce = true;
+    if (!this.link?.ready) {
+      this.settleWorktrees(this.worktreesWaiters.splice(0), new Error('the link is not ready'));
+      this.worktreesForce = false;
+      return done;
+    }
     if (this.worktreesBusy) {
       this.worktreesAgain = true;
-      return;
+      return done;
     }
     this.worktreesBusy = true;
+    const waiters = this.worktreesWaiters.splice(0);
+    const forced = this.worktreesForce;
+    this.worktreesForce = false;
     const active = new Set(this.deps.registry.sessions().filter((r) => r.eridani && r.state !== 'exited').map((r) => r.eridani!.worktree));
     const targets = loadTargets(this.deps.dir);
     // nominate fetches each base first (rate-limited), so the heads read the same fresh ref.
@@ -419,18 +452,69 @@ export class EridaniRuntime {
       ([rows, heads]) => {
         const body = heads.length ? { t: 'worktrees.report' as const, worktrees: rows, heads } : { t: 'worktrees.report' as const, worktrees: rows };
         const text = JSON.stringify(body);
-        if (text !== this.worktreesSent && this.link?.ready) {
-          if (this.link.enqueue(body, 0, WORKTREES_ENTITY, ++this.worktreesRev)) this.worktreesSent = text;
-        }
+        if (!forced && text === this.worktreesSent) return this.settleWorktrees(waiters, null);
+        if (!this.link?.ready) return this.settleWorktrees(waiters, new Error('the link went down during the scan'));
+        if (this.link.enqueue(body, 0, WORKTREES_ENTITY, ++this.worktreesRev)) {
+          this.worktreesSent = text;
+          this.settleWorktrees(waiters, null);
+        } else this.settleWorktrees(waiters, new Error('the outbox refused the report'));
       },
-      (err) => this.deps.log(`eridani: worktrees report failed: ${(err as Error).message}`),
+      (err) => {
+        this.deps.log(`eridani: worktrees report failed: ${(err as Error).message}`);
+        this.settleWorktrees(waiters, err instanceof Error ? err : new Error(String(err)));
+      },
     ).finally(() => {
       this.worktreesBusy = false;
       if (this.worktreesAgain) {
         this.worktreesAgain = false;
-        this.reportWorktrees();
+        void this.reportWorktrees();
       }
     });
+    return done;
+  }
+
+  private settleWorktrees(waiters: Array<{ resolve: () => void; reject: (err: Error) => void }>, err: Error | null): void {
+    for (const w of waiters) {
+      if (err) w.reject(err);
+      else w.resolve();
+    }
+  }
+
+  /**
+   * `worktrees.scan`: rescan the worktrees and (when named) one session, and
+   * send both reports even when nothing changed. `executed` once both are
+   * queued; `failed` when either scan fails. A session this host does not have
+   * (or a collector that is off) is still `executed`, with `result.session`
+   * saying so: the worktrees part is what was asked for in any case.
+   */
+  private async scanCommand(cmd: CommandBody, ctx: CommandContext): Promise<CommandResult> {
+    const c = cmd as unknown as WorktreesScanCommand;
+    ctx.begin();
+    const fail = (what: string, err: unknown): CommandResult => ({
+      state: 'failed',
+      detail: `${what}: ${(err as Error)?.message ?? String(err)}`.slice(0, ERIDANI_LIMITS.reasonChars),
+    });
+    try {
+      await this.reportWorktrees(true);
+    } catch (err) {
+      return fail('worktrees scan failed', err);
+    }
+    const result: Record<string, unknown> = { worktrees: 'reported' };
+    if (c.tool && c.session_id) {
+      const collector = this.collector;
+      if (!collector) result.session = 'collector_off';
+      else {
+        let r;
+        try {
+          r = await collector.scanOne(c.tool.startsWith('codex') ? 'codex' : 'claude', c.session_id, { tool: c.tool, force: true });
+        } catch (err) {
+          return fail('session scan failed', err);
+        }
+        if (r.failed) return { state: 'failed', detail: 'session scan: the outbox refused the report', result: { ...result, session: 'not_queued' } };
+        result.session = r.queued ? 'reported' : 'not_found';
+      }
+    }
+    return { state: 'executed', result };
   }
 
   /** Run what was accepted before a restart and never started (once per connection). */
@@ -449,7 +533,7 @@ export class EridaniRuntime {
   }
 
   private scan(): void {
-    this.reportWorktrees();
+    void this.reportWorktrees();
     const link = this.link;
     if (!link || !this.collector || !link.ready) return;
     if (link.spool.fill > MAX_FILL_FOR_SCAN) {

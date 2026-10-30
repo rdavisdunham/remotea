@@ -103,7 +103,9 @@ export type LinkCap =
   | 'digest'
   | 'context.scope'
   // The host sends each root prompt as it is submitted (`prompt`), before the turn that answers it.
-  | 'prompt';
+  | 'prompt'
+  // The host takes `worktrees.scan`: a fresh worktrees.report and session.report on request (the judge's PR evidence).
+  | 'worktrees.scan';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -120,8 +122,8 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 /** Stage E, advertised only while `eridani.json.collector` is `authoritative`. */
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
-/** Stage F: everything in D, plus `digest`, `context.scope` and live `prompt` frames. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt']);
+/** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames and `worktrees.scan`. */
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -687,6 +689,25 @@ export interface VerifyCommand extends OpFields {
   expires_at?: number | string;
 }
 
+/**
+ * Rescan now and report even what did not change: every worktree
+ * (`worktrees.report`) and, when named, one session (`session.report`). Eridani
+ * sends it while a judge verdict waits for a PR record newer than the turn.
+ * The fence is informational: a stale one is harmless, only `expires_at` counts.
+ */
+export interface WorktreesScanCommand extends OpFields {
+  t: 'worktrees.scan';
+  run_id: string;
+  generation: number;
+  branch?: string | null;
+  turn_seq?: number | null;
+  tool?: SessionTool;
+  session_id?: string;
+  expires_at: number | string;
+}
+
+export const SESSION_TOOLS: ReadonlySet<string> = new Set<SessionTool>(['claude_code', 'claude_desktop', 'codex_cli', 'codex_desktop']);
+
 /** Eridani's answer to sessions.snapshot: what each run should be doing. */
 export interface RunsSnapshotEntry {
   run_id: string;
@@ -957,6 +978,16 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
     case 'verify':
       if (!isStr(m.attempt_id, 200) || !isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad attempt';
       if (!isInt(m.turn_seq) || !isInt(m.plan_revision) || !isStr(m.verify_id, 64) || !/^[A-Za-z0-9._-]+$/.test(m.verify_id)) return 'bad verify';
+      return null;
+    case 'worktrees.scan':
+      // Not effectful, but short-lived (2 min): a scan nobody waits for any more is refused.
+      if (m.expires_at === undefined) return 'expires_at required';
+      if (!isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
+      if (m.branch !== undefined && m.branch !== null && !isStr(m.branch, 200)) return 'bad branch';
+      if (m.turn_seq !== undefined && m.turn_seq !== null && !isInt(m.turn_seq)) return 'bad turn_seq';
+      if ((m.tool === undefined) !== (m.session_id === undefined)) return 'tool and session_id go together';
+      if (m.tool !== undefined && !(typeof m.tool === 'string' && SESSION_TOOLS.has(m.tool))) return 'bad tool';
+      if (m.session_id !== undefined && !(isStr(m.session_id, 200) && /^[A-Za-z0-9._:-]+$/.test(m.session_id))) return 'bad session_id';
       return null;
     default:
       return null; // a kind this module does not describe: its handler validates it

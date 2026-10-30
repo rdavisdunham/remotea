@@ -395,12 +395,13 @@ recovery ref first (`refs/remotea/recovery/<branch>`), then
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
 | `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id, expires_at` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, a minimal environment, the target's timeout), then sends `verify.result`. Shares the attempt machinery of [stage D](#stage-d-verification-after-turns). |
+| `worktrees.scan` | `run_id, generation, branch, turn_seq, tool?, session_id?, expires_at` (Eridani gives it 2 min) | The judge's PR evidence (Eridani PR #94): sent only to a host whose hello `caps` has `worktrees.scan`, while a judge verdict waits for a PR record newer than the turn. Rescans the worktrees and sends `worktrees.report` **even if nothing changed**; when `tool` and `session_id` are given (both or neither), re-reads that session with the collector and sends its `session.report` even if its fingerprint is unchanged. Then `executed` with `result {worktrees: "reported", session?: "reported" \| "not_found" \| "collector_off"}`; `failed` (with the reason) when a scan fails or the outbox refuses a report. The run fence is informational: a stale `run_id`/`generation` is harmless and not rejected, but `expires_at` is required and a past one is `rejected` ("expired"). Journaled like every command (refused with `journal_unavailable` when the journal cannot record it); found `executing` after a restart it settles as `failed`. |
 
-Every command needs a fence that matches: an `input`/`stop` names the surface
+Every command (except `worktrees.scan`, which only reads) needs a fence that matches: an `input`/`stop` names the surface
 and its `incarnation`, the run, and the generation (a queued input must match
 the current generation; steer and stop may name a newer one). Every effectful
 command (`spawn`, `input`, `answer`, `stop`, `verify`) must carry
-`expires_at`. A missing one is rejected (`expires_at required`, since stage
+`expires_at`, and so must `worktrees.scan`. A missing one is rejected (`expires_at required`, since stage
 F), and so is one that is past or more than 7 days out (the replay horizon,
 the time the journal remembers an `op_id`).
 
@@ -600,7 +601,8 @@ remotea also sends: `question`, `question.resolved`, `verify.result
 workspace_fingerprint ("<HEAD>:<sha256 of the branch, status, diff and
 untracked contents>"), exit_code, tail (last 4000 chars), truncated, duration_ms,
 timed_out, canceled, error?}` and `worktrees.report {worktrees: [...], heads?: [...]}` (on
-ready, after a spawn or exit, and every 2 min when it changed). `turn` now
+ready, after a spawn or exit, and every 2 min when it changed; on `worktrees.scan`
+always). `turn` now
 carries the run binding taken when the turn's prompt was submitted, Claude's
 `prompt_id` as `provider_turn_id`, and `interim: true` for a Stop with
 background tasks still running. `sessions.snapshot` surfaces carry `task_id,
@@ -894,8 +896,10 @@ Other sessions see at most the fenced candidate list (D6, above).
 `.remotea-backup` copy is always 0600.
 
 **Capabilities.** hello adds `digest` (every op frame carries its digest, so
-Eridani may require it), `context.scope` and `prompt` (live `prompt` frames,
-sent only when Eridani advertises `prompt` back). The lag rules:
+Eridani may require it), `context.scope`, `prompt` (live `prompt` frames,
+sent only when Eridani advertises `prompt` back) and `worktrees.scan` (the
+host takes the [`worktrees.scan`](#commands) command; an Eridani that never
+sends it loses nothing). The lag rules:
 
 - Eridani refuses an `op_id` frame without a digest only from a host that
   advertises `digest`.
