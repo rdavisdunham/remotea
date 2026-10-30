@@ -46,7 +46,7 @@ import type { Registry } from './registry';
 import { Collector } from './collector/collector';
 import { CollectorState } from './collector/state';
 import { statusFromRegistry } from './collector/report';
-import { Dispatch } from './dispatch';
+import { Dispatch, type DispatchTimers } from './dispatch';
 import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
 import { WorktreeManager } from './worktrees';
@@ -89,6 +89,30 @@ export interface EridaniRuntimeDeps {
   dispatchTiming?: ConstructorParameters<typeof Dispatch>[0]['timing'];
   questionHoldMs?: number;
   contextMs?: number;
+}
+
+/**
+ * Dispatch's timers with every callback contained: a throw inside one (a
+ * queued input whose `executing` the journal cannot record) is logged, never
+ * an uncaught exception in the process that owns every terminal.
+ */
+export function containedTimers(log: (msg: string) => void, base?: DispatchTimers): DispatchTimers {
+  const run = (fn: () => void) => () => {
+    try {
+      fn();
+    } catch (err) {
+      log(`eridani dispatch: a timer callback failed: ${(err as Error)?.message ?? String(err)}`);
+    }
+  };
+  if (base) return { setTimeout: (fn, ms) => base.setTimeout(run(fn), ms), clearTimeout: (h) => base.clearTimeout(h) };
+  return {
+    setTimeout: (fn, ms) => {
+      const t = setTimeout(run(fn), ms);
+      t.unref?.();
+      return t;
+    },
+    clearTimeout: (h) => clearTimeout(h as NodeJS.Timeout),
+  };
 }
 
 /** `claude --version` / `codex --version`, once per link start. Never blocks the link. */
@@ -169,6 +193,7 @@ export class EridaniRuntime {
       resumeAgents: deps.resumeAgents,
       log: deps.log,
       timing: deps.dispatchTiming,
+      timers: containedTimers(deps.log),
     });
     this.context = new ContextService({
       session: (id) => registry.session(id),
