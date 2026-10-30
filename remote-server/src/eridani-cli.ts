@@ -7,7 +7,12 @@
  *       welcome against the URL, then writes `eridani-token` (0600) and
  *       enables the link in `eridani.json`. The running server picks the
  *       change up within 30 s; nothing restarts.
- *   status [--json]      the link as the running server last wrote it
+ *   setup [flags]        the whole setup, re-runnable: link, targets, MCP
+ *                        key and user-level MCP entries, hooks report,
+ *                        readiness table (eridani-setup.ts)
+ *   status [--json] [--probe]
+ *                        the link as the running server last wrote it, the
+ *                        MCP wiring per harness and per-target readiness
  *   disconnect [--forget]
  *       disables the link; --forget also deletes the key
  *   collect [--dry-run] [--days N]
@@ -39,7 +44,7 @@ import {
   writeEridaniToken,
   type EridaniConfig,
 } from './config';
-import { ERIDANI_PROTO, ERIDANI_SUBPROTOCOL, ERIDANI_TIMING, STAGE_B_CAPS, parseDownFrame } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_PROTO, ERIDANI_SUBPROTOCOL, ERIDANI_TIMING, STAGE_B_CAPS, parseDownFrame, type HelloTarget } from '../../src/shared/eridani-link-protocol';
 import { readLinkStatus, type Advertised, type LinkStatus } from './eridani-link';
 import { Collector, formatRows } from './collector/collector';
 import { CollectorState } from './collector/state';
@@ -48,6 +53,9 @@ import { WINDOWS_USERS, serverVersion } from './eridani-runtime';
 import type { RegistryData } from './registry';
 import { loadTargets, removeTarget, saveTarget, type ExecutionTarget, type VerifySpec } from './eridani-targets';
 import { WorktreeManager, cleanupCommands } from './worktrees';
+import { defaultHookPaths } from './hooks-install';
+import { defaultProbe, launchersToProbe, probeKey, type LauncherProbe } from './launch-caps';
+import { fmtReadiness, fmtWiring, localReadiness, mcpWiring, parseSetupArgs, readSecret, runSetup, serviceEnv, SETUP_USAGE, stdinLinesOnce, ttyPrompter, noPrompter } from './eridani-setup';
 
 export interface EridaniSummary {
   enabled: boolean;
@@ -123,38 +131,14 @@ async function readKey(): Promise<string> {
     }
     return data.trim();
   }
-  process.stderr.write('Eridani link key (eri_bot_…): ');
-  return new Promise((resolve, reject) => {
-    const stdin = process.stdin;
-    let key = '';
-    stdin.setRawMode(true);
-    stdin.resume();
-    stdin.setEncoding('utf8');
-    const done = (err?: Error) => {
-      stdin.setRawMode(false);
-      stdin.pause();
-      stdin.removeListener('data', onData);
-      process.stderr.write('\n');
-      if (err) reject(err);
-      else resolve(key.trim());
-    };
-    const onData = (ch: string) => {
-      for (const c of ch) {
-        if (c === '\r' || c === '\n') return done();
-        if (c === '\x03') return done(new Error('cancelled'));
-        if (c === '\x7f' || c === '\b') key = key.slice(0, -1);
-        else if (c >= ' ') key += c;
-      }
-    };
-    stdin.on('data', onData);
-  });
+  return readSecret('Eridani link key (eri_bot_…): ');
 }
 
 /**
  * One hello → welcome against `url` with `key`. Resolves with Eridani's host id;
  * rejects with a sentence a person can act on.
  */
-export function probeLink(url: string, key: string, hello: { server_id: string; machine: string; version: string }, timeoutMs: number = ERIDANI_TIMING.probeMs): Promise<{ hostId: string | null; connEpoch: number }> {
+export function probeLink(url: string, key: string, hello: { server_id: string; machine: string; version: string }, timeoutMs: number = ERIDANI_TIMING.probeMs): Promise<{ hostId: string | null; connEpoch: number; caps: string[] }> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const ws = new WebSocket(url, [ERIDANI_SUBPROTOCOL], {
@@ -162,7 +146,7 @@ export function probeLink(url: string, key: string, hello: { server_id: string; 
       perMessageDeflate: false,
       handshakeTimeout: timeoutMs,
     });
-    const finish = (err: Error | null, value?: { hostId: string | null; connEpoch: number }) => {
+    const finish = (err: Error | null, value?: { hostId: string | null; connEpoch: number; caps: string[] }) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -197,13 +181,13 @@ export function probeLink(url: string, key: string, hello: { server_id: string; 
       }
       const f = parseDownFrame(raw);
       if (f?.t !== 'welcome') return;
-      const w = f as unknown as { host_id: string | null; conn_epoch: number };
+      const w = f as unknown as { host_id: string | null; conn_epoch: number; caps?: unknown };
       try {
         ws.send(JSON.stringify({ v: 1, id: crypto.randomUUID(), conn_epoch: w.conn_epoch, at: Date.now(), t: 'bye', reason: 'probe' }));
       } catch {
         /* closing anyway */
       }
-      finish(null, { hostId: w.host_id, connEpoch: w.conn_epoch });
+      finish(null, { hostId: w.host_id, connEpoch: w.conn_epoch, caps: Array.isArray(w.caps) ? w.caps.filter((c): c is string => typeof c === 'string') : [] });
     });
   });
 }
@@ -257,6 +241,30 @@ export function collectorChecklist(mode: 'parity' | 'authoritative'): string {
   ].join('\n');
 }
 
+/**
+ * What `status` adds: the MCP wiring per harness, and each target's
+ * readiness: the running link's hello when there is one, else computed here
+ * (verify and mcp; launchers only with --probe, which runs them the way the
+ * server does).
+ */
+async function statusExtras(dir: string, s: EridaniSummary, probe: boolean): Promise<{ wiring: ReturnType<typeof mcpWiring>; readiness: HelloTarget[]; source: string }> {
+  const wiring = mcpWiring(dir, { home: os.homedir(), env: process.env });
+  const targets = loadTargets(dir);
+  const venv = serviceEnv(os.homedir(), process.env).env;
+  const probes = new Map<string, LauncherProbe>();
+  if (probe) {
+    await Promise.all(launchersToProbe(targets).map(async ({ harness, bin }) => probes.set(probeKey(harness, bin), await defaultProbe(harness, bin))));
+    return { wiring, readiness: localReadiness(dir, targets, probes, venv), source: 'probed now' };
+  }
+  const adv = s.link?.advertised?.targets;
+  if (adv) {
+    // The running hello for launch and verify; mcp and any target added since, from disk now.
+    const local = localReadiness(dir, targets, probes, venv);
+    return { wiring, readiness: local.map((t) => { const a = adv.find((x) => x.id === t.id); return a ? { ...a, mcp: t.mcp } : t; }), source: 'launch and verify from the running hello; mcp from disk now' };
+  }
+  return { wiring, readiness: localReadiness(dir, targets, probes, venv), source: `${s.link ? 'the running server does not report its hello targets (an older build)' : 'no running link'}: launchers not probed (--probe), verify and mcp from disk` };
+}
+
 function fmtTime(ms: number | null | undefined): string {
   return ms ? new Date(ms).toISOString() : '-';
 }
@@ -285,12 +293,13 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
     }
     case 'status': {
       const s = eridaniSummary(dir, await serverRunning());
+      const extra = await statusExtras(dir, s, rest.includes('--probe'));
       if (rest.includes('--json')) {
-        out.write(JSON.stringify(s, null, 2) + '\n');
+        out.write(JSON.stringify({ ...s, mcpWiring: extra.wiring, readiness: extra.readiness }, null, 2) + '\n');
         return 0;
       }
       if (!s.url) {
-        out.write('not set up: run `remotea eridani connect --url wss://…`\n');
+        out.write('not set up: run `remotea eridani setup` (or `remotea eridani connect --url wss://…`)\n');
         return 0;
       }
       out.write(`link ${s.state}  ${s.url}  as ${s.machine}  collector ${s.collector}  key ${s.keyPresent ? 'present' : 'MISSING'}\n`);
@@ -308,7 +317,32 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
         if (l.rejected) out.write(`refused by Eridani: ${l.rejected} (last: ${l.lastRejection})\n`);
         if (l.advertised) for (const line of fmtAdvertised(l.advertised)) out.write(`${line}\n`);
       }
+      out.write('\nMCP for coding agents:\n');
+      for (const line of fmtWiring(extra.wiring)) out.write(`  ${line}\n`);
+      out.write(`\nReadiness per target (${extra.source}):\n`);
+      for (const line of fmtReadiness(extra.readiness)) out.write(`  ${line}\n`);
       return 0;
+    }
+    case 'setup': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        out.write(`${SETUP_USAGE}\n`);
+        return 0;
+      }
+      const o = parseSetupArgs(rest);
+      const report = await runSetup(o, {
+        dir,
+        home: os.homedir(),
+        env: process.env,
+        out,
+        prompt: process.stdin.isTTY && process.stderr.isTTY ? ttyPrompter() : noPrompter,
+        serverRunning,
+        probeLink: (url, key, hello) => probeLink(url, key, hello),
+        probe: defaultProbe,
+        hookPaths: defaultHookPaths(),
+        stdinLines: stdinLinesOnce(),
+        version: serverVersion(),
+      });
+      return report.skipped.some((x) => /failed/.test(x)) ? 1 : 0;
     }
     case 'disconnect': {
       const prev = loadEridaniConfig(dir);
@@ -365,7 +399,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
     case 'worktrees':
       return worktreesCommand(dir, rest, out);
     default:
-      process.stderr.write(`usage: remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]
+      process.stderr.write(`usage: remotea eridani setup [--help | <flags>] | connect [--url <wss://…>] [--machine <name>] | status [--json] [--probe] | disconnect [--forget] | collect [--dry-run] [--days N]
        remotea eridani collector [parity|authoritative]
        remotea eridani targets list [--json] | add --id <id> --repo <path> --worktree-root <path> [--base <branch>] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>] | add --json '<target>' | remove <id>
        remotea eridani worktrees [--json]\n`);

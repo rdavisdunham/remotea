@@ -64,6 +64,8 @@ remotea token             # the token the app needs
 - Logs: `journalctl --user -u remotea -f`
 - Restart: `systemctl --user restart remotea`. A restart ends running processes. The apps respawn them, and Claude Code and Codex sessions are resumed.
 
+**Eridani quick start (optional).** To let [Eridani](docs/remotea/eridani-link.md) start agents here, run `remotea eridani setup` in WSL and paste the setup code Eridani shows after **Enable** (Settings → Connections); it is read without echo. The wizard writes the link key and URL, offers the git repositories it finds as execution targets (with a launch config and a detected verify command), saves the MCP bot key that spawned agents use (`~/.config/remotea/eridani-mcp-token`, 0600, never the link key), offers a user-level `eridani` MCP entry for each installed harness (Claude Code, Codex, OpenCode; an existing entry is only replaced with `--replace`), reports whether the hooks are current, and ends with a per-target readiness table and a list of what it changed and what it skipped. It is safe to run again: a second run changes nothing. Every answer has a flag for scripts (`remotea eridani setup --help`), and `remotea eridani status` shows the same wiring and readiness later. Details: [Setup](docs/remotea/eridani-link.md#setup).
+
 ### 2. App (on each Windows machine)
 
 Requirements: git and Node, with Node 22 LTS recommended (`winget install OpenJS.NodeJS.LTS`). Node 20.19+ also works (root `package.json` `engines`: `^20.19.0 || ^22.13.0 || >=24.0.0`). Clone to a path **without spaces**, then:
@@ -127,7 +129,7 @@ Agents in remotea terminals report their state (working, needs you, done) the sa
 
 ### Eridani (optional)
 
-The server can link to [Eridani](docs/remotea/eridani-link.md), which then starts Claude Code and Codex runs in managed worktrees here. `remotea eridani connect` sets up the link key (`~/.config/remotea/eridani-token`). A run's agent reports its plan and steps through Eridani's MCP tools (`submit_plan`, `task_step`, `task_interview`, `session_link`), so it needs a **second** key, used only for MCP:
+The server can link to [Eridani](docs/remotea/eridani-link.md), which then starts Claude Code and Codex runs in managed worktrees here. `remotea eridani setup` does all of the below in one go (see the quick start under Install); the steps by hand: `remotea eridani connect` sets up the link key (`~/.config/remotea/eridani-token`). A run's agent reports its plan and steps through Eridani's MCP tools (`submit_plan`, `task_step`, `task_interview`, `session_link`), so it needs a **second** key, used only for MCP:
 
 1. In Eridani, open Settings → Connections → Bot keys and create a bot key with the scopes **agents:session**, **tasks** (read/write) and **notes** (read/write). The owner does this once per machine.
 2. Save it on this machine: `install -m 600 /dev/null ~/.config/remotea/eridani-mcp-token`, then paste the key into that file (one line, `eri_bot_…`). Do not reuse the link key; remotea refuses it.
