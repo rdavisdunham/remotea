@@ -7,8 +7,8 @@ import path from 'path';
 import WebSocket from 'ws';
 import { GROUP_ID_RE, LIMITS, PROTO, SURFACE_ID_RE, parseServerMsg } from '../../shared/remote-host-protocol';
 import { IPC_CHANNELS } from '../../shared/types';
-import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, RegistryPayload, RemoteRegistryView } from '../../shared/remote-hosts-types';
-import { HostStore, loadDevice, PendingIntents, validateHostUrl, type SecretBox, type StoredHost } from './host-config';
+import type { HostDTO, HostSaveRequest, HostStatus, HostTestRequest, HostTestResult, RegistryPayload, RemoteRegistryView } from '../../shared/remote-hosts-types';
+import { assertHostUrlAcknowledged, HostStore, loadDevice, PendingIntents, validateHostUrl, type SecretBox, type StoredHost } from './host-config';
 import { RemoteHostClient, type SocketFactory } from './host-client';
 import { diag, diagQueued, requeueDiag, takeDiag } from './diag';
 import { remoteInsertionText } from '../remote-insert';
@@ -100,7 +100,10 @@ export class RemoteHosts {
   private dto(host: StoredHost): HostDTO {
     const client = this.clients.get(host.id);
     const status: HostStatus = client?.status() ?? { hostId: host.id, state: 'disabled', attempt: 0 };
-    return { id: host.id, name: host.name, url: host.url, enabled: host.enabled, hasToken: !!host.tokenEnc, serverId: host.serverId, status };
+    return {
+      id: host.id, name: host.name, url: host.url, enabled: host.enabled, hasToken: !!host.tokenEnc, serverId: host.serverId,
+      unencryptedAcknowledged: !!host.unencryptedAckUrl && host.unencryptedAckUrl === host.url, status,
+    };
   }
 
   list(): HostDTO[] {
@@ -121,7 +124,8 @@ export class RemoteHosts {
       const seed = JSON.parse(raw) as { name?: unknown; url?: unknown; token?: unknown };
       if (typeof seed.name !== 'string' || typeof seed.url !== 'string' || typeof seed.token !== 'string') throw new Error('needs name, url and token');
       const existing = this.store.list().find((h) => h.url === seed.url);
-      this.store.save({ id: existing?.id, name: seed.name, url: seed.url, token: seed.token, enabled: true });
+      // A scripted setup chose its URL deliberately (the desktop test harness uses loopback anyway).
+      this.store.save({ id: existing?.id, name: seed.name, url: seed.url, token: seed.token, enabled: true, acknowledgeUnencrypted: true });
       this.log(`seeded host ${seed.name} (${seed.url}) from REMOTEA_SEED_HOST`);
     } catch (err) {
       this.log(`ignoring REMOTEA_SEED_HOST: ${(err as Error).message}`);
@@ -185,10 +189,12 @@ export class RemoteHosts {
   }
 
   /** One-shot connection check for the Settings "Test" button; touches nothing. */
-  test(req: { url: string; token?: string; id?: string }): Promise<HostTestResult> {
+  test(req: HostTestRequest): Promise<HostTestResult> {
     let url: string;
     try {
       url = validateHostUrl(req.url);
+      // Testing sends the token too: the same acknowledgement as saving.
+      assertHostUrlAcknowledged(url, req.acknowledgeUnencrypted, req.id ? this.store.get(req.id)?.unencryptedAckUrl : undefined);
     } catch (err) {
       return Promise.resolve({ ok: false, error: (err as Error).message });
     }
@@ -311,6 +317,7 @@ export class RemoteHosts {
         sessions,
         closedIds: [...closedIds],
         lost: {},
+        restoring: c.restoringIds(),
       };
     });
   }

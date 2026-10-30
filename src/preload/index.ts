@@ -5,7 +5,7 @@ import { IPC_CHANNELS, type InsertionResult, type NotificationSoundPickResult, t
   type WorktreeCloseMode, type WorktreeInspectResult, type WorktreeRemoveResult,
 } from '../shared/types';
 import type { BrowserHistory } from '../shared/browser-history';
-import type { HostDTO, HostSaveRequest, HostStatus, HostTestResult, PtyExitInfo, RegistryPayload, RemoteSize, RemoteRegistryView, TerminalSnapshot } from '../shared/remote-hosts-types';
+import type { HostDTO, HostSaveRequest, HostStatus, HostTestRequest, HostTestResult, PtyExitInfo, RegistryPayload, RemoteSize, RemoteRegistryView, TerminalSnapshot } from '../shared/remote-hosts-types';
 import type {
   RemoteConsoleBridge,
   RemoteConsoleStatus,
@@ -89,7 +89,7 @@ contextBridge.exposeInMainWorld('wmux', {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.RHOST_LIST) as Promise<HostDTO[]>,
     save: (req: HostSaveRequest) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_SAVE, req) as Promise<{ ok: boolean; host?: HostDTO; error?: string }>,
     remove: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_REMOVE, id) as Promise<boolean>,
-    test: (req: { url: string; token?: string; id?: string }) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_TEST, req) as Promise<HostTestResult>,
+    test: (req: HostTestRequest) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_TEST, req) as Promise<HostTestResult>,
     reconnect: () => ipcRenderer.send(IPC_CHANNELS.RHOST_RECONNECT),
     // Agent status hooks on a host's server: install them there, or stop asking.
     installHooks: (hostId: string) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_HOOKS_INSTALL, hostId) as Promise<{ ok: boolean; error?: string }>,
