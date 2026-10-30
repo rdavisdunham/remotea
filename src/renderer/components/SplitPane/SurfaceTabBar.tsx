@@ -673,7 +673,8 @@ export default function SurfaceTabBar({
             role="menuitem"
             onClick={() => { onClose(ctxMenu.surfaceId); setCtxMenu(null); }}
           >
-            {t('surfaceTab.close', 'Close')}{isRemoteSurface(ctxMenu.surfaceId) ? ' (on all devices)' : ''}
+            {/* remotea: a remote tab's close ends the session on every device; it asks first (RemoteCloseDialog). */}
+            {isRemoteSurface(ctxMenu.surfaceId) ? 'End session on this host…' : t('surfaceTab.close', 'Close')}
           </div>
           {surfaces.length > 1 && (
             <div
