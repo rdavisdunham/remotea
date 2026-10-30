@@ -196,6 +196,13 @@ export interface HelloBody {
   harnesses: CapabilityMatrix;
   /** Stage C: the configured execution targets (ids and repos only; never argv or env). */
   targets?: HelloTarget[];
+  /**
+   * Present only while the host is degraded: why (e.g.
+   * `journal_unavailable (write failed: ENOSPC)` while effectful commands are
+   * refused, or `disk-full` / `spool-full` for the outbox). Absent when
+   * healthy. Optional; an older Eridani ignores it.
+   */
+  degraded_reason?: string;
 }
 
 /** One execution target as hello lists it, for Eridani's target picker. */

@@ -51,7 +51,7 @@ import {
 } from '../../src/shared/eridani-link-protocol';
 import { initialFsm, publicState, step, type Fsm, type FsmEvent } from '../../src/main/remote-hosts/connection-fsm';
 import { Spool, type Lane, type SpoolEntry } from './eridani-spool';
-import { FINAL_STATES, Journal, type JournalRecord } from './eridani-journal';
+import { FINAL_STATES, JOURNAL_UNAVAILABLE, Journal, JournalUnavailableError, type JournalRecord, type JournalState } from './eridani-journal';
 
 export const OUTBOX_FILE = 'eridani-outbox.jsonl';
 export const JOURNAL_FILE = 'eridani-journal.jsonl';
@@ -127,9 +127,23 @@ export interface LinkStatus {
   lastConnectedAt: number | null;
   lastAckAt: number | null;
   unacked: number;
-  spool: { entries: number; bytes: number; fill: number; evicted: number };
+  spool: { entries: number; bytes: number; fill: number; evicted: number; degraded?: string | null };
   dirty: number;
+  /**
+   * Why the link is degraded, or null: the journal first
+   * (`journal_unavailable (write failed: ENOSPC)`: commands are refused),
+   * then the outbox (`spool-full`, `disk-full`, …: events are only in memory).
+   */
   degraded: string | null;
+  /** The inbound journal (task 9d3eda83). Optional: an older server's status file lacks it. */
+  journal?: {
+    /** Why commands cannot be recorded, or null. */
+    degraded: string | null;
+    /** Outcomes that happened but are not on disk yet (reported once they are). */
+    unrecorded: number;
+    /** Commands refused with `journal_unavailable` since the server started. */
+    refused: number;
+  };
   rejected: number;
   lastRejection: string | null;
   updatedAt: number;
@@ -185,6 +199,10 @@ export interface EridaniLinkDeps {
 const OPEN = 1;
 const MAX_BUFFERED = 1024 * 1024;
 const RETRY_LATER_MS = 30_000;
+/** While the journal cannot record, how often to try writing it again. */
+export const JOURNAL_PROBE_MS = 30_000;
+
+type FinalPatch = { digest: string; t: string; state: JournalState & CommandOutcomeState; detail?: string; outcome?: unknown };
 
 export function digestOf(body: Record<string, unknown>): string {
   return crypto.createHash('sha256').update(canonicalJson(semanticPayload(body))).digest('hex');
@@ -229,6 +247,17 @@ export class EridaniLink {
   private readonly runParts = new Map<string, Array<{ i: number; runs: RunsSnapshotBody['runs'] }>>();
   /** Commands running now, so a duplicate arriving mid-effect is not run twice. */
   private readonly running = new Set<string>();
+  /**
+   * Outcomes that happened while the journal could not record them, by op_id.
+   * They are written (then reported) once it can; until then the journal
+   * still says `accepted`/`executing`, which is what a restart or a
+   * reconnect snapshot sees.
+   */
+  private readonly unrecorded = new Map<string, FinalPatch>();
+  /** How many of `journal.settledOnLoad` were reported. */
+  private settledReported = 0;
+  private journalRefused = 0;
+  private probeTimer: unknown = null;
 
   constructor(private readonly deps: EridaniLinkDeps) {
     this.timers = deps.timers ?? realTimers;
@@ -252,8 +281,9 @@ export class EridaniLink {
       log: this.log,
       recover: deps.recover,
     });
-    // What a restart settled (or left uncertain) is reported once, through the spool.
-    for (const r of this.journal.settledOnLoad) this.outcome(r.op_id, r.state as CommandOutcomeState, r.detail, r.t, r.outcome);
+    // What a restart settled (or left uncertain) is reported once, through the spool, once it is on disk.
+    this.reportSettled();
+    if (this.journal.degraded) this.scheduleProbe();
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -281,6 +311,7 @@ export class EridaniLink {
     this.dispatch({ type: 'stop' });
     this.clearTimer('statusTimer');
     this.clearTimer('heldTimer');
+    this.clearTimer('probeTimer');
     this.writeStatusNow();
     this.spool.close();
     this.journal.close();
@@ -288,6 +319,13 @@ export class EridaniLink {
 
   get ready(): boolean {
     return this.fsm.state === 'ready';
+  }
+
+  /** Why the link is degraded (journal first, then outbox), or null. Sent in hello as `degraded_reason`. */
+  degradedReason(): string | null {
+    const j = this.journal.degraded;
+    if (j) return `${JOURNAL_UNAVAILABLE} (${j})`;
+    return this.spool.degraded;
   }
 
   status(): LinkStatus {
@@ -303,9 +341,10 @@ export class EridaniLink {
       lastConnectedAt: this.lastConnectedAt,
       lastAckAt: this.lastAckAt,
       unacked: [...this.spool.pending()].filter((e) => !e.ephemeral).length,
-      spool: { entries: this.spool.size, bytes: this.spool.bytes, fill: Math.round(this.spool.fill * 1000) / 1000, evicted: this.spool.evictedTotal },
+      spool: { entries: this.spool.size, bytes: this.spool.bytes, fill: Math.round(this.spool.fill * 1000) / 1000, evicted: this.spool.evictedTotal, degraded: this.spool.degraded },
       dirty: this.spool.dirty.length,
-      degraded: this.spool.degraded,
+      degraded: this.degradedReason(),
+      journal: { degraded: this.journal.degraded, unrecorded: this.unrecorded.size, refused: this.journalRefused },
       rejected: this.rejected,
       lastRejection: this.lastRejection,
       updatedAt: this.now(),
@@ -393,7 +432,7 @@ export class EridaniLink {
     }
   }
 
-  private clearTimer(name: 'retryTimer' | 'beatTimer' | 'handshakeTimer' | 'statusTimer' | 'heldTimer'): void {
+  private clearTimer(name: 'retryTimer' | 'beatTimer' | 'handshakeTimer' | 'statusTimer' | 'heldTimer' | 'probeTimer'): void {
     if (this[name] !== null) this.timers.clearTimeout(this[name]);
     this[name] = null;
   }
@@ -447,6 +486,7 @@ export class EridaniLink {
         caps: [...(this.deps.caps?.() ?? STAGE_B_CAPS)],
         harnesses: this.deps.harnesses?.() ?? {},
         ...(this.deps.targets ? { targets: this.deps.targets() } : {}),
+        ...(this.degradedReason() ? { degraded_reason: this.degradedReason() } : {}),
       });
       this.handshakeTimer = this.timers.setTimeout(() => {
         this.handshakeTimer = null;
@@ -582,9 +622,9 @@ export class EridaniLink {
    */
   replayAccepted(): void {
     for (const rec of this.journal.acceptedOps()) {
-      if (this.running.has(rec.op_id)) continue;
+      if (this.running.has(rec.op_id) || this.unrecorded.has(rec.op_id)) continue;
       const cmd = { ...rec.body, op_id: rec.op_id, digest: rec.digest } as CommandBody;
-      void this.run(cmd, rec.digest, true);
+      this.run(cmd, rec.digest, true).catch((err) => this.contain(rec.op_id, err));
     }
   }
 
@@ -661,8 +701,12 @@ export class EridaniLink {
       }
       case 'runs.snapshot':
         return this.onRunsSnapshot(f as DownFrame & RunsSnapshotBody);
-      default:
-        void this.onCommand(f as DownFrame & CommandBody);
+      default: {
+        const cmd = f as DownFrame & CommandBody;
+        // The asynchronous boundary: nothing a command does may become an unhandled rejection
+        // in the process that owns every terminal.
+        this.onCommand(cmd).catch((err) => this.contain(cmd.op_id, err));
+      }
     }
   }
 
@@ -721,6 +765,12 @@ export class EridaniLink {
    *   3. `accepted` is journaled and fsynced BEFORE the ack goes out;
    *   4. the handler marks `executing` when its effect starts; the outcome is
    *      journaled, then reported as `command.outcome`.
+   *
+   * When the journal cannot record (2) or (3), the command is refused with
+   * `ack ok:false error:"journal_unavailable"`: nothing is journaled, nothing
+   * runs, and no `command.outcome` follows (that would claim a recorded
+   * state). Every record goes through the journal's own durable-first write,
+   * so what a duplicate or a reconnect snapshot sees is only ever on disk.
    */
   private async onCommand(cmd: CommandBody & { id: string }): Promise<void> {
     // The digest is recomputed, never trusted: a body that does not match it is refused outright.
@@ -741,16 +791,105 @@ export class EridaniLink {
     }
     const reject = this.admit(cmd);
     if (reject) {
-      this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject });
+      if (!this.journalWrite(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject })) return this.refuseUnjournaled(cmd);
       this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: 'rejected', detail: reject } });
       this.outcome(cmd.op_id, 'rejected', reject, cmd.t);
       return;
     }
     const body: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(cmd)) if (!['v', 'id', 'conn_epoch', 'at', 'op_id', 'digest'].includes(k)) body[k] = v;
-    this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'accepted', body });
+    // Never ack an acceptance that is not on disk.
+    if (!this.journalWrite(cmd.op_id, { digest, t: cmd.t, state: 'accepted', body })) return this.refuseUnjournaled(cmd);
     this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: 'accepted', ...this.acceptFacts(cmd) } });
     await this.run(cmd, digest, false);
+  }
+
+  /**
+   * The journal could not record this command's first state: refuse it
+   * without claiming anything was recorded. Eridani treats `ok:false` without
+   * `retry` as a final refusal (its command becomes `rejected`, "refused by
+   * the host: journal_unavailable"); the op_id is not remembered here, so a
+   * resend is judged afresh.
+   */
+  private refuseUnjournaled(cmd: CommandBody & { id: string }): void {
+    this.journalRefused++;
+    this.log(`eridani: refused ${cmd.t} ${cmd.op_id}: ${JOURNAL_UNAVAILABLE} (${this.journal.degraded ?? 'unknown'})`);
+    this.sendFrame({
+      t: 'ack',
+      acked_id: cmd.id,
+      op_id: cmd.op_id,
+      ok: false,
+      error: JOURNAL_UNAVAILABLE,
+      outcome: { state: 'rejected', detail: JOURNAL_UNAVAILABLE, durable: false },
+    });
+    this.writeStatus();
+  }
+
+  /** Record durably; false (journal degraded, a probe scheduled) when it could not be. */
+  private journalWrite(op: string, patch: Parameters<Journal['record']>[1]): boolean {
+    try {
+      this.journal.record(op, patch);
+    } catch (err) {
+      this.journalDown(err);
+      return false;
+    }
+    this.journalUp();
+    return true;
+  }
+
+  private journalDown(err: unknown): void {
+    if (!(err instanceof JournalUnavailableError)) this.log(`eridani: journal write failed unexpectedly: ${(err as Error)?.message ?? String(err)}`);
+    this.scheduleProbe();
+    this.writeStatus();
+  }
+
+  /** A write succeeded: record what waited for the journal (then report it), and stop probing. */
+  private journalUp(): void {
+    if (this.journal.degraded) return;
+    if (this.probeTimer === null && this.unrecorded.size === 0 && this.settledReported === this.journal.settledOnLoad.length) return;
+    this.clearTimer('probeTimer');
+    for (const [op, patch] of [...this.unrecorded]) {
+      try {
+        this.journal.record(op, patch);
+      } catch (err) {
+        this.journalDown(err);
+        return;
+      }
+      this.unrecorded.delete(op);
+      this.outcome(op, patch.state, patch.detail, patch.t, patch.outcome);
+    }
+    this.reportSettled();
+    this.writeStatus();
+  }
+
+  private scheduleProbe(): void {
+    if (this.probeTimer !== null) return;
+    this.probeTimer = this.timers.setTimeout(() => {
+      this.probeTimer = null;
+      try {
+        if (this.journal.probe()) this.journalUp();
+        else this.scheduleProbe();
+      } catch (err) {
+        this.log(`eridani: journal probe failed: ${(err as Error)?.message ?? String(err)}`);
+        this.scheduleProbe();
+      }
+      this.writeStatus();
+    }, JOURNAL_PROBE_MS);
+  }
+
+  /** Report what a restart settled, once the journal has it on disk. */
+  private reportSettled(): void {
+    const settled = this.journal.settledOnLoad;
+    for (; this.settledReported < settled.length; this.settledReported++) {
+      const r = settled[this.settledReported];
+      this.outcome(r.op_id, r.state as CommandOutcomeState, r.detail, r.t, r.outcome);
+    }
+  }
+
+  /** Last line of defence at an asynchronous boundary: log, never rethrow. */
+  private contain(op: string, err: unknown): void {
+    this.log(`eridani: command ${op} failed outside its handler: ${(err as Error)?.message ?? String(err)}`);
+    this.writeStatus();
   }
 
   /** Why a command is refused before it is accepted, or null. */
@@ -778,37 +917,62 @@ export class EridaniLink {
   }
 
   private async run(cmd: CommandBody, digest: string, replay: boolean): Promise<void> {
-    if (this.running.has(cmd.op_id)) return;
+    if (this.running.has(cmd.op_id) || this.unrecorded.has(cmd.op_id)) return;
     if (replay) {
       // Accepted before a restart: everything is checked again against what is true now.
       const reject = this.admit(cmd);
       if (reject) {
-        this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject });
-        this.outcome(cmd.op_id, 'rejected', reject, cmd.t);
+        this.settle(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject });
         return;
       }
     }
     const handler = this.deps.handlers![cmd.t];
     this.running.add(cmd.op_id);
     let began = false;
+    // Settles the run when `executing` cannot be recorded, even if the handler never returns.
+    let abort: (r: CommandResult) => void = () => {};
+    const aborted = new Promise<CommandResult>((resolve) => (abort = resolve));
     const ctx: CommandContext = {
       begin: () => {
         if (began) return;
-        began = true;
         // The body stays with the record so a restart can reconcile it (recover).
-        this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'executing', body: this.journal.get(cmd.op_id)?.body });
+        try {
+          this.journal.record(cmd.op_id, { digest, t: cmd.t, state: 'executing', body: this.journal.get(cmd.op_id)?.body });
+        } catch (err) {
+          this.journalDown(err);
+          const reason = err instanceof JournalUnavailableError ? err.reason : (err as Error)?.message ?? String(err);
+          abort({ state: 'failed', detail: `${JOURNAL_UNAVAILABLE}: not started (${reason})`.slice(0, ERIDANI_LIMITS.reasonChars) });
+          // Throwing stops the handler before its effect: no effect runs unjournaled.
+          throw err instanceof JournalUnavailableError ? err : new JournalUnavailableError(String(reason));
+        }
+        began = true;
+        this.journalUp();
       },
     };
     let res: CommandResult;
     try {
-      res = await handler(cmd, ctx);
+      res = await Promise.race([handler(cmd, ctx), aborted]);
     } catch (err) {
-      res = { state: 'failed', detail: (err as Error).message.slice(0, ERIDANI_LIMITS.reasonChars) };
+      res = { state: 'failed', detail: ((err as Error)?.message ?? String(err)).slice(0, ERIDANI_LIMITS.reasonChars) };
     } finally {
       this.running.delete(cmd.op_id);
     }
-    this.journal.record(cmd.op_id, { digest, t: cmd.t, state: res.state, detail: res.detail, outcome: res.result });
-    this.outcome(cmd.op_id, res.state, res.detail, cmd.t, res.result);
+    this.settle(cmd.op_id, { digest, t: cmd.t, state: res.state, detail: res.detail, outcome: res.result });
+  }
+
+  /**
+   * Journal an outcome, then report it. When the journal cannot record it,
+   * the outcome waits (in memory, never reported) until a write succeeds;
+   * the journal keeps saying `accepted`/`executing`, which is what a restart
+   * then settles from.
+   */
+  private settle(op: string, patch: FinalPatch): void {
+    if (this.journalWrite(op, patch)) {
+      this.outcome(op, patch.state, patch.detail, patch.t, patch.outcome);
+      return;
+    }
+    this.unrecorded.set(op, patch);
+    this.log(`eridani: outcome of ${op} (${patch.state}) waits for the journal`);
   }
 
   private outcome(commandId: string, state: CommandOutcomeState, detail?: string, kind?: string, result?: unknown): void {
