@@ -104,6 +104,8 @@ function world(harnesses: Array<'claude' | 'codex' | 'opencode'> = ['claude', 'c
   const repo = path.join(root, 'work', 'proj');
   fs.mkdirSync(repo, { recursive: true });
   execFileSync('git', ['init', '-q', '-b', 'main', repo]);
+  // A base with a commit: the template check (S-Q3) does not advertise a target whose base does not exist.
+  execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'init']);
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }));
   const w: World = {
     root, home, dir, bin, repo, out: sink(), probes: 0,

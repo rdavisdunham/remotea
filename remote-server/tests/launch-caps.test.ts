@@ -35,6 +35,14 @@ function tmpDir(prefix = 'remotea-caps-'): string {
   return d;
 }
 
+/** A repository with a commit on main: the template check (S-Q3) advertises only a target whose base exists. */
+function gitRepo(): string {
+  const d = tmpDir('remotea-caps-repo-');
+  execFileSync('git', ['init', '-q', '-b', 'main', d]);
+  execFileSync('git', ['-C', d, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'init']);
+  return d;
+}
+
 async function until(cond: () => boolean, ms = 5000): Promise<void> {
   const end = Date.now() + ms;
   while (!cond()) {
@@ -267,7 +275,7 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
     cleanups.push(() => eri.close());
     await new Promise((r) => eri.wss.once('listening', r));
     const dir = tmpDir();
-    const repo = tmpDir();
+    const repo = gitRepo();
     writeEridaniToken(dir, 'eri_bot_test0123456789');
     saveEridaniConfig(dir, { enabled: true, url: eri.url, machine: 'caps-box', collector: 'off' });
     saveTarget(dir, { id: 'jarvis', repo, worktreeRoot: path.join(repo, '..', 'wt-jarvis'), base: 'main', launch: { claude: {} }, verify: [{ id: 'api', argv: ['uv-not-on-path-zz', 'run', 'pytest'], timeout: 600 }] });
@@ -359,7 +367,8 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
     const { eri, rt, dir } = await runtime(async (h, bin) => (asked.push(`${h}:${bin}`), { ok: true, version: '1.0.0' }));
     rt.start();
     await until(() => eri.hellos().length === 1);
-    saveTarget(dir, { id: 'late', repo: '/srv/late', worktreeRoot: '/srv/late-wt', base: 'main', launch: { codex: { bin: '/opt/codex-late' } }, verify: [] });
+    const late = gitRepo();
+    saveTarget(dir, { id: 'late', repo: late, worktreeRoot: `${late}-wt`, base: 'main', launch: { codex: { bin: '/opt/codex-late' } }, verify: [] });
     rt.check();
     await until(() => asked.includes('codex:/opt/codex-late'));
     await until(() => rt.helloTargets().find((t) => t.id === 'late')?.harnesses.includes('codex') === true);

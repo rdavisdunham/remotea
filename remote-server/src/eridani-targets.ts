@@ -10,7 +10,9 @@
  *     "base": "main",
  *     "launch": { "claude": {}, "codex": { "bin": "/home/davin/.local/bin/codex" } },
  *     "verify": [{ "id": "test", "argv": ["npm", "test"], "cwd": "remote-server", "timeout": 600 }],
- *     "mcpKeyFile": "~/.config/remotea/eridani-mcp-token"
+ *     "mcpKeyFile": "~/.config/remotea/eridani-mcp-token",
+ *     "prepare": [{ "id": "deps", "argv": ["npm", "ci"], "cwd": "remote-server", "timeout": 600 }],
+ *     "limits": { "maxRuns": 3, "minFreeMiB": 2048 }
  *   }]
  *
  * A spawn names a target by id; nothing Eridani sends becomes a path, a
@@ -27,6 +29,14 @@
  * from the server's environment reaches it. Where bubblewrap works it also
  * runs in a sandbox (verify-sandbox.ts): `isolation`, `network`, `ports` and
  * `mounts` on the entry, e.g. `"network": "loopback", "ports": [5432]`.
+ *
+ * A target is a template (S-Q3): the repository, the harness launch, the
+ * dependency preparation (`prepare`: fixed argv steps run in a new managed
+ * worktree before the agent starts, target-template.ts), the verification
+ * environment, migrations and resource `limits`, all defined once here. The
+ * whole template is checked before hello advertises the target as ready
+ * (target-template.ts templateStatus); `prepare` and `limits` are optional,
+ * so a target without them behaves exactly as before.
  *
  * Read from disk on every use, so `remotea eridani targets add` takes effect
  * at once and never restarts the link.
@@ -73,6 +83,31 @@ export interface VerifySpec {
   mounts?: string[];
 }
 
+/**
+ * S-Q3: one dependency preparation step (`uv sync --locked`, `npm ci`), run
+ * in a new managed worktree before the agent starts. Fixed argv, no shell,
+ * the minimal verify environment (verifyEnv: PATH, HOME, LANG, CI=1,
+ * TERM=dumb, plus `env`), as the server user with its network: preparation
+ * installs dependencies, it does not run the agent's code.
+ */
+export interface PrepareSpec {
+  id: string;
+  argv: string[];
+  /** Relative to the worktree; never outside it. */
+  cwd?: string;
+  /** Seconds (≤ 2 h). */
+  timeout: number;
+  env?: Record<string, string>;
+}
+
+/** S-Q3: resource limits a target sets for the work Eridani starts there. */
+export interface LimitsSpec {
+  /** At most this many live Eridani sessions on the target at once; one more spawn is rejected `target_busy`. */
+  maxRuns?: number;
+  /** Below this much free space (MiB) where the worktrees live, the target is not ready and spawns are rejected. */
+  minFreeMiB?: number;
+}
+
 /** Where a target keeps numbered migrations (Alembic `NNNN_name.py`); Eridani reserves numbers only for targets with this. */
 export interface MigrationsSpec {
   /** Relative to the repository root. */
@@ -96,11 +131,32 @@ export interface ExecutionTarget {
    * Default: eridani.json's `mcpKeyFile`, else `<config dir>/eridani-mcp-token`.
    */
   mcpKeyFile?: string;
+  /** S-Q3: dependency preparation for a new managed worktree, in order; absent: none. */
+  prepare?: PrepareSpec[];
+  /** S-Q3: resource limits; absent: none. */
+  limits?: LimitsSpec;
 }
+
+export const PREPARE_MAX_STEPS = 8;
+export const PREPARE_MAX_TIMEOUT_S = 2 * 3600;
 
 export const TARGET_ID_RE = /^[A-Za-z0-9._-]{1,64}$/;
 const BIN_RE = /^(?:[A-Za-z0-9._+-]{1,64}|\/[^\0\n\r]{1,1023})$/;
 const ARG_OK = (a: unknown): a is string => typeof a === 'string' && a.length > 0 && a.length <= 512 && !/[\0\r\n]/.test(a);
+
+/** argv, cwd, timeout and env of a verify entry or a prepare step; returns the problem, or null. */
+function commandError(what: string, vo: Record<string, unknown>, maxTimeout: number, maxLabel: string): string | null {
+  if (!Array.isArray(vo.argv) || !vo.argv.length || vo.argv.length > 64 || !vo.argv.every(ARG_OK)) return `${what}: argv`;
+  if (vo.cwd !== undefined && !(typeof vo.cwd === 'string' && !path.isAbsolute(vo.cwd) && !vo.cwd.split(/[\\/]/).includes('..'))) return `${what}: cwd is relative to the worktree`;
+  if (typeof vo.timeout !== 'number' || !(vo.timeout > 0 && vo.timeout <= maxTimeout)) return `${what}: timeout in seconds (≤ ${maxLabel})`;
+  if (vo.env !== undefined) {
+    if (!vo.env || typeof vo.env !== 'object' || Array.isArray(vo.env) || Object.keys(vo.env).length > 32) return `${what}: env is an object`;
+    for (const [k, val] of Object.entries(vo.env as Record<string, unknown>)) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(k) || typeof val !== 'string' || val.length > 4096 || /[\0\r\n]/.test(val)) return `${what}: env ${k.slice(0, 40)}`;
+    }
+  }
+  return null;
+}
 
 /** Validate one target; returns the problem, or null. */
 export function targetError(t: unknown): string | null {
@@ -129,15 +185,8 @@ export function targetError(t: unknown): string | null {
     if (!vo || typeof vo.id !== 'string' || !TARGET_ID_RE.test(vo.id)) return 'verify[].id';
     if (ids.has(vo.id)) return `verify id ${vo.id} twice`;
     ids.add(vo.id);
-    if (!Array.isArray(vo.argv) || !vo.argv.length || vo.argv.length > 64 || !vo.argv.every(ARG_OK)) return `verify ${vo.id}: argv`;
-    if (vo.cwd !== undefined && !(typeof vo.cwd === 'string' && !path.isAbsolute(vo.cwd) && !vo.cwd.split(/[\\/]/).includes('..'))) return `verify ${vo.id}: cwd is relative to the worktree`;
-    if (typeof vo.timeout !== 'number' || !(vo.timeout > 0 && vo.timeout <= 6 * 3600)) return `verify ${vo.id}: timeout in seconds (≤ 6 h)`;
-    if (vo.env !== undefined) {
-      if (!vo.env || typeof vo.env !== 'object' || Array.isArray(vo.env) || Object.keys(vo.env).length > 32) return `verify ${vo.id}: env is an object`;
-      for (const [k, val] of Object.entries(vo.env as Record<string, unknown>)) {
-        if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(k) || typeof val !== 'string' || val.length > 4096 || /[\0\r\n]/.test(val)) return `verify ${vo.id}: env ${k.slice(0, 40)}`;
-      }
-    }
+    const cmdErr = commandError(`verify ${vo.id}`, vo, 6 * 3600, '6 h');
+    if (cmdErr) return cmdErr;
     if (vo.isolation !== undefined && vo.isolation !== 'bwrap' && vo.isolation !== 'none') return `verify ${vo.id}: isolation is "bwrap" or "none"`;
     if (vo.network !== undefined && typeof vo.network !== 'boolean' && vo.network !== 'loopback') return `verify ${vo.id}: network is true, false or "loopback"`;
     if (vo.network === 'loopback') {
@@ -165,6 +214,27 @@ export function targetError(t: unknown): string | null {
       }
     }
   }
+  const prepare = o.prepare;
+  if (prepare !== undefined) {
+    if (!Array.isArray(prepare) || prepare.length > PREPARE_MAX_STEPS) return `prepare: a list of up to ${PREPARE_MAX_STEPS} steps`;
+    const pids = new Set<string>();
+    for (const p of prepare as unknown[]) {
+      const po = p as Record<string, unknown>;
+      if (!po || typeof po.id !== 'string' || !TARGET_ID_RE.test(po.id)) return 'prepare[].id';
+      if (pids.has(po.id)) return `prepare id ${po.id} twice`;
+      pids.add(po.id);
+      const cmdErr = commandError(`prepare ${po.id}`, po, PREPARE_MAX_TIMEOUT_S, '2 h');
+      if (cmdErr) return cmdErr;
+    }
+  }
+  const limits = o.limits;
+  if (limits !== undefined) {
+    if (!limits || typeof limits !== 'object' || Array.isArray(limits)) return 'limits: { maxRuns?, minFreeMiB? }';
+    const lo = limits as Record<string, unknown>;
+    for (const k of Object.keys(lo)) if (k !== 'maxRuns' && k !== 'minFreeMiB') return `limits.${k.slice(0, 40)}: unknown (maxRuns, minFreeMiB)`;
+    if (lo.maxRuns !== undefined && !(Number.isInteger(lo.maxRuns) && (lo.maxRuns as number) >= 1 && (lo.maxRuns as number) <= 64)) return 'limits.maxRuns: a whole number from 1 to 64';
+    if (lo.minFreeMiB !== undefined && !(Number.isInteger(lo.minFreeMiB) && (lo.minFreeMiB as number) >= 1 && (lo.minFreeMiB as number) <= 1024 * 1024)) return 'limits.minFreeMiB: a whole number of MiB (1 to 1048576)';
+  }
   return null;
 }
 
@@ -187,25 +257,45 @@ function normalize(t: Record<string, unknown>): ExecutionTarget {
       ...(v.mounts ? { mounts: [...v.mounts] } : {}),
     })),
     ...(typeof t.mcpKeyFile === 'string' ? { mcpKeyFile: t.mcpKeyFile } : {}),
+    ...(Array.isArray(t.prepare) && t.prepare.length
+      ? { prepare: (t.prepare as PrepareSpec[]).map((p) => ({ id: p.id, argv: [...p.argv], ...(p.cwd ? { cwd: p.cwd } : {}), timeout: p.timeout, ...(p.env ? { env: { ...p.env } } : {}) })) }
+      : {}),
+    ...(t.limits ? { limits: { ...(t.limits as LimitsSpec) } } : {}),
     ...(t.migrations ? { migrations: { dir: (t.migrations as MigrationsSpec).dir.replace(/\/+$/, ''), ...((t.migrations as MigrationsSpec).pattern ? { pattern: (t.migrations as MigrationsSpec).pattern } : {}) } } : {}),
   };
 }
 
 /** The valid targets; an invalid entry is skipped and reported through `warn`. */
 export function loadTargets(dir: string, warn?: (m: string) => void): ExecutionTarget[] {
+  const { targets, invalid } = readTargets(dir);
+  for (const i of invalid) warn?.(`eridani.json: target ${JSON.stringify(i.id)} ignored: ${i.error}`);
+  return targets;
+}
+
+/** An entry of eridani.json's `targets` that is never advertised, and why (doctor reports it). */
+export interface InvalidTarget {
+  /** The entry's id as written, or `?`. */
+  id: string;
+  error: string;
+}
+
+/** The valid targets, and the entries skipped as invalid. */
+export function readTargets(dir: string): { targets: ExecutionTarget[]; invalid: InvalidTarget[] } {
   const raw = readEridaniFile(dir).targets;
-  if (!Array.isArray(raw)) return [];
+  if (!Array.isArray(raw)) return { targets: [], invalid: [] };
   const out: ExecutionTarget[] = [];
+  const invalid: InvalidTarget[] = [];
   for (const t of raw) {
     const err = targetError(t);
     if (err) {
-      warn?.(`eridani.json: target ${JSON.stringify((t as { id?: unknown })?.id ?? '?')} ignored: ${err}`);
+      const id = (t as { id?: unknown })?.id;
+      invalid.push({ id: typeof id === 'string' ? id.slice(0, 64) : '?', error: err });
       continue;
     }
     if (out.some((o) => o.id === (t as { id: string }).id)) continue;
     out.push(normalize(t as Record<string, unknown>));
   }
-  return out;
+  return { targets: out, invalid };
 }
 
 export function findTarget(dir: string, id: string, warn?: (m: string) => void): ExecutionTarget | null {

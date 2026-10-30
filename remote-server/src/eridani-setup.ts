@@ -57,6 +57,7 @@ import {
 } from './config';
 import { keyFilePath, keyFileSettingOk, mcpStatus, mcpUrlError, mcpUrlFromLink, resolveMcp, writePrivate, type McpStatus } from './eridani-mcp';
 import { TARGET_ID_RE, loadTargets, saveTarget, targetError, type ExecutionTarget, type VerifySpec } from './eridani-targets';
+import { withTemplate } from './target-template';
 import { helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn, type ProbeHarness, type SpawnHarness } from './launch-caps';
 import { hookVersion, loadBuildInfo, readServerInfo } from './build-info';
 import { hooksStatus, installHooks, type HookPaths } from './hooks-install';
@@ -748,6 +749,13 @@ export function fmtReadiness(targets: HelloTarget[]): string[] {
     if (!verify.length) rows.push([t.id, 'verify', 'none', 'no verify entry: Eridani cannot run checks here']);
     for (const v of verify) rows.push([t.id, `verify ${v.id}`, v.ready ? 'ready' : 'NOT READY', 'reason' in v && v.reason ? v.reason : '']);
     rows.push([t.id, 'mcp', !t.mcp ? 'unknown' : t.mcp.configured ? 'ready' : 'NOT READY', t.mcp?.reason ?? '']);
+    // S-Q3: the template's own problems (launch and verify have their rows above).
+    if (t.template && !t.template.ready) rows.push([t.id, 'template', 'NOT READY', 'not advertised: Eridani starts nothing here']);
+    for (const p of t.template?.problems ?? []) {
+      if (p.check === 'launch' || p.check.startsWith('verify.')) continue;
+      rows.push([t.id, p.check, p.level === 'fail' ? 'NOT READY' : 'warn', p.reason]);
+    }
+    if (t.prepare?.length) rows.push([t.id, 'prepare', 'ready', `a new worktree runs ${t.prepare.join(', ')} first`]);
   }
   return fmtTable(rows);
 }
@@ -765,9 +773,9 @@ export function serviceEnv(home: string, env: NodeJS.ProcessEnv): { env: NodeJS.
   return { env: { PATH, HOME: home, LANG: env.LANG }, source: m ? unit : 'install.sh default' };
 }
 
-/** Targets as hello lists them, with mcp, from the given probes. */
+/** Targets as hello lists them, with mcp and the template check (S-Q3), from the given probes. */
 export function localReadiness(dir: string, targets: ExecutionTarget[], probes: ReadonlyMap<string, LauncherProbe>, venv: NodeJS.ProcessEnv): HelloTarget[] {
-  return helloTargets(targets, probes, { env: venv }).map((h) => {
+  return withTemplate(helloTargets(targets, probes, { env: venv }), targets, { env: venv }).map((h) => {
     const t = targets.find((x) => x.id === h.id);
     return t ? { ...h, mcp: mcpStatus(resolveMcp(dir, t)) } : h;
   });

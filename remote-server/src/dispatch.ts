@@ -16,6 +16,13 @@
  *           One writer per worktree (S-S4): a spawn onto a branch another
  *           live session (or a spawn in flight) already writes is `rejected`
  *           `worktree_busy` with `{branch, writer}`, unless it says `share`.
+ *           S-Q3: a target whose template fails (target-template.ts) is
+ *           `rejected` `target_not_ready: <reasons>`; one at its
+ *           `limits.maxRuns` is `rejected` `target_busy` with `{limit,
+ *           running}`. A target with `prepare` steps runs them in the
+ *           worktree before the agent starts (a new worktree, or one whose
+ *           last preparation failed or changed); a failure is `failed`
+ *           `prepare: <reason>` with `result.prepare` and no agent starts.
  *   input   fenced on (surf, incarnation, run_id, generation). `queue` waits
  *           until the agent is at its prompt (idle) and the link is up (a
  *           disconnected host invents no continuation); `steer` interrupts
@@ -76,9 +83,10 @@ import type {
   StopCommand,
   VerifyCommand,
   WorktreeWriter,
+  HelloTemplate,
 } from '../../src/shared/eridani-link-protocol';
-import { WORKTREE_BUSY } from '../../src/shared/eridani-link-protocol';
-import type { CreateSpec, EridaniBinding, RemoteSurfaceId, ServerMsg, SessionRecord } from '../../src/shared/remote-host-protocol';
+import { TARGET_BUSY, TARGET_NOT_READY, WORKTREE_BUSY } from '../../src/shared/eridani-link-protocol';
+import type { CreateSpec, EridaniBinding, PrepareFacts, RemoteSurfaceId, ServerMsg, SessionRecord } from '../../src/shared/remote-host-protocol';
 import type { Hub, HubConn, HubEridaniHooks } from './hub';
 import type { Registry } from './registry';
 import type { CommandContext, CommandHandler, CommandResult } from './eridani-link';
@@ -89,6 +97,7 @@ import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
 import type { TurnFields } from './turn-capture';
+import { notReadyReason, runPrepare } from './target-template';
 import { claudeMcpConfig, codexMcpArgs, ERIDANI_MCP_DIR, MCP_TOKEN_ENV, mcpStatus, writePrivate, type McpResolution, type McpStatus } from './eridani-mcp';
 
 export const RUNS_FILE = 'eridani-runs.json';
@@ -269,6 +278,10 @@ export interface DispatchDeps {
   mcpDir?: string;
   /** Eridani's web app (config.ts resolveWebUrl), recorded on each binding for the desktop's "Open in Eridani". */
   webUrl?: () => string | null;
+  /** S-Q3: the target's template checked at spawn (target-template.ts templateStatus). Absent: not checked. */
+  checkTarget?: (target: ExecutionTarget) => HelloTemplate;
+  /** S-Q3: dependency preparation in a worktree (target-template.ts runPrepare); `force` for a new worktree. Default: runPrepare. */
+  prepare?: (target: ExecutionTarget, worktree: string, force: boolean) => Promise<PrepareFacts | null>;
 }
 
 export const DEFAULT_TIMING = {
@@ -302,6 +315,10 @@ export class Dispatch {
   private readonly exitWaiters = new Map<string, Array<(code: number) => void>>();
   readonly attempts: VerifyAttempts;
   private readonly spawning = new Set<string>();
+  /** S-Q3: the target of each spawn in flight (limits.maxRuns). */
+  private readonly spawningOn = new Map<string, string>();
+  /** S-Q3: the dependency preparation in flight per worktree path. */
+  private readonly preparing = new Map<string, Promise<PrepareFacts | null>>();
   /** S-S4: the branch (`<target>\0<branch>`) each spawn in flight is claiming, with its writer. */
   private readonly claims = new Map<string, WorktreeWriter>();
   /**
@@ -595,6 +612,7 @@ export class Dispatch {
       surf: rec.id, incarnation: rec.incarnation ?? 0, worktree: b.worktree, branch: b.branch, base: b.base, base_sha: b.baseSha, target: b.target,
       ...(b.baseRef !== undefined ? { base_ref: b.baseRef, fetch: b.fetch ?? null, behind: b.behind ?? null, ahead: b.ahead ?? null } : {}),
       ...(b.mcp ? { mcp: { ...b.mcp } } : {}),
+      ...(b.prepare ? { prepare: { ...b.prepare } } : {}),
     };
   }
 
@@ -659,6 +677,15 @@ export class Dispatch {
     if (!target) return { state: 'rejected', detail: `unknown execution target ${cmd.target.id}` };
     const launch = target.launch[cmd.harness];
     if (!launch) return { state: 'rejected', detail: `${cmd.harness} is not enabled on target ${target.id}` };
+    // S-Q3: what hello would not advertise is not started either (the template may have broken since).
+    const template = this.deps.checkTarget?.(target);
+    if (template && !template.ready) return { state: 'rejected', detail: `${TARGET_NOT_READY}: ${notReadyReason(template)}`, result: { template } };
+    const limit = target.limits?.maxRuns;
+    const running = limit ? this.runsOn(target.id) : 0;
+    if (limit && running >= limit) {
+      this.log(`eridani: refused spawn for run ${cmd.run_id} on ${target.id}: ${running} of ${limit} runs (limits.maxRuns)`);
+      return { state: 'rejected', detail: TARGET_BUSY, result: { limit, running } };
+    }
     // S-S4: one writer per worktree. Checked and claimed with no await in between, so two spawns cannot both pass.
     const claim = `${target.id}\0${cmd.target.branch}`;
     const writer = this.writerFor(target.id, cmd.target.branch);
@@ -669,6 +696,7 @@ export class Dispatch {
     const claimed = !writer;
     if (claimed) this.claims.set(claim, { surf, run_id: cmd.run_id });
     this.spawning.add(surf);
+    this.spawningOn.set(surf, target.id);
     try {
       ctx.begin();
       const base = cmd.target.base ?? target.base;
@@ -677,6 +705,13 @@ export class Dispatch {
         wt = await this.deps.worktrees.ensure(target, cmd.target.branch, base);
       } catch (err) {
         return { state: 'failed', detail: `worktree: ${(err as Error).message}` };
+      }
+      // S-Q3: the target's dependency preparation, before the agent starts; a failure starts nothing.
+      let prepare: PrepareFacts | null = null;
+      if (target.prepare?.length) {
+        prepare = await this.prepareWorktree(target, wt.path, wt.created);
+        this.log(`eridani: prepare for run ${cmd.run_id} in ${wt.path}: ${!prepare ? 'none' : !prepare.ran ? 'already done' : prepare.ok ? `ok (${prepare.steps.map((x) => x.id).join(', ')})` : `FAILED: ${prepare.reason ?? '?'}`}${prepare?.log ? `; log ${prepare.log}` : ''}`);
+        if (prepare && !prepare.ok) return { state: 'failed', detail: `prepare: ${prepare.reason ?? 'failed'}`, result: { worktree: wt.path, branch: wt.branch, target: target.id, prepare } };
       }
       const note = cmd.prompt ? freshnessNote(wt, cmd.migration ?? null) : '';
       const prompt = note ? `${note}\n\n${cmd.prompt}` : cmd.prompt;
@@ -717,6 +752,7 @@ export class Dispatch {
         ...(prompt ? { acceptedInput: { generation: cmd.generation, at: this.now() } } : {}),
         // What the desktop needs to link back to the run (no secrets): only what this spawn and config carry.
         ...(cmd.title ? { taskTitle: cmd.title } : {}),
+        ...(prepare ? { prepare } : {}),
       };
       const webUrl = this.webUrl();
       if (webUrl) binding.webUrl = webUrl;
@@ -745,8 +781,30 @@ export class Dispatch {
       return { state: 'executed', result: this.spawnFacts(rec!) };
     } finally {
       this.spawning.delete(surf);
+      this.spawningOn.delete(surf);
       if (claimed) this.claims.delete(claim);
     }
+  }
+
+  /** S-Q3: live Eridani sessions on a target, plus spawns in flight there (limits.maxRuns). */
+  private runsOn(targetId: string): number {
+    const live = liveWriters(this.deps.registry.sessions()).filter((w) => w.target === targetId).length;
+    return live + [...this.spawningOn.values()].filter((t) => t === targetId).length;
+  }
+
+  /**
+   * S-Q3: prepare a worktree once at a time: a shared spawn onto a worktree
+   * being prepared waits for that preparation instead of starting another.
+   */
+  private prepareWorktree(target: ExecutionTarget, worktree: string, force: boolean): Promise<PrepareFacts | null> {
+    const inflight = this.preparing.get(worktree);
+    if (inflight) return inflight;
+    const run = (this.deps.prepare ?? ((t, w, f) => runPrepare(t, w, { force: f })))(target, worktree, force).catch(
+      (err): PrepareFacts => ({ ran: true, ok: false, steps: [], reason: `cannot run: ${(err as Error)?.message ?? err}`.slice(0, ERIDANI_LIMITS.reasonChars) }),
+    );
+    const p = run.finally(() => this.preparing.delete(worktree));
+    this.preparing.set(worktree, p);
+    return p;
   }
 
   /**

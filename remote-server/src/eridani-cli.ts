@@ -53,7 +53,8 @@ import { CollectorState } from './collector/state';
 import { statusFromRegistry } from './collector/report';
 import { WINDOWS_USERS, linkCaps, serverVersion } from './eridani-runtime';
 import type { RegistryData } from './registry';
-import { loadTargets, removeTarget, saveTarget, type ExecutionTarget, type VerifySpec } from './eridani-targets';
+import { loadTargets, removeTarget, saveTarget, type ExecutionTarget, type PrepareSpec, type VerifySpec } from './eridani-targets';
+import { templateStatus } from './target-template';
 import { WorktreeManager, cleanupCommands, writersByPath } from './worktrees';
 import { defaultHookPaths } from './hooks-install';
 import { defaultProbe, launchersToProbe, probeKey, type LauncherProbe } from './launch-caps';
@@ -124,6 +125,9 @@ export function fmtAdvertised(a: Advertised): string[] {
       return v.isolated ? `${state}, sandboxed` : `${state}, NOT sandboxed${v.isolation_reason ? ` (${v.isolation_reason})` : ''}`;
     });
     lines.push(`target ${t.id}: ${launch.join(', ') || 'no harness enabled'}; verify ${verify.join(', ') || 'none'}`);
+    // S-Q3: a target whose template fails is not advertised as ready.
+    if (t.template && !t.template.ready) lines.push(`  NOT ready: ${(t.template.problems ?? []).filter((p) => p.level === 'fail').map((p) => p.reason).join('; ')}`);
+    if (t.prepare?.length) lines.push(`  prepare (new worktrees): ${t.prepare.join(', ')}`);
   }
   return lines;
 }
@@ -283,7 +287,7 @@ async function statusExtras(dir: string, s: EridaniSummary, probe: boolean): Pro
   if (adv) {
     // The running hello for launch and verify; mcp and any target added since, from disk now.
     const local = localReadiness(dir, targets, probes, venv);
-    return { wiring, readiness: local.map((t) => { const a = adv.find((x) => x.id === t.id); return a ? { ...a, mcp: t.mcp } : t; }), source: 'launch and verify from the running hello; mcp from disk now' };
+    return { wiring, readiness: local.map((t) => { const a = adv.find((x) => x.id === t.id); return a ? { ...a, mcp: t.mcp, ...(a.template ? {} : t.template ? { template: t.template } : {}) } : t; }), source: 'launch and verify from the running hello; mcp from disk now' };
   }
   return { wiring, readiness: localReadiness(dir, targets, probes, venv), source: `${s.link ? 'the running server does not report its hello targets (an older build)' : 'no running link'}: launchers not probed (--probe), verify and mcp from disk` };
 }
@@ -425,7 +429,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
     default:
       process.stderr.write(`usage: remotea eridani setup [--help | <flags>] | connect [--url <wss://…>] [--machine <name>] | status [--json] [--probe] | disconnect [--forget] | collect [--dry-run] [--days N]
        remotea eridani collector [parity|authoritative]
-       remotea eridani targets list [--json] | add --id <id> --repo <path> --worktree-root <path> [--base <branch>] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>] | add --json '<target>' | remove <id>
+       remotea eridani targets list [--json] | add --id <id> --repo <path> --worktree-root <path> [--base <branch>] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>] [--prepare <id>=<command>]… [--prepare-timeout <s>] [--max-runs <n>] | add --json '<target>' | remove <id>
        remotea eridani worktrees [--json]\n`);
       return sub === undefined ? 0 : 2;
   }
@@ -465,7 +469,9 @@ function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream)
       for (const t of list) {
         const harnesses = (['claude', 'codex'] as const).filter((h) => t.launch[h]).join(', ') || 'none';
         out.write(`${t.id}  ${t.repo}  worktrees in ${t.worktreeRoot}  base ${t.base}  harnesses ${harnesses}\n`);
+        for (const p of t.prepare ?? []) out.write(`  prepare ${p.id}: ${p.argv.join(' ')}${p.cwd ? ` (in ${p.cwd})` : ''}, ${p.timeout} s\n`);
         for (const v of t.verify) out.write(`  verify ${v.id}: ${v.argv.join(' ')}${v.cwd ? ` (in ${v.cwd})` : ''}, ${v.timeout} s\n`);
+        if (t.limits) out.write(`  limits: ${Object.entries(t.limits).map(([k, v]) => `${k} ${v}`).join(', ')}\n`);
         const mcp = resolveMcp(dir, t);
         out.write(`  eridani mcp: ${mcp.configured ? `configured (${mcp.url})` : `not configured: ${mcp.reason}`}\n`);
       }
@@ -487,15 +493,31 @@ function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream)
           if (eq < 1) throw new Error(`--verify ${v}: <id>=<command>`);
           return { id: v.slice(0, eq), argv: v.slice(eq + 1).trim().split(/\s+/).filter(Boolean), timeout };
         });
+        const prepareTimeout = Number(flag(rest, '--prepare-timeout') ?? 900);
+        const prepare: PrepareSpec[] = flags(rest, '--prepare').map((v) => {
+          const eq = v.indexOf('=');
+          if (eq < 1) throw new Error(`--prepare ${v}: <id>=<command>`);
+          return { id: v.slice(0, eq), argv: v.slice(eq + 1).trim().split(/\s+/).filter(Boolean), timeout: prepareTimeout };
+        });
+        const maxRuns = flag(rest, '--max-runs');
         const launch: ExecutionTarget['launch'] = {};
         if (rest.includes('--claude')) launch.claude = {};
         if (rest.includes('--codex')) launch.codex = {};
         if (!launch.claude && !launch.codex) launch.claude = {};
-        target = { id, repo: path.resolve(repo), worktreeRoot: path.resolve(root), base: flag(rest, '--base') ?? 'main', launch, verify };
+        target = {
+          id, repo: path.resolve(repo), worktreeRoot: path.resolve(root), base: flag(rest, '--base') ?? 'main', launch, verify,
+          ...(prepare.length ? { prepare } : {}),
+          ...(maxRuns ? { limits: { maxRuns: Number(maxRuns) } } : {}),
+        };
       }
       if (!fs.existsSync(path.join(target.repo ?? '', '.git'))) throw new Error(`${target.repo} is not a git repository`);
       saveTarget(dir, target);
       out.write(`target ${target.id} saved; it applies to the next spawn (no restart)\n`);
+      // S-Q3: what hello will say about it, checked against the service's PATH.
+      const saved = loadTargets(dir).find((t) => t.id === target.id);
+      const tpl = saved ? templateStatus(saved, { env: serviceEnv(os.homedir(), process.env).env }) : null;
+      if (tpl && !tpl.ready) out.write(`warning: target ${target.id} is not ready, so Eridani will not be offered it until this is fixed:\n`);
+      for (const p of tpl?.problems ?? []) out.write(`  ${p.level === 'fail' ? 'NOT READY' : 'warn'} ${p.check}: ${p.reason}\n`);
       return 0;
     }
     case 'remove': {

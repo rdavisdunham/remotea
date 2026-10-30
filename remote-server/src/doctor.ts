@@ -14,10 +14,13 @@
  *              backlog, journal, refusals
  *   hooks      the helper, and Claude Code's, Codex's (with Codex's trust
  *              records) and OpenCode's entries against what an install writes
- *   targets    per execution target: the repository, launch readiness per
- *              harness, each verify entry (program on the SERVICE's PATH,
- *              dependencies in the checkout, a database URL when the command
- *              looks like it needs one), isolation, MCP
+ *   targets    per execution target: the repository, the template as a whole
+ *              (S-Q3, target-template.ts: worktree root, base, prepare steps,
+ *              migrations, disk limit; not ready = not advertised), launch
+ *              readiness per harness, each verify entry (program on the
+ *              SERVICE's PATH, dependencies in the checkout, a database URL
+ *              when the command looks like it needs one), isolation, MCP;
+ *              entries of eridani.json that are ignored as invalid
  *   disk       free space where the config, temp files and worktrees live
  *   uploads    pasted/dropped files against their budget
  *   recovery   managed worktrees holding work no live session owns, and
@@ -49,7 +52,7 @@ import { DEFAULT_CONFIG, loadEridaniConfig, readEridaniToken, type CollectorMode
 import { hookVersion, loadBuildInfo, readServerInfo, type BuildInfo, type HookVersion, type ServerInfo } from './build-info';
 import { agentHookChecks, defaultHookPaths, type AgentHookCheck, type HookPaths } from './hooks-install';
 import { readLinkStatus, type CollectorLinkStatus, type LinkStatus } from './eridani-link';
-import { loadTargets, type ExecutionTarget, type VerifySpec } from './eridani-targets';
+import { readTargets, type ExecutionTarget, type InvalidTarget, type VerifySpec } from './eridani-targets';
 import { defaultProbe, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn } from './launch-caps';
 import { localReadiness, redact, serviceEnv, which } from './eridani-setup';
 import { WorktreeManager, runGit, type GitRunner } from './worktrees';
@@ -57,6 +60,9 @@ import { COLLECTOR_STATE_FILES } from './collector/state';
 import { probeSqlite } from './collector/codex-sqlite';
 import { UploadStore, readUploadsStatus } from './upload';
 import { observeKeeperStatus, type KeeperObservation } from './pty-backend';
+import { existingAncestor, statfs } from './target-template';
+
+export { statfs };
 
 export const DOCTOR_VERSION = 1;
 
@@ -152,6 +158,8 @@ export interface DoctorFacts {
   };
   collector: { sqlite: string | null; stateMtime: number | null; scan: CollectorLinkStatus | null };
   targets: ExecutionTarget[];
+  /** Entries of eridani.json's targets skipped as invalid (never advertised). Optional: older callers omit it. */
+  invalidTargets?: InvalidTarget[];
   readiness: HelloTarget[];
   /** Where launch and verify readiness came from. */
   readinessSource: 'probed' | 'hello' | 'disk';
@@ -207,6 +215,15 @@ const short = (b: { sha: string; dirty: boolean | null }) => (b.sha === 'unknown
 const AGENT_NAME: Record<AgentHookCheck['agent'], string> = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode' };
 /** An id segment: what a target or verify id may contain, anything else as `_`. */
 const seg = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 40);
+
+/** The fix for a template problem, by its check (target-template.ts). */
+const TEMPLATE_FIX: Record<string, string> = {
+  worktree_root: 'set worktreeRoot to a folder the server user can create and write',
+  base: 'set base to a branch the repository has (git branch -a)',
+  prepare: 'use an absolute program path, or set PATH in the step\'s env; the cwd must exist in the repository',
+  migrations: 'fix migrations.dir (relative to the repository)',
+  limits: 'free disk space where the worktrees live (remotea eridani worktrees), or lower limits.minFreeMiB',
+};
 
 // ── Evaluate: facts → findings (pure) ──────────────────────────────────────────
 
@@ -342,6 +359,7 @@ export function evaluate(f: DoctorFacts): DoctorItem[] {
   }
 
   // targets
+  for (const bad of f.invalidTargets ?? []) add('targets', `target.${seg(bad.id)}.config`, 'fail', `${bad.id}: ignored, not advertised: ${bad.error}`, 'fix the entry in eridani.json (remotea eridani targets add --json checks it)');
   if (!f.targets.length) {
     if (e.configured) add('targets', 'targets', 'warn', 'no execution targets: Eridani cannot start work here', 'remotea eridani setup --add-repo <path> (or remotea eridani targets add)');
   } else {
@@ -351,6 +369,18 @@ export function evaluate(f: DoctorFacts): DoctorItem[] {
       const ready = f.readiness.find((x) => x.id === tg.id);
       if (!fs.existsSync(path.join(tg.repo, '.git'))) add('targets', `${tid}.repo`, 'fail', `${tg.id}: ${t(tg.repo)} is missing or not a git checkout`, `fix the path, or remotea eridani targets remove ${tg.id}`);
       else add('targets', `${tid}.repo`, 'ok', `${tg.id}: ${t(tg.repo)}, worktrees in ${t(tg.worktreeRoot)}, base ${tg.base}`);
+      // S-Q3: the template as a whole, and the problems no other item here covers (repo, launch and verify have their own).
+      const tpl = ready?.template;
+      if (tpl) {
+        const fails = (tpl.problems ?? []).filter((p) => p.level === 'fail');
+        const prep = tg.prepare?.length ? `; a new worktree runs ${tg.prepare.map((p) => p.id).join(', ')} first` : '';
+        if (tpl.ready) add('targets', `${tid}.template`, 'ok', `${tg.id}: template valid, advertised as ready${prep}`);
+        else add('targets', `${tid}.template`, 'fail', `${tg.id}: not advertised as ready: ${scrub(fails.map((p) => p.reason).join('; '), f.home)}`, 'fix the target in eridani.json (remotea eridani targets list); Eridani sees the change from the next connect');
+        for (const p of tpl.problems ?? []) {
+          if (p.check === 'repo' || p.check === 'launch' || p.check.startsWith('verify.')) continue;
+          add('targets', `${tid}.${p.check.split('.').map(seg).join('.')}`, p.level, `${tg.id}: ${scrub(p.reason, f.home)}`, TEMPLATE_FIX[p.check.split('.')[0]]);
+        }
+      }
       const enabled = (['claude', 'codex'] as const).filter((h) => tg.launch[h]);
       if (!enabled.length) add('targets', `${tid}.launch`, 'fail', `${tg.id}: no harness enabled`, `enable one: remotea eridani targets add --json '<target with launch.claude>'`);
       for (const h of enabled) {
@@ -366,7 +396,7 @@ export function evaluate(f: DoctorFacts): DoctorItem[] {
         const st = (ready?.verify_status ?? []).find((x) => x.id === v.id);
         if (st && !st.ready) add('targets', vid, 'fail', `${tg.id}/${v.id}: ${st.reason ?? 'not ready'}`, 'use an absolute program path, or set PATH in the entry\'s env');
         else add('targets', vid, 'ok', `${tg.id}/${v.id}: \`${path.basename(v.argv[0] ?? '?')}\` resolves on the service PATH`);
-        const deps = depsCheck(tg.repo, v);
+        const deps = depsCheck(tg.repo, v, !!tg.prepare?.length);
         if (deps) add('targets', `${vid}.deps`, deps.ok ? 'ok' : 'warn', `${tg.id}/${v.id}: ${deps.summary}`, deps.fix);
         const db = dbCheck(tg.repo, v);
         if (db) add('targets', `${vid}.db`, db.ok ? 'ok' : 'warn', `${tg.id}/${v.id}: ${db.summary}`, db.fix);
@@ -444,12 +474,13 @@ const NODE_RUNNERS = new Set(['npm', 'npx', 'pnpm', 'yarn', 'bun', 'node', 'vite
 const PY_RUNNERS = new Set(['pytest', 'python', 'python3', 'py.test', 'alembic']);
 
 /** Does the verify command need dependencies that are not in the checkout? null: no recognised toolchain. */
-export function depsCheck(repo: string, v: VerifySpec): { ok: boolean; summary: string; fix?: string } | null {
+export function depsCheck(repo: string, v: VerifySpec, prepared = false): { ok: boolean; summary: string; fix?: string } | null {
   const cwd = v.cwd ? path.resolve(repo, v.cwd) : repo;
   const prog = path.basename(v.argv[0] ?? '');
   const installs = v.argv.some((a) => a === 'ci' || a === 'install' || a === 'sync');
   if (NODE_RUNNERS.has(prog) && fs.existsSync(path.join(cwd, 'package.json'))) {
     if (installs) return { ok: true, summary: 'installs its node dependencies itself' };
+    if (prepared) return { ok: true, summary: 'the target\'s prepare steps install dependencies in each new worktree' };
     if (fs.existsSync(path.join(cwd, 'node_modules'))) return { ok: true, summary: 'node_modules present in the checkout (new worktrees start without it)' };
     return { ok: false, summary: `no node_modules in ${v.cwd ?? 'the repository'}: \`${prog}\` will not find its dependencies`, fix: 'make the entry run a script that installs first (npm ci), or run npm ci in the checkout' };
   }
@@ -589,26 +620,6 @@ export function healthzOk(port: number, timeoutMs = 1000): Promise<boolean> {
   });
 }
 
-export function statfs(p: string): { free: number; total: number } | null {
-  try {
-    const s = fs.statfsSync(p);
-    return { free: s.bavail * s.bsize, total: s.blocks * s.bsize };
-  } catch {
-    return null;
-  }
-}
-
-/** The nearest folder that exists at or above `p` (a worktree root not created yet lives on its parent's disk). */
-function existingAncestor(p: string): string {
-  let cur = path.resolve(p);
-  while (!fs.existsSync(cur)) {
-    const up = path.dirname(cur);
-    if (up === cur) break;
-    cur = up;
-  }
-  return cur;
-}
-
 /** config.json without creating it (loadConfig writes a default one). */
 function readServerConfig(dir: string): { port: number; hookPort: number; uploadBudgetMiB: number; ptyKeeper: boolean } {
   let user: Record<string, unknown> = {};
@@ -715,7 +726,7 @@ export async function gatherFacts(o: GatherOptions): Promise<DoctorFacts> {
   }
 
   // targets and readiness
-  const targets = loadTargets(dir, () => {});
+  const { targets, invalid: invalidTargets } = readTargets(dir);
   const svc = serviceEnv(home, env).env;
   let readiness: HelloTarget[];
   let readinessSource: DoctorFacts['readinessSource'];
@@ -735,7 +746,8 @@ export async function gatherFacts(o: GatherOptions): Promise<DoctorFacts> {
       // Launch and verify from the running hello (the service's own probes and PATH); mcp, and targets added since, from disk now.
       readiness = local.map((t) => {
         const a = adv.find((x) => x.id === t.id);
-        return a ? { ...a, mcp: t.mcp } : t;
+        // A running build older than S-Q3 sends no template: the one checked here stands in.
+        return a ? { ...a, mcp: t.mcp, ...(a.template ? {} : t.template ? { template: t.template } : {}) } : t;
       });
       readinessSource = 'hello';
     } else {
@@ -782,6 +794,7 @@ export async function gatherFacts(o: GatherOptions): Promise<DoctorFacts> {
     eridani: { configured: !!ecfg, enabled: !!ecfg?.enabled, keyPresent: readEridaniToken(dir) !== null, mode, link },
     collector: { sqlite: probeSqlite(), stateMtime, scan: o.collector !== undefined ? o.collector : link?.collector ?? null },
     targets,
+    invalidTargets,
     readiness,
     readinessSource,
     serviceEnv: svc,
