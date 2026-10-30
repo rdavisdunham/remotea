@@ -645,8 +645,23 @@ export interface SpawnCommand extends OpFields {
   verify?: RunVerifyConfig | null;
   /** The migration number Eridani reserved for this run's plan; a reused, stale worktree's prompt then says to re-point it. */
   migration?: { number: number; dir: string } | null;
+  /**
+   * S-S4: start even though another live session already writes the branch's
+   * worktree (both then edit it). Absent or false: such a spawn is `rejected`
+   * with detail `worktree_busy` and result `{branch, writer}`.
+   */
+  share?: boolean;
   expires_at: number | string;
 }
+
+/** The live session writing a worktree (S-S4): its surface and the run bound to it. */
+export interface WorktreeWriter {
+  surf: string;
+  run_id: string;
+}
+
+/** The `command.outcome` detail of a spawn refused because another live session writes the branch (S-S4). */
+export const WORKTREE_BUSY = 'worktree_busy';
 
 /** The verification a run's frozen plan asks for after each root turn (stage D). */
 export interface RunVerifyConfig {
@@ -754,6 +769,8 @@ export interface WorktreeReport {
   candidate: boolean;
   /** Why it is unmerged work (empty for a candidate). */
   reasons: string[];
+  /** S-S4: the live session writing this worktree, null when none. Optional: older hosts. */
+  writer?: WorktreeWriter | null;
 }
 
 /** Every managed worktree, after sessions.snapshot and whenever the list changes. */
@@ -958,6 +975,7 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
         const mg = m.migration;
         if (!isObj(mg) || !isInt(mg.number, 1) || !isStr(mg.dir, 200) || !noControl(mg.dir) || /[\r\n]/.test(mg.dir)) return 'bad migration';
       }
+      if (m.share !== undefined && typeof m.share !== 'boolean') return 'bad share';
       if (m.run_token !== undefined && !(isStr(m.run_token, 512) && /^[\x21-\x7e]+$/.test(m.run_token))) return 'bad run_token';
       if (m.env !== undefined) {
         if (!isObj(m.env) || Object.keys(m.env).length > 32) return 'bad env';

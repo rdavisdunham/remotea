@@ -410,6 +410,18 @@ base otherwise (`git worktree add -b <branch> <path> <base sha>`), and the base
 is recorded in `eridani-worktrees.json`. A spawn on the base branch itself is
 refused. Operations on one repo run one at a time.
 
+**One writer per worktree (S-S4).** Every Eridani session that has not exited
+(live, or lost and about to be resumed) is the *writer* of its branch's
+worktree. A spawn onto a branch that already has a writer, or that another
+spawn in flight is claiming, is refused before anything starts:
+`command.outcome {state: "rejected", detail: "worktree_busy", result: {branch,
+writer: {surf, run_id}}}`. That holds for another attempt of the same run
+too: stop the old surface first. A spawn that says `share: true` starts
+anyway, in the same worktree, and both sessions edit it (the oldest stays the
+reported writer). A child task's spawn names its own branch with the parent's
+branch as `base`, so it gets its own worktree as before, while the parent
+keeps writing.
+
 **Freshness.** Before basing on (or reusing a worktree of) the target's own
 `base`, the host runs `git fetch origin <base>` (30 s, non-interactive). New
 work starts from `origin/<base>`, unless local `<base>` already contains it
@@ -442,13 +454,16 @@ every 5 min. A branch with no commits of its own reports `merged: null` with
 `merged_reason: "no commits of its own yet"`, not `true`. A row with no reason
 is a *candidate*, and the CLI prints the commands a person could run: a
 recovery ref first (`refs/remotea/recovery/<branch>`), then
-`git worktree remove`.
+`git worktree remove`. Each row also carries `writer: {surf, run_id} | null`
+(S-S4, optional: older hosts omit it), the live session writing that
+worktree, so "unmerged work" can say who is still on it; the CLI prints it as
+`writer <surf> (run <run_id>)`.
 
 ### Commands
 
 | `t` | Fields | Effect |
 |---|---|---|
-| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
+| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, share?, expires_at` | `share` (boolean, optional, S-S4): start even when another live session writes the branch's worktree; without it such a spawn is `rejected` `worktree_busy` with `result {branch, writer {surf, run_id}}` (see [Worktrees](#worktrees)). Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
 | `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then (800 ms later) the text. Typed as a bracketed paste and Enter (150 ms later). Never counts as a person answering. The outcome is `executed` only once Enter was sent; see [Input and steer outcomes](#input-and-steer-outcomes). |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |

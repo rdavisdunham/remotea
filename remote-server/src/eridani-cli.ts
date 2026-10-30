@@ -47,7 +47,7 @@ import { statusFromRegistry } from './collector/report';
 import { WINDOWS_USERS, serverVersion } from './eridani-runtime';
 import type { RegistryData } from './registry';
 import { loadTargets, removeTarget, saveTarget, type ExecutionTarget, type VerifySpec } from './eridani-targets';
-import { WorktreeManager, cleanupCommands } from './worktrees';
+import { WorktreeManager, cleanupCommands, writersByPath } from './worktrees';
 
 export interface EridaniSummary {
   enabled: boolean;
@@ -459,8 +459,8 @@ function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream)
 async function worktreesCommand(dir: string, args: string[], out: NodeJS.WritableStream): Promise<number> {
   const targets = loadTargets(dir, (m) => process.stderr.write(`${m}\n`));
   const reg = readRegistry(dir);
-  const active = new Set(Object.values(reg?.sessions ?? {}).filter((r) => r.eridani && r.state !== 'exited').map((r) => r.eridani!.worktree));
-  const rows = await new WorktreeManager({ dir }).nominate(targets, (p) => active.has(p));
+  const writers = writersByPath(Object.values(reg?.sessions ?? {}));
+  const rows = await new WorktreeManager({ dir }).nominate(targets, (p) => writers.has(p), (p) => writers.get(p) ?? null);
   if (args.includes('--json')) {
     out.write(JSON.stringify(rows, null, 2) + '\n');
     return 0;
@@ -471,6 +471,7 @@ async function worktreesCommand(dir: string, args: string[], out: NodeJS.Writabl
   }
   for (const r of rows) {
     out.write(`${r.candidate ? 'candidate ' : 'keep      '} ${r.target}  ${r.branch ?? '(detached)'}  ${r.path}\n`);
+    if (r.writer) out.write(`           writer ${r.writer.surf} (run ${r.writer.run_id})\n`);
     if (r.reasons.length) out.write(`           ${r.reasons.join('; ')}\n`);
     if (r.candidate) {
       const t = targets.find((x) => x.id === r.target);

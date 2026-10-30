@@ -67,7 +67,7 @@ import { statusFromRegistry } from './collector/report';
 import { Dispatch, type DispatchTimers } from './dispatch';
 import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
-import { WorktreeManager } from './worktrees';
+import { WorktreeManager, writersByPath } from './worktrees';
 import { loadTargets } from './eridani-targets';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
@@ -452,10 +452,10 @@ export class EridaniRuntime {
     const waiters = this.worktreesWaiters.splice(0);
     const forced = this.worktreesForce;
     this.worktreesForce = false;
-    const active = new Set(this.deps.registry.sessions().filter((r) => r.eridani && r.state !== 'exited').map((r) => r.eridani!.worktree));
+    const writers = writersByPath(this.deps.registry.sessions());
     const targets = loadTargets(this.deps.dir);
     // nominate fetches each base first (rate-limited), so the heads read the same fresh ref.
-    this.worktrees.nominate(targets, (p) => active.has(p)).then(async (rows) => [rows, await this.worktrees.migrationHeads(targets)] as const).then(
+    this.worktrees.nominate(targets, (p) => writers.has(p), (p) => writers.get(p) ?? null).then(async (rows) => [rows, await this.worktrees.migrationHeads(targets)] as const).then(
       ([rows, heads]) => {
         const body = heads.length ? { t: 'worktrees.report' as const, worktrees: rows, heads } : { t: 'worktrees.report' as const, worktrees: rows };
         const text = JSON.stringify(body);
