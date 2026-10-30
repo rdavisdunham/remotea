@@ -71,9 +71,10 @@ import { WorktreeManager } from './worktrees';
 import { loadTargets } from './eridani-targets';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
-import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn } from './launch-caps';
+import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn, type ProbeHarness } from './launch-caps';
 import { hookVersion, loadBuildInfo, type BuildInfo } from './build-info';
-import { defaultHookPaths } from './hooks-install';
+import { adapterHooks, defaultHookPaths } from './hooks-install';
+import type { AdapterHooks } from './harness-adapters';
 
 export const COLLECTOR_STATE_FILE = 'eridani-collector.json';
 /** Delivered fingerprints per mode: a parity ack says nothing about what Eridani stored. */
@@ -115,6 +116,8 @@ export interface EridaniRuntimeDeps {
   contextMs?: number;
   /** Tests: how a launcher is probed (default: `<bin> --version` through the login shell). */
   probe?: ProbeFn;
+  /** Tests: whether each question adapter's hook is wired (default: read the agents' settings, hooks-install.ts). */
+  adapterHooks?: () => AdapterHooks;
   /** The build hello reports (default: dist/build-info.json). */
   build?: BuildInfo;
   /** Where the hook helper is installed and shipped (default: hooks-install's). */
@@ -187,6 +190,8 @@ export class EridaniRuntime {
     this.questions = new QuestionBroker({
       session: (id) => registry.session(id),
       canHold: (id) => !!this.link?.ready && !!registry.session(id)?.eridani,
+      // Only what hello advertises is ever held: an adapter not verified on this version leaves the prompt in the terminal.
+      capable: (provider, kind) => !!this.harnesses()[provider]?.question_kinds?.includes(kind),
       // No entity: a question and its resolution are separate facts, never coalesced.
       emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
       needsYou: (id, reason) => hub.agentState.report(id, { awaitingHuman: reason !== null, reason }),
@@ -373,7 +378,7 @@ export class EridaniRuntime {
 
   /** The host-wide harness matrix from the latest probes (launch-caps.ts). */
   harnesses(): CapabilityMatrix {
-    return harnessMatrix(this.probes, loadTargets(this.deps.dir));
+    return harnessMatrix(this.probes, loadTargets(this.deps.dir), (this.deps.adapterHooks ?? (() => adapterHooks()))());
   }
 
   /** Execution targets for hello: ids, repos, permission, probed launchers and verify readiness; never argv or env. */
@@ -404,7 +409,7 @@ export class EridaniRuntime {
   }
 
   /** Probe launchers (in parallel, one at a time per launcher); a failure is a result, never a throw. */
-  private async probeAll(launchers: Array<{ harness: 'claude' | 'codex'; bin: string }>): Promise<void> {
+  private async probeAll(launchers: Array<{ harness: ProbeHarness; bin: string }>): Promise<void> {
     const probe = this.deps.probe ?? defaultProbe;
     await Promise.all(launchers.map(({ harness, bin }) => {
       const key = probeKey(harness, bin);

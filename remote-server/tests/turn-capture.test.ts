@@ -118,6 +118,22 @@ describe('TurnCapture', () => {
     expect(turns[2]).toMatchObject({ text: 'answer two', source: 'rollout', missing: false });
   });
 
+  it('reads Codex 0.166 rollouts: task_complete and item_completed AgentMessage, no agent_message event', () => {
+    // The shapes a real 0.166.0 rollout has (event_msg agent_message is no longer written).
+    const line = (o: object) => JSON.stringify(o);
+    const tail = [
+      line({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't1' } }),
+      line({ type: 'event_msg', payload: { type: 'item_completed', turn_id: 't1', item: { type: 'AgentMessage', phase: 'commentary', content: [{ type: 'Text', text: 'working on it' }] } } }),
+      line({ type: 'event_msg', payload: { type: 'item_completed', turn_id: 't1', item: { type: 'AgentMessage', phase: 'final_answer', content: [{ type: 'Text', text: 'final ' }, { type: 'Text', text: 'one' }] } } }),
+      line({ type: 'event_msg', payload: { type: 'task_started', turn_id: 't2' } }),
+      line({ type: 'event_msg', payload: { type: 'task_complete', turn_id: 't2', last_agent_message: 'final two' } }),
+    ].join('\n');
+    expect(rolloutFinalAnswer(tail, 't1')).toBe('final one');
+    expect(rolloutFinalAnswer(tail, 't2')).toBe('final two');
+    expect(rolloutFinalAnswer(tail)).toBe('final two');
+    expect(rolloutFinalAnswer(tail, 't3')).toBeNull();
+  });
+
   it('Claude never reads a transcript: missing text is reported missing', () => {
     claude('Stop', { transcriptPath: '/home/u/.claude/projects/x/s.jsonl' });
     expect(turns[0]).toMatchObject({ missing: true, text: '', source: 'hook' });

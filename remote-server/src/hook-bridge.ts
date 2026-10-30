@@ -23,6 +23,9 @@
  *                     the answers to print, or nothing. While a request is
  *                     held the connection is exempt from the idle timeout, and
  *                     its closing (Claude killed the hook) is reported.
+ *   remotea.approval  Codex's PermissionRequest hook HOLDS here the same way
+ *                     (questions-claude.ts holdApproval); the reply carries
+ *                     the decision to print (allow / deny), or nothing.
  *   remotea.context   SessionStart's text for the agent (context.ts).
  */
 import crypto from 'crypto';
@@ -50,13 +53,15 @@ export interface HookBridgeDeps {
   relay: (sessionId: string, method: string, params: Record<string, unknown>) => boolean;
   /** Hold an AskUserQuestion; `closed` registers a callback for the helper going away. */
   question?: (sessionId: string, params: Record<string, unknown>, closed: (cb: () => void) => void) => Promise<unknown>;
+  /** Hold a Codex PermissionRequest; same contract as `question`. */
+  approval?: (sessionId: string, params: Record<string, unknown>, closed: (cb: () => void) => void) => Promise<unknown>;
   /** SessionStart context text. */
   context?: (sessionId: string, params: Record<string, unknown>) => Promise<string>;
   log?: (msg: string) => void;
 }
 
 /** Methods answered asynchronously (see the header). */
-export const HELD_METHODS: ReadonlySet<string> = new Set(['remotea.question', 'remotea.context']);
+export const HELD_METHODS: ReadonlySet<string> = new Set(['remotea.question', 'remotea.approval', 'remotea.context']);
 
 export type BridgeReply = { result?: unknown; error?: { code: number; message: string }; id?: unknown };
 
@@ -85,6 +90,10 @@ export async function handleBridgeRequest(deps: HookBridgeDeps, raw: unknown, cl
       if (method === 'remotea.question') {
         if (!deps.question) return { result: { reason: 'unsupported' }, id };
         return { result: await deps.question(surfaceId, params, closed), id };
+      }
+      if (method === 'remotea.approval') {
+        if (!deps.approval) return { result: { reason: 'unsupported' }, id };
+        return { result: await deps.approval(surfaceId, params, closed), id };
       }
       if (!deps.context) return { result: { text: '' }, id };
       return { result: { text: await deps.context(surfaceId, params) }, id };

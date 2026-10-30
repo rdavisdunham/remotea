@@ -26,7 +26,10 @@ The design is in `docs/remotea/plan.md` and the mission-control plan (v2,
 | `remote-server/src/dispatch.ts` | Stage C: what each command does; recovery on boot and after a reconnect. |
 | `remote-server/src/eridani-targets.ts` | Execution targets in `eridani.json`. |
 | `remote-server/src/worktrees.ts` | One worktree per branch; the nominate-only cleanup report. |
-| `remote-server/src/questions-claude.ts` | Holding Claude's AskUserQuestion for Eridani. |
+| `remote-server/src/questions-claude.ts` | Holding Claude's AskUserQuestion (and, through `holdApproval`, Codex's PermissionRequest) for Eridani. |
+| `remote-server/src/questions-codex.ts` | The Codex approval shape: items, allow once / deny decision. |
+| `remote-server/src/harness-adapters.ts` | Which question kinds each harness may have answered, on which tested versions. |
+| `remote-server/scripts/capability-codex.mjs` | Capability test of the Codex adapters against the installed Codex (fake model, scratch home). |
 | `remote-server/src/context.ts` | SessionStart context from Eridani. |
 | `remote-server/src/verify-runner.ts` | One configured verification, with a workspace fingerprint. |
 
@@ -140,7 +143,9 @@ remotea sends:
 
 `caps` is `session.report, session.report.parity, turn, status, exit,
 sessions.snapshot, chunking, journal`. `harnesses` is
-`{claude|codex: {version, observe, capture, question: false, context: false, resume}}`.
+`{claude|codex: {version, observe, capture, question: false, context: false, resume}}`
+(stage B; for what later stages send, see
+[Harness capability matrix](#harness-capability-matrix)).
 
 Eridani sends:
 
@@ -204,8 +209,11 @@ The server then applies these rules:
 - **Root only.** A Stop with `agent_id` (inside a subagent) and `SubagentStop`
   never make a turn.
 - **Missing text.** `missing: true` with empty text. Codex then falls back to
-  the rollout tail (`agent_message`, `phase: "final_answer"`, same turn id).
-  Claude has no fallback: transcripts are not read.
+  the rollout tail, same turn id: `task_complete.last_agent_message` or an
+  `item_completed` AgentMessage with `phase: "final_answer"` (Codex 0.166.0,
+  checked against real rollouts; 0.166 no longer writes the older
+  `agent_message` event, which is still read). Claude has no fallback:
+  transcripts are not read.
 - **Redaction.** Text and prompt go through the collector's redaction before
   anything is stored or sent.
 - **Apps.** They still get the `Stop` event, without the server-only fields.
@@ -298,7 +306,7 @@ hello keeps these facts apart (S-S1); `caps_version: 2` says a host does
 
 | Fact | Where | How it is known |
 |---|---|---|
-| Protocol support | `caps[]`; each harness's `observe, capture, question, context, resume, steer, permission?, launch_flags` | What this build implements. |
+| Protocol support | `caps[]`; each harness's `observe, capture, question, question_kinds, context, resume, steer, permission, loop, launch_flags` | What this build implements. `question` is narrower: only a kind whose adapter was tested on the installed version, with its hook wired (see [Harness capability matrix](#harness-capability-matrix)). |
 | Installed harness | `harnesses.<h>.installed: boolean`, `version: string \| null`, `launch_error?: string` | `<bin> --version` run exactly as a spawn runs it: the login shell (`$SHELL -l -i -c`), the session environment (pty-spawn.ts), from `$HOME`. One probe per distinct `(harness, bin)`: the bare name, plus each target's `launch.<h>.bin`. The server runs under systemd with a minimal PATH, so a plain exec would prove nothing. |
 | Target permission | `targets[].enabled: ("claude"\|"codex")[]` | The target's `launch` lists the harness. |
 | Spawnable | `harnesses.<h>.spawn: boolean`; `targets[].harnesses`; `targets[].launch.<h> {ready, version, error?}` | `targets[].harnesses` is `enabled` minus launchers whose probe failed (always a subset of `enabled`). `spawn` is true only when some target enables the harness AND its launcher works. Eridani checks both (jarvis PR #91). |
@@ -627,7 +635,129 @@ there later → `answered_locally`); the hook killed early (Esc) →
 `canceled`; the process exiting or a new prompt → `canceled`. A subagent's
 question (`agent_id`) is never held. `remote_answerable` is always false on
 `question.resolved`. Claude's PermissionRequest is captured, not answered
-(`permission: "capture"` in `harnesses`).
+(`permission: "capture"` in `harnesses`). A question is held only while
+`harnesses.claude.question_kinds` includes `ask` (the tested version range,
+and the AskUserQuestion hook installed with its 600 s timeout); otherwise the
+helper is told `not-verified` and Claude asks in the terminal at once.
+
+### Approvals (Codex)
+
+Codex CLI's approval prompt is answered through its `PermissionRequest` hook,
+which remotea installs in `~/.codex/hooks.json` with a 600 s timeout (every
+other Codex entry keeps 10 s). For a session bound to a run, with the link
+up and the adapter advertised (`harnesses.codex.question_kinds` includes
+`approval`):
+
+1. the helper (`--event PermissionRequest --provider codex`) holds
+   `remotea.approval` on the bridge, and the TUI shows "Running hook" (no
+   prompt). The server sends `question {…, provider: "codex", kind:
+   "approval", provider_request_id, provider_turn_id (turn_id), items: [{id:
+   "q1", header: "Approval", text: "Codex wants to run:\n<command>[\nReason:
+   …]", choices: [{id: "allow_once", label: "Allow once"}, {id: "deny",
+   label: "Deny"}]}]}` and the pane says needs_you. PermissionRequest has no
+   `tool_use_id`; `provider_request_id` is the `tool_use_id` of the
+   PreToolUse Codex fires just before it for the same tool, else
+   `perm_<uuid>`;
+2. the `answer` takes exactly one choice; a `text` note goes with `deny` only
+   and becomes the message the model gets (default "Denied from Eridani.").
+   The helper prints `{"hookSpecificOutput": {"hookEventName":
+   "PermissionRequest", "decision": {"behavior": "allow"}}}` or `{…
+   "behavior": "deny", "message": "…"}`. There is no "always": Codex 0.166
+   fails closed on `updatedPermissions`, so "don't ask again" stays a
+   terminal choice;
+3. `question.resolved accepted` on the call's PostToolUse (allowed), or when
+   the turn moves on after the decision (Stop, a new prompt, the next
+   approval): a denied call never runs, so it has no PostToolUse.
+
+Otherwise the helper prints nothing and reports the permission Notification
+as before, and Codex shows its own prompt ("Would you like to run the
+following command?"): not an Eridani session, link down, a subagent's
+request, the adapter not advertised (`not-verified`), or the 570 s hold
+expired (`timed_out`, still open; the call running or the turn ending then →
+`answered_locally`; a new prompt → `canceled`). Esc while the hook holds
+interrupts the whole Codex turn and kills the hook → `canceled`. While an
+approval is held no hook event resolves it (a background tool finishing, a
+subagent's Stop and the like are ignored); only an answer, the timeout, the
+hook dying or the process exiting end it.
+
+Codex 0.166 keeps a trust hash per hook entry (`[hooks.state]` in
+`~/.codex/config.toml`). After `remotea hooks install` changes an entry (this
+change raises PermissionRequest's timeout from 10 to 600 s), the next Codex
+start shows "Hooks need review"; trust them once in a terminal (`/hooks`, or
+"Trust all and continue"). Until the new entry is installed the adapter is
+not advertised (`adapterHooks` reads the timeout), and an Eridani-spawned
+Codex that hits the review screen waits there like any other prompt.
+
+### Harness capability matrix
+
+hello's `harnesses.<h>`, as this build sends it on a host with Claude Code
+2.1.314, Codex CLI 0.166.0 and OpenCode 1.17.20 installed and hooks
+installed. "start" is `spawn` (also gated on a target that enables the
+harness and a working launcher); "loop" is `loop` (turns captured, and
+`input` queue/steer continues the run).
+
+| | observe | capture | question / answer | context | start (`spawn`) | resume | loop | permission |
+|---|---|---|---|---|---|---|---|---|
+| claude | yes | yes (Stop `last_assistant_message`) | yes: `ask` (AskUserQuestion) | yes | per target | yes (`claude --resume`) | yes | `capture` |
+| codex | yes | yes (Stop `last_assistant_message`, `turn_id`; rollout fallback) | yes: `approval` (PermissionRequest, allow once / deny); `request_user_input` stays in the terminal | yes | per target | yes (`codex resume`) | yes | `answer` |
+| opencode | yes (wmux plugin) | no | no | no | no | no | no | `capture` |
+
+`question` is computed, never assumed (harness-adapters.ts): a kind is
+advertised only when the installed version is in the range its capability
+test ran on (lowest tested version up to the next minor) and its hook is
+installed with the long timeout. A Claude or Codex update past the range
+turns the flag off, and remotea stops holding those prompts, until the test
+is re-run and the range widened. Unsupported controls stay off, so Eridani
+keeps showing "open the terminal" for them.
+
+| Adapter | Tested on | Advertised for | How |
+|---|---|---|---|
+| claude `ask` | 2.1.312 (stage A spike, spike-stage-a/capability-matrix.md) | 2.1.312 ≤ v < 2.2.0 | Real Claude Code; single, multi, free text, several questions per call. 2.1.314 (installed now) is advertised under the range rule; it was not re-run in this change. |
+| codex `approval` | 0.166.0 (2026-10-30) | 0.166.0 ≤ v < 0.167.0 | `node remote-server/scripts/capability-codex.mjs`: the installed Codex TUI in a PTY, a scratch `CODEX_HOME` with test hooks, a local fake Responses API that asks for an escalated `touch`. |
+
+Codex 0.166.0 record (`codex --version` → `codex-cli 0.166.0`;
+`capability-codex.mjs` output, all PASS):
+
+- approval-allow: decision `allow` → the command ran, no prompt shown;
+- payload: PermissionRequest keys `cwd, hook_event_name, model,
+  permission_mode, session_id, tool_input, tool_name, transcript_path,
+  turn_id` (no `tool_use_id`; `tool_name: "Bash"`, `tool_input {command,
+  description}`);
+- held-screen: "Running hook" while the hook holds;
+- stop-capture: Stop carries `last_assistant_message` and the same `turn_id`
+  as UserPromptSubmit (turn-capture.ts keys Codex turns by it: correct);
+- approval-deny: "Blocked by hook", the command did not run;
+- approval-none / approval-timeout: Codex's own prompt;
+- question-pre: PreToolUse fires for `request_user_input` with
+  `tool_input.questions`, but an `updatedInput` with answers is ignored and
+  the TUI still asks. Not answerable by a hook.
+
+Codex questions (`request_user_input`), and why they stay in the terminal:
+the tool exists only in Plan mode, or in Default mode behind the
+`default_mode_request_user_input` feature ("under development", off). The
+App Server protocol (`codex app-server generate-ts`, 0.166.0) has a typed
+answer, `item/tool/requestUserInput` → `{answers: {<id>: {answers:
+[…]}}}`, and typed approvals (`item/commandExecution/requestApproval` with
+`acceptForSession`), but server requests go to the client that owns the
+thread, which is the TUI remotea spawns. Driving it would mean spawning
+Codex as `--remote` against an app server remotea runs, a launch change not
+made here. Keystrokes into the TUI's question view ("Question 1/1", numbered
+options, "enter to submit answer") were not implemented: no structured
+proof that a keystroke landed.
+
+Claude permission prompts stay captured: no keystroke shape was verified for
+this change. (Claude's own PermissionRequest hook takes the same
+`decision.behavior` output as Codex's; it is the structured path if this is
+taken up, after a capability test like Codex's.)
+
+OpenCode 1.17.20 (`opencode --version`): the wmux plugin is installed and
+reports status (observe). Its `question.asked` / `permission.asked` events
+reach the plugin, and `opencode --help` lists `--prompt`, `--session`,
+`--continue` and `--model`, but nothing here was run: Eridani cannot spawn
+OpenCode (no launch path, `SPAWN_HARNESSES` is claude and codex), so no
+OpenCode session is ever bound to a run and nothing could be held. hello
+probes `opencode --version` like the others so `installed`/`version` are
+facts; every control is off.
 
 ### Context (SessionStart)
 
@@ -971,7 +1101,13 @@ sends it loses nothing). The lag rules:
   sandbox, through bubblewrap or `codex sandbox linux`, with no network, or
   make automatic verify opt-in per target. Until then verify runs agent-edited
   code unsandboxed (see the security model above).
-- Answering permission prompts (captured only) and Codex questions (no hook).
+- Answering Claude permission prompts (captured only), Codex
+  `request_user_input` questions (no hook can answer them; see
+  [Harness capability matrix](#harness-capability-matrix)), and anything
+  from OpenCode (not spawnable).
+- Eridani's side of Codex approvals: its answer gate checks
+  `harnesses.claude.question` for every question; it should check
+  `harnesses[<question provider>].question_kinds` (jarvis follow-up).
 - Removing worktrees (nominate only, by design).
 - Eridani's side of `mcp.configured: false` (task 3bc2803c): remotea only
   reports it. Eridani should show the reason on the run and on the target

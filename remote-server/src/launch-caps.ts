@@ -29,16 +29,25 @@ import {
   ERIDANI_LIMITS,
   type CapabilityMatrix,
   type HarnessCaps,
+  type HarnessName,
   type HelloLaunch,
   type HelloTarget,
   type HelloVerifyStatus,
 } from '../../src/shared/eridani-link-protocol';
 import type { ExecutionTarget, LaunchSpec, VerifySpec } from './eridani-targets';
+import { answerableKinds, type AdapterHooks } from './harness-adapters';
 import { buildEnv, loginShell, shellArgs } from './pty-spawn';
 import { verifyEnv } from './verify-runner';
 
 export type SpawnHarness = 'claude' | 'codex';
 export const SPAWN_HARNESSES: readonly SpawnHarness[] = ['claude', 'codex'];
+/**
+ * Harnesses hello describes without Eridani being able to start them: probed
+ * by their bare name only (no target can launch them), so `installed` and
+ * `version` are facts, and every control is off.
+ */
+export const OBSERVED_HARNESSES: readonly HarnessName[] = ['opencode'];
+export type ProbeHarness = SpawnHarness | 'opencode';
 
 export interface LauncherProbe {
   ok: boolean;
@@ -47,19 +56,20 @@ export interface LauncherProbe {
 }
 
 /** Probes one launcher: `bin` is a bare name or an absolute path, as in LaunchSpec. */
-export type ProbeFn = (harness: SpawnHarness, bin: string) => Promise<LauncherProbe>;
+export type ProbeFn = (harness: ProbeHarness, bin: string) => Promise<LauncherProbe>;
 
 /** The program a target's launch runs for a harness (launchCommand's rule). */
 export function launcherBin(harness: SpawnHarness, spec: LaunchSpec | undefined): string {
   return spec?.bin ?? harness;
 }
 
-export const probeKey = (harness: SpawnHarness, bin: string): string => `${harness}\0${bin}`;
+export const probeKey = (harness: ProbeHarness, bin: string): string => `${harness}\0${bin}`;
 
-/** Every launcher to probe: each harness's bare name, plus every target's own `bin`. */
-export function launchersToProbe(targets: ExecutionTarget[]): Array<{ harness: SpawnHarness; bin: string }> {
-  const seen = new Map<string, { harness: SpawnHarness; bin: string }>();
+/** Every launcher to probe: each harness's bare name (observed-only ones too), plus every target's own `bin`. */
+export function launchersToProbe(targets: ExecutionTarget[]): Array<{ harness: ProbeHarness; bin: string }> {
+  const seen = new Map<string, { harness: ProbeHarness; bin: string }>();
   for (const harness of SPAWN_HARNESSES) seen.set(probeKey(harness, harness), { harness, bin: harness });
+  for (const harness of OBSERVED_HARNESSES as ProbeHarness[]) seen.set(probeKey(harness, harness), { harness, bin: harness });
   for (const t of targets) {
     for (const harness of SPAWN_HARNESSES) {
       const spec = t.launch[harness];
@@ -149,12 +159,30 @@ export const defaultProbe: ProbeFn = (_harness, bin) => probeLauncher(bin);
 
 const NOT_PROBED: LauncherProbe = { ok: false, version: null, error: 'not probed yet' };
 
-/** What remotea's code supports per harness (protocol support), before anything is probed. */
-function supported(harness: SpawnHarness): Omit<HarnessCaps, 'version'> {
-  const base = { observe: true, capture: true, question: false, context: true, resume: true, steer: 'interrupt' as const };
+/** No question hook is known to be wired: nothing is answerable. */
+export const NO_ADAPTER_HOOKS: AdapterHooks = Object.freeze({ claudeAsk: false, codexApproval: false });
+
+/**
+ * What remotea's code supports per harness (protocol support). `question` is
+ * true only for the kinds whose adapter was verified on this version and whose
+ * hook is wired (harness-adapters.ts).
+ */
+function supported(harness: SpawnHarness, version: string | null, hooks: AdapterHooks): Omit<HarnessCaps, 'version'> {
+  const kinds = answerableKinds(harness, version, hooks);
+  const base = { observe: true, capture: true, question: kinds.length > 0, question_kinds: kinds, context: true, resume: true, steer: 'interrupt' as const, loop: true };
   return harness === 'claude'
-    ? { ...base, question: true, permission: 'capture', launch_flags: ['--permission-mode', 'auto'] }
-    : { ...base, launch_flags: ['--disable', 'daemon_auto_start'] };
+    ? { ...base, permission: 'capture', launch_flags: ['--permission-mode', 'auto'] }
+    : { ...base, permission: kinds.includes('approval') ? 'answer' : 'capture', launch_flags: ['--disable', 'daemon_auto_start'] };
+}
+
+/**
+ * OpenCode (1.17.20 checked): the wmux plugin reports its status (observe),
+ * nothing else is wired. No final-response capture (the plugin sends no Stop
+ * text), no context, no questions (its question/permission events reach the
+ * plugin, but no session of it is ever bound to a run), no resume, no spawn.
+ */
+function observedOnly(): Omit<HarnessCaps, 'version'> {
+  return { observe: true, capture: false, question: false, question_kinds: [], context: false, resume: false, loop: false, permission: 'capture', spawn: false };
 }
 
 /**
@@ -162,7 +190,7 @@ function supported(harness: SpawnHarness): Omit<HarnessCaps, 'version'> {
  * answered, `version` from the bare name's probe first, `spawn` only when a
  * target that enables the harness has a working launcher.
  */
-export function harnessMatrix(probes: ReadonlyMap<string, LauncherProbe>, targets: ExecutionTarget[]): CapabilityMatrix {
+export function harnessMatrix(probes: ReadonlyMap<string, LauncherProbe>, targets: ExecutionTarget[], hooks: AdapterHooks = NO_ADAPTER_HOOKS): CapabilityMatrix {
   const out: CapabilityMatrix = {};
   for (const harness of SPAWN_HARNESSES) {
     const bare = probes.get(probeKey(harness, harness)) ?? NOT_PROBED;
@@ -173,10 +201,19 @@ export function harnessMatrix(probes: ReadonlyMap<string, LauncherProbe>, target
     const version = (bare.ok ? bare.version : null) ?? working?.version ?? null;
     out[harness] = {
       version,
-      ...supported(harness),
+      ...supported(harness, version, hooks),
       spawn: enabled.some((p) => p.ok),
       installed,
       ...(installed ? {} : { launch_error: bare.error ?? 'not installed' }),
+    };
+  }
+  for (const harness of OBSERVED_HARNESSES) {
+    const bare = probes.get(probeKey(harness as ProbeHarness, harness)) ?? NOT_PROBED;
+    out[harness] = {
+      version: bare.ok ? bare.version : null,
+      ...observedOnly(),
+      installed: bare.ok,
+      ...(bare.ok ? {} : { launch_error: bare.error ?? 'not installed' }),
     };
   }
   return out;
