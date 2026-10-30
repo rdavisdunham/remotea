@@ -24,10 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 22: the collector reads Codex's state database with node:sqlite (Node 22.5+).
+      # The server's runtime: remote-server/.nvmrc (22). The collector reads Codex's
+      # state database with node:sqlite, unflagged from Node 22.13; package.json
+      # "engines" and scripts/check-node.sh hold that floor (tests/node-version.test.ts).
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: remote-server/.nvmrc
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -59,6 +61,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The app's build toolchain only (Electron bundles its own Node at run time):
+      # root package.json "engines". 20 matches release.yml.
       - uses: actions/setup-node@v4
         with:
           node-version: 20
