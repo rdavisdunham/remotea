@@ -10,6 +10,7 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { Collector, formatRows, type ReportOut } from '../src/collector/collector';
 import { CollectorState } from '../src/collector/state';
+import { DatabaseSync } from 'node:sqlite';
 import { DbReader, codexSources } from '../src/collector/codex-sqlite';
 import { clip, redact } from '../src/collector/redact';
 import { pyIso } from '../src/collector/iso';
@@ -21,11 +22,22 @@ const FIX = path.join(__dirname, 'fixtures', 'collector');
 const status = JSON.parse(fs.readFileSync(path.join(FIX, 'status.json'), 'utf8')) as StatusLike;
 const expected = JSON.parse(fs.readFileSync(path.join(FIX, 'expected.json'), 'utf8')) as Record<string, unknown>;
 
+/** The fixture home, copied so the Codex threads' absolute rollout_path can point at this checkout. */
+const HOME = (() => {
+  const home = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'collector-home-')), 'home');
+  fs.cpSync(path.join(FIX, 'home'), home, { recursive: true });
+  const db = new DatabaseSync(path.join(home, '.codex', 'state_5.sqlite'));
+  db.prepare("UPDATE threads SET rollout_path = ? || '/.codex/sessions/' || substr(rollout_path, instr(rollout_path, '/.codex/sessions/') + 17)"
+    + " WHERE rollout_path LIKE '%/.codex/sessions/%'").run(home);
+  db.close();
+  return home;
+})();
+
 function make(opts: { state?: CollectorState; send?: (r: ReportOut) => boolean; now?: () => number } = {}) {
   const sent: ReportOut[] = [];
   const state = opts.state ?? new CollectorState(null);
   const c = new Collector({
-    home: path.join(FIX, 'home'),
+    home: HOME,
     windowsUsers: path.join(FIX, 'windows-users'),
     machine: 'fixturepc',
     state,
