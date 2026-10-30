@@ -235,6 +235,12 @@ export default function WorkspaceSettings() {
           "Ask before the × button, the context menu or Ctrl+Shift+W closes a session — a stray click can't take down agents that haven't saved their state yet. Closes from the CLI and agents never prompt.",
         )}
       </p>
+      {/* remotea: not governed by the toggle above. */}
+      <p className="settings-hint">
+        Workspaces and tabs with remote sessions always ask, whatever this setting says: <strong>Hide on this device</strong> removes
+        them here only and they keep running; <strong>End sessions on this host</strong> stops them on every device, including
+        sessions hidden here and Eridani agent runs. Quitting the app only detaches from remote sessions.
+      </p>
 
       <div className="settings-row">
         <label className="settings-label">{t('settings.workspacePanel.confirmAppClose', 'Confirm before closing remotea')}</label>

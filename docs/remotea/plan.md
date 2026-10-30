@@ -324,11 +324,11 @@ The server broadcasts every event to every connection, and applying an event is 
 |---|---|
 | create session in W | placed as a new tab in its copy of W (created there if missing) |
 | close tab or pane (`killSurfacePty`, `pty-teardown.ts:39`, gets `shellSpec`) → `close` | `dropSurfacesLocal`: removed with no kill |
-| close workspace (`closeWorkspace`, `workspace-slice.ts:242`) → `groupClose` per host | all its sessions are dropped, hidden ones included; W is discarded if nothing local is left |
+| close workspace (`closeWorkspace` — the CLI, or "End sessions on this host" in the remote close dialog; user gestures reach it only through that dialog) → `groupClose` per host | all its sessions are dropped, hidden ones included; W is discarded if nothing local is left |
 | process exits on its own | `[process exited]` banner on both; closing it on either one removes it from both |
 | rename or recolor W | the server takes the last write, and every device updates |
 | move a session between workspaces | `sessionUpdate{groupId}`; the other device moves it too |
-| Hide here | dropped locally only; `hiddenBy` gets this device's id |
+| Hide here (a tab, or "Hide on this device" for a whole workspace: `hideWorkspaceOnDevice`) | dropped locally only; `hiddenBy` gets this device's id; never a `close` or `groupClose` |
 
 ### New store actions
 

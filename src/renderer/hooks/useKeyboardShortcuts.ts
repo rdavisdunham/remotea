@@ -348,6 +348,8 @@ export function useKeyboardShortcuts(
       newWindow: () => window.wmux?.window?.create?.(),
       // Routed through the close guard (issue #90): prompts when the opt-in
       // confirmWorkspaceClose pref is on, closes immediately otherwise.
+      // remotea: a workspace with remote sessions always gets the remote close
+      // dialog (Hide on this device / End sessions on this host).
       closeWorkspace: () => { if (activeWorkspaceId) requestCloseWorkspace(activeWorkspaceId); },
       closeWindow: () => window.close(),
       openFolder: openFolderAsWorkspace,

@@ -1,9 +1,12 @@
 import { StateCreator } from 'zustand';
 import { v4 as uuid } from 'uuid';
-import { WorkspaceId, WorkspaceInfo, SplitNode, SavedLayout } from '../../shared/types';
+import { WorkspaceId, WorkspaceInfo, SplitNode, SavedLayout, PaneId, SurfaceId } from '../../shared/types';
 import { isPosixPath } from '../../shared/paths';
 import { buildWorkspaceTree, WorkspaceLayout, instantiateLayout, freezeSurfaceCwds, dropEphemeralSurfaces, dropCodeContent, mergeStartupCommands } from './split-utils';
-import { closeRemoteGroups, killDroppedSurfaces, killTreeTerminalPtys } from './pty-teardown';
+import { closeRemoteGroups, forgetSurfaceLocally, hideRemoteSessionHere, killDroppedSurfaces, killSurfacePty, killTreeTerminalPtys } from './pty-teardown';
+import { allSurfaceIds, forEachSurface, isRemoteWorkspace, remoteHostOf, remoteSurfacesOf, type RemoteCloseRequest } from './remote-close';
+import { latestRemoteViews } from '../remote-sessions/registry-cache';
+import { remoteTargetsAllExited } from '../remote-sessions/close-summary';
 // The one module that owns every tab-label rule. It is pure (no React), so the
 // store importing it pulls in nothing but the label helpers.
 import { deriveWorkspaceTitle } from '../components/SplitPane/surface-label';
@@ -24,6 +27,17 @@ type SettingsReach = {
   };
   savedLayouts?: SavedLayout[];
   setSavedLayouts?: (layouts: SavedLayout[]) => void;
+};
+
+/** The default shell decides whether a tab with no shell of its own is remote. */
+function defaultShellOf(get: () => unknown): string | undefined {
+  return (get() as { workspacePrefs?: { defaultShell?: string } }).workspacePrefs?.defaultShell;
+}
+
+/** Surface-slice actions the remote close dialog carries out for a tab-level close. */
+type SurfaceReach = {
+  closeSurface?: (workspaceId: WorkspaceId, paneId: PaneId, surfaceId: SurfaceId) => void;
+  dropSurfacesLocal?: (surfaceIds: readonly string[]) => void;
 };
 
 /**
@@ -127,6 +141,31 @@ export interface WorkspaceSlice {
   confirmPendingClose(): void;
   /** Dialog "Cancel" / Escape: drop the queue, close nothing. */
   cancelPendingClose(): void;
+  /**
+   * remotea: closes the user asked for that would end sessions on a remote
+   * host, waiting for the remote close dialog (one at a time, head first).
+   * Always asked, whatever `confirmWorkspaceClose` says. Runtime-only.
+   */
+  pendingRemoteClose: RemoteCloseRequest[];
+  /**
+   * remotea: the routing every USER close gesture (workspace ×, Ctrl+Shift+W,
+   * tab ×, Ctrl+W, pane ×, Close others/to the right) goes through first.
+   * Closing `surfaceIds` of the workspace would end remote sessions: park the
+   * close for the dialog and answer true — the caller then closes nothing.
+   * False: nothing remote is involved (or only sessions that already exited),
+   * carry on with the ordinary close. A close that would empty a workspace
+   * bound to a server group becomes a whole-workspace request.
+   */
+  routeRemoteClose(workspaceId: WorkspaceId, surfaceIds: readonly string[]): boolean;
+  /**
+   * remotea: "Hide on this device" for a whole workspace. Its remote tabs are
+   * hidden here (they keep running and stay on other devices), its local
+   * tabs close as usual, and the workspace goes away on this device only.
+   * Never sends a server close: no group close, no session close.
+   */
+  hideWorkspaceOnDevice(id: WorkspaceId): void;
+  /** The remote close dialog's answer for the request at the head of the queue. */
+  resolveRemoteClose(choice: 'hide' | 'end' | 'cancel'): void;
   selectWorkspace(id: WorkspaceId): void;
   renameWorkspace(id: WorkspaceId, title: string): void;
   reorderWorkspaces(ids: WorkspaceId[]): void;
@@ -160,10 +199,54 @@ export interface WorkspaceSlice {
 
 // ─── Slice creator ───────────────────────────────────────────────────────────
 
+type SliceSet = Parameters<StateCreator<WorkspaceSlice>>[0];
+
+/** Drop one workspace from the list, selecting a neighbour if it was active. Tears nothing down. */
+function removeWorkspaceEntry(set: SliceSet, id: WorkspaceId): void {
+  set((state) => {
+    const idx = state.workspaces.findIndex((w) => w.id === id);
+    if (idx === -1) return state;
+
+    const next = state.workspaces.filter((w) => w.id !== id);
+
+    let nextActiveId = state.activeWorkspaceId;
+    if (state.activeWorkspaceId === id) {
+      // Pick neighbour: prefer the one after, then before
+      if (next.length === 0) {
+        nextActiveId = null;
+      } else {
+        const newIdx = Math.min(idx, next.length - 1);
+        nextActiveId = next[newIdx].id;
+      }
+    }
+
+    return {
+      workspaces: next,
+      activeWorkspaceId: nextActiveId,
+      pendingCloseWorktree: state.pendingCloseWorktree?.id === id ? null : state.pendingCloseWorktree,
+    };
+  });
+}
+
+/** Queue a remote close for the dialog; one request per workspace at a time. */
+function enqueueRemoteClose(set: SliceSet, req: RemoteCloseRequest): void {
+  set((state) => {
+    const queue = state.pendingRemoteClose;
+    const dup = queue.findIndex((q) => q.workspaceId === req.workspaceId);
+    if (dup === -1) return { pendingRemoteClose: [...queue, req] };
+    // A whole-workspace request supersedes a tab-level one for the same workspace.
+    if (req.scope === 'workspace' && queue[dup].scope !== 'workspace') {
+      return { pendingRemoteClose: queue.map((q, i) => (i === dup ? req : q)) };
+    }
+    return state;
+  });
+}
+
 export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
   pendingCloseWorkspaceIds: [],
+  pendingRemoteClose: [],
   pendingLayoutSave: null,
   pendingCloseWorktree: null,
 
@@ -248,37 +331,105 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
     const closing = get().workspaces.find((w) => w.id === id);
     // remotea: a workspace bound to a shared group closes that group on every
     // device — including sessions some device had hidden. The per-tab kills
-    // below then find them already closed (idempotent on the server).
+    // below then find them already closed (idempotent on the server). This is
+    // the programmatic close (CLI, agents) and the dialog's "End sessions on
+    // this host"; user gestures on a remote workspace go through
+    // requestCloseWorkspace / routeRemoteClose and the dialog first.
     if (closing?.remoteGroups) closeRemoteGroups(closing.remoteGroups);
     if (closing) killTreeTerminalPtys(closing.splitTree);
+    removeWorkspaceEntry(set, id);
+  },
 
-    set((state) => {
-      const idx = state.workspaces.findIndex((w) => w.id === id);
-      if (idx === -1) return state;
-
-      const next = state.workspaces.filter((w) => w.id !== id);
-
-      let nextActiveId = state.activeWorkspaceId;
-      if (state.activeWorkspaceId === id) {
-        // Pick neighbour: prefer the one after, then before
-        if (next.length === 0) {
-          nextActiveId = null;
-        } else {
-          const newIdx = Math.min(idx, next.length - 1);
-          nextActiveId = next[newIdx].id;
-        }
+  hideWorkspaceOnDevice(id: WorkspaceId): void {
+    const ws = get().workspaces.find((w) => w.id === id);
+    if (!ws) return;
+    const defaultShell = defaultShellOf(get);
+    forEachSurface(ws.splitTree, (s) => {
+      const host = remoteHostOf(s, ws.shell, defaultShell);
+      if (host) {
+        forgetSurfaceLocally(s.id);
+        hideRemoteSessionHere(host, s.id);
+      } else {
+        killSurfacePty(s);
       }
-
-      return {
-        workspaces: next,
-        activeWorkspaceId: nextActiveId,
-        pendingCloseWorktree: state.pendingCloseWorktree?.id === id ? null : state.pendingCloseWorktree,
-      };
     });
+    removeWorkspaceEntry(set, id);
+  },
+
+  routeRemoteClose(workspaceId: WorkspaceId, surfaceIds: readonly string[]): boolean {
+    const ws = get().workspaces.find((w) => w.id === workspaceId);
+    if (!ws) return false;
+    const defaultShell = defaultShellOf(get);
+    const all = allSurfaceIds(ws.splitTree);
+    const targets = new Set(surfaceIds);
+    const empties = all.every((id) => targets.has(id));
+    if (empties && isRemoteWorkspace(ws, defaultShell)) {
+      enqueueRemoteClose(set, { workspaceId, scope: 'workspace', surfaceIds: [] });
+      return true;
+    }
+    const remote = remoteSurfacesOf(ws, defaultShell);
+    if (!surfaceIds.some((id) => remote.has(id))) return false;
+    if (remoteTargetsAllExited(remote, surfaceIds, latestRemoteViews())) return false;
+    enqueueRemoteClose(set, { workspaceId, scope: 'surfaces', surfaceIds: [...surfaceIds] });
+    return true;
+  },
+
+  resolveRemoteClose(choice: 'hide' | 'end' | 'cancel'): void {
+    const [head, ...rest] = get().pendingRemoteClose;
+    if (!head) return;
+    set({ pendingRemoteClose: rest });
+    if (choice === 'cancel') return;
+    const wsId = head.workspaceId as WorkspaceId;
+    const ws = get().workspaces.find((w) => w.id === wsId);
+    if (!ws) return;
+    if (head.scope === 'workspace') {
+      if (choice === 'end') get().closeWorkspace(wsId);
+      else get().hideWorkspaceOnDevice(wsId);
+      return;
+    }
+    // The layout may have changed while the dialog was up. If these tabs are
+    // now all the workspace holds, closing them would close the workspace —
+    // and with it the server group, which this dialog never named.
+    const targets = new Set(head.surfaceIds);
+    if (allSurfaceIds(ws.splitTree).every((id) => targets.has(id))) {
+      if (choice === 'hide') get().hideWorkspaceOnDevice(wsId);
+      else enqueueRemoteClose(set, { workspaceId: wsId, scope: 'workspace', surfaceIds: [] });
+      return;
+    }
+    const reach = get() as unknown as SurfaceReach;
+    const defaultShell = defaultShellOf(get);
+    const remote = remoteSurfacesOf(ws, defaultShell);
+    if (choice === 'hide') {
+      const hidden: string[] = [];
+      for (const id of head.surfaceIds) {
+        const host = remote.get(id);
+        if (!host) continue;
+        hideRemoteSessionHere(host, id);
+        hidden.push(id);
+      }
+      reach.dropSurfacesLocal?.(hidden);
+    }
+    // Ending closes every targeted tab; hiding still closes the LOCAL ones the gesture named.
+    for (const id of head.surfaceIds) {
+      if (choice === 'hide' && remote.has(id)) continue;
+      const current = get().workspaces.find((w) => w.id === wsId);
+      if (!current) return;
+      let paneId: string | null = null;
+      forEachSurface(current.splitTree, (s, p) => { if (s.id === id) paneId = p; });
+      if (paneId) reach.closeSurface?.(wsId, paneId as PaneId, id as SurfaceId);
+    }
   },
 
   requestCloseWorkspace(id: WorkspaceId): void {
     const ws = get().workspaces.find((w) => w.id === id);
+    // remotea: a workspace with remote sessions always asks — Hide on this
+    // device, or End sessions on this host — whatever confirmWorkspaceClose
+    // says. Ending closes its server group on every device, including
+    // sessions hidden here and Eridani runs, so it is never done silently.
+    if (ws && isRemoteWorkspace(ws, defaultShellOf(get))) {
+      enqueueRemoteClose(set, { workspaceId: id, scope: 'workspace', surfaceIds: [] });
+      return;
+    }
     if (ws?.worktree) {
       set({ pendingCloseWorktree: ws });
       return;

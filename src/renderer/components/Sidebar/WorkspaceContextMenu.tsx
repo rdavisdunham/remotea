@@ -4,6 +4,8 @@ import { WorkspaceInfo, WorkspaceId } from '../../../shared/types';
 import { useT } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 import { useWorkspaceLabel } from '../SplitPane/use-osc-title';
+import { useStore } from '../../store';
+import { isRemoteWorkspace } from '../../store/remote-close';
 
 interface WorkspaceContextMenuProps {
   x: number;
@@ -67,6 +69,10 @@ export default function WorkspaceContextMenu({
   const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
   const [renaming, setRenaming] = useState(false);
+  // remotea: a workspace with remote sessions offers two different things —
+  // hide it on this device, or end its sessions on the host (which asks first).
+  const defaultShell = useStore((s) => s.workspacePrefs.defaultShell);
+  const remote = isRemoteWorkspace(workspace, defaultShell);
   // Starts from what the sidebar shows; see WorkspaceRow for why an untouched
   // field must not count as a rename.
   const workspaceLabel = useWorkspaceLabel(workspace);
@@ -256,7 +262,8 @@ export default function WorkspaceContextMenu({
       <div className="ctx-menu__separator" />
 
       {/* Close */}
-      {item(t('ctx.close'), () => onCloseWorkspace(workspaceId), true)}
+      {remote && item('Hide on this device', () => useStore.getState().hideWorkspaceOnDevice(workspaceId))}
+      {item(remote ? 'End sessions on this host…' : t('ctx.close'), () => onCloseWorkspace(workspaceId), true)}
       {item(t('ctx.closeOthers'), () => onCloseOthers(workspaceId), true)}
 
       <div className="ctx-menu__separator" />

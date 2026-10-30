@@ -520,14 +520,22 @@ export default function PaneWrapper({
     }
   };
 
+  // remotea: closing tabs that are remote sessions asks first (Hide on this
+  // device / End on this host) — routeRemoteClose parks the close for the
+  // remote close dialog and answers true; local-only closes carry straight on.
   const handleCloseOtherSurfaces = (surfaceId: SurfaceId) => {
     if (activeWorkspaceId) {
+      const dropped = surfaces.filter((s) => s.id !== surfaceId).map((s) => s.id);
+      if (useStore.getState().routeRemoteClose(activeWorkspaceId, dropped)) return;
       closeOtherSurfaces(activeWorkspaceId, paneId, surfaceId);
     }
   };
 
   const handleCloseSurfacesToRight = (surfaceId: SurfaceId) => {
     if (activeWorkspaceId) {
+      const idx = surfaces.findIndex((s) => s.id === surfaceId);
+      const dropped = idx === -1 ? [] : surfaces.slice(idx + 1).map((s) => s.id);
+      if (useStore.getState().routeRemoteClose(activeWorkspaceId, dropped)) return;
       closeSurfacesToRight(activeWorkspaceId, paneId, surfaceId);
     }
   };
@@ -560,7 +568,8 @@ export default function PaneWrapper({
     // `wmux close-pane` and closeSurface's last-tab path had each grown their own
     // copy, and all three killed the shells before discovering they were not
     // going to remove anything (a one-pane workspace). See surface-slice.closePane.
-    useStore.getState().closePane(activeWorkspaceId, paneId);
+    // remotea: via requestClosePane, so remote sessions go to the close dialog.
+    useStore.getState().requestClosePane(activeWorkspaceId, paneId);
   };
 
   const getSourceLeaf = (sourcePaneId: PaneId) => {
