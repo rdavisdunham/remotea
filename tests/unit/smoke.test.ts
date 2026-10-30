@@ -151,7 +151,7 @@ describe('smoke wiring', () => {
   const repo = path.resolve(__dirname, '..', '..');
   it('isolates itself before anything reads the instance', () => {
     const index = fs.readFileSync(path.join(repo, 'src/main/index.ts'), 'utf8');
-    const firstImport = index.split('\n').find((l) => l.startsWith('import '));
+    const firstImport = index.split(/\r?\n/).find((l) => l.startsWith('import '));
     expect(firstImport).toBe("import './smoke-env';");
     const env = fs.readFileSync(path.join(repo, 'src/main/smoke-env.ts'), 'utf8');
     for (const v of ['WMUX_INSTANCE', 'REMOTEA_SKIP_AGENT_INTEGRATION', 'WMUX_DISABLE_UPDATER']) expect(env).toContain(v);
