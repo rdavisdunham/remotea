@@ -39,7 +39,7 @@ Electron-based Windows terminal multiplexer for AI agents. TypeScript, React 19,
 
 ```bash
 npm run dev            # Vite (port 5199) + Electron hot-reload
-npm run build:main     # tsc main/preload/cli only (fast iteration)
+npm run build:main     # tsc main/preload/cli + bundle the sandboxed preload (fast iteration)
 npm run build:renderer # Vite production build: BOTH entries (desktop index.html + remote/index.html), writes dist/renderer/remote-manifest.json (the console server refuses to serve without it)
 npm run build          # Full: tsc + vite + electron-builder
 npm test               # Vitest unit tests
@@ -448,7 +448,7 @@ wmux is distributed as a **portable zip** (not NSIS installer) because without c
 
 ```bash
 # 1. Build everything
-npm run build:main        # Compile TS → dist/main/, dist/preload/, dist/cli/
+npm run build:main        # Compile TS → dist/main/, dist/preload/, dist/cli/; then bundle dist/preload/index.js (sandboxed: one file, requires only electron)
 npx vite build            # Build renderer → dist/renderer/
 
 # 2. Verify compiled code

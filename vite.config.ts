@@ -2,9 +2,22 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { REMOTE_MANIFEST_FILE } from './src/shared/remote-console-config';
+import { injectRendererCsp, isDesktopRendererHtml } from './src/shared/renderer-csp';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // The desktop renderer's CSP (src/shared/renderer-csp.ts), build only: the
+    // dev server's inline React-refresh preamble would be blocked by it.
+    {
+      name: 'remotea-renderer-csp',
+      apply: 'build',
+      transformIndexHtml: {
+        order: 'post',
+        handler: (html, ctx) => (isDesktopRendererHtml(ctx.filename) ? injectRendererCsp(html) : html),
+      },
+    },
+  ],
   root: 'src/renderer',
   base: './',
   build: {

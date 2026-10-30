@@ -1,0 +1,151 @@
+name: Windows smoke
+
+# Builds the app the way release.yml does (electron-builder, NSIS), then runs the
+# PACKAGED binary's `--smoke` self-test (src/main/smoke.ts): main window opens,
+# the sandboxed preload bridge answers, the renderer's first local terminal gets
+# a PTY, `echo smoke-ok` comes back through the xterm buffer. Twice: the unpacked
+# build, and the NSIS installer installed silently into a temp dir (then
+# uninstalled). Unit tests cannot see any of this — a preload that fails to load
+# in the sandbox, a file missing from the asar, a renderer that throws on first
+# paint all pass `npm test`. README "Releases" describes it.
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'resources/**'
+      - 'build/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'electron-builder.json'
+      - 'vite.config.ts'
+      - 'tsconfig*.json'
+      - 'scripts/bundle-preload.mjs'
+      - 'scripts/smoke-windows.ps1'
+      - '.github/workflows/smoke.yml'
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Packaged app smoke (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      # Never try to sign in a smoke build, and keep electron-builder's downloads
+      # (Electron zip, NSIS, winCodeSign) in a cached place.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      ELECTRON_CACHE: ${{ github.workspace }}\.cache\electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}\.cache\electron-builder
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same toolchain as release.yml.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node_modules
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: smoke-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+
+      - name: Cache Electron and electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/electron
+            .cache/electron-builder
+          key: smoke-electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: smoke-electron-${{ runner.os }}-
+
+      - name: Fix Python distutils for node-gyp
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: pip install setuptools
+
+      - name: Install dependencies
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      # build:main = tsc + the sandboxed-preload bundle (scripts/bundle-preload.mjs).
+      - name: Build main + preload + CLI
+        run: npm run build:main
+
+      - name: Build renderer
+        run: npx vite build
+
+      - name: Package with electron-builder
+        run: npx electron-builder --win --publish never
+
+      - name: Smoke the unpacked build
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File scripts/smoke-windows.ps1 `
+            -Exe release/win-unpacked/remotea.exe `
+            -Out smoke/unpacked.json -Instance smoke-unpacked
+
+      - name: Smoke the installer (silent install, run, uninstall)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ver = node -p "require('./package.json').version"
+          $setup = Resolve-Path "release/remotea-$ver-setup.exe"
+          $dir = Join-Path $env:RUNNER_TEMP 'remotea-install'
+          # /S silent, /currentuser no elevation, /D= must be last and unquoted.
+          Write-Host "install: $setup -> $dir"
+          $p = Start-Process -FilePath $setup -ArgumentList '/S', '/currentuser', "/D=$dir" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "installer exited $($p.ExitCode)" }
+          $exe = Join-Path $dir 'remotea.exe'
+          if (-not (Test-Path $exe)) { throw "installer did not create $exe" }
+
+          pwsh -NoProfile -File scripts/smoke-windows.ps1 -Exe $exe -Out smoke/installed.json -Instance smoke-installed
+          $smokeExit = $LASTEXITCODE
+
+          $uninstaller = Join-Path $dir 'Uninstall remotea.exe'
+          if (-not (Test-Path $uninstaller)) { throw "no uninstaller at $uninstaller" }
+          Start-Process -FilePath $uninstaller -ArgumentList '/S', '/currentuser' -Wait
+          # The NSIS uninstaller re-launches itself from %TEMP% and returns at
+          # once, so wait for the files to actually go.
+          $deadline = (Get-Date).AddSeconds(90)
+          while ((Test-Path $exe) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+          if (Test-Path $exe) { throw "uninstall left $exe behind" }
+          Write-Host "uninstall: removed $dir"
+          exit $smokeExit
+
+      - name: Collect app logs
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force smoke/appdata | Out-Null
+          foreach ($name in 'remotea-smoke-unpacked', 'remotea-smoke-installed') {
+            $src = Join-Path $env:APPDATA $name
+            if (Test-Path $src) {
+              # Logs only: never settings, session or token files.
+              Get-ChildItem $src -Recurse -Include *.log, *.jsonl -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -notmatch '\\(chromium|Partitions|Cache|Code Cache|GPUCache)\\' } |
+                ForEach-Object {
+                  $rel = $_.FullName.Substring($src.Length).TrimStart('\')
+                  $dest = Join-Path "smoke/appdata/$name" $rel
+                  New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
+                  Copy-Item $_.FullName $dest
+                }
+            }
+          }
+
+      - name: Upload smoke results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-smoke
+          path: smoke/
+          if-no-files-found: warn
+          retention-days: 14

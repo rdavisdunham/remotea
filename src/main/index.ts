@@ -1,3 +1,5 @@
+// First: a --smoke run isolates itself before any module reads the instance (smoke-env.ts).
+import './smoke-env';
 import { app, BrowserWindow, ipcMain, powerMonitor, session, shell } from 'electron';
 import { registerIpcHandlers, agentManager, ptyManager, remoteHosts, setupAgentPtyForwarding, reapOrphanedPtys, sshDetector, agentIdentity, replayRemoteBindings } from './ipc-handlers';
 import { sequenceFrom, splitSequencedReport } from './ssh-detect';
@@ -15,6 +17,8 @@ import {
   needsAppWindowNavigationLock,
   popupWindowTitle,
 } from './webview-navigation';
+import { decidePermission } from './security-policy';
+import { parseSmokeArgs, runSmoke, type SmokeOptions } from './smoke';
 import { correctedDashboardHeaders, DASHBOARD_HEADER_FILTER } from './dashboard-content-type';
 import {
   agentBrowserNeedsTeardown,
@@ -1146,6 +1150,113 @@ function hardenWebContents(): void {
   });
 }
 
+// Permissions (camera, mic, geolocation, notifications, protocol handlers, …).
+// With no handler Electron grants EVERY request, and the browser panel's
+// <webview>s share the default session with the app, so any page the panel
+// loaded got all of them. Deny-by-default; the allowlist and the reasoning are
+// decidePermission in security-policy.ts (and docs/remotea/desktop-security.md).
+function restrictPermissions(): void {
+  const isAppContents = (wc: Electron.WebContents | null): boolean =>
+    !!wc && !wc.isDestroyed() && wc.getType() === 'window' && !wc.opener;
+  const ses = session.defaultSession;
+  ses.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const granted = decidePermission({
+      permission,
+      isAppContents: isAppContents(wc),
+      requestingUrl: details.requestingUrl ?? '',
+      externalUrl: (details as { externalURL?: string }).externalURL,
+    });
+    if (!granted) logDiagnostic('permission-denied', { permission, type: wc?.getType?.() ?? 'none' });
+    callback(granted);
+  });
+  ses.setPermissionCheckHandler((wc, permission, requestingOrigin) =>
+    decidePermission({ permission, isAppContents: isAppContents(wc), requestingUrl: requestingOrigin }));
+  // WebHID / WebUSB / Web Serial: nothing in the app or the panel needs a device.
+  ses.setDevicePermissionHandler(() => false);
+}
+
+/**
+ * The Electron half of `--smoke` (the pure runner and its steps are smoke.ts).
+ * Writes `<out>` (JSON) and `<out>.log` (renderer console, preload errors) and
+ * exits 0/1. A hard timer exits 2 if the run itself wedges past its budget.
+ */
+async function runSmokeMode(opts: SmokeOptions): Promise<void> {
+  const outFile = path.resolve(opts.outFile ?? path.join(getAppDataDir(), 'smoke-result.json'));
+  const logFile = `${outFile}.log`;
+  const startedAt = new Date().toISOString();
+  const logLines: string[] = [];
+  const log = (line: string) => { logLines.push(`${new Date().toISOString()} ${line}`); };
+  const app_ = {
+    version: app.getVersion(),
+    electron: process.versions.electron,
+    platform: process.platform,
+    arch: process.arch,
+    packaged: app.isPackaged,
+    execPath: process.execPath,
+  };
+  let finished = false;
+  const finish = (result: Record<string, unknown>, code: number) => {
+    if (finished) return;
+    finished = true;
+    try {
+      fs.mkdirSync(path.dirname(outFile), { recursive: true });
+      fs.writeFileSync(outFile, JSON.stringify({ ...result, startedAt, finishedAt: new Date().toISOString(), app: app_, diagnostics: getDiagnosticsPath() }, null, 2));
+      fs.writeFileSync(logFile, logLines.join('\n') + '\n');
+    } catch (err) {
+      console.error('[smoke] could not write the result:', err);
+    }
+    console.log(`[smoke] ${code === 0 ? 'PASS' : 'FAIL'} -> ${outFile}`);
+    try { ptyManager.killAll(); } catch { /* exiting anyway */ }
+    app.exit(code);
+  };
+  const hardStop = setTimeout(() => finish({ ok: false, error: `smoke run exceeded ${opts.timeoutMs + 15_000} ms` }, 2), opts.timeoutMs + 15_000);
+  hardStop.unref?.();
+
+  const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+  if (!win) { finish({ ok: false, error: 'no window was created' }, 1); return; }
+  const wc = win.webContents;
+  log(`window ${win.id} url=${wc.getURL() || '(loading)'}`);
+
+  let loadFailure: string | null = null;
+  const failLoad: ((msg: string) => void)[] = [];
+  const fail = (msg: string) => { loadFailure ??= msg; log(msg); failLoad.forEach((f) => f(msg)); };
+  wc.on('console-message', (details) => { log(`console.${details.level}: ${details.message} (${details.sourceId}:${details.lineNumber})`); });
+  wc.on('preload-error', (_e, preloadPath, error) => fail(`preload-error ${preloadPath}: ${error?.message ?? error}`));
+  wc.on('did-fail-load', (_e, code, desc, url, isMainFrame) => { if (isMainFrame) fail(`did-fail-load ${code} ${desc} ${url}`); });
+  wc.on('render-process-gone', (_e, d) => fail(`render-process-gone ${d.reason} (exit ${d.exitCode})`));
+
+  const result = await runSmoke({
+    now: () => Date.now(),
+    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    waitForWindowLoad: () => new Promise<void>((resolve, reject) => {
+      if (loadFailure) { reject(new Error(loadFailure)); return; }
+      failLoad.push((msg) => reject(new Error(msg)));
+      if (!wc.isLoading() && wc.getURL()) { resolve(); return; }
+      wc.once('did-finish-load', () => resolve());
+    }),
+    probeRenderer: async () => {
+      if (loadFailure) throw new Error(loadFailure);
+      const r = await wc.executeJavaScript(
+        `({ bridge: typeof window.wmux === 'object' && typeof window.wmux?.pty?.create === 'function',
+            readScreen: typeof window.__wmux_readScreen === 'function',
+            sandboxed: window.wmux?.system?.sandboxed === true,
+            activeSurfaceId: window.__wmux_getActiveSurfaceId?.() ?? null })`,
+      );
+      return { bridge: !!r?.bridge, readScreen: !!r?.readScreen, sandboxed: r?.sandboxed === true, activeSurfaceId: typeof r?.activeSurfaceId === 'string' ? r.activeSurfaceId : null };
+    },
+    hasPty: (id) => ptyManager.has(id as SurfaceId),
+    writePty: (id, data) => { log(`write ${JSON.stringify(data)} -> ${id}`); ptyManager.write(id as SurfaceId, data); },
+    readScreen: async (id) => {
+      const r = await wc.executeJavaScript(`window.__wmux_readScreen?.(${JSON.stringify(id)}, 200)`);
+      return typeof r?.text === 'string' ? r.text : null;
+    },
+  }, { timeoutMs: opts.timeoutMs });
+
+  clearTimeout(hardStop);
+  for (const s of result.steps) log(`step ${s.name} ${s.ok ? 'ok' : 'FAILED'} ${s.ms}ms${s.detail ? ` ${s.detail}` : ''}`);
+  finish({ ...result }, result.ok ? 0 : 1);
+}
+
 // The agent-browser dashboard answers its own deep link as octet-stream, which
 // Chromium turns into a Save dialog over the window (#269). Webviews have no
 // partition, so they share the default session. See dashboard-content-type.ts.
@@ -1484,6 +1595,7 @@ app.whenReady().then(() => {
   });
 
   hardenWebContents();
+  restrictPermissions();
   fixDashboardContentType();
 
   // Find out whether PowerShell will run the .ps1 shim before the renderer asks
@@ -1665,6 +1777,10 @@ app.whenReady().then(() => {
   // must not block on an answer, so the rest of the launch proceeds and the
   // integration lands whenever the user gets to it.
   void initAgentIntegration(BrowserWindow.getAllWindows()[0]);
+
+  // `--smoke` (smoke.ts): drive the window just opened, write a result, exit.
+  const smoke = parseSmokeArgs(process.argv, process.env);
+  if (smoke) void runSmokeMode(smoke);
 
   // Cold launch from the Explorer verb: no instance was running, so there is no
   // second-instance event — the folder is in our own argv. Wait for the renderer
