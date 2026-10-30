@@ -17,9 +17,11 @@ import { defaultHookPaths, hooksStatus, installHooks, toAgentStatus } from './ho
 import { runFsOp } from './remote-fs';
 import { EridaniRuntime, serverVersion } from './eridani-runtime';
 import { loadBuildInfo, serverInfo, writeServerInfo } from './build-info';
+import { UPLOADS_STATUS_FILE, UploadStore } from './upload';
 
 const DAY = 24 * 60 * 60 * 1000;
 const BIND_RETRY_MS = 5_000;
+const UPLOAD_SWEEP_MS = 10 * 60 * 1000;
 
 function log(msg: string): void {
   process.stdout.write(`${new Date().toISOString()} ${msg}\n`);
@@ -74,8 +76,18 @@ async function main(): Promise<void> {
   }
   // Re-read the token on every handshake so `remotea rotate-token` takes effect without a restart, and
   // when the file changes (watchTokenFile below), so the rotation also closes sockets admitted with the old one.
+  // S-S3: pasted/dropped files are held to a budget and an age; usage goes to uploads-status.json.
+  const uploads = new UploadStore({
+    budgetBytes: Math.max(1, config.uploadBudgetMiB) * 1024 * 1024,
+    maxAgeMs: Math.max(0, config.uploadMaxAgeDays) * DAY,
+    isLive: (surf) => hub.isLive(surf),
+    statusFile: path.join(dir, UPLOADS_STATUS_FILE),
+    log,
+  });
+  uploads.tick();
   const server = new RemoteaServer({
     hub,
+    uploads,
     token: () => {
       try {
         token = ensureToken(dir);
@@ -137,6 +149,7 @@ async function main(): Promise<void> {
   const lagTimer = setInterval(() => hub.pumpLagging(), 250);
   const probeTimer = setInterval(() => hub.probeAgents(), 5_000);
   const pruneTimer = setInterval(() => hub.prune(), 60 * 60 * 1000);
+  const uploadTimer = setInterval(() => uploads.tick(), UPLOAD_SWEEP_MS);
 
   let stopping = false;
   const stop = async (signal: string) => {
@@ -146,6 +159,7 @@ async function main(): Promise<void> {
     clearInterval(lagTimer);
     clearInterval(probeTimer);
     clearInterval(pruneTimer);
+    clearInterval(uploadTimer);
     tokenWatch.close();
     hub.shutdown();
     eridani.stop();

@@ -26,7 +26,7 @@ import type { Duplex } from 'stream';
 import { WebSocketServer, type WebSocket, type RawData } from 'ws';
 import { BIN_INPUT, decodeFrame, parseClientMsg, LIMITS, type ServerMsg } from '../../src/shared/remote-host-protocol';
 import type { Hub, HubConn } from './hub';
-import { MAX_UPLOAD_BYTES, receiveUpload } from './upload';
+import { MAX_UPLOAD_BYTES, receiveUpload, type UploadStore } from './upload';
 
 export const MAX_PAYLOAD = 16 * 1024 * 1024;
 const HELLO_TIMEOUT_MS = 10_000;
@@ -113,6 +113,8 @@ export interface RemoteaServerOptions {
   /** The token in effect. Read on every handshake, upload and `checkToken()`; a new value revokes older sockets. */
   token: () => string;
   log?: (msg: string) => void;
+  /** S-S3: the uploads' budget, age limit and references. Absent: uploads are only capped one by one. */
+  uploads?: UploadStore;
 }
 
 export class RemoteaServer {
@@ -232,10 +234,15 @@ export class RemoteaServer {
       const declared = Number(req.headers['content-length']);
       if (!Number.isInteger(declared) || declared < 0) return refuse(411, 'Content-Length required');
       if (declared > MAX_UPLOAD_BYTES) return refuse(413, `larger than ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB`);
+      const room = this.opts.uploads?.admit(declared);
+      if (room && !room.ok) return refuse(room.status, room.error);
       res.writeContinue();
     }
-    const r = await receiveUpload(req, name);
-    if (!r.ok) return reply(r.status, { error: r.error });
+    const r = this.opts.uploads ? await this.opts.uploads.receive(req, surf, name) : await receiveUpload(req, name);
+    if (!r.ok) {
+      if (r.status === 507) this.log(`upload refused for ${surf}: ${r.error}`);
+      return reply(r.status, { error: r.error });
+    }
     this.log(`upload: ${r.bytes} bytes for ${surf}`);
     reply(200, { path: r.path });
   }

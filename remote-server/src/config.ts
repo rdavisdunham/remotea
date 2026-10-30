@@ -25,6 +25,10 @@ export interface ServerConfig {
    * 0 turns the bridge off.
    */
   hookPort: number;
+  /** S-S3: all pasted/dropped files together (/tmp/remotea-drop-*), in MiB; the oldest unreferenced go first. */
+  uploadBudgetMiB: number;
+  /** S-S3: an unreferenced pasted/dropped file is removed after this many days. */
+  uploadMaxAgeDays: number;
 }
 
 export const DEFAULT_CONFIG: ServerConfig = {
@@ -37,6 +41,8 @@ export const DEFAULT_CONFIG: ServerConfig = {
   exitedRetentionDays: 7,
   tombstoneDays: 30,
   hookPort: 7718,
+  uploadBudgetMiB: 2048,
+  uploadMaxAgeDays: 7,
 };
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {
