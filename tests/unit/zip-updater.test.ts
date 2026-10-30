@@ -26,6 +26,7 @@ import {
   isScoopManagedInstall,
   pickZipAsset,
   findPayloadRoot,
+  APP_EXE,
   buildApplyUpdateCmd,
   updateStampName,
   updateZipName,
@@ -81,7 +82,15 @@ describe('isPortableZipInstall', () => {
     expect(isPortableZipInstall(root)).toBe(false);
   });
 
-  it('is false when wmux.exe is missing', () => {
+  it('recognises the remotea exe, and the NSIS uninstaller of either name', () => {
+    const root = tempDir();
+    fs.writeFileSync(path.join(root, APP_EXE), '');
+    expect(isPortableZipInstall(root)).toBe(true);
+    fs.writeFileSync(path.join(root, `Uninstall ${APP_EXE}`), '');
+    expect(isPortableZipInstall(root)).toBe(false);
+  });
+
+  it('is false when the exe is missing', () => {
     const root = tempDir();
     expect(isPortableZipInstall(root)).toBe(false);
   });
@@ -123,10 +132,10 @@ describe('pickZipAsset', () => {
 });
 
 describe('findPayloadRoot', () => {
-  it('uses the extract dir when wmux.exe is at the zip root', () => {
+  it('uses the extract dir when the exe is at the zip root (an install still named wmux.exe)', () => {
     const root = tempDir();
     fs.writeFileSync(path.join(root, 'wmux.exe'), '');
-    expect(findPayloadRoot(root)).toBe(root);
+    expect(findPayloadRoot(root, 'wmux.exe')).toBe(root);
   });
 
   it('walks one directory down when the zip wrapped a folder', () => {
@@ -134,13 +143,35 @@ describe('findPayloadRoot', () => {
     const inner = path.join(root, 'wmux-1.6.0-win-x64');
     fs.mkdirSync(inner);
     fs.writeFileSync(path.join(inner, 'wmux.exe'), '');
-    expect(findPayloadRoot(root)).toBe(inner);
+    expect(findPayloadRoot(root, 'wmux.exe')).toBe(inner);
   });
 
-  it('throws when the zip is not a wmux payload', () => {
+  it('throws when the zip is not a payload', () => {
     const root = tempDir();
     fs.writeFileSync(path.join(root, 'README.txt'), 'nope');
-    expect(() => findPayloadRoot(root)).toThrow(/wmux\.exe/);
+    expect(() => findPayloadRoot(root)).toThrow(/remotea\.exe/);
+  });
+
+  it('looks for remotea.exe by default, at the root or one folder down', () => {
+    const root = tempDir();
+    const inner = path.join(root, 'remotea-1.0.0-win-x64');
+    fs.mkdirSync(inner);
+    fs.writeFileSync(path.join(inner, APP_EXE), '');
+    expect(findPayloadRoot(root)).toBe(inner);
+    fs.writeFileSync(path.join(root, APP_EXE), '');
+    expect(findPayloadRoot(root)).toBe(root);
+  });
+
+  it('wants the exe this install runs: an old wmux zip is refused for a remotea install', () => {
+    const root = tempDir();
+    fs.writeFileSync(path.join(root, 'wmux.exe'), '');
+    expect(() => findPayloadRoot(root, APP_EXE)).toThrow(/does not contain remotea\.exe/);
+    expect(findPayloadRoot(root, 'wmux.exe')).toBe(root);
+  });
+
+  it('APP_EXE is the exe electron-builder packages (productName, or executableName when set)', () => {
+    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '../../electron-builder.json'), 'utf8')) as { productName: string; executableName?: string; win?: { executableName?: string } };
+    expect(APP_EXE).toBe(`${cfg.win?.executableName ?? cfg.executableName ?? cfg.productName}.exe`);
   });
 });
 
@@ -245,8 +276,10 @@ describe('buildApplyUpdateCmd', () => {
   // user their old install back instead of nothing.
   it('relaunches instead of exiting when the payload is gone', () => {
     const lines = cmd.split('\r\n');
-    expect(cmd).not.toContain('if not exist "%SRC%\\wmux.exe" exit /b 1');
-    expect(cmd).toContain('if not exist "%SRC%\\wmux.exe" set "SKIPCOPY=');
+    expect(cmd).not.toContain('if not exist "%SRC%\\%EXENAME%" exit /b 1');
+    expect(cmd).toContain('if not exist "%SRC%\\%EXENAME%" set "SKIPCOPY=');
+    // The exe it checks for is the one it relaunches (the 4th argument's file name).
+    expect(lines).toContain('set "EXENAME=%~nx4"');
     expect(lines).toContain('if not defined SKIPCOPY goto copy');
     // The skip jumps to the label, not off the end of the script, and lands
     // before the copy block rather than falling through into it.
@@ -658,6 +691,12 @@ describe('applyStagedPortableUpdate', () => {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+  });
+
+  it('checks the payload for the exe this install runs', async () => {
+    const remoteaInstall = { ...staged(), installDir: 'C:\\remotea', exePath: 'C:\\remotea\\remotea.exe' };
+    await expect(applyStagedPortableUpdate(remoteaInstall)).rejects.toMatchObject({ code: 'PAYLOAD_MISSING' });
+    expect(spawnMock).not.toHaveBeenCalled();
   });
 
   it('refuses a payload that is gone, without writing, spawning or quitting', async () => {

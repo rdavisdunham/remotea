@@ -52,7 +52,17 @@ import { fetchLatestRelease, compareVersions, type GithubReleaseAsset } from './
 //              already requires), then Windows PowerShell Expand-Archive.
 //   apply    — cmd.exe + robocopy/tasklist/waitfor/findstr, all via System32.
 
-const UNINSTALLER_NAME = 'Uninstall wmux.exe';
+/**
+ * The packaged exe. electron-builder names it after `productName` in
+ * electron-builder.json (no `executableName` is set); zip-updater.test.ts
+ * fails if the two drift apart. `LEGACY_EXE` is the name before the remotea
+ * rename: an install still running it is recognised and updated in kind.
+ */
+export const APP_EXE = 'remotea.exe';
+const LEGACY_EXE = 'wmux.exe';
+const INSTALL_EXES = [APP_EXE, LEGACY_EXE];
+/** NSIS writes `Uninstall <productName>.exe` beside the exe; a zip extract has none. */
+const UNINSTALLER_NAMES = INSTALL_EXES.map((exe) => `Uninstall ${exe}`);
 
 export function isPortableZipInstall(installRoot: string): boolean {
   if (!installRoot) return false;
@@ -68,8 +78,8 @@ export function isPortableZipInstall(installRoot: string): boolean {
   } catch {
     return false;
   }
-  if (!fs.existsSync(path.join(root, 'wmux.exe'))) return false;
-  return !fs.existsSync(path.join(root, UNINSTALLER_NAME));
+  if (!INSTALL_EXES.some((exe) => fs.existsSync(path.join(root, exe)))) return false;
+  return !UNINSTALLER_NAMES.some((name) => fs.existsSync(path.join(root, name)));
 }
 
 /**
@@ -99,8 +109,14 @@ export function pickZipAsset(assets: GithubReleaseAsset[] | undefined | null): G
   return winish[0] ?? null;
 }
 
-export function findPayloadRoot(extractDir: string): string {
-  const direct = path.join(extractDir, 'wmux.exe');
+/**
+ * The folder of the extracted zip that holds `exeName`: the zip root, or one
+ * folder down when the zip wrapped one. `exeName` is the exe this install runs
+ * (the helper relaunches it after the copy), so a zip carrying a different exe
+ * is refused here rather than copied in beside the old one.
+ */
+export function findPayloadRoot(extractDir: string, exeName: string = APP_EXE): string {
+  const direct = path.join(extractDir, exeName);
   if (fs.existsSync(direct)) return extractDir;
   let entries: fs.Dirent[];
   try {
@@ -110,10 +126,10 @@ export function findPayloadRoot(extractDir: string): string {
   }
   const dirs = entries.filter((e) => e.isDirectory());
   for (const dir of dirs) {
-    const candidate = path.join(extractDir, dir.name, 'wmux.exe');
+    const candidate = path.join(extractDir, dir.name, exeName);
     if (fs.existsSync(candidate)) return path.join(extractDir, dir.name);
   }
-  throw new Error('zip does not contain wmux.exe');
+  throw new Error(`zip does not contain ${exeName}`);
 }
 
 // ── Update leftovers in %TEMP% (#3) ─────────────────────────────────────────
@@ -301,6 +317,8 @@ export function buildApplyUpdateCmd(): string {
     'set "SRC=%~2"',
     'set "DST=%~3"',
     'set "EXE=%~4"',
+    // The payload must carry the exe relaunched below (its name, from the path).
+    'set "EXENAME=%~nx4"',
     // The one thing this helper cannot work around is having no exe to
     // start, so that is the only line here that exits without reaching
     // :relaunch. Everything else is decided into SKIPCOPY and settled at
@@ -318,7 +336,7 @@ export function buildApplyUpdateCmd(): string {
     // No pid is no way to know when the old wmux let go of its files, and
     // copying over a live install is how a half-written wmux.exe happens.
     'if not defined PID set "SKIPCOPY=there is no remotea process to wait for"',
-    'if not exist "%SRC%\\wmux.exe" set "SKIPCOPY=the downloaded files are no longer on disk"',
+    'if not exist "%SRC%\\%EXENAME%" set "SKIPCOPY=the downloaded files are no longer on disk"',
     'echo.',
     'echo   Installing the remotea update.',
     'echo   This window closes by itself. Leave it open; nothing to type here.',
@@ -649,7 +667,7 @@ export async function runPortableZipUpdate(opts: {
       onProgress: opts.onProgress,
     });
     await extractZip(zipPath, extractDir);
-    const payload = findPayloadRoot(extractDir);
+    const payload = findPayloadRoot(extractDir, path.win32.basename(exePath));
     fs.unlink(zipPath, () => {});
     return { version, extractDir: payload, installDir, exePath };
   } catch (err) {
@@ -674,7 +692,8 @@ export async function runPortableZipUpdate(opts: {
  * child is a no-op rather than an uncaught exception in main.
  */
 export async function applyStagedPortableUpdate(staged: StagedZipUpdate): Promise<void> {
-  if (!fs.existsSync(path.join(staged.extractDir, 'wmux.exe'))) {
+  // win32: the exe path is a Windows path (this updater only runs there; the tests run anywhere).
+  if (!fs.existsSync(path.join(staged.extractDir, path.win32.basename(staged.exePath)))) {
     throw Object.assign(
       new Error('the downloaded update is no longer on disk — download it again'),
       { code: 'PAYLOAD_MISSING' },
