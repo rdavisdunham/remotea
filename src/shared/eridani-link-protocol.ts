@@ -101,7 +101,9 @@ export type LinkCap =
   // Stage F: every op frame carries its digest (Eridani may then require it), and
   // context.response's `scope` is honoured (D6: full text only for run-bound surfaces).
   | 'digest'
-  | 'context.scope';
+  | 'context.scope'
+  // The host sends each root prompt as it is submitted (`prompt`), before the turn that answers it.
+  | 'prompt';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -118,8 +120,8 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 /** Stage E, advertised only while `eridani.json.collector` is `authoritative`. */
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
-/** Stage F: everything in D, plus `digest` and `context.scope`. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope']);
+/** Stage F: everything in D, plus `digest`, `context.scope` and live `prompt` frames. */
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /** What one harness can do on this host (the capability matrix, C15). Advertise only what is verified. */
@@ -263,6 +265,34 @@ export interface TurnBody extends OpFields {
   interim?: boolean;
   /** When the Stop hook fired, epoch ms. */
   ended_at: number;
+}
+
+/**
+ * A root prompt the moment it was submitted (UserPromptSubmit), so Eridani's
+ * run timeline shows it before the turn ends. Sent only for a surface bound
+ * to a run and only to an Eridani whose welcome advertised `prompt`; the
+ * `turn` that follows still carries `prompt` for older Eridanis.
+ */
+export interface PromptBody extends OpFields {
+  t: 'prompt';
+  surf: string;
+  incarnation: number;
+  run_id: string;
+  generation: number;
+  provider: 'claude' | 'codex';
+  tool: SessionTool;
+  provider_session_id: string;
+  /**
+   * The `seq` the turn answering this prompt will carry (`turnSeq + 1` at
+   * submit; the Stop that follows assigns the same number). A prompt without a
+   * matching turn (restart mid-turn, dropped Stop) leaves a gap, never a clash.
+   */
+  seq: number;
+  /** Redacted and cut at `ERIDANI_LIMITS.promptChars` code points. */
+  text: string;
+  truncated: boolean;
+  /** When the hook fired, epoch ms. */
+  at: number;
 }
 
 export interface StatusBody extends OpFields {
@@ -637,6 +667,7 @@ export type UpBody =
   | HelloBody
   | SessionReportBody
   | TurnBody
+  | PromptBody
   | StatusBody
   | ExitBody
   | SessionsSnapshotBody
@@ -712,6 +743,9 @@ export function parseUpFrame(raw: unknown): UpFrame | null {
     case 'turn':
       return op && isStr(m.surf, 120) && isStr(m.provider_turn_id, 200) && isNum(m.seq) && typeof m.text === 'string'
         && m.text.length <= ERIDANI_LIMITS.turnTextChars && typeof m.truncated === 'boolean' ? (m as unknown as UpFrame) : null;
+    case 'prompt':
+      return op && isStr(m.surf, 120) && isStr(m.run_id, 200) && isNum(m.generation) && isNum(m.seq) && isNum(m.at)
+        && typeof m.text === 'string' && m.text.length <= ERIDANI_LIMITS.promptChars && typeof m.truncated === 'boolean' ? (m as unknown as UpFrame) : null;
     case 'status':
       return op && isStr(m.surf, 120) && isNum(m.since) && isNum(m.revision)
         && ['working', 'needs_you', 'idle', 'exited'].includes(m.state as string) ? (m as unknown as UpFrame) : null;

@@ -29,7 +29,7 @@ import { probeSession, type ProbeResult } from './agent-probe';
 import type { FsRequest } from './remote-fs';
 import { childrenIndex } from './proc';
 import { AgentStateTracker } from './agent-state';
-import { TurnCapture, type TurnFields } from './turn-capture';
+import { TurnCapture, type PromptFields, type TurnFields } from './turn-capture';
 import type { ExitBody, SnapshotSurface, StatusBody } from '../../src/shared/eridani-link-protocol';
 
 /**
@@ -39,6 +39,8 @@ import type { ExitBody, SnapshotSurface, StatusBody } from '../../src/shared/eri
 export interface HubEventSink {
   status(s: Omit<StatusBody, 't' | 'op_id' | 'digest' | 'entity'>): void;
   turn(t: TurnFields): void;
+  /** A root prompt was submitted on a run-bound surface (sent live, before its turn). */
+  prompt?(p: PromptFields): void;
   exit(e: Omit<ExitBody, 't' | 'op_id' | 'digest'>): void;
   /** A turn was captured for this conversation: its collector report is worth refreshing. */
   turnCaptured?(provider: 'claude' | 'codex', sessionId: string): void;
@@ -174,6 +176,7 @@ export class Hub {
         this.sink?.turn(t);
         this.eridani.turn?.(t);
       },
+      prompt: (p) => this.sink?.prompt?.(p),
       binding: (id) => {
         const b = this.registry.session(id)?.eridani;
         return b ? { runId: b.runId, generation: b.generation, ...(b.acceptedInput ? { accepted: b.acceptedInput } : {}) } : null;

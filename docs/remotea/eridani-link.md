@@ -119,6 +119,7 @@ remotea sends:
 | `command.outcome` | control | `outcome:<op_id>` | Stage B only reports `rejected` (`unsupported` / `expired`). |
 | `status` | live | `status:<surf>`, numeric `revision` | `surf, incarnation, state, since, reason?, provider?, provider_session_id?` |
 | `turn` | live | never | `surf, incarnation, run_id: null, generation: 0, provider, tool, provider_session_id, provider_turn_id, root: true, seq, text, truncated, missing, source, prompt?, prompt_truncated?, ended_at` |
+| `prompt` | live | never | `surf, incarnation, run_id, generation, provider, tool, provider_session_id, seq, text, truncated, at`. A root prompt as it was submitted, only for a run-bound surface and only to an Eridani whose welcome advertised `prompt` (see Turn capture). |
 | `exit` | live | never | `surf, incarnation, code, exited_at` |
 | `session.report` | bulk | `<tool>:<session_id>`, `revision` = fingerprint | `parity, tool, session_id, report` (the HTTP collector's `SessionInput`, unchanged) |
 | `ack` | | | For inbound commands. |
@@ -186,6 +187,17 @@ The server then applies these rules:
 - **Redaction.** Text and prompt go through the collector's redaction before
   anything is stored or sent.
 - **Apps.** They still get the `Stop` event, without the server-only fields.
+- **Live prompts.** A root, non-synthetic `UserPromptSubmit` on a surface
+  bound to a run is also sent at once as a `prompt` frame, so the run timeline
+  shows what was typed before the turn ends. It carries the binding taken at
+  submit (`run_id`, `generation`), the redacted text cut at 4,000 code points
+  (`truncated`), the hook's time (`at`) and `seq = turnSeq + 1`: the number the
+  Stop that ends this turn assigns, so `prompt.seq === turn.seq` for the turn
+  (or the interim turn) that answers it. A synthetic hand-back prompt, a
+  subagent's prompt, an empty prompt and an unbound surface send nothing. The
+  frame goes only to an Eridani whose welcome advertised `prompt` (hello
+  offers `prompt` too); otherwise it is dropped, not spooled, and the `turn`
+  still carries `prompt` / `prompt_truncated` as before.
 
 ## Agent state
 
@@ -684,7 +696,8 @@ Other sessions see at most the fenced candidate list (D6, above).
 `.remotea-backup` copy is always 0600.
 
 **Capabilities.** hello adds `digest` (every op frame carries its digest, so
-Eridani may require it) and `context.scope`. The lag rules:
+Eridani may require it), `context.scope` and `prompt` (live `prompt` frames,
+sent only when Eridani advertises `prompt` back). The lag rules:
 
 - Eridani refuses an `op_id` frame without a digest only from a host that
   advertises `digest`.
