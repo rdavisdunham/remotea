@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { refreshRemoteHosts, startRemoteHostStatus, useRemoteHosts } from '../../remote-sessions/status';
 import { parseRemoteShellSpec, remoteShellSpec } from '../../../shared/remote-shell-spec';
-import type { HostConnState, HostDTO, HostSaveRequest, HostTestResult, RemoteRegistryView } from '../../../shared/remote-hosts-types';
+import type { HostConnState, HostDTO, HostSaveRequest, HostStatus, HostTestResult, RemoteRegistryView } from '../../../shared/remote-hosts-types';
 import { closeRemoteSession, unhideRemoteSession } from '../../remote-sessions/sync';
 import '../../styles/remote-hosts.css';
 
@@ -16,6 +16,7 @@ type Bridge = {
   save(req: HostSaveRequest): Promise<{ ok: boolean; host?: HostDTO; error?: string }>;
   remove(id: string): Promise<boolean>;
   test(req: { url: string; token?: string; id?: string }): Promise<HostTestResult>;
+  dismissOutboxFailures?(hostId: string): void;
 };
 
 const bridge = (): Bridge | null => (window as unknown as { wmux?: { remoteHosts?: Bridge } }).wmux?.remoteHosts ?? null;
@@ -29,6 +30,15 @@ const STATE_LABEL: Record<HostConnState, string> = {
   'wrong-server': 'Different server',
   incompatible: 'Incompatible',
   suspended: 'Paused (sleep)',
+};
+
+const OUTBOX_LABEL: Record<NonNullable<HostStatus['outbox']>['failed'][number]['t'], string> = {
+  close: 'close',
+  groupClose: 'close workspace',
+  hide: 'hide',
+  unhide: 'unhide',
+  sessionUpdate: 'rename/move',
+  groupUpsert: 'workspace edit',
 };
 
 interface Draft {
@@ -198,6 +208,19 @@ export default function RemoteHostsSettings() {
             </div>
             {status[h.id]?.error && st !== 'ready' && (
               <div className="remote-host-message remote-host-message--error">{status[h.id]?.error}</div>
+            )}
+            {!!status[h.id]?.outbox?.pending && (
+              <div className="remote-host-message">
+                {status[h.id]!.outbox!.pending} change{status[h.id]!.outbox!.pending === 1 ? '' : 's'} made here not yet confirmed by this host
+              </div>
+            )}
+            {!!status[h.id]?.outbox?.failed.length && (
+              <div className="remote-host-message remote-host-message--error">
+                Not applied on this host:{' '}
+                {status[h.id]!.outbox!.failed.map((f) => `${OUTBOX_LABEL[f.t]} ${f.id} (${f.state === 'expired' ? 'gave up' : f.error ?? 'refused'})`).join('; ')}
+                {' '}
+                <button className="settings-button" onClick={() => bridge()?.dismissOutboxFailures?.(h.id)}>Dismiss</button>
+              </div>
             )}
             <div className="settings-row">
               <label className="settings-label">New terminals open here by default</label>

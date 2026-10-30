@@ -14,7 +14,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { hostIdFromName, HOST_ID_RE } from '../../shared/remote-shell-spec';
 import { DEVICE_ID_RE, GROUP_ID_RE, SURFACE_ID_RE } from '../../shared/remote-host-protocol';
-import type { HostSaveRequest } from '../../shared/remote-hosts-types';
+import type { HostSaveRequest, OutboxSummary } from '../../shared/remote-hosts-types';
 
 export interface SecretBox {
   isEncryptionAvailable(): boolean;
@@ -171,46 +171,299 @@ export type PendingIntent =
   | { t: 'sessionUpdate'; id: string; groupId?: string | null; group?: { name: string; color?: string }; title?: string | null }
   | { t: 'groupUpsert'; id: string; name: string; color?: string };
 
-function validIntent(i: PendingIntent): boolean {
-  if (i.t === 'groupClose' || i.t === 'groupUpsert') return GROUP_ID_RE.test(i.id);
-  return SURFACE_ID_RE.test(i.id);
+type SessionUpdateIntent = Extract<PendingIntent, { t: 'sessionUpdate' }>;
+
+function validIntent(i: unknown): i is PendingIntent {
+  if (!i || typeof i !== 'object') return false;
+  const x = i as { t?: unknown; id?: unknown; name?: unknown };
+  if (typeof x.id !== 'string') return false;
+  switch (x.t) {
+    case 'groupClose': return GROUP_ID_RE.test(x.id);
+    case 'groupUpsert': return GROUP_ID_RE.test(x.id) && typeof x.name === 'string';
+    case 'close':
+    case 'hide':
+    case 'unhide':
+    case 'sessionUpdate': return SURFACE_ID_RE.test(x.id);
+    default: return false;
+  }
 }
 
 /**
- * Changes made while a host was unreachable, replayed right after the next
- * welcome and BEFORE reconciling — so a tab closed on the train is closed on
- * the server, not re-placed from the registry when the laptop reconnects.
+ * Where an intent stands. Only `pending` is ever sent; the others are terminal
+ * and kept a while so the UI can say what happened:
+ *   failed     the server refused it (ack ok:false), or it was sent too many
+ *              times without ever being acknowledged;
+ *   expired    still unapplied after INTENT_TTL_MS;
+ *   superseded a newer intent about the same target replaced it before it
+ *              was confirmed (the newer one carries everything still wanted).
+ * An applied intent is not a state: its entry is removed.
+ */
+export type IntentState = 'pending' | 'failed' | 'expired' | 'superseded';
+
+export interface OutboxEntry {
+  /** Stable id: survives restarts and resends. */
+  iid: string;
+  /** Monotonic per outbox file: a later intent wins over an earlier one about the same target. */
+  seq: number;
+  intent: PendingIntent;
+  state: IntentState;
+  createdAt: number;
+  /** How many times it was written to a connected socket. */
+  attempts: number;
+  lastSentAt?: number;
+  /** When it reached a terminal state. */
+  doneAt?: number;
+  error?: string;
+  /** iid of the newer intent that replaced this one. */
+  supersededBy?: string;
+}
+
+/** Unapplied intents older than this are given up on (and reported), not replayed. */
+export const INTENT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** Sent this many times and never acknowledged: something about it breaks the connection. */
+export const INTENT_MAX_ATTEMPTS = 10;
+/** Terminal entries are kept this long, and at most this many per host, for the UI. */
+const DONE_KEEP_MS = 7 * 24 * 60 * 60 * 1000;
+const DONE_KEEP_MAX = 50;
+const OUTBOX_VERSION = 2;
+
+/** The target an intent is about: a newer intent with the same key supersedes an older one. */
+export function intentKey(i: PendingIntent): string {
+  switch (i.t) {
+    case 'close': return `s:${i.id}:close`;
+    case 'hide':
+    case 'unhide': return `s:${i.id}:vis`;
+    case 'sessionUpdate': return `s:${i.id}:meta`;
+    case 'groupClose': return `g:${i.id}:close`;
+    case 'groupUpsert': return `g:${i.id}:meta`;
+  }
+}
+
+/**
+ * Last writer wins per FIELD for session metadata: a rename queued after a
+ * move keeps the move. `newer`'s fields override `older`'s.
+ */
+function mergeSessionUpdate(older: SessionUpdateIntent, newer: SessionUpdateIntent): SessionUpdateIntent {
+  const out: SessionUpdateIntent = { t: 'sessionUpdate', id: newer.id };
+  const groupFrom = newer.groupId !== undefined ? newer : older;
+  if (groupFrom.groupId !== undefined) {
+    out.groupId = groupFrom.groupId;
+    if (groupFrom.group) out.group = groupFrom.group;
+  }
+  const title = newer.title !== undefined ? newer.title : older.title;
+  if (title !== undefined) out.title = title;
+  return out;
+}
+
+interface OutboxFile {
+  v: number;
+  seq: number;
+  hosts: Record<string, OutboxEntry[]>;
+}
+
+function validEntry(e: unknown): e is OutboxEntry {
+  if (!e || typeof e !== 'object') return false;
+  const x = e as Partial<OutboxEntry>;
+  return typeof x.iid === 'string' && Number.isSafeInteger(x.seq) && validIntent(x.intent)
+    && (x.state === 'pending' || x.state === 'failed' || x.state === 'expired' || x.state === 'superseded')
+    && typeof x.createdAt === 'number' && Number.isSafeInteger(x.attempts);
+}
+
+/**
+ * The durable outbox of registry changes this device made (close, hide,
+ * rename, move, group edits). Replayed right after a welcome and BEFORE
+ * reconciling, so a tab closed on the train is closed on the server, not
+ * re-placed from the registry when the laptop reconnects.
+ *
+ * An entry is on disk before it is sent (connected or not), and is removed
+ * only when the server acknowledges it, or when a welcome snapshot already
+ * shows its effect (applied, but the ack was lost with the connection).
+ * Until then every reconnect resends it. Every server operation it maps to is
+ * idempotent, so a resend after an unseen application changes nothing.
+ *
+ * File: `{ v: 2, seq, hosts: { [hostId]: OutboxEntry[] } }`. The first
+ * format, `{ [hostId]: PendingIntent[] }`, is migrated on load.
  */
 export class PendingIntents {
-  private byHost: Record<string, PendingIntent[]>;
+  private byHost: Record<string, OutboxEntry[]> = {};
+  private seq = 0;
+  private readonly now: () => number;
 
-  constructor(private readonly file: string) {
-    const raw = readJson<Record<string, PendingIntent[]>>(file) ?? {};
-    this.byHost = {};
-    for (const [host, list] of Object.entries(raw)) {
-      if (HOST_ID_RE.test(host) && Array.isArray(list)) this.byHost[host] = list.filter(validIntent);
+  constructor(private readonly file: string, opts: { now?: () => number } = {}) {
+    this.now = opts.now ?? Date.now;
+    const raw = readJson<unknown>(file);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+    const r = raw as Partial<OutboxFile> & Record<string, unknown>;
+    if (r.v === OUTBOX_VERSION && r.hosts && typeof r.hosts === 'object') {
+      this.seq = Number.isSafeInteger(r.seq) ? (r.seq as number) : 0;
+      for (const [host, list] of Object.entries(r.hosts)) {
+        if (!HOST_ID_RE.test(host) || !Array.isArray(list)) continue;
+        const entries = list.filter(validEntry).sort((a, b) => a.seq - b.seq);
+        for (const e of entries) this.seq = Math.max(this.seq, e.seq);
+        if (entries.length) this.byHost[host] = entries;
+      }
+      return;
     }
+    // v1: { [hostId]: PendingIntent[] }, already coalesced, oldest first.
+    const createdAt = this.now();
+    for (const [host, list] of Object.entries(r)) {
+      if (!HOST_ID_RE.test(host) || !Array.isArray(list)) continue;
+      for (const intent of list) if (validIntent(intent)) this.enqueue(host, intent, createdAt);
+    }
+    if (Object.keys(this.byHost).length) this.persist();
   }
 
-  add(hostId: string, intent: PendingIntent): void {
+  /** Record an intent, on disk before this returns. Supersedes older pending intents about the same target. */
+  add(hostId: string, intent: PendingIntent): OutboxEntry {
+    const entry = this.enqueue(hostId, intent, this.now());
+    this.persist();
+    return { ...entry };
+  }
+
+  private enqueue(hostId: string, intent: PendingIntent, createdAt: number): OutboxEntry {
     const list = (this.byHost[hostId] ??= []);
-    // Later intents about the same target supersede earlier ones (hide then unhide = unhide).
-    const key = (i: PendingIntent) => `${i.t === 'groupClose' || i.t === 'groupUpsert' ? 'g' : 's'}:${i.id}:${i.t === 'hide' || i.t === 'unhide' ? 'vis' : i.t}`;
-    const k = key(intent);
-    this.byHost[hostId] = [...list.filter((i) => key(i) !== k), intent];
-    writeJsonAtomic(this.file, this.byHost);
-  }
-
-  take(hostId: string): PendingIntent[] {
-    const list = this.byHost[hostId] ?? [];
-    if (list.length) {
-      delete this.byHost[hostId];
-      writeJsonAtomic(this.file, this.byHost);
+    const seq = ++this.seq;
+    const iid = `int-${seq}-${crypto.randomBytes(4).toString('hex')}`;
+    let effective: PendingIntent = intent;
+    const key = intentKey(intent);
+    for (const e of list) {
+      if (e.state !== 'pending') continue;
+      const k = intentKey(e.intent);
+      const sameTarget = k === key;
+      // Closing a session (or group) makes every other pending change to it moot.
+      const mootByClose = (intent.t === 'close' && k.startsWith(`s:${intent.id}:`))
+        || (intent.t === 'groupClose' && k.startsWith(`g:${intent.id}:`));
+      if (!sameTarget && !mootByClose) continue;
+      if (effective.t === 'sessionUpdate' && e.intent.t === 'sessionUpdate') effective = mergeSessionUpdate(e.intent, effective);
+      e.state = 'superseded';
+      e.supersededBy = iid;
+      e.doneAt = createdAt;
     }
-    return list;
+    const entry: OutboxEntry = { iid, seq, intent: effective, state: 'pending', createdAt, attempts: 0 };
+    list.push(entry);
+    this.prune(hostId);
+    return entry;
   }
 
+  /** Pending entries of a host, oldest first. Expires the ones past their TTL first. */
+  pending(hostId: string): OutboxEntry[] {
+    this.expire(hostId);
+    return (this.byHost[hostId] ?? []).filter((e) => e.state === 'pending').map((e) => ({ ...e }));
+  }
+
+  /** Every entry of a host, terminal ones included, oldest first. */
+  entries(hostId: string): OutboxEntry[] {
+    return (this.byHost[hostId] ?? []).map((e) => ({ ...e }));
+  }
+
+  get(hostId: string, iid: string): OutboxEntry | undefined {
+    const e = this.find(hostId, iid);
+    return e ? { ...e } : undefined;
+  }
+
+  /**
+   * About to write entry `iid` to the socket: count the attempt, on disk
+   * first. False (send nothing) when it is no longer pending, or has used up
+   * its attempts (it is then failed).
+   */
+  beginSend(hostId: string, iid: string): boolean {
+    const e = this.find(hostId, iid);
+    if (!e || e.state !== 'pending') return false;
+    if (e.attempts >= INTENT_MAX_ATTEMPTS) {
+      this.finish(e, 'failed', `no acknowledgement after ${e.attempts} attempts`);
+      this.persist();
+      return false;
+    }
+    e.attempts++;
+    e.lastSentAt = this.now();
+    this.persist();
+    return true;
+  }
+
+  /**
+   * The server acknowledged entry `iid` (or a snapshot proved it). Applied:
+   * the entry is removed, whatever its state. Refused: a pending entry fails.
+   * Never touches another entry; an ack for an older intent says nothing
+   * about a newer one.
+   */
+  settle(hostId: string, iid: string, result: { ok: boolean; error?: string }): void {
+    const list = this.byHost[hostId];
+    const e = list?.find((x) => x.iid === iid);
+    if (!list || !e) return;
+    if (result.ok) {
+      this.byHost[hostId] = list.filter((x) => x !== e);
+      this.prune(hostId);
+    } else {
+      if (e.state !== 'pending') return;
+      this.finish(e, 'failed', result.error || 'refused by the server');
+    }
+    this.persist();
+  }
+
+  /** Forget a host's terminal (failed / expired / superseded) entries: the user has seen them. */
+  clearDone(hostId: string): void {
+    const list = this.byHost[hostId];
+    if (!list) return;
+    this.byHost[hostId] = list.filter((e) => e.state === 'pending');
+    this.prune(hostId);
+    this.persist();
+  }
+
+  /** What the UI is told (HostStatus.outbox). */
+  summary(hostId: string): OutboxSummary {
+    const list = this.byHost[hostId] ?? [];
+    const failed: OutboxSummary['failed'] = [];
+    for (const e of list) {
+      if (e.state === 'failed' || e.state === 'expired') {
+        failed.push({ iid: e.iid, t: e.intent.t, id: e.intent.id, state: e.state, error: e.error, at: e.doneAt ?? e.createdAt });
+      }
+    }
+    return { pending: list.filter((e) => e.state === 'pending').length, failed };
+  }
+
+  /** The pending intents, oldest first. */
   peek(hostId: string): PendingIntent[] {
-    return [...(this.byHost[hostId] ?? [])];
+    return (this.byHost[hostId] ?? []).filter((e) => e.state === 'pending').map((e) => e.intent);
+  }
+
+  private find(hostId: string, iid: string): OutboxEntry | undefined {
+    return this.byHost[hostId]?.find((e) => e.iid === iid);
+  }
+
+  private finish(e: OutboxEntry, state: Exclude<IntentState, 'pending'>, error?: string): void {
+    e.state = state;
+    e.doneAt = this.now();
+    if (error) e.error = error;
+  }
+
+  private expire(hostId: string): void {
+    const cutoff = this.now() - INTENT_TTL_MS;
+    let changed = false;
+    for (const e of this.byHost[hostId] ?? []) {
+      if (e.state === 'pending' && e.createdAt < cutoff) {
+        this.finish(e, 'expired', 'not applied within 30 days');
+        changed = true;
+      }
+    }
+    if (this.prune(hostId) || changed) this.persist();
+  }
+
+  /** Drop old terminal entries (and an empty host); true when anything went. */
+  private prune(hostId: string): boolean {
+    const list = this.byHost[hostId];
+    if (!list) return false;
+    const cutoff = this.now() - DONE_KEEP_MS;
+    let done = list.filter((e) => e.state !== 'pending' && (e.doneAt ?? e.createdAt) >= cutoff);
+    if (done.length > DONE_KEEP_MAX) done = done.slice(done.length - DONE_KEEP_MAX);
+    const keep = new Set(done);
+    const next = list.filter((e) => e.state === 'pending' || keep.has(e));
+    if (next.length) this.byHost[hostId] = next;
+    else delete this.byHost[hostId];
+    return next.length !== list.length || !next.length;
+  }
+
+  private persist(): void {
+    const file: OutboxFile = { v: OUTBOX_VERSION, seq: this.seq, hosts: this.byHost };
+    writeJsonAtomic(this.file, file);
   }
 }

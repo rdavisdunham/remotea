@@ -29,6 +29,24 @@ export interface HostStatus {
     /** Ask the user to install them: an agent there lacks them, and the user has not declined for this host. */
     prompt: boolean;
   };
+  /** Registry changes made here (close, hide, rename, move, group edits) not yet confirmed by the server. */
+  outbox?: OutboxSummary;
+}
+
+/** A host's outbox as the UI sees it. */
+export interface OutboxSummary {
+  /** Waiting to be sent, or sent and not acknowledged yet. */
+  pending: number;
+  /** Changes that will not be applied: refused by the server, or given up on. */
+  failed: Array<{
+    iid: string;
+    t: 'close' | 'groupClose' | 'hide' | 'unhide' | 'sessionUpdate' | 'groupUpsert';
+    /** The session or group it was about. */
+    id: string;
+    state: 'failed' | 'expired';
+    error?: string;
+    at: number;
+  }>;
 }
 
 /** A remote terminal's size as its server has it; `owner`: this device sets it (the last one focused or typed in). */
