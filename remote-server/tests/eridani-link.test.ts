@@ -198,8 +198,9 @@ describe('EridaniLink', () => {
     expect(link.prompt(prompt(2))).toBe(false);
     link.turn({ ...turn(1), prompt: 'prompt 2', prompt_truncated: false });
     await until(() => eri.of('turn').length === 1);
+    // The turn reaching Eridani is not its ack reaching the link: wait for the spool to drain.
+    await until(() => link.spool.size === 0);
     expect(eri.of('prompt')).toEqual([]);
-    expect(link.spool.size).toBe(0);
     expect(link.status().unacked).toBe(0);
   });
 
@@ -618,6 +619,9 @@ describe('EridaniLink: stage C commands', () => {
       // The genuine body under the same op_id still runs: the forged one left no record.
       eri.send(ws, { ...signed(cmd), id: 'c-good' });
       await until(() => runs === 1);
+      // The handler returning is not the outcome being journaled and sent: wait for the frame (S-S6).
+      await until(() => eri.of('command.outcome').length === 1);
+      await new Promise((r) => setTimeout(r, 50));
       expect(eri.of('command.outcome')).toHaveLength(1);
     });
 
