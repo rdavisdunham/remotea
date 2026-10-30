@@ -141,6 +141,11 @@ export interface EridaniBinding {
   base: string;
   /** The base commit the worktree was created from (null when it was reused). */
   baseSha: string | null;
+  /** Freshness at spawn (optional: bindings recorded by older servers): the ref measured against, the fetch, the counts. */
+  baseRef?: string | null;
+  fetch?: { ok: boolean; error?: string } | null;
+  behind?: number | null;
+  ahead?: number | null;
   /** op_id of the spawn command. */
   spawnOp: string;
   /** A stop was accepted; cleared only by the process exiting. Never resumed while set. */

@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { WorktreeManager, cleanupCommands } from '../src/worktrees';
+import { WorktreeManager, cleanupCommands, migrationHead } from '../src/worktrees';
 import { runVerify, workspaceFingerprint } from '../src/verify-runner';
 import type { ExecutionTarget } from '../src/eridani-targets';
 
@@ -59,12 +59,100 @@ describe('worktrees', () => {
     expect(by(dirty.path).reasons.join(';')).toMatch(/ignored file/);
     expect(by(ahead.path)).toMatchObject({ candidate: false, merged: false, ahead: 1 });
     expect(by(ahead.path).reasons.join(';')).toMatch(/no upstream/);
-    expect(by(clean.path)).toMatchObject({ candidate: true, merged: true, reasons: [] });
+    // No commits of its own: not "merged", just nothing to merge yet; still nothing to lose.
+    expect(by(clean.path)).toMatchObject({ candidate: true, merged: null, merged_reason: 'no commits of its own yet', ahead: 0, reasons: [] });
     // Active sessions keep theirs.
     expect((await m.nominate([target], (p) => p === clean.path)).find((r) => r.path === clean.path)!.candidate).toBe(false);
     // Nothing was removed, and the commands offered start with a recovery ref.
     expect(fs.existsSync(clean.path)).toBe(true);
     expect(cleanupCommands(target.repo, by(clean.path))[0]).toMatch(/update-ref refs\/remotea\/recovery\/eri--clean /);
+  });
+});
+
+/** A repo whose `origin` is a bare repository, plus a second clone that pushes to it. */
+function withOrigin() {
+  const r = repo();
+  const bare = path.join(r.root, 'origin.git');
+  git(r.root, 'init', '-q', '--bare', '-b', 'main', bare);
+  git(r.repo, 'remote', 'add', 'origin', bare);
+  git(r.repo, 'push', '-q', 'origin', 'main');
+  const other = path.join(r.root, 'other');
+  git(r.root, 'clone', '-q', bare, other);
+  const pushUpstream = (file: string) => {
+    fs.mkdirSync(path.dirname(path.join(other, file)), { recursive: true });
+    fs.writeFileSync(path.join(other, file), `${file}\n`);
+    git(other, 'add', '.');
+    git(other, 'commit', '-q', '-m', file);
+    git(other, 'push', '-q', 'origin', 'main');
+    return git(other, 'rev-parse', 'HEAD').trim();
+  };
+  return { ...r, pushUpstream };
+}
+
+describe('worktrees: freshness', () => {
+  it('fetches before basing: a new worktree starts from origin/main when local main is behind it', async () => {
+    const { root, target, repo: r, pushUpstream } = withOrigin();
+    const upstream = pushUpstream('b.txt');
+    const m = new WorktreeManager({ dir: root });
+    const a = await m.ensure(target, 'eri/fresh');
+    expect(a).toMatchObject({ baseSha: upstream, baseRef: 'origin/main', fetch: { ok: true }, behind: 0, ahead: 0, created: true });
+    expect(git(r, 'rev-parse', 'main').trim()).not.toBe(upstream); // local main untouched
+  });
+
+  it('keeps local main when it already contains origin/main (unpushed local commits)', async () => {
+    const { root, target, repo: r } = withOrigin();
+    fs.writeFileSync(path.join(r, 'local.txt'), 'x\n');
+    git(r, 'add', '.');
+    git(r, 'commit', '-q', '-m', 'local');
+    const a = await new WorktreeManager({ dir: root }).ensure(target, 'eri/local');
+    expect(a).toMatchObject({ baseSha: git(r, 'rev-parse', 'main').trim(), baseRef: 'main', fetch: { ok: true } });
+  });
+
+  it('falls back to local main when the fetch fails, and says so', async () => {
+    const { root, target, repo: r } = repo(); // no origin remote
+    const a = await new WorktreeManager({ dir: root }).ensure(target, 'eri/offline');
+    expect(a.fetch?.ok).toBe(false);
+    expect(a.fetch?.error).toBeTruthy();
+    expect(a).toMatchObject({ baseSha: git(r, 'rev-parse', 'main').trim(), baseRef: 'main' });
+  });
+
+  it('does not fetch for a base other than the target\'s own', async () => {
+    const { root, target } = withOrigin();
+    const m = new WorktreeManager({ dir: root });
+    await m.ensure(target, 'eri/parent');
+    expect((await m.ensure(target, 'eri/child', 'eri/parent')).fetch).toBeNull();
+  });
+
+  it('a reused worktree is measured against the freshly fetched base', async () => {
+    const { root, target, pushUpstream } = withOrigin();
+    const m = new WorktreeManager({ dir: root });
+    const first = await m.ensure(target, 'eri/reuse');
+    pushUpstream('c.txt');
+    pushUpstream('d.txt');
+    const again = await m.ensure(target, 'eri/reuse');
+    expect(again).toMatchObject({ path: first.path, created: false, baseSha: first.baseSha, baseRef: 'origin/main', behind: 2, ahead: 0 });
+  });
+
+  it('reports behind/merged against origin/main and the migration head on the fresh base', async () => {
+    const { root, target, pushUpstream } = withOrigin();
+    const t = { ...target, migrations: { dir: 'migrations/versions' } };
+    const m = new WorktreeManager({ dir: root });
+    const w = await m.ensure(t, 'eri/report');
+    fs.writeFileSync(path.join(w.path, 'mine.txt'), 'x\n');
+    git(w.path, 'add', '.');
+    git(w.path, 'commit', '-q', '-m', 'mine');
+    pushUpstream('migrations/versions/0007_a.py');
+    pushUpstream('migrations/versions/0012_b.py');
+    const rows = await m.nominate([t], () => false);
+    expect(rows[0]).toMatchObject({ branch: 'eri/report', base_ref: 'origin/main', behind: 2, ahead: 1, merged: false });
+    expect(await m.migrationHeads([t])).toEqual([{ target: 't', dir: 'migrations/versions', ref: 'origin/main', head: 12 }]);
+    expect(await m.migrationHeads([target])).toEqual([]); // not configured: nothing reported
+  });
+
+  it('migrationHead takes the first capture group of the pattern', () => {
+    expect(migrationHead(['0001_a.py', '0032_plan_review.py', '__init__.py', 'README'])).toBe(32);
+    expect(migrationHead(['v3-x.sql', 'v10-y.sql'], '^v(\\d+)-')).toBe(10);
+    expect(migrationHead([])).toBeNull();
   });
 });
 

@@ -327,6 +327,7 @@ export class EridaniRuntime {
       worktree_root: t.worktreeRoot,
       harnesses: (['claude', 'codex'] as const).filter((h) => !!t.launch[h]),
       verify: t.verify.map((v) => v.id),
+      ...(t.migrations ? { migrations: { ...t.migrations } } : {}),
     }));
   }
 
@@ -343,11 +344,14 @@ export class EridaniRuntime {
     }
     this.worktreesBusy = true;
     const active = new Set(this.deps.registry.sessions().filter((r) => r.eridani && r.state !== 'exited').map((r) => r.eridani!.worktree));
-    this.worktrees.nominate(loadTargets(this.deps.dir), (p) => active.has(p)).then(
-      (rows) => {
-        const text = JSON.stringify(rows);
+    const targets = loadTargets(this.deps.dir);
+    // nominate fetches each base first (rate-limited), so the heads read the same fresh ref.
+    this.worktrees.nominate(targets, (p) => active.has(p)).then(async (rows) => [rows, await this.worktrees.migrationHeads(targets)] as const).then(
+      ([rows, heads]) => {
+        const body = heads.length ? { t: 'worktrees.report' as const, worktrees: rows, heads } : { t: 'worktrees.report' as const, worktrees: rows };
+        const text = JSON.stringify(body);
         if (text !== this.worktreesSent && this.link?.ready) {
-          if (this.link.enqueue({ t: 'worktrees.report', worktrees: rows }, 0, WORKTREES_ENTITY, ++this.worktreesRev)) this.worktreesSent = text;
+          if (this.link.enqueue(body, 0, WORKTREES_ENTITY, ++this.worktreesRev)) this.worktreesSent = text;
         }
       },
       (err) => this.deps.log(`eridani: worktrees report failed: ${(err as Error).message}`),

@@ -69,7 +69,7 @@ import type { Registry } from './registry';
 import type { CommandContext, CommandHandler, CommandResult } from './eridani-link';
 import type { JournalRecord } from './eridani-journal';
 import type { ExecutionTarget, LaunchSpec } from './eridani-targets';
-import type { WorktreeManager } from './worktrees';
+import type { EnsuredWorktree, WorktreeManager } from './worktrees';
 import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
@@ -100,6 +100,27 @@ export function surfFor(runId: string, generation: number, attempt: number): str
 }
 
 const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+
+/**
+ * What the agent must know about its base before it touches code, put at the
+ * top of the spawn prompt: a failed fetch (the base may be stale), and a
+ * reused branch that is behind its base (merge it first, and re-point a
+ * reserved migration at the current chain head). Empty when neither.
+ */
+export function freshnessNote(wt: Pick<EnsuredWorktree, 'branch' | 'base' | 'baseRef' | 'baseSha' | 'fetch' | 'behind' | 'created'>, migration: { number: number; dir: string } | null): string {
+  const lines: string[] = [];
+  if (wt.fetch && !wt.fetch.ok) {
+    lines.push(`Could not fetch origin/${wt.base} (${wt.fetch.error ?? 'unknown error'}); this worktree is based on local ${wt.baseRef ?? wt.base}${wt.baseSha ? ` @ ${wt.baseSha.slice(0, 7)}` : ''}, which may be stale.`);
+  }
+  if (wt.behind && wt.behind > 0) {
+    const ref = wt.baseRef ?? wt.base;
+    lines.push(`Your branch ${wt.branch} is ${wt.behind} commit(s) behind ${ref}. Before touching code, merge ${ref} into it (\`git merge ${ref}\`), resolve conflicts, and commit.`);
+    if (migration) {
+      lines.push(`This plan adds a migration (reserved number ${String(migration.number).padStart(4, '0')}). After merging, re-point its down_revision at the current chain head in ${migration.dir} and renumber it if the number is taken; tests/test_release_migrations.py fails the PR otherwise.`);
+    }
+  }
+  return lines.join('\n');
+}
 
 /** The command line a spawn runs (through the login shell; the prompt stays in $ERIDANI_PROMPT). */
 export function launchCommand(harness: 'claude' | 'codex', model: string, spec: LaunchSpec, withPrompt: boolean): string {
@@ -424,7 +445,10 @@ export class Dispatch {
 
   private spawnFacts(rec: SessionRecord): Record<string, unknown> {
     const b = rec.eridani!;
-    return { surf: rec.id, incarnation: rec.incarnation ?? 0, worktree: b.worktree, branch: b.branch, base: b.base, base_sha: b.baseSha, target: b.target };
+    return {
+      surf: rec.id, incarnation: rec.incarnation ?? 0, worktree: b.worktree, branch: b.branch, base: b.base, base_sha: b.baseSha, target: b.target,
+      ...(b.baseRef !== undefined ? { base_ref: b.baseRef, fetch: b.fetch ?? null, behind: b.behind ?? null, ahead: b.ahead ?? null } : {}),
+    };
   }
 
   private groupFor(name: string): { groupId: string; group: { name: string } } {
@@ -451,7 +475,8 @@ export class Dispatch {
       } catch (err) {
         return { state: 'failed', detail: `worktree: ${(err as Error).message}` };
       }
-      const prompt = cmd.prompt;
+      const note = cmd.prompt ? freshnessNote(wt, cmd.migration ?? null) : '';
+      const prompt = note ? `${note}\n\n${cmd.prompt}` : cmd.prompt;
       const env: Record<string, string> = {
         ...cmd.env,
         ERIDANI_RUN_ID: cmd.run_id,
@@ -479,6 +504,10 @@ export class Dispatch {
         branch: wt.branch,
         base: wt.base,
         baseSha: wt.baseSha,
+        baseRef: wt.baseRef,
+        fetch: wt.fetch,
+        behind: wt.behind,
+        ahead: wt.ahead,
         spawnOp: cmd.op_id,
         ...(cmd.verify ? { verify: { verifyId: cmd.verify.verify_id, planRevision: cmd.verify.plan_revision } } : {}),
         // F07: the prompt typed at launch belongs to the spawn's generation.
