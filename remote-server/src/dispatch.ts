@@ -13,6 +13,9 @@
  *           (EridaniConn, device "Eridani"), so every app shows it as a tab.
  *           Its surface id is derived from (run_id, generation, attempt), so
  *           a spawn is reconciled by that mapping and never started twice.
+ *           One writer per worktree (S-S4): a spawn onto a branch another
+ *           live session (or a spawn in flight) already writes is `rejected`
+ *           `worktree_busy` with `{branch, writer}`, unless it says `share`.
  *   input   fenced on (surf, incarnation, run_id, generation). `queue` waits
  *           until the agent is at its prompt (idle) and the link is up (a
  *           disconnected host invents no continuation); `steer` interrupts
@@ -71,14 +74,16 @@ import type {
   SpawnCommand,
   StopCommand,
   VerifyCommand,
+  WorktreeWriter,
 } from '../../src/shared/eridani-link-protocol';
+import { WORKTREE_BUSY } from '../../src/shared/eridani-link-protocol';
 import type { CreateSpec, EridaniBinding, RemoteSurfaceId, ServerMsg, SessionRecord } from '../../src/shared/remote-host-protocol';
 import type { Hub, HubConn, HubEridaniHooks } from './hub';
 import type { Registry } from './registry';
 import type { CommandContext, CommandHandler, CommandResult } from './eridani-link';
 import type { JournalRecord } from './eridani-journal';
 import type { ExecutionTarget, LaunchSpec } from './eridani-targets';
-import type { EnsuredWorktree, WorktreeManager } from './worktrees';
+import { liveWriters, type EnsuredWorktree, type WorktreeManager } from './worktrees';
 import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
@@ -292,6 +297,8 @@ export class Dispatch {
   private readonly exitWaiters = new Map<string, Array<(code: number) => void>>();
   readonly attempts: VerifyAttempts;
   private readonly spawning = new Set<string>();
+  /** S-S4: the branch (`<target>\0<branch>`) each spawn in flight is claiming, with its writer. */
+  private readonly claims = new Map<string, WorktreeWriter>();
   /**
    * M7: the incarnation of each surface dispatch itself launched with the
    * run's agent command (spawn or resume line), and whether that agent has
@@ -570,6 +577,15 @@ export class Dispatch {
     if (!target) return { state: 'rejected', detail: `unknown execution target ${cmd.target.id}` };
     const launch = target.launch[cmd.harness];
     if (!launch) return { state: 'rejected', detail: `${cmd.harness} is not enabled on target ${target.id}` };
+    // S-S4: one writer per worktree. Checked and claimed with no await in between, so two spawns cannot both pass.
+    const claim = `${target.id}\0${cmd.target.branch}`;
+    const writer = this.writerFor(target.id, cmd.target.branch);
+    if (writer && cmd.share !== true) {
+      this.log(`eridani: refused spawn for run ${cmd.run_id} on ${cmd.target.branch}: ${writer.surf} (run ${writer.run_id}) writes it`);
+      return { state: 'rejected', detail: WORKTREE_BUSY, result: { branch: cmd.target.branch, writer } };
+    }
+    const claimed = !writer;
+    if (claimed) this.claims.set(claim, { surf, run_id: cmd.run_id });
     this.spawning.add(surf);
     try {
       ctx.begin();
@@ -643,7 +659,17 @@ export class Dispatch {
       return { state: 'executed', result: this.spawnFacts(rec!) };
     } finally {
       this.spawning.delete(surf);
+      if (claimed) this.claims.delete(claim);
     }
+  }
+
+  /**
+   * S-S4: the live session writing `branch` on `target` (the oldest, when a
+   * spawn shared it), or the spawn in flight claiming it; null when free.
+   */
+  writerFor(targetId: string, branch: string): WorktreeWriter | null {
+    const live = liveWriters(this.deps.registry.sessions()).find((w) => w.target === targetId && w.branch === branch);
+    return live?.writer ?? this.claims.get(`${targetId}\0${branch}`) ?? null;
   }
 
   // ── input ────────────────────────────────────────────────────────────────
