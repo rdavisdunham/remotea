@@ -86,13 +86,27 @@ The phone Remote Console page (`src/renderer/remote/index.html`) is served by ma
 
 `window.wmux.system.sandboxed` is new in this PR. It reports `process.sandboxed`, and the `--smoke` self-test fails if it is false.
 
+## CDP proxy token (design note)
+
+Requiring a per-launch secret on the CDP proxy was looked at (2026-10-30) and not done, because its main client can't get a token that changes on every launch through any channel it has today:
+
+- **chrome-devtools-mcp**, the panel's main consumer, is started by the agent harness, not by remotea. `agent-integration.ts` writes it once into `~/.claude.json` (`claude-context.ts`, `--browserUrl=http://127.0.0.1:9222`) and into Qwen's settings (`qwen-context.ts`). Every running Claude/Qwen session reads that file when it starts and keeps the URL. A token that changed on every launch would have to be rewritten into the user's harness config on every start, and each app restart would break the browser tool for every agent session that was already open.
+- **The user's own tools** (Playwright `connectOverCDP`, puppeteer `browserURL`, issue #233) are pointed at the port by hand, and their config has nothing remotea can update.
+- The proxy does not always get 9222 (it walks 9222–9230 when busy), and the stored URL already fixes 9222. So the stored config is already a best-effort pointer, not a channel remotea controls.
+
+What would work, if this becomes worth doing:
+
+1. **A stable secret on the WebSocket, not a per-launch one.** The secret would be generated once, kept in the app's data folder (`0600`), and rotated only when the user asks. The existing `ensureChromeDevtoolsConfig` / `ensureQwenMcp` would write it into the harness configs. The proxy would accept the WebSocket upgrade only on a path that carries the secret, and `/json/version` / `/json/list` would stop advertising a usable `webSocketDebuggerUrl`, or they'd hand it to anyone. chrome-devtools-mcp can connect to a WebSocket directly (`--wsEndpoint`, and `--wsHeaders` for a header) instead of going through `--browserUrl` discovery. A secret in the `--browserUrl` path is probably not enough: puppeteer appears to build the discovery URL as `new URL("/json/version", browserURL)`, which drops the path. Check this and the flags against the pinned `CHROME_DEVTOOLS_MCP_PACKAGE` version before building it. The "any local process" exposure then shrinks to processes that can read `~/.claude.json`, and those can already drive the agent.
+2. **A grace period:** accept tokenless clients for one release with a deprecation log line, so hand-configured Playwright setups get a warning before they stop working, and document the new URL in the browser panel's settings.
+3. **Tests:** a WebSocket upgrade without the secret is refused the way a bad Origin is today (`isAllowedCdpOrigin`), and `/json/*` never contains the secret.
+
 ## Follow-ups (not in this PR)
 
 | Item | Why not now |
 |---|---|
 | Validate `event.senderFrame` (main frame, app origin) in `ipcMain` handlers | Today only app windows have the preload, since webviews and popups have none, and the app has no iframes. Validating the sender is defence in depth across about 170 handlers, which needs its own change. |
 | Electron fuses (`EnableNodeOptionsEnvironmentVariable`, `EnableNodeCliInspectArguments`, `EnableEmbeddedAsarIntegrityValidation`, `OnlyLoadAppFromAsar`) | The `RunAsNode` fuse must stay on, because the CLI shims (`src/cli-bin/wmux*`, `node-runtime.ts`) run `remotea.exe` with `ELECTRON_RUN_AS_NODE=1`. The others change packaging and need a Windows install test. The smoke workflow is now the place to try them. |
-| CDP proxy on `127.0.0.1:9222`–`9230` | It is always on and drives the browser panel. It checks Host and Origin against DNS rebinding and web origins (`cdp-proxy.ts`), but there is no token, so any local process can drive the panel's page. Gating it on agent-browser use or adding a token is a product decision. |
+| CDP proxy on `127.0.0.1:9222`–`9230` | It is always on and drives the browser panel. It checks Host and Origin against DNS rebinding and web origins (`cdp-proxy.ts`), but there is no token, so any local process can drive the panel's page. A per-launch token would break its legitimate clients; see [CDP proxy token (design note)](#cdp-proxy-token-design-note). |
 | Replace `<webview>` with `WebContentsView` | That would let `webviewTag` go off. It is a rewrite of the browser panel. |
 | Per-site permission prompts in the panel | Today it's deny-by-default. A prompt UI would bring video calls back. |
 
