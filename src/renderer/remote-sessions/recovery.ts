@@ -10,9 +10,12 @@
  * nothing, and never acts):
  *   exited     a tab here whose process exited while away:
  *              leave the tab / close it / reopen (a new terminal there, same
- *              directory), plus the worktree choices for an Eridani run;
+ *              directory, resuming its Claude or Codex conversation when the
+ *              session reported one), plus the worktree choices for an
+ *              Eridani run;
  *   closed     a tab here whose session was closed on another device (sync
- *              drops it): keep closed / reopen;
+ *              drops it): keep closed / reopen (resuming, as above, when the
+ *              record is still there to say which conversation);
  *   restored   a tab whose session the host lost in a restart; opening the
  *              tab respawns it (an agent resumes): reopen / keep closed.
  *              This is the one "clean" kind: nothing was lost;
@@ -24,7 +27,7 @@
  * Pure, so it can be tested without a window. Each item has a stable `key`
  * so an item the user has seen is not offered again (unless it changes).
  */
-import type { SessionRecord, WorktreeStateInfo } from '../../shared/remote-host-protocol';
+import { agentResumeCommand, type SessionRecord, type WorktreeStateInfo } from '../../shared/remote-host-protocol';
 import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
 
 export type RecoveryKind = 'exited' | 'closed' | 'restored' | 'worktree';
@@ -40,6 +43,12 @@ export interface RecoveryItem {
   title: string;
   /** Where Reopen starts the new terminal. */
   cwd?: string;
+  /**
+   * What Reopen runs in the new terminal instead of a shell: the agent's
+   * resume command (`claude --resume <id>`, `codex resume <id>`) when the
+   * session reported its conversation. Absent: a plain shell.
+   */
+  resume?: string;
   /** One line: what happened. */
   detail: string;
   branch?: string;
@@ -102,6 +111,12 @@ function clock(at: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** Reopen's command and the sentence saying so, for a session whose agent reported its conversation. */
+function resumeOf(rec: SessionRecord | undefined): { resume?: string; note: string } {
+  const cmd = rec?.agent ? agentResumeCommand(rec.agent) : null;
+  return cmd ? { resume: cmd, note: ` Reopen resumes its ${rec!.agent!.provider === 'codex' ? 'Codex' : 'Claude'} conversation.` } : { note: '' };
+}
+
 function worktreeChoices(s: SessionRecord): RecoveryChoice[] {
   return s.eridani?.worktree ? ['open-worktree', 'copy-branch'] : [];
 }
@@ -120,9 +135,11 @@ export function recoveryInventory(state: RecoveryState): RecoveryInventory {
       if (tab.hostId !== view.hostId) continue;
       const rec = records.get(tab.id);
       if (closed.has(tab.id)) {
+        const { resume, note } = resumeOf(rec);
         items.push({
           key: `closed:${tab.id}`, kind: 'closed', hostId: view.hostId, surfaceId: tab.id, workspaceId: tab.workspaceId,
-          title: tab.title || 'shell', cwd: tab.cwd, detail: 'Closed on another device while this one was away.',
+          title: tab.title || 'shell', cwd: tab.cwd ?? rec?.lastCwd ?? rec?.cwd, ...(resume ? { resume } : {}),
+          detail: `Closed on another device while this one was away.${note}`,
           choices: ['keep-closed', 'reopen'], clean: false,
         });
         listed.add(tab.id);
@@ -132,10 +149,11 @@ export function recoveryInventory(state: RecoveryState): RecoveryInventory {
       if (rec.state === 'exited' && (rec.exitedAt ?? 0) > since) {
         const work = unmergedWork(rec.worktreeState);
         const code = rec.exitCode !== undefined ? ` with code ${rec.exitCode}` : '';
+        const { resume, note } = resumeOf(rec);
         items.push({
           key: `exited:${tab.id}:${rec.exitedAt ?? 0}`, kind: 'exited', hostId: view.hostId, surfaceId: tab.id, workspaceId: tab.workspaceId,
-          title: title(rec, tab.title), cwd: rec.lastCwd ?? rec.cwd,
-          detail: `Exited${code}${rec.exitedAt ? ` at ${clock(rec.exitedAt)}` : ''} while this device was away.${work ? ` Its worktree has ${work}.` : ''}`,
+          title: title(rec, tab.title), cwd: rec.lastCwd ?? rec.cwd, ...(resume ? { resume } : {}),
+          detail: `Exited${code}${rec.exitedAt ? ` at ${clock(rec.exitedAt)}` : ''} while this device was away.${work ? ` Its worktree has ${work}.` : ''}${note}`,
           ...(rec.eridani ? { branch: rec.eridani.branch, worktree: rec.eridani.worktree } : {}),
           choices: ['leave', 'keep-closed', 'reopen', ...worktreeChoices(rec)], clean: false,
         });

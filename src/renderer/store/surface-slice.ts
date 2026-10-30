@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { v4 as uuid } from 'uuid';
-import { WorkspaceId, PaneId, SurfaceId, SurfaceRef, SurfaceType } from '../../shared/types';
+import { WorkspaceId, PaneId, SurfaceId, SurfaceRef, SurfaceType, WorkspaceInfo } from '../../shared/types';
 import { findLeaf, removeLeaf, splitNode, getAllPaneIds } from './split-utils';
 import { forgetSurfaceLocally, killSurfacePty } from './pty-teardown';
 import { WorkspaceSlice } from './workspace-slice';
@@ -221,6 +221,22 @@ export interface SurfaceSlice {
    * closing any session.
    */
   dropSurfacesLocal: (surfaceIds: readonly string[]) => void;
+
+  /**
+   * remotea: move tabs to another workspace on THIS device, keeping each
+   * surface as it is (same id, so a terminal re-attaches to its PTY on
+   * remount; nothing is killed or announced closed). `dest` is a pane of an
+   * existing workspace, or a workspace to create holding just the moved tabs
+   * (never activated, as sync creates them). A tab whose shell came from its
+   * old workspace keeps that shell. Emptied panes collapse and an emptied
+   * workspace is discarded, as in dropSurfacesLocal; when that was the active
+   * one, the destination becomes active. Returns the destination workspace,
+   * or null when nothing moved.
+   */
+  moveSurfacesLocal: (
+    surfaceIds: readonly string[],
+    dest: { workspaceId: WorkspaceId; paneId: PaneId } | { create: Partial<WorkspaceInfo> },
+  ) => WorkspaceId | null;
 
   /**
    * Set rendered markdown content on a surface, found by id across all
@@ -864,6 +880,69 @@ export const createSurfaceSlice: StateCreator<SliceState, [], [], SurfaceSlice> 
         : current.activeWorkspaceId;
       set({ workspaces: next, activeWorkspaceId: active } as Partial<SliceState>);
     }
+  },
+
+  moveSurfacesLocal(surfaceIds, dest) {
+    const move = new Set(surfaceIds);
+    if (!move.size) return null;
+    const state = get();
+    const into = 'workspaceId' in dest ? dest : null;
+    const create = 'create' in dest ? dest.create : {};
+    if (into) {
+      const target = state.workspaces.find((w) => w.id === into.workspaceId);
+      if (!target || !findLeaf(target.splitTree, into.paneId)) return null;
+    }
+    const moved: SurfaceRef[] = [];
+    const touched: Array<{ id: WorkspaceId; tree: SplitNode | null; removed: SurfaceId[] }> = [];
+    for (const ws of state.workspaces) {
+      if (ws.id === into?.workspaceId) continue;
+      let tree: SplitNode | null = ws.splitTree;
+      const removed: SurfaceId[] = [];
+      for (const paneId of getAllPaneIds(ws.splitTree)) {
+        const leaf: Extract<SplitNode, { type: 'leaf' }> | null | undefined = tree ? findLeaf(tree, paneId) : null;
+        if (!leaf || !leaf.surfaces.some((s: SurfaceRef) => move.has(s.id))) continue;
+        for (const s of leaf.surfaces as SurfaceRef[]) {
+          if (!move.has(s.id)) continue;
+          removed.push(s.id);
+          moved.push(s.shell || !ws.shell ? s : { ...s, shell: ws.shell });
+        }
+        const keep: SurfaceRef[] = leaf.surfaces.filter((s: SurfaceRef) => !move.has(s.id));
+        tree = keep.length
+          ? patchLeaf(tree!, paneId, { surfaces: keep, activeSurfaceIndex: Math.min(leaf.activeSurfaceIndex, keep.length - 1) })
+          : removeLeaf(tree!, paneId);
+        if (!tree) break;
+      }
+      if (removed.length) touched.push({ id: ws.id, tree, removed });
+    }
+    if (!moved.length) return null;
+    const wasActive = state.activeWorkspaceId;
+    let activeGone = false;
+    for (const t of touched) {
+      // The PR badge belongs to the workspace the reporting tab leaves.
+      clearPrIfOwner(get, t.id, t.removed);
+      if (t.tree) {
+        get().updateSplitTree(t.id, t.tree);
+        continue;
+      }
+      const current = get();
+      if (!current.workspaces.some((w) => w.id === t.id)) continue;
+      if (t.id === wasActive) activeGone = true;
+      set({ workspaces: current.workspaces.filter((w) => w.id !== t.id) } as Partial<SliceState>);
+    }
+    let destId: WorkspaceId;
+    if (into) {
+      const target = get().workspaces.find((w) => w.id === into.workspaceId)!;
+      const leaf = findLeaf(target.splitTree, into.paneId)!;
+      get().updateSplitTree(target.id, patchLeaf(target.splitTree, into.paneId, { surfaces: [...leaf.surfaces, ...moved] }));
+      destId = target.id;
+    } else {
+      destId = get().createWorkspace({
+        ...create,
+        splitTree: { type: 'leaf', paneId: `pane-${uuid()}` as PaneId, surfaces: moved, activeSurfaceIndex: 0 },
+      });
+    }
+    if (activeGone) set({ activeWorkspaceId: destId } as Partial<SliceState>);
+    return destId;
   },
 
   setMarkdownContent(surfaceId, content, options) {

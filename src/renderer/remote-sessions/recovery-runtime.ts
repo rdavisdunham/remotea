@@ -115,11 +115,14 @@ export function noteRegistryForRecovery(views: RemoteRegistryView[], local: Reco
 
 // ── Choices ────────────────────────────────────────────────────────────────
 
-/** A new remote terminal in `cwd`, next to `near` (or in the workspace, else the active one); focused. */
-export function openRemoteTerminal(hostId: string, cwd: string | undefined, opts: { workspaceId?: string; near?: string; title?: string } = {}): string | null {
+/**
+ * A new remote terminal in `cwd`, next to `near` (or in the workspace, else the active one); focused.
+ * `command` runs instead of a login shell (Reopen: the agent's resume command).
+ */
+export function openRemoteTerminal(hostId: string, cwd: string | undefined, opts: { workspaceId?: string; near?: string; title?: string; command?: string } = {}): string | null {
   const st = useStore.getState();
   const id = `surf-${uuid()}`;
-  const seed = { id: id as SurfaceId, shell: remoteShellSpec(hostId), ...(cwd ? { cwd } : {}), ...(opts.title ? { customTitle: opts.title } : {}) };
+  const seed = { id: id as SurfaceId, shell: remoteShellSpec(hostId, opts.command), ...(cwd ? { cwd } : {}), ...(opts.title ? { customTitle: opts.title } : {}) };
   let ws = st.workspaces.find((w) => w.id === opts.workspaceId) ?? st.workspaces.find((w) => w.id === st.activeWorkspaceId);
   if (!ws) {
     const wsId = st.createWorkspace({
@@ -179,7 +182,8 @@ export async function applyRecoveryChoice(item: RecoveryItem, choice: RecoveryCh
       return true;
     case 'reopen':
       if (item.kind === 'restored') return true; // its tab respawns it on open
-      openRemoteTerminal(item.hostId, item.cwd, { workspaceId: item.workspaceId, near: item.surfaceId, title: item.title });
+      // An agent session comes back with its conversation (`claude --resume <id>`), as a lost one does on the host.
+      openRemoteTerminal(item.hostId, item.cwd, { workspaceId: item.workspaceId, near: item.surfaceId, title: item.title, ...(item.resume ? { command: item.resume } : {}) });
       if (item.kind === 'exited') {
         // The new terminal takes the dead one's place.
         closeRemoteSession(item.hostId, item.surfaceId);

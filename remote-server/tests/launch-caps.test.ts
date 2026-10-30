@@ -146,14 +146,14 @@ describe('helloTargets: permission, launch and verify readiness per target', () 
     const nodeDir = path.dirname(process.execPath);
     const env = { PATH: '/nonexistent-bin', HOME: '/tmp' };
     const v = (id: string, argv: string[], extra: Partial<{ cwd: string; env: Record<string, string> }> = {}) => verifyStatus(repo, { id, argv, timeout: 60, ...extra }, { env });
-    expect(v('uv', ['uv', 'run', 'pytest'])).toEqual({ id: 'uv', ready: false, reason: expect.stringMatching(/not on the service PATH/) });
-    expect(v('abs', [process.execPath, '-e', '0'])).toEqual({ id: 'abs', ready: true });
+    expect(v('uv', ['uv', 'run', 'pytest'])).toEqual({ id: 'uv', ready: false, reason: expect.stringMatching(/not on the service PATH/), timeout_s: 60 });
+    expect(v('abs', [process.execPath, '-e', '0'])).toEqual({ id: 'abs', ready: true, timeout_s: 60 });
     expect(v('abs-missing', ['/nonexistent/uv'])).toMatchObject({ ready: false, reason: expect.stringMatching(/does not exist/) });
-    expect(v('own-path', ['node', '-e', '0'], { env: { PATH: nodeDir } })).toEqual({ id: 'own-path', ready: true });
-    expect(verifyStatus(repo, { id: 'svc', argv: ['node'], timeout: 60 }, { env: { PATH: nodeDir } })).toEqual({ id: 'svc', ready: true });
-    expect(v('rel', ['./verify.sh'])).toEqual({ id: 'rel', ready: true });
+    expect(v('own-path', ['node', '-e', '0'], { env: { PATH: nodeDir } })).toEqual({ id: 'own-path', ready: true, timeout_s: 60 });
+    expect(verifyStatus(repo, { id: 'svc', argv: ['node'], timeout: 900 }, { env: { PATH: nodeDir } })).toEqual({ id: 'svc', ready: true, timeout_s: 900 });
+    expect(v('rel', ['./verify.sh'])).toEqual({ id: 'rel', ready: true, timeout_s: 60 });
     expect(v('rel-missing', ['./nope.sh'])).toMatchObject({ ready: false });
-    expect(v('cwd', [process.execPath], { cwd: 'remote-server' })).toEqual({ id: 'cwd', ready: true });
+    expect(v('cwd', [process.execPath], { cwd: 'remote-server' })).toEqual({ id: 'cwd', ready: true, timeout_s: 60 });
     expect(v('cwd-missing', [process.execPath], { cwd: 'no-such-dir' })).toMatchObject({ ready: false, reason: expect.stringMatching(/cwd does not exist/) });
   });
 
@@ -163,11 +163,11 @@ describe('helloTargets: permission, launch and verify readiness per target', () 
       repo,
       verify: [
         { id: 'test', argv: [process.execPath, '--secret-flag-zz'], timeout: 60, env: { TOKEN: 'secret-value-zz' } },
-        { id: 'py', argv: ['uv-not-here-zz', 'run'], timeout: 60 },
+        { id: 'py', argv: ['uv-not-here-zz', 'run'], timeout: 1800 },
       ],
     })], new Map(), { env: { PATH: '/nonexistent-bin' } });
     expect(t.verify).toEqual(['test', 'py']);
-    expect(t.verify_status).toEqual([{ id: 'test', ready: true }, { id: 'py', ready: false, reason: expect.any(String) }]);
+    expect(t.verify_status).toEqual([{ id: 'test', ready: true, timeout_s: 60 }, { id: 'py', ready: false, reason: expect.any(String), timeout_s: 1800 }]);
     const text = JSON.stringify(t);
     for (const s of ['secret-flag-zz', 'secret-value-zz', 'uv-not-here-zz', process.execPath]) expect(text).not.toContain(s);
   });

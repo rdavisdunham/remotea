@@ -325,7 +325,7 @@ function handlePortsUpdate(cmd: any, updateWorkspaceMetadata: StoreAction): void
     for (const ws of useStore.getState().workspaces) {
       updateWorkspaceMetadata(ws.id, { ports: devPorts.length > 0 ? devPorts : undefined });
     }
-  } catch {}
+  } catch { /* a malformed ports report: keep the last known ports */ }
 }
 
 /** `wmux notify <text>` — works even outside a pane (falls back to active workspace). */

@@ -234,8 +234,15 @@ function executable(p: string): boolean {
   }
 }
 
-/** Would verify-runner find this entry's program and folder? Checked against the repository. */
+/**
+ * Would verify-runner find this entry's program and folder? Checked against the repository. Carries the entry's
+ * timeout (`timeout_s`), which Eridani's verify deadline follows.
+ */
 export function verifyStatus(repo: string, spec: VerifySpec, o: VerifyCheckOptions = {}): HelloVerifyStatus {
+  return { ...verifyReadiness(repo, spec, o), timeout_s: spec.timeout };
+}
+
+function verifyReadiness(repo: string, spec: VerifySpec, o: VerifyCheckOptions): HelloVerifyStatus {
   const cwd = spec.cwd ? path.resolve(repo, spec.cwd) : repo;
   try {
     if (!fs.statSync(cwd).isDirectory()) return { id: spec.id, ready: false, reason: 'its cwd is not a folder in the repository' };

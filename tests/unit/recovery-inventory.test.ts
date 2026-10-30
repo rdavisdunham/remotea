@@ -9,10 +9,10 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { mergeRecoveryItems, recoveryInventory, shouldShowRecovery, unmergedWork, type RecoveryLocalSurface, type RecoveryState } from '../../src/renderer/remote-sessions/recovery';
-import { noteRegistryForRecovery, resetRecoveryForTests, useRecovery } from '../../src/renderer/remote-sessions/recovery-runtime';
+import { applyRecoveryChoice, noteRegistryForRecovery, resetRecoveryForTests, useRecovery } from '../../src/renderer/remote-sessions/recovery-runtime';
 import RecoveryDialog, { RecoveryItemRow } from '../../src/renderer/components/RecoveryDialog';
 import { useStore } from '../../src/renderer/store';
-import type { EridaniBinding, SessionRecord, WorktreeStateInfo } from '../../src/shared/remote-host-protocol';
+import { agentResumeCommand, type EridaniBinding, type SessionRecord, type WorktreeStateInfo } from '../../src/shared/remote-host-protocol';
 import type { RemoteRegistryView } from '../../src/shared/remote-hosts-types';
 
 const ME = 'dev-me000000';
@@ -99,6 +99,61 @@ describe('recoveryInventory', () => {
     expect(unmergedWork({ ...CLEAN, untracked: 1, unpushed: 2 })).toBe('1 untracked file, 2 unpushed commits');
     expect(unmergedWork(CLEAN)).toBeNull();
     expect(unmergedWork(undefined)).toBeNull();
+  });
+});
+
+describe('Reopen resumes the agent conversation', () => {
+  const CLAUDE_ID = '0b6c1d2e-3f40-4a5b-8c6d-7e8f90a1b2c3';
+
+  it('an exited or closed agent session carries its resume command; a shell or an unknown provider does not', () => {
+    const v = view([
+      session('surf-claude', { state: 'exited', exitedAt: 5, agent: { provider: 'claude', sessionId: CLAUDE_ID, seenAt: 1 } }),
+      session('surf-codex', { state: 'exited', exitedAt: 5, agent: { provider: 'codex', sessionId: 'c0dex-1', seenAt: 1 }, eridani: binding({ harness: 'codex' }) }),
+      session('surf-oc', { state: 'exited', exitedAt: 5, agent: { provider: 'opencode', sessionId: 'oc-1', seenAt: 1 } }),
+      session('surf-odd', { state: 'exited', exitedAt: 5, agent: { provider: 'claude', sessionId: 'x; rm -rf ~', seenAt: 1 } }),
+      session('surf-sh', { state: 'exited', exitedAt: 5 }),
+      session('surf-closed', { agent: { provider: 'claude', sessionId: CLAUDE_ID, seenAt: 1 } }),
+    ], { closedIds: ['surf-closed', 'surf-gone'] });
+    const local = ['surf-claude', 'surf-codex', 'surf-oc', 'surf-odd', 'surf-sh', 'surf-closed', 'surf-gone'].map((id) => tab(id));
+    const by = Object.fromEntries(recoveryInventory(state([v], local)).items.map((i) => [i.surfaceId, i]));
+    expect(by['surf-claude']).toMatchObject({ resume: `claude --resume ${CLAUDE_ID}` });
+    expect(by['surf-claude'].detail).toMatch(/Reopen resumes its Claude conversation\.$/);
+    expect(by['surf-codex']).toMatchObject({ resume: 'codex resume c0dex-1' });
+    expect(by['surf-codex'].detail).toMatch(/Codex conversation/);
+    for (const id of ['surf-oc', 'surf-odd', 'surf-sh', 'surf-gone']) {
+      expect(by[id].resume).toBeUndefined();
+      expect(by[id].detail).not.toMatch(/resumes/);
+    }
+    expect(by['surf-closed']).toMatchObject({ kind: 'closed', resume: `claude --resume ${CLAUDE_ID}` });
+  });
+
+  it('the server and the desktop build the same command', () => {
+    expect(agentResumeCommand({ provider: 'claude', sessionId: CLAUDE_ID })).toBe(`claude --resume ${CLAUDE_ID}`);
+    expect(agentResumeCommand({ provider: 'codex', sessionId: 'abc' })).toBe('codex resume abc');
+    expect(agentResumeCommand({ provider: 'qwen', sessionId: 'abc' })).toBeNull();
+    expect(agentResumeCommand({ provider: 'claude', sessionId: '$(id)' })).toBeNull();
+  });
+
+  it('Reopen opens the new tab with the resume command; a plain session gets a shell', async () => {
+    const st = useStore.getState();
+    const wsId = st.createWorkspace({ title: 'Recover', titleIsDefault: false });
+    const shells = () => {
+      const out: string[] = [];
+      const ws = useStore.getState().workspaces.find((w) => w.id === wsId)!;
+      const visit = (n: typeof ws.splitTree): void => { if (n.type === 'leaf') out.push(...n.surfaces.map((x) => x.shell ?? '')); else { visit(n.children[0]); visit(n.children[1]); } };
+      visit(ws.splitTree);
+      return out;
+    };
+    const before = shells();
+    const items = recoveryInventory(state([view([
+      session('surf-claude', { state: 'exited', exitedAt: 5, agent: { provider: 'claude', sessionId: CLAUDE_ID, seenAt: 1 } }),
+      session('surf-sh', { state: 'exited', exitedAt: 5 }),
+    ])], [tab('surf-claude', { workspaceId: wsId, cwd: '/home/me/proj' }), tab('surf-sh', { workspaceId: wsId })])).items;
+    for (const item of items) expect(await applyRecoveryChoice(item, 'reopen')).toBe(true);
+    const after = shells();
+    const plain = (list: string[]) => list.filter((x) => x === 'remote:desk').length;
+    expect(after).toContain(`remote:desk claude --resume ${CLAUDE_ID}`);
+    expect(plain(after)).toBe(plain(before) + 1);
   });
 });
 

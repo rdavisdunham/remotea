@@ -111,6 +111,13 @@ jobs:
         run: |
           VER=$(node -p "require('./package.json').version")
           echo "version=$VER" >> "$GITHUB_OUTPUT"
+          # The installer's name comes from electron-builder.json (nsis.artifactName,
+          # remotea-<ver>-setup.exe), so a rename there cannot strand the steps below
+          # on a file that doesn't exist (they used to look for wmux-<ver>-setup.exe).
+          INSTALLER=$(node -p "require('./electron-builder.json').nsis.artifactName.replace('\${version}', '$VER').replace('\${ext}', 'exe')")
+          test -f "release/$INSTALLER" || { echo "::error::release/$INSTALLER was not built"; ls release; exit 1; }
+          echo "installer=$INSTALLER" >> "$GITHUB_OUTPUT"
+          echo "zip=remotea-$VER-win-x64.zip" >> "$GITHUB_OUTPUT"
           if [ "${{ github.event_name }}" = "push" ]; then
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           elif [ -n "${{ github.event.inputs.tag }}" ]; then
@@ -145,7 +152,7 @@ jobs:
             -F "signingPolicySlug=wmux" \
             -F "artifactConfigurationSlug=initial" \
             -F "description=CI release v${{ steps.version.outputs.version }}" \
-            -F "artifact=@release/wmux-${{ steps.version.outputs.version }}-setup.exe" \
+            -F "artifact=@release/${{ steps.version.outputs.installer }}" \
             -D headers.txt \
             "https://app.signpath.io/api/v1/$SIGNPATH_ORGANIZATION_ID/SigningRequests/SubmitWithArtifact")
           HTTP_CODE=$(echo "$HTTP_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
@@ -190,9 +197,9 @@ jobs:
         run: |
           curl -s \
             -H "Authorization: Bearer $SIGNPATH_API_TOKEN" \
-            -o "release/wmux-${{ steps.version.outputs.version }}-setup.exe" \
+            -o "release/${{ steps.version.outputs.installer }}" \
             "https://app.signpath.io/api/v1/$SIGNPATH_ORGANIZATION_ID/SigningRequests/${{ steps.sign-submit.outputs.signing_request_id }}/SignedArtifact"
-          echo "Signed installer downloaded, size: $(wc -c < release/wmux-${{ steps.version.outputs.version }}-setup.exe) bytes"
+          echo "Signed installer downloaded, size: $(wc -c < release/${{ steps.version.outputs.installer }}) bytes"
           # trusted=true only for a chain-valid Authenticode signature. A
           # SignPath project can also sign with a SELF-SIGNED certificate
           # (e.g. while the OSS "SignPath Foundation" cert is unavailable,
@@ -203,7 +210,7 @@ jobs:
           # so a self-signed installer downloads and then fails to install,
           # which is exactly the endless-update loop of issue #96.
           powershell -NoProfile -Command "
-            \$sig = Get-AuthenticodeSignature 'release/wmux-${{ steps.version.outputs.version }}-setup.exe';
+            \$sig = Get-AuthenticodeSignature 'release/${{ steps.version.outputs.installer }}';
             \$subject = if (\$sig.SignerCertificate) { \$sig.SignerCertificate.Subject } else { '(none)' };
             Write-Host ('Status: ' + \$sig.Status + ' — Subject: ' + \$subject);
             \$trusted = if (\$sig.Status -eq 'Valid') { 'true' } else { 'false' };
@@ -214,8 +221,8 @@ jobs:
           "
 
       # ── Portable zip ───────────────────────────────────────
-      # Keep shipping the portable zip alongside the NSIS installer: the docs
-      # and wmux.org tell users to grab wmux-X.Y.Z-win-x64.zip, and unsigned
+      # Keep shipping the portable zip (remotea-X.Y.Z-win-x64.zip; zip-updater's
+      # pickZipAsset looks for "win-x64") alongside the NSIS installer: unsigned
       # zips trip SmartScreen far less than unsigned installers. The NSIS build
       # above still emits release/win-unpacked/ as an intermediate, so this is
       # free. Auto-update (latest.yml) points at the installer, not this zip —
@@ -224,7 +231,7 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path "release/win-unpacked/*" `
-            -DestinationPath "wmux-${{ steps.version.outputs.version }}-win-x64.zip"
+            -DestinationPath "${{ steps.version.outputs.zip }}"
 
       # ── Generate latest.yml for electron-updater ──────────
       # ALWAYS published. The `win.publisherName` pin was removed from
@@ -253,7 +260,7 @@ jobs:
             const crypto = require('crypto');
             const fs = require('fs');
             const version = '${{ steps.version.outputs.version }}';
-            const installer = 'wmux-' + version + '-setup.exe';
+            const installer = '${{ steps.version.outputs.installer }}';
             const data = fs.readFileSync('release/' + installer);
             const sha512 = crypto.createHash('sha512').update(data).digest('base64');
             const size = data.length;
@@ -276,10 +283,10 @@ jobs:
       - name: Upload release artifacts as workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wmux-release
+          name: remotea-release
           path: |
-            release/wmux-${{ steps.version.outputs.version }}-setup.exe
-            wmux-${{ steps.version.outputs.version }}-win-x64.zip
+            release/${{ steps.version.outputs.installer }}
+            ${{ steps.version.outputs.zip }}
             latest.yml
 
       # ── GitHub Release ─────────────────────────────────────
@@ -287,10 +294,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: wmux ${{ steps.version.outputs.tag }}
+          name: remotea ${{ steps.version.outputs.tag }}
           files: |
-            release/wmux-${{ steps.version.outputs.version }}-setup.exe
-            wmux-${{ steps.version.outputs.version }}-win-x64.zip
+            release/${{ steps.version.outputs.installer }}
+            ${{ steps.version.outputs.zip }}
             latest.yml
           draft: false
           generate_release_notes: true
@@ -303,13 +310,15 @@ jobs:
       # continue-on-error: the release is already published; a push race with
       # another commit must not mark it failed — re-run this step, or run the
       # script by hand.
+      # remotea (the fork) has neither bucket/ nor the script, and its branch is
+      # main, so this is skipped until a bucket is set up for it.
       - name: Update Scoop manifest
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' && hashFiles('scripts/update-scoop-manifest.mjs') != '' }}
         continue-on-error: true
         shell: bash
         run: |
           VER='${{ steps.version.outputs.version }}'
-          ZIP="$PWD/wmux-$VER-win-x64.zip"
+          ZIP="$PWD/${{ steps.version.outputs.zip }}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch --no-tags origin master
