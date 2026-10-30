@@ -32,6 +32,7 @@ export function uploadFile(opts: { hostUrl: string; token: string; surfaceId: st
     const url = uploadUrl(opts.hostUrl, opts.surfaceId, path.basename(opts.localPath));
     const lib = url.protocol === 'https:' ? https : http;
     let settled = false;
+    let sending = false;
     const done = (r: UploadResult) => {
       if (settled) return;
       settled = true;
@@ -39,7 +40,12 @@ export function uploadFile(opts: { hostUrl: string; token: string; surfaceId: st
     };
     const req = lib.request(url, {
       method: 'POST',
-      headers: { authorization: `Bearer ${opts.token}`, 'content-type': 'application/octet-stream', 'content-length': size },
+      // The server answers a refusal (bad token, gone session, too large) before the body is sent; an older
+      // server continues at once, as before.
+      headers: {
+        authorization: `Bearer ${opts.token}`, 'content-type': 'application/octet-stream', 'content-length': size,
+        expect: '100-continue',
+      },
       signal: opts.signal,
       // Generous for a slow link, finite for a dead one: 15 s plus 1 s per MB.
       timeout: 15_000 + Math.ceil(size / 1_000_000) * 1000,
@@ -52,15 +58,20 @@ export function uploadFile(opts: { hostUrl: string; token: string; surfaceId: st
         try { parsed = JSON.parse(body); } catch { /* not JSON */ }
         if (res.statusCode === 200 && typeof parsed.path === 'string') done({ ok: true, path: parsed.path });
         else done({ ok: false, error: typeof parsed.error === 'string' ? parsed.error : `HTTP ${res.statusCode}` });
+        // Refused before the body: the request was never finished, so close it.
+        if (!sending) req.destroy();
       });
     });
     req.on('timeout', () => req.destroy(new Error('upload timed out')));
     req.on('error', (err) => done({ ok: false, error: opts.signal?.aborted ? 'cancelled' : err.message }));
-    const file = fs.createReadStream(opts.localPath);
-    file.on('error', (err) => {
-      req.destroy(err);
-      done({ ok: false, error: err.message });
+    req.on('continue', () => {
+      sending = true;
+      const file = fs.createReadStream(opts.localPath);
+      file.on('error', (err) => {
+        req.destroy(err);
+        done({ ok: false, error: err.message });
+      });
+      file.pipe(req);
     });
-    file.pipe(req);
   });
 }
