@@ -56,6 +56,10 @@ export const ERIDANI_LIMITS = Object.freeze({
   questionTextChars: 4_000,
   /** The output tail of a verify run, in characters. */
   verifyTailChars: 4_000,
+  /** `doctor` (S-Q1): at most this many warn/fail items, each summary and fix at most this many characters. */
+  doctorItems: 40,
+  doctorTextChars: 200,
+  doctorIdChars: 120,
 });
 
 export const ERIDANI_TIMING = Object.freeze({
@@ -107,7 +111,10 @@ export type LinkCap =
   // The host takes `worktrees.scan`: a fresh worktrees.report and session.report on request (the judge's PR evidence).
   | 'worktrees.scan'
   // The host takes `terminal.focus`: bring the run's tab to the front in the connected desktop app(s).
-  | 'terminal.focus';
+  | 'terminal.focus'
+  // The host reports `remotea doctor`'s summary: in hello (`doctor`), and as a `doctor` frame when it changes.
+  // The frame goes only to an Eridani whose welcome advertised `doctor`.
+  | 'doctor';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -124,8 +131,8 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 /** Stage E, advertised only while `eridani.json.collector` is `authoritative`. */
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
-/** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan` and `terminal.focus`. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus']);
+/** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus` and the `doctor` summary. */
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -248,6 +255,47 @@ export interface HelloBody {
    * healthy. Optional; an older Eridani ignores it.
    */
   degraded_reason?: string;
+  /**
+   * The latest `remotea doctor` summary the server computed (S-Q1), when it
+   * has one. Optional and additive: an Eridani that does not know it ignores
+   * it. Updates after welcome travel as `doctor` frames (DoctorBody), only to
+   * an Eridani that advertised `doctor`.
+   */
+  doctor?: DoctorSummary;
+}
+
+/**
+ * `remotea doctor` as Eridani sees it (S-Q1): when it was computed, how many
+ * checks were ok, warn and fail, and every warn and fail (never the ok ones),
+ * worst first, at most ERIDANI_LIMITS.doctorItems of them. Redacted at the
+ * source: no keys, no environment, paths under $HOME written with `~`.
+ */
+export interface DoctorSummary {
+  /** Epoch ms. */
+  at: number;
+  ok: number;
+  warn: number;
+  fail: number;
+  items: DoctorWireItem[];
+  /** True when items were dropped to fit ERIDANI_LIMITS.doctorItems (the counts are still complete). */
+  truncated?: boolean;
+}
+
+export interface DoctorWireItem {
+  /** Stable check id, e.g. `service.active`, `target.jarvis.verify.test` (≤ 120 characters). */
+  id: string;
+  level: 'warn' | 'fail';
+  /** One line, ≤ ERIDANI_LIMITS.doctorTextChars. */
+  summary: string;
+  /** The one-line fix, ≤ ERIDANI_LIMITS.doctorTextChars. Optional. */
+  fix?: string;
+}
+
+/** Sent when the summary changes (and once after each welcome), only to an Eridani that advertised `doctor`. Coalesced: only the latest matters. */
+export interface DoctorBody extends DoctorSummary {
+  t: 'doctor';
+  op_id: string;
+  digest: string;
 }
 
 /** One launcher on one target, as probed (caps_version 2). */
@@ -859,6 +907,7 @@ export type UpBody =
   | SessionReportBody
   | TurnBody
   | PromptBody
+  | DoctorBody
   | StatusBody
   | ExitBody
   | SessionsSnapshotBody
@@ -888,6 +937,14 @@ export type DownFrame = Envelope & DownBody;
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isStr = (v: unknown, max = 512): v is string => typeof v === 'string' && v.length > 0 && v.length <= max;
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/** A `doctor` summary within its limits (in hello, and the body of a `doctor` frame). */
+export function isDoctorSummary(m: unknown): m is DoctorSummary {
+  if (!isObj(m) || !isNum(m.at) || !isNum(m.ok) || !isNum(m.warn) || !isNum(m.fail) || !Array.isArray(m.items)) return false;
+  if (m.items.length > ERIDANI_LIMITS.doctorItems) return false;
+  return m.items.every((i) => isObj(i) && isStr(i.id, ERIDANI_LIMITS.doctorIdChars) && (i.level === 'warn' || i.level === 'fail')
+    && isStr(i.summary, ERIDANI_LIMITS.doctorTextChars) && (i.fix === undefined || isStr(i.fix, ERIDANI_LIMITS.doctorTextChars)));
+}
 
 /** Validate the envelope of anything received. Returns null for garbage. */
 export function parseEnvelope(raw: unknown): (Envelope & Record<string, unknown>) | null {
@@ -937,6 +994,8 @@ export function parseUpFrame(raw: unknown): UpFrame | null {
     case 'prompt':
       return op && isStr(m.surf, 120) && isStr(m.run_id, 200) && isNum(m.generation) && isNum(m.seq) && isNum(m.at)
         && typeof m.text === 'string' && m.text.length <= ERIDANI_LIMITS.promptChars && typeof m.truncated === 'boolean' ? (m as unknown as UpFrame) : null;
+    case 'doctor':
+      return op && isDoctorSummary(m) ? (m as unknown as UpFrame) : null;
     case 'status':
       return op && isStr(m.surf, 120) && isNum(m.since) && isNum(m.revision)
         && ['working', 'needs_you', 'idle', 'exited'].includes(m.state as string) ? (m as unknown as UpFrame) : null;

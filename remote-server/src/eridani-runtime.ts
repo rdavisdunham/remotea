@@ -50,8 +50,11 @@ import {
   STAGE_F_CAPS,
   type CapabilityMatrix,
   type CommandBody,
+  type DoctorSummary,
   type HarnessCaps,
+  type LinkCap,
   type TerminalFocusCommand,
+  type WorktreeReport,
   type WorktreesScanCommand,
 } from '../../src/shared/eridani-link-protocol';
 import {
@@ -68,7 +71,7 @@ import { EridaniLink, type CommandContext, type CommandResult, type EridaniLinkD
 import type { Hub } from './hub';
 import type { Registry } from './registry';
 import { Collector } from './collector/collector';
-import { CollectorState } from './collector/state';
+import { COLLECTOR_STATE_FILES as STATE_FILES, CollectorState } from './collector/state';
 import { statusFromRegistry } from './collector/report';
 import { Dispatch, type DispatchTimers } from './dispatch';
 import { QuestionBroker } from './questions-claude';
@@ -79,16 +82,14 @@ import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn, type ProbeHarness } from './launch-caps';
-import { hookVersion, loadBuildInfo, type BuildInfo } from './build-info';
+import { hookVersion, loadBuildInfo, readServerInfo, type BuildInfo } from './build-info';
+import { doctorSummary, runDoctor, type GatherOptions } from './doctor';
+import type { CollectorLinkStatus } from './eridani-link';
 import { adapterHooks, defaultHookPaths } from './hooks-install';
 import type { AdapterHooks } from './harness-adapters';
 
-export const COLLECTOR_STATE_FILE = 'eridani-collector.json';
-/** Delivered fingerprints per mode: a parity ack says nothing about what Eridani stored. */
-export const COLLECTOR_STATE_FILES: Record<Exclude<CollectorMode, 'off'>, string> = {
-  parity: COLLECTOR_STATE_FILE,
-  authoritative: 'eridani-collector-authoritative.json',
-};
+/** Delivered fingerprints per mode (defined beside CollectorState, so `remotea doctor` reads them without this module). */
+export { COLLECTOR_STATE_FILE, COLLECTOR_STATE_FILES } from './collector/state';
 /** collector.py's Windows side. */
 export const WINDOWS_USERS = '/mnt/c/Users';
 const CHECK_MS = 30_000;
@@ -131,7 +132,17 @@ export interface EridaniRuntimeDeps {
   hookPaths?: { cliDir: string; sourceDir: string };
   /** The service environment verify readiness is checked against (default: process.env). */
   verifyEnv?: NodeJS.ProcessEnv;
+  /**
+   * S-Q1: the doctor run while the link is up (doctor.ts), every DOCTOR_MS;
+   * its summary goes out in hello and `doctor` frames. `false` turns it off;
+   * an object overrides what it reads (tests: systemctl, ports, statfs).
+   */
+  doctor?: false | Partial<GatherOptions>;
+  doctorMs?: number;
 }
+
+/** How often the server recomputes the doctor summary while the link is up. */
+export const DOCTOR_MS = 5 * 60_000;
 
 /**
  * Dispatch's timers with every callback contained: a throw inside one (a
@@ -155,6 +166,11 @@ export function containedTimers(log: (msg: string) => void, base?: DispatchTimer
     },
     clearTimeout: (h) => clearTimeout(h as NodeJS.Timeout),
   };
+}
+
+/** The link caps hello advertises for a collector mode (also what `remotea eridani connect`'s probe sends). */
+export function linkCaps(mode: CollectorMode | null | undefined): readonly LinkCap[] {
+  return mode === 'authoritative' ? STAGE_F_AUTHORITATIVE_CAPS : STAGE_F_CAPS;
 }
 
 /** What each harness can do through remotea in stage B: observe and capture, nothing that acts. */
@@ -187,6 +203,14 @@ export class EridaniRuntime {
   /** Who waits for the next run to finish (a forced report starts after its request, never joins one in flight). */
   private worktreesWaiters: Array<{ resolve: () => void; reject: (err: Error) => void }> = [];
   private readonly worktrees: WorktreeManager;
+  /** The last worktrees report built (the doctor's recovery check reads it instead of running git again). */
+  private lastWorktrees: WorktreeReport[] | null = null;
+  /** The collector's last full scan (status file and doctor: parity age). */
+  private lastScan: { at: number; seen: number; queued: number; failed: number; error: string | null } | null = null;
+  /** S-Q1: the latest doctor summary (hello and `doctor` frames), when it was computed, and whether one is running. */
+  private doctor: DoctorSummary | null = null;
+  private doctorAt = 0;
+  private doctorBusy = false;
   readonly dispatch: Dispatch;
   readonly questions: QuestionBroker;
   readonly context: ContextService;
@@ -259,6 +283,7 @@ export class EridaniRuntime {
       this.reconfigure();
     }
     if (this.link) this.refreshProbes();
+    if (this.link && Date.now() - this.doctorAt >= (this.deps.doctorMs ?? DOCTOR_MS)) void this.runDoctor();
     const req = path.join(this.deps.dir, ERIDANI_COLLECT_REQUEST);
     if (fs.existsSync(req)) {
       fs.rmSync(req, { force: true });
@@ -290,7 +315,7 @@ export class EridaniRuntime {
     const machine = cfg!.machine || this.deps.hostname;
     const mode = cfg!.collector;
     const parity = mode !== 'authoritative';
-    this.state = new CollectorState(path.join(this.deps.dir, COLLECTOR_STATE_FILES[mode === 'off' ? 'parity' : mode]));
+    this.state = new CollectorState(path.join(this.deps.dir, STATE_FILES[mode === 'off' ? 'parity' : mode]));
     const collector: Collector | null = mode === 'off' ? null : new Collector({
       home: this.deps.collectorHome,
       windowsUsers: this.deps.windowsUsers === undefined ? WINDOWS_USERS : this.deps.windowsUsers,
@@ -345,8 +370,10 @@ export class EridaniRuntime {
         ? { state: 'failed', detail: 'interrupted by a server restart' }
         : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
-      caps: () => (mode === 'authoritative' ? STAGE_F_AUTHORITATIVE_CAPS : STAGE_F_CAPS),
+      caps: () => linkCaps(mode),
       targets: () => this.helloTargets(),
+      doctor: () => this.doctor,
+      collectorStatus: () => this.collectorStatus(),
       onRunsSnapshot: (runs) => {
         this.dispatch.applyRunsSnapshot(runs);
         this.replay();
@@ -363,6 +390,7 @@ export class EridaniRuntime {
       },
       onDirty: (entity) => {
         if (entity === WORKTREES_ENTITY) this.worktreesSent = '';
+        else if (entity === 'doctor') this.doctorAt = 0; // not queued: computed and offered again on the next tick
         else this.state?.dirty(entity);
       },
       ...this.deps.linkOverrides,
@@ -387,6 +415,12 @@ export class EridaniRuntime {
     if (known) link.start();
     else void probed.then(() => {
       if (this.link === link) link.start();
+    });
+    // The doctor summary hello carries; from the probes once they are in. A later hello (any reconnect) has it.
+    this.lastScan = null;
+    this.doctorAt = Date.now();
+    void probed.then(() => {
+      if (this.link === link) void this.runDoctor();
     });
     this.scanTimer = setInterval(() => this.scan(), this.deps.scanMs ?? SCAN_MS);
     this.scanTimer.unref?.();
@@ -481,6 +515,7 @@ export class EridaniRuntime {
     // nominate fetches each base first (rate-limited), so the heads read the same fresh ref.
     this.worktrees.nominate(targets, (p) => writers.has(p), (p) => writers.get(p) ?? null).then(async (rows) => [rows, await this.worktrees.migrationHeads(targets)] as const).then(
       ([rows, heads]) => {
+        this.lastWorktrees = rows;
         const body = heads.length ? { t: 'worktrees.report' as const, worktrees: rows, heads } : { t: 'worktrees.report' as const, worktrees: rows };
         const text = JSON.stringify(body);
         if (!forced && text === this.worktreesSent) return this.settleWorktrees(waiters, null);
@@ -592,10 +627,74 @@ export class EridaniRuntime {
     this.takeDirty();
     this.collector.scan().then(
       (r) => {
+        this.lastScan = { at: Date.now(), seen: r.seen, queued: r.queued, failed: r.failed, error: null };
         if (r.queued || r.failed) this.deps.log(`eridani collector: ${r.seen} session(s), ${r.queued} report(s) queued, ${r.failed} not queued`);
       },
-      (err) => this.deps.log(`eridani collector: scan failed: ${(err as Error).message}`),
+      (err) => {
+        this.lastScan = { at: Date.now(), seen: 0, queued: 0, failed: 0, error: String((err as Error)?.message ?? err).slice(0, 200) };
+        this.deps.log(`eridani collector: scan failed: ${(err as Error).message}`);
+      },
     );
+  }
+
+  /** The collector's mode and last full scan, for the status file (`remotea doctor`'s parity age). */
+  collectorStatus(): CollectorLinkStatus | null {
+    if (!this.cfg) return null;
+    const s = this.lastScan;
+    return {
+      mode: this.cfg.collector,
+      lastScanAt: s?.at ?? null,
+      lastScan: s && !s.error ? { seen: s.seen, queued: s.queued, failed: s.failed } : null,
+      lastScanError: s?.error ?? null,
+      codexUnavailable: this.collector?.codexUnavailable ?? null,
+    };
+  }
+
+  /** The latest doctor summary (null before the first run). */
+  get doctorSummary(): DoctorSummary | null {
+    return this.doctor;
+  }
+
+  /**
+   * S-Q1: run the doctor from inside the server (its own link, probes,
+   * worktrees report and registry; no git, no probes of its own), keep the
+   * summary for the next hello, and offer it to the link, which sends a
+   * `doctor` frame only to an Eridani that advertised `doctor` and only when
+   * the findings changed. Never throws.
+   */
+  async runDoctor(): Promise<DoctorSummary | null> {
+    if (this.deps.doctor === false || this.doctorBusy) return this.doctor;
+    this.doctorBusy = true;
+    this.doctorAt = Date.now();
+    try {
+      const link = this.link;
+      const report = await runDoctor({
+        dir: this.deps.dir,
+        ...(this.deps.hookPaths ? { hookPaths: { home: defaultHookPaths().home, ...this.deps.hookPaths } } : {}),
+        link: link?.status() ?? null,
+        readiness: this.helloTargets(),
+        worktrees: async () => this.lastWorktrees,
+        registry: {
+          v: 1,
+          epoch: '',
+          groups: Object.fromEntries(this.deps.registry.groups().map((g) => [g.id, g])),
+          sessions: Object.fromEntries(this.deps.registry.sessions().map((s) => [s.id, s])),
+          tombstones: {},
+          devices: {},
+        },
+        serverInfo: readServerInfo(this.deps.dir),
+        diskBuild: this.build,
+        collector: this.collectorStatus(),
+        ...(this.deps.doctor ?? {}),
+      });
+      this.doctor = doctorSummary(report);
+      if (this.link === link) link?.reportDoctor(this.doctor);
+    } catch (err) {
+      this.deps.log(`eridani: doctor failed: ${(err as Error)?.message ?? String(err)}`);
+    } finally {
+      this.doctorBusy = false;
+    }
+    return this.doctor;
   }
 
   private teardown(reason: string): void {

@@ -65,6 +65,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { ERIDANI_LIMITS } from '../../src/shared/eridani-link-protocol';
 import type {
   AnswerCommand,
   CommandBody,
@@ -881,7 +882,18 @@ export class Dispatch {
       // One write per surface at a time: the previous input's Enter may still be due.
       if (!this.writes.has(surf) && this.deps.linkReady() && st?.state === 'idle' && fresh) {
         list.shift();
-        head.ctx.begin();
+        try {
+          head.ctx.begin();
+        } catch (err) {
+          // `executing` could not be recorded (the journal is down): nothing was typed. This input
+          // fails, and the tick goes on, so the inputs queued behind it are not stranded.
+          const why = (err as Error)?.message ?? String(err);
+          this.log(`eridani: queued input for ${surf} not delivered: ${why}`);
+          head.resolve({ state: 'failed', detail: `not delivered: ${why}`.slice(0, ERIDANI_LIMITS.reasonChars) });
+          if (list.length) this.pollTimers.set(surf, this.timers.setTimeout(tick, this.timing.queuePollMs));
+          else this.queues.delete(surf);
+          return;
+        }
         this.delivered.set(surf, this.now());
         this.acceptInput(surf, head.cmd.generation);
         const w = this.startWrite(this.deps.registry.session(surf)!, 'queue', head.cmd.generation);
