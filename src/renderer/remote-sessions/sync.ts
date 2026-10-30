@@ -88,6 +88,7 @@ export function buildLocalIndex(): LocalIndex {
       paneIds,
       focusedPaneId: st.activeWorkspaceId === ws.id ? focusedPane() ?? undefined : undefined,
       active: st.activeWorkspaceId === ws.id,
+      ...(ws.eridaniTask ? { eridaniTask: ws.eridaniTask } : {}),
     });
   }
   return index;
@@ -127,6 +128,19 @@ export function applySyncActions(actions: SyncAction[]): void {
         agreedMeta.set(`${wsId}|${a.hostId}`, { name: a.title, color: a.color });
         break;
       }
+      case 'create-task-workspace': {
+        const surfaces: SurfaceRef[] = a.surfaces.map((s) => ({
+          id: s.id as SurfaceId,
+          type: 'terminal',
+          shell: s.shell,
+          ...(s.cwd ? { cwd: s.cwd } : {}),
+          ...(s.customTitle ? { customTitle: s.customTitle } : {}),
+        }));
+        // Like create-workspace, one pane holding exactly the placed sessions;
+        // unlike it, bound to no server group (see plan.ts).
+        st.createWorkspace({ title: a.title, titleIsDefault: false, splitTree: leafNode(surfaces), eridaniTask: a.task });
+        break;
+      }
       case 'bind': {
         const ws = useStore.getState().workspaces.find((w) => w.id === a.workspaceId);
         if (!ws) break;
@@ -157,6 +171,7 @@ function runSync(): void {
     placer: latest.placer,
     elsewhere: new Set(latest.elsewhere),
     pendingMeta: new Set(pendingMeta.keys()),
+    groupEridani: useStore.getState().workspacePrefs.groupEridaniRuns !== false,
   });
   if (actions.length) applySyncActions(actions);
 }

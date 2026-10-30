@@ -1233,6 +1233,7 @@ export default function App() {
             explorerExpanded: ws.explorerExpanded,
             explorerShowHidden: ws.explorerShowHidden,
             remoteGroups: ws.remoteGroups,
+            eridaniTask: ws.eridaniTask,
             worktree: ws.worktree,
           })),
         }],
@@ -1422,6 +1423,7 @@ export default function App() {
         explorerExpanded: ws.explorerExpanded,
         explorerShowHidden: ws.explorerShowHidden,
         remoteGroups: ws.remoteGroups,
+        eridaniTask: ws.eridaniTask,
         // The worktree binding survives a named save like every other field
         // (#366): dropping it turned a live checkout into an anonymous folder.
         worktree: ws.worktree,

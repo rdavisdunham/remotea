@@ -80,7 +80,9 @@ export default function HostAttentionBar({ onOpenHosts }: { onOpenHosts?: () => 
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const shownHere = useMemo(() => new Set(buildLocalIndex().surfaces.map((s) => s.id)), [workspaces]);
+  const anyHost = Object.keys(hosts).length > 0;
+  // buildLocalIndex reads the store; `workspaces` is what changes it.
+  const shownHere = useMemo(() => (anyHost ? new Set(buildLocalIndex().surfaces.map((s) => s.id)) : new Set<string>()), [workspaces, anyHost]);
   const rows = useMemo(() => hostAttention(hosts, status, views, shownHere, now), [hosts, status, views, shownHere, now]);
   if (!rows.length) return null;
   return (

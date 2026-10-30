@@ -511,6 +511,23 @@ export interface WorkspaceInfo {
    * is created or a foreign session is placed here; arrangement stays local.
    */
   remoteGroups?: Record<string, string>;
+  /**
+   * remotea: this workspace holds the sessions Eridani started for one task
+   * (or one run, when it has no task) on one host's execution target. Set
+   * when sync places such a session with run grouping on; never bound to a
+   * server group, so closing it closes its own tabs only.
+   */
+  eridaniTask?: EridaniTaskRef;
+}
+
+/** remotea: which Eridani task a workspace groups (see WorkspaceInfo.eridaniTask). */
+export interface EridaniTaskRef {
+  hostId: string;
+  /** The execution target id (the repo the runs work in). */
+  target: string;
+  taskId: string | null;
+  /** The run that opened the workspace; the key when there is no task. */
+  runId: string;
 }
 
 // Surface
@@ -655,6 +672,7 @@ export interface SavedSession {
     explorerExpanded?: Record<string, string[]>;
     explorerShowHidden?: boolean;
     remoteGroups?: Record<string, string>;
+    eridaniTask?: EridaniTaskRef;
     pinned?: boolean;
   }>;
   sidebarWidth: number;

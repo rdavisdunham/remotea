@@ -298,6 +298,7 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
       shellState: options.shellState,
       worktree: options.worktree,
       remoteGroups: options.remoteGroups,
+      eridaniTask: options.eridaniTask,
     };
 
     set((state) => {
@@ -523,6 +524,7 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
       explorerShowHidden: config.explorerShowHidden,
       worktree: config.worktree,
       remoteGroups: config.remoteGroups,
+      eridaniTask: config.eridaniTask,
     }));
 
     // IDs are regenerated above, so a saved activeWorkspaceId is meaningless —

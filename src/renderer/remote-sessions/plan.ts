@@ -12,10 +12,19 @@
  *   - takes the group's name and colour (server wins, except while one of
  *     our own edits is still on its way there).
  * It never rearranges anything that already exists.
+ *
+ * With `groupEridani` (task 0ec167e4) a session Eridani started (one that
+ * carries an `eridani` binding) is not placed by its server group (they all
+ * share "Eridani") but into a local workspace per task on its execution
+ * target — per run when it has no task — created on first need and marked
+ * with `eridaniTask`. Such a workspace is never bound to a server group, so
+ * a rename does not rename the shared group and closing it closes only its
+ * own tabs.
  */
-import { INBOX_GROUP_ID, type SessionRecord } from '../../shared/remote-host-protocol';
+import { INBOX_GROUP_ID, type EridaniBinding, type SessionRecord } from '../../shared/remote-host-protocol';
 import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
 import { remoteShellSpec } from '../../shared/remote-shell-spec';
+import type { EridaniTaskRef } from '../../shared/types';
 
 export interface LocalWorkspace {
   id: string;
@@ -27,6 +36,8 @@ export interface LocalWorkspace {
   /** The pane to add tabs to when this workspace is the active one. */
   focusedPaneId?: string;
   active: boolean;
+  /** Set: this workspace groups one Eridani task's sessions (never bound to a server group). */
+  eridaniTask?: EridaniTaskRef;
 }
 
 export interface LocalSurface {
@@ -51,6 +62,7 @@ export type SyncAction =
   | { kind: 'drop'; surfaceIds: string[] }
   | { kind: 'insert'; workspaceId: string; paneId: string; surfaces: SeedSurface[] }
   | { kind: 'create-workspace'; hostId: string; groupId: string; title: string; color?: string; surfaces: SeedSurface[] }
+  | { kind: 'create-task-workspace'; task: EridaniTaskRef; title: string; surfaces: SeedSurface[] }
   | { kind: 'bind'; workspaceId: string; hostId: string; groupId: string }
   | { kind: 'workspace-meta'; workspaceId: string; title: string; color?: string };
 
@@ -63,6 +75,23 @@ export interface PlanInput {
   elsewhere: ReadonlySet<string>;
   /** Groups with a local name/colour edit not yet confirmed by the server. */
   pendingMeta: ReadonlySet<string>;
+  /** Place Eridani-started sessions in one workspace per task (Settings → Remote hosts). */
+  groupEridani?: boolean;
+}
+
+/** Does workspace task `w` hold sessions of binding `b` on `hostId`? Same target and task (same run when there is no task). */
+export function sameEridaniTask(w: EridaniTaskRef, hostId: string, b: Pick<EridaniBinding, 'target' | 'taskId' | 'runId'>): boolean {
+  if (w.hostId !== hostId || w.target !== b.target) return false;
+  return b.taskId ? w.taskId === b.taskId : !w.taskId && w.runId === b.runId;
+}
+
+function taskKey(b: EridaniBinding): string {
+  return `${b.target}\u0000${b.taskId ? `task:${b.taskId}` : `run:${b.runId}`}`;
+}
+
+/** The pane new tabs go to: the focused one when the workspace is active, else its first. */
+function targetPane(ws: LocalWorkspace): string {
+  return ws.active && ws.focusedPaneId && ws.paneIds.includes(ws.focusedPaneId) ? ws.focusedPaneId : ws.paneIds[0];
 }
 
 function seedFor(hostId: string, s: SessionRecord): SeedSurface {
@@ -109,7 +138,8 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
       }
       const ws = wsById.get(surf.workspaceId);
       const groupId = rec.groupId ?? INBOX_GROUP_ID;
-      if (ws && !ws.remoteGroups?.[host] && !boundWs.has(groupId)) {
+      // A task workspace stands for a task, not for the server group its sessions share.
+      if (ws && !ws.eridaniTask && !ws.remoteGroups?.[host] && !boundWs.has(groupId)) {
         // A workspace holding a session of group G, bound to nothing on this host: it IS G here.
         actions.push({ kind: 'bind', workspaceId: ws.id, hostId: host, groupId });
         ws.remoteGroups = { ...(ws.remoteGroups ?? {}), [host]: groupId };
@@ -130,9 +160,17 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
     // 3. Sessions this device does not show yet (placer window only).
     if (!input.placer) continue;
     const byGroup = new Map<string, SessionRecord[]>();
+    const byTask = new Map<string, SessionRecord[]>();
     for (const s of view.sessions) {
       if (shownHere.has(s.id) || input.elsewhere.has(s.id)) continue;
       if (s.hiddenBy.includes(view.deviceId)) continue;
+      if (input.groupEridani && s.eridani) {
+        const k = taskKey(s.eridani);
+        const list = byTask.get(k) ?? [];
+        list.push(s);
+        byTask.set(k, list);
+        continue;
+      }
       const g = s.groupId ?? INBOX_GROUP_ID;
       const list = byGroup.get(g) ?? [];
       list.push(s);
@@ -143,8 +181,7 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
       const seeds = list.map((s) => seedFor(host, s));
       const ws = boundWs.get(groupId);
       if (ws && ws.paneIds.length) {
-        const paneId = ws.active && ws.focusedPaneId && ws.paneIds.includes(ws.focusedPaneId) ? ws.focusedPaneId : ws.paneIds[0];
-        actions.push({ kind: 'insert', workspaceId: ws.id, paneId, surfaces: seeds });
+        actions.push({ kind: 'insert', workspaceId: ws.id, paneId: targetPane(ws), surfaces: seeds });
         continue;
       }
       const g = view.groups.find((x) => x.id === groupId);
@@ -154,6 +191,23 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
         groupId,
         title: g?.name ?? (groupId === INBOX_GROUP_ID ? 'Inbox' : 'Remote'),
         color: g?.color,
+        surfaces: seeds,
+      });
+    }
+    for (const list of byTask.values()) {
+      list.sort((a, b) => a.createdAt - b.createdAt);
+      const b = list[0].eridani!;
+      const seeds = list.map((s) => seedFor(host, s));
+      const ws = input.local.workspaces.find((w) => w.eridaniTask && w.paneIds.length && sameEridaniTask(w.eridaniTask, host, b));
+      if (ws) {
+        actions.push({ kind: 'insert', workspaceId: ws.id, paneId: targetPane(ws), surfaces: seeds });
+        continue;
+      }
+      actions.push({
+        kind: 'create-task-workspace',
+        task: { hostId: host, target: b.target, taskId: b.taskId, runId: b.runId },
+        // Eridani spawns with the task title as the session title.
+        title: list[0].title || `${b.harness} · ${b.branch}`,
         surfaces: seeds,
       });
     }

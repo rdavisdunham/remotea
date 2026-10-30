@@ -290,6 +290,24 @@ export default function RemoteHostsSettings() {
       {editing === 'new'
         ? <HostEditor initial={EMPTY} hasToken={false} onDone={() => setEditing(null)} />
         : <button className="settings-button" onClick={() => setEditing('new')}>Add remote host</button>}
+      <div className="settings-divider" />
+      <h3 className="settings-section-title">Eridani runs and recovery</h3>
+      <div className="settings-row">
+        <label className="settings-label" htmlFor="remote-group-eridani">
+          Group Eridani runs by repository and task
+          <span className="settings-hint"> A workspace per task, under its execution target in the sidebar, with the run&apos;s state. Off: they share the host&apos;s &quot;Eridani&quot; workspace. Manual sessions are never moved.</span>
+        </label>
+        <input id="remote-group-eridani" type="checkbox" className="settings-toggle" checked={workspacePrefs.groupEridaniRuns !== false}
+          onChange={(e) => setWorkspacePrefs({ groupEridaniRuns: e.target.checked })} />
+      </div>
+      <div className="settings-row">
+        <label className="settings-label" htmlFor="remote-recovery-skip-clean">
+          Skip the recovery dialog when everything restores cleanly
+          <span className="settings-hint"> After a start or a reconnect, ask only about terminals that exited or were closed while away and worktrees with unmerged work.</span>
+        </label>
+        <input id="remote-recovery-skip-clean" type="checkbox" className="settings-toggle" checked={workspacePrefs.recoverySkipClean !== false}
+          onChange={(e) => setWorkspacePrefs({ recoverySkipClean: e.target.checked })} />
+      </div>
       <HiddenSessions />
     </div>
   );
