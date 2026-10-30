@@ -94,6 +94,12 @@ function targetPane(ws: LocalWorkspace): string {
   return ws.active && ws.focusedPaneId && ws.paneIds.includes(ws.focusedPaneId) ? ws.focusedPaneId : ws.paneIds[0];
 }
 
+/** A task workspace's title, from its earliest session: Eridani spawns with the task title as the session title. */
+function taskTitle(first: SessionRecord): string {
+  const b = first.eridani!;
+  return first.title || `${b.harness} · ${b.branch}`;
+}
+
 function seedFor(hostId: string, s: SessionRecord): SeedSurface {
   return {
     id: s.id,
@@ -206,8 +212,7 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
       actions.push({
         kind: 'create-task-workspace',
         task: { hostId: host, target: b.target, taskId: b.taskId, runId: b.runId },
-        // Eridani spawns with the task title as the session title.
-        title: list[0].title || `${b.harness} · ${b.branch}`,
+        title: taskTitle(list[0]),
         surfaces: seeds,
       });
     }
@@ -215,4 +220,65 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
 
   if (drops.length) actions.unshift({ kind: 'drop', surfaceIds: [...new Set(drops)] });
   return actions;
+}
+
+/** One move of the Eridani tab migration: into an existing task workspace's pane, or a new task workspace. */
+export type EridaniMigrationMove =
+  | { surfaceIds: string[]; workspaceId: string; paneId: string }
+  | { surfaceIds: string[]; task: EridaniTaskRef; title: string };
+
+export interface EridaniMigrationPlan {
+  moves: EridaniMigrationMove[];
+  /** Eridani tabs this push decided about (moved or left where they are): never looked at again. */
+  decided: string[];
+}
+
+/**
+ * The one-time move of Eridani tabs that predate task workspaces (task
+ * 0ec167e4 placed only NEW sessions per task; tabs already shown sat on in
+ * the shared "Eridani" workspace). A tab of a session with an `eridani`
+ * binding that sits in its server group's workspace (bound to that group on
+ * the host, or not bound there yet) moves to its task workspace, joining one
+ * that exists or creating it as placement would. A tab already in a task
+ * workspace, or one the user put in a workspace of another group, stays.
+ *
+ * Pure. `done` holds tabs decided before (the caller persists `decided`), so
+ * each tab is considered once: a tab the user later drags back out of its
+ * task workspace stays where they put it. Only connected hosts, and never a
+ * tab whose session was closed or hidden (sync drops those).
+ */
+export function planEridaniMigration(views: RemoteRegistryView[], local: LocalIndex, done: ReadonlySet<string>): EridaniMigrationPlan {
+  const decided: string[] = [];
+  const wsById = new Map(local.workspaces.map((w) => [w.id, w]));
+  const groups = new Map<string, { host: string; recs: SessionRecord[] }>();
+  for (const view of views) {
+    if (!view.connected) continue;
+    const host = view.hostId;
+    const sessions = new Map<string, SessionRecord>(view.sessions.map((s) => [s.id, s]));
+    const closed = new Set(view.closedIds);
+    for (const surf of local.surfaces) {
+      if (surf.hostId !== host || done.has(surf.id) || closed.has(surf.id)) continue;
+      const rec = sessions.get(surf.id);
+      if (!rec?.eridani || rec.hiddenBy.includes(view.deviceId)) continue;
+      const ws = wsById.get(surf.workspaceId);
+      if (!ws) continue;
+      decided.push(surf.id);
+      const bound = ws.remoteGroups?.[host];
+      if (ws.eridaniTask || (bound && bound !== (rec.groupId ?? INBOX_GROUP_ID))) continue;
+      const k = `${host}\u0000${taskKey(rec.eridani)}`;
+      const g = groups.get(k) ?? { host, recs: [] };
+      g.recs.push(rec);
+      groups.set(k, g);
+    }
+  }
+  const moves: EridaniMigrationMove[] = [];
+  for (const { host, recs } of groups.values()) {
+    recs.sort((a, b) => a.createdAt - b.createdAt);
+    const b = recs[0].eridani!;
+    const surfaceIds = recs.map((r) => r.id as string);
+    const ws = local.workspaces.find((w) => w.eridaniTask && w.paneIds.length && sameEridaniTask(w.eridaniTask, host, b));
+    if (ws) moves.push({ surfaceIds, workspaceId: ws.id, paneId: targetPane(ws) });
+    else moves.push({ surfaceIds, task: { hostId: host, target: b.target, taskId: b.taskId, runId: b.runId }, title: taskTitle(recs[0]) });
+  }
+  return { moves, decided };
 }

@@ -14,10 +14,10 @@
 import { v4 as uuid } from 'uuid';
 import { useStore } from '../store';
 import type { SplitNode, SurfaceRef, WorkspaceId, PaneId, SurfaceId } from '../../shared/types';
-import type { RegistryPayload } from '../../shared/remote-hosts-types';
+import type { RegistryPayload, RemoteRegistryView } from '../../shared/remote-hosts-types';
 import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
 import { INBOX_GROUP_ID } from '../../shared/remote-host-protocol';
-import { planRemoteSync, type LocalIndex, type SyncAction } from './plan';
+import { planEridaniMigration, planRemoteSync, type LocalIndex, type SyncAction } from './plan';
 import { setLatestRemoteViews } from './registry-cache';
 import { noteRegistryForRecovery } from './recovery-runtime';
 
@@ -158,6 +158,38 @@ export function applySyncActions(actions: SyncAction[]): void {
   }
 }
 
+const MIGRATED_KEY = 'remotea-eridani-task-migration';
+const MIGRATED_MAX = 2000;
+
+function loadMigrated(): Set<string> {
+  try {
+    const list = JSON.parse(globalThis.localStorage?.getItem(MIGRATED_KEY) ?? '[]') as unknown;
+    return new Set(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Move Eridani tabs that predate task workspaces out of the shared group
+ * workspace, once each (plan.ts planEridaniMigration). Only moves tabs
+ * (moveSurfacesLocal): never closes a terminal or a session. Exported for tests.
+ */
+export function migrateEridaniTabs(views: RemoteRegistryView[]): void {
+  const done = loadMigrated();
+  const { moves, decided } = planEridaniMigration(views, buildLocalIndex(), done);
+  for (const m of moves) {
+    if ('workspaceId' in m) useStore.getState().moveSurfacesLocal(m.surfaceIds, { workspaceId: m.workspaceId as WorkspaceId, paneId: m.paneId as PaneId });
+    else useStore.getState().moveSurfacesLocal(m.surfaceIds, { create: { title: m.title, titleIsDefault: false, eridaniTask: m.task } });
+  }
+  if (!decided.length) return;
+  try {
+    globalThis.localStorage?.setItem(MIGRATED_KEY, JSON.stringify([...done, ...decided].slice(-MIGRATED_MAX)));
+  } catch {
+    /* storage unavailable: a tab dragged back out of its task workspace may be moved again */
+  }
+}
+
 function runSync(): void {
   applyQueued = false;
   if (!ready || !latest) return;
@@ -168,13 +200,15 @@ function runSync(): void {
   }
   // What happened while away, offered before sync drops anything (recovery-runtime.ts).
   noteRegistryForRecovery(latest.views);
+  const groupEridani = useStore.getState().workspacePrefs.groupEridaniRuns !== false;
+  if (groupEridani) migrateEridaniTabs(latest.views);
   const actions = planRemoteSync({
     views: latest.views,
     local: buildLocalIndex(),
     placer: latest.placer,
     elsewhere: new Set(latest.elsewhere),
     pendingMeta: new Set(pendingMeta.keys()),
-    groupEridani: useStore.getState().workspacePrefs.groupEridaniRuns !== false,
+    groupEridani,
   });
   if (actions.length) applySyncActions(actions);
 }
