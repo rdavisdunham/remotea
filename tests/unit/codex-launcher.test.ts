@@ -446,7 +446,7 @@ describe.skipIf(process.platform !== 'win32')('PowerShell launcher arguments', (
     expect(JSON.parse(require('fs').readFileSync(output, 'utf8'))).toEqual([
       'Explain > and < & | literally', '-c', 'model="a b"', '', 'C:\\space dir\\',
     ]);
-  });
+  }, 90_000); // above the 60 s spawn timeout, so a slow cold start fails on its own message, not vitest's 15 s cap
 });
 
 describe.runIf(process.platform === 'win32')('codexShimDirs — which shell gets which shim', () => {
