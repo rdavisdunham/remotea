@@ -74,7 +74,7 @@ import { sameWorktreeState, WorktreeManager, worktreeStateOf, writersByPath } fr
 import { loadTargets } from './eridani-targets';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
-import type { HelloTarget, WorktreeReport } from '../../src/shared/eridani-link-protocol';
+import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn, type ProbeHarness } from './launch-caps';
 import { hookVersion, loadBuildInfo, readServerInfo, type BuildInfo } from './build-info';
 import { doctorSummary, runDoctor, type GatherOptions } from './doctor';
