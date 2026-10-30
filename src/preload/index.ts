@@ -94,6 +94,8 @@ contextBridge.exposeInMainWorld('wmux', {
     // Agent status hooks on a host's server: install them there, or stop asking.
     installHooks: (hostId: string) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_HOOKS_INSTALL, hostId) as Promise<{ ok: boolean; error?: string }>,
     dismissHooksPrompt: (hostId: string, forever: boolean) => ipcRenderer.send(IPC_CHANNELS.RHOST_HOOKS_DISMISS, hostId, forever),
+    // Forget a host's changes that could not be applied there (the user has seen them).
+    dismissOutboxFailures: (hostId: string) => ipcRenderer.send(IPC_CHANNELS.RHOST_OUTBOX_DISMISS, hostId),
     onStatus: (callback: (status: HostStatus) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, status: HostStatus) => callback(status);
       ipcRenderer.on(IPC_CHANNELS.RHOST_STATUS, handler);

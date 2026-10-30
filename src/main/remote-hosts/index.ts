@@ -280,17 +280,44 @@ export class RemoteHosts {
 
   // ── Registry views (phase 2 placement) ───────────────────────────────────
 
+  /**
+   * Each host's registry mirror with this device's unconfirmed changes laid
+   * over it: a close or hide still in the outbox must not let the next
+   * reconcile put the tab back.
+   */
   views(): RemoteRegistryView[] {
-    return [...this.clients.values()].map((c) => ({
-      hostId: c.hostId,
-      deviceId: this.device.id,
-      connected: c.ready,
-      bootId: c.bootId,
-      groups: [...c.groups.values()],
-      sessions: [...c.sessions.values()],
-      closedIds: [...c.closedIds],
-      lost: {},
-    }));
+    const me = this.device.id;
+    return [...this.clients.values()].map((c) => {
+      const o = c.outboxOverlay();
+      const closedIds = new Set(c.closedIds);
+      const sessions = [];
+      for (const s of c.sessions.values()) {
+        if (o.closing.has(s.id) || (s.groupId && o.groupsClosing.has(s.groupId))) {
+          closedIds.add(s.id);
+          continue;
+        }
+        const hidden = (s.hiddenBy as string[]).includes(me);
+        if (o.hiding.has(s.id) && !hidden) sessions.push({ ...s, hiddenBy: [...s.hiddenBy, me as (typeof s.hiddenBy)[number]] });
+        else if (o.unhiding.has(s.id) && hidden) sessions.push({ ...s, hiddenBy: s.hiddenBy.filter((d) => d !== me) });
+        else sessions.push(s);
+      }
+      for (const id of o.closing) closedIds.add(id);
+      return {
+        hostId: c.hostId,
+        deviceId: me,
+        connected: c.ready,
+        bootId: c.bootId,
+        groups: [...c.groups.values()].filter((g) => !o.groupsClosing.has(g.id)),
+        sessions,
+        closedIds: [...closedIds],
+        lost: {},
+      };
+    });
+  }
+
+  /** The user has seen a host's failed or expired changes (Settings). */
+  dismissOutboxFailures(hostId: string): void {
+    this.clients.get(hostId)?.dismissOutboxFailures();
   }
 
   private registryChanged(): void {

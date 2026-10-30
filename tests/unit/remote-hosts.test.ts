@@ -162,7 +162,9 @@ describe('device identity and pending intents', () => {
     p.add('desk', { t: 'unhide', id: 'surf-1' });
     p.add('desk', { t: 'close', id: 'surf-2' });
     const reloaded = new PendingIntents(file);
-    expect(reloaded.take('desk')).toEqual([{ t: 'unhide', id: 'surf-1' }, { t: 'close', id: 'surf-2' }]);
+    expect(reloaded.peek('desk')).toEqual([{ t: 'unhide', id: 'surf-1' }, { t: 'close', id: 'surf-2' }]);
+    // Removed only once applied (see remote-host-outbox.test.ts).
+    for (const e of reloaded.pending('desk')) reloaded.settle('desk', e.iid, { ok: true });
     expect(new PendingIntents(file).peek('desk')).toEqual([]);
   });
 });

@@ -11,12 +11,13 @@
  *
  * Input typed while disconnected is DROPPED, never queued: replaying
  * keystrokes into an agent minutes later is how commands get approved by
- * accident. Destructive intents (close a tab, hide it) ARE queued — see
- * PendingIntents — because those are decisions, not keystrokes.
+ * accident. Registry changes (close a tab, hide it, rename, move) ARE kept — see
+ * PendingIntents, a durable outbox — because those are decisions, not keystrokes.
  */
 import WebSocket from 'ws';
 import {
   BIN_OUTPUT,
+  INBOX_GROUP_ID,
   PROTO,
   decodeFrame,
   encodeInput,
@@ -34,7 +35,7 @@ import {
 } from '../../shared/remote-host-protocol';
 import type { HostStatus, PtyExitInfo, RemoteSize, TerminalSnapshot } from '../../shared/remote-hosts-types';
 import { initialFsm, publicState, step, type Fsm, type FsmEvent } from './connection-fsm';
-import type { PendingIntent, PendingIntents } from './host-config';
+import type { OutboxEntry, PendingIntent, PendingIntents } from './host-config';
 import { diag } from './diag';
 import { uploadFile } from './upload';
 
@@ -159,6 +160,8 @@ export class RemoteHostClient {
   private nextRid = 1;
   private readonly surfs = new Map<string, Surf>();
   private readonly acks = new Map<number, (ok: boolean, error?: string) => void>();
+  /** rid -> outbox entry iid, for intents sent on the current socket. */
+  private readonly intentAcks = new Map<number, string>();
   private readonly fsWaiters = new Map<number, (result: unknown) => void>();
   private readonly timers: ClientTimers;
   private readonly now: () => number;
@@ -208,6 +211,7 @@ export class RemoteHostClient {
         agents: this.hooks,
         prompt: this.ready && !(this.deps.hooksPromptDeclined?.() ?? false) && this.hooks.some((a) => a.present && !a.installed),
       },
+      outbox: this.deps.intents.summary(this.hostId),
     };
   }
 
@@ -428,13 +432,16 @@ export class RemoteHostClient {
 
   private onReady(): void {
     this.probed.clear();
-    for (const intent of this.deps.intents.take(this.hostId)) this.sendIntent(intent);
+    this.settleFromSnapshot();
+    this.flushOutbox();
     for (const surf of this.surfs.values()) {
       if (surf.wanted && surf.state !== 'closed') this.sendOpen(surf);
     }
   }
 
   private onDown(): void {
+    // Unacknowledged intents stay pending in the outbox: resent on the next welcome.
+    this.intentAcks.clear();
     for (const surf of this.surfs.values()) {
       surf.open = false;
       surf.openRid = null;
@@ -449,24 +456,131 @@ export class RemoteHostClient {
     }
   }
 
-  private sendIntent(intent: PendingIntent): void {
+  // ── Outbox (see PendingIntents) ──────────────────────────────────────────
+
+  /**
+   * The welcome is the server's state after everything it received on earlier
+   * connections. A pending intent whose effect it already shows was applied
+   * and only its ack was lost: settle it without resending, so an older
+   * choice is never replayed over a state that already moved on.
+   */
+  private settleFromSnapshot(): void {
+    const me = this.deps.device.id;
+    let changed = false;
+    for (const e of this.deps.intents.pending(this.hostId)) {
+      const i = e.intent;
+      let applied = false;
+      switch (i.t) {
+        case 'close': applied = !this.sessions.has(i.id); break;
+        case 'groupClose': applied = !this.groups.has(i.id); break;
+        case 'hide': {
+          const s = this.sessions.get(i.id);
+          // Gone altogether is as hidden as it gets.
+          applied = !s || (s.hiddenBy as string[]).includes(me);
+          break;
+        }
+        case 'unhide': {
+          const s = this.sessions.get(i.id);
+          applied = !!s && !(s.hiddenBy as string[]).includes(me);
+          break;
+        }
+        case 'sessionUpdate': {
+          const s = this.sessions.get(i.id);
+          // The server files a session without a (live) group under the inbox, and stores a null title as none.
+          applied = !!s
+            && (i.groupId === undefined || s.groupId === (i.groupId ?? INBOX_GROUP_ID))
+            && (i.title === undefined || (s.title ?? undefined) === (i.title ?? undefined));
+          break;
+        }
+        case 'groupUpsert': {
+          const g = this.groups.get(i.id);
+          applied = !!g && g.name === i.name && (g.color ?? undefined) === (i.color ?? undefined);
+          break;
+        }
+      }
+      if (applied) {
+        diag('intent.proved', { host: this.hostId, t: i.t, attempts: e.attempts }, i.id);
+        this.deps.intents.settle(this.hostId, e.iid, { ok: true });
+        changed = true;
+      }
+    }
+    if (changed) this.outboxChanged();
+  }
+
+  /** Send every pending intent not already sent on this connection, oldest first. */
+  private flushOutbox(): void {
+    const inFlight = new Set(this.intentAcks.values());
+    for (const e of this.deps.intents.pending(this.hostId)) {
+      if (!inFlight.has(e.iid)) this.sendEntry(e);
+    }
+    this.outboxChanged();
+  }
+
+  /** Count the attempt on disk, then send; the ack (by rid) settles the entry. */
+  private sendEntry(e: OutboxEntry): void {
+    if (!this.ws || this.ws.readyState !== OPEN) return;
+    if (!this.deps.intents.beginSend(this.hostId, e.iid)) return;
     const rid = this.nextRid++;
+    this.intentAcks.set(rid, e.iid);
+    if (!this.sendIntent(rid, e.intent)) this.intentAcks.delete(rid);
+  }
+
+  private onIntentAck(iid: string, ok: boolean, error?: string): void {
+    const e = this.deps.intents.get(this.hostId, iid);
+    if (!e) return;
+    diag('intent.ack', { host: this.hostId, t: e.intent.t, ok, error: error ?? null, attempts: e.attempts }, e.intent.id);
+    if (!ok) this.log(`${this.hostId}: ${e.intent.t} ${e.intent.id} refused: ${error ?? 'no reason'}`);
+    this.deps.intents.settle(this.hostId, iid, { ok, error });
+    this.outboxChanged();
+  }
+
+  private outboxChanged(): void {
+    this.deps.onStatus(this.status());
+    this.deps.onRegistry?.();
+  }
+
+  /**
+   * What this device has asked for and the server has not confirmed yet, to
+   * lay over the registry mirror: a tab closed or hidden here must not be
+   * re-placed from a registry that has not heard about it.
+   */
+  outboxOverlay(): { closing: Set<string>; groupsClosing: Set<string>; hiding: Set<string>; unhiding: Set<string> } {
+    const o = { closing: new Set<string>(), groupsClosing: new Set<string>(), hiding: new Set<string>(), unhiding: new Set<string>() };
+    for (const i of this.deps.intents.peek(this.hostId)) {
+      if (i.t === 'close') o.closing.add(i.id);
+      else if (i.t === 'groupClose') o.groupsClosing.add(i.id);
+      else if (i.t === 'hide') o.hiding.add(i.id);
+      else if (i.t === 'unhide') o.unhiding.add(i.id);
+    }
+    return o;
+  }
+
+  /** The user has seen this host's failed or expired changes. */
+  dismissOutboxFailures(): void {
+    this.deps.intents.clearDone(this.hostId);
+    this.deps.onStatus(this.status());
+  }
+
+  private sendIntent(rid: number, intent: PendingIntent): boolean {
     switch (intent.t) {
-      case 'close': this.sendJson({ t: 'close', rid, id: intent.id as RemoteSurfaceId }); break;
-      case 'groupClose': this.sendJson({ t: 'groupClose', rid, id: intent.id as `grp-${string}` }); break;
-      case 'hide': this.sendJson({ t: 'hide', rid, id: intent.id as RemoteSurfaceId }); break;
-      case 'unhide': this.sendJson({ t: 'unhide', rid, id: intent.id as RemoteSurfaceId }); break;
+      case 'close': return this.sendJson({ t: 'close', rid, id: intent.id as RemoteSurfaceId });
+      case 'groupClose': return this.sendJson({ t: 'groupClose', rid, id: intent.id as `grp-${string}` });
+      case 'hide': return this.sendJson({ t: 'hide', rid, id: intent.id as RemoteSurfaceId });
+      case 'unhide': return this.sendJson({ t: 'unhide', rid, id: intent.id as RemoteSurfaceId });
       case 'sessionUpdate':
-        this.sendJson({ t: 'sessionUpdate', rid, id: intent.id as RemoteSurfaceId, groupId: intent.groupId as `grp-${string}` | null | undefined, group: intent.group, title: intent.title });
-        break;
-      case 'groupUpsert': this.sendJson({ t: 'groupUpsert', rid, group: { id: intent.id as `grp-${string}`, name: intent.name, color: intent.color } }); break;
+        return this.sendJson({ t: 'sessionUpdate', rid, id: intent.id as RemoteSurfaceId, groupId: intent.groupId as `grp-${string}` | null | undefined, group: intent.group, title: intent.title });
+      case 'groupUpsert': return this.sendJson({ t: 'groupUpsert', rid, group: { id: intent.id as `grp-${string}`, name: intent.name, color: intent.color } });
     }
   }
 
-  /** Send now when connected, otherwise keep it for the next welcome. */
+  /**
+   * Record the change in the outbox (on disk), then send it if connected.
+   * Either way it stays there until the server acknowledges it.
+   */
   intent(intent: PendingIntent): void {
-    if (this.ready) this.sendIntent(intent);
-    else this.deps.intents.add(this.hostId, intent);
+    const entry = this.deps.intents.add(this.hostId, intent);
+    if (this.ready) this.sendEntry(entry);
+    this.outboxChanged();
   }
 
   private sendOpen(surf: Surf): void {
@@ -507,6 +621,12 @@ export class RemoteHostClient {
       case 'opened': return this.onOpened(msg);
       case 'openError': return this.onOpenError(msg);
       case 'ack': {
+        const iid = this.intentAcks.get(msg.rid);
+        if (iid !== undefined) {
+          this.intentAcks.delete(msg.rid);
+          this.onIntentAck(iid, msg.ok, msg.error);
+          return;
+        }
         const ack = this.acks.get(msg.rid);
         this.acks.delete(msg.rid);
         ack?.(msg.ok, msg.error);
