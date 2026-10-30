@@ -3,6 +3,9 @@
  * `remotea` — the server-side CLI (runs in WSL next to the server).
  *
  *   remotea status [--json]        sessions, groups and server state (reads the registry; no token needed)
+ *   remotea doctor [--json] [--probe]
+ *                                  one redacted readiness report: service, build, listener, collector, link,
+ *                                  hooks, targets, disk, uploads, recovery (doctor.ts); exit 1 when a check fails
  *   remotea open --group <name> [--cwd <dir>] [--title <t>] [--id surf-…] [--json] -- <cmd…>
  *                                  create a session in a workspace group (created if missing) and run
  *                                  <cmd…> once its shell is ready; every connected app places it as a tab
@@ -48,6 +51,7 @@ import { hookVersion, loadBuildInfo, readServerInfo, type BuildInfo, type HookVe
 import { ERIDANI_CAPS_VERSION, ERIDANI_PROTO } from '../../src/shared/eridani-link-protocol';
 import type { RegistryData } from './registry';
 import { eridaniCommand, statusBlock } from './eridani-cli';
+import { doctorCommand } from './doctor';
 import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord, type VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
 
 /** status --json while the collector is authoritative (the cutover interlock, above). */
@@ -510,6 +514,7 @@ function fmtAge(ms: number | null): string {
 
 const USAGE = `usage:
   remotea status [--json]
+  remotea doctor [--json] [--probe]                             readiness report (ok/warn/fail per check; exit 1 on a fail)
   remotea open --group <name> [--cwd <dir>] [--title <t>] [--id surf-...] [--json] -- <command...>
   remotea close <surf-id>
   remotea token
@@ -527,6 +532,8 @@ export async function main(argv: string[]): Promise<number> {
   const dir = configDir();
   const [cmd, ...rest] = argv;
   switch (cmd) {
+    case 'doctor':
+      return doctorCommand(dir, rest);
     case 'status': {
       const status = await buildStatus(dir);
       if (rest.includes('--json')) {

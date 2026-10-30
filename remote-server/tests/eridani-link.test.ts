@@ -189,6 +189,53 @@ describe('EridaniLink', () => {
     expect(link.spool.size).toBe(0);
   });
 
+  it('doctor (S-Q1): hello carries the summary; later changes go as `doctor` frames only to an Eridani that advertised it, once per change', async () => {
+    const summary = (fail: number, at = 1000) => ({ at, ok: 5, warn: 0, fail, items: fail ? [{ id: 'listener.port', level: 'fail' as const, summary: 'nothing accepts on 127.0.0.1:7717', fix: 'systemctl --user start remotea' }] : [] });
+    let current: ReturnType<typeof summary> | null = summary(0);
+    const { eri, link } = await setup({ caps: () => STAGE_F_CAPS, doctor: () => current });
+    eri.welcomeCaps = ['doctor'];
+    link.start();
+    await until(() => link.ready);
+    const hello = eri.of('hello')[0] as UpFrame & { doctor?: unknown; caps: string[] };
+    expect(hello.caps).toContain('doctor');
+    expect(hello.doctor).toEqual(summary(0));
+    // What hello carried is not sent again, and a new `at` alone is no change.
+    expect(link.reportDoctor(summary(0, 2000))).toBe(false);
+    current = summary(1, 3000);
+    expect(link.reportDoctor(current)).toBe(true);
+    await until(() => eri.of('doctor').length === 1);
+    const f = eri.of('doctor')[0] as unknown as Record<string, unknown>;
+    expect(f).toMatchObject({ t: 'doctor', at: 3000, ok: 5, warn: 0, fail: 1, items: [{ id: 'listener.port', level: 'fail' }] });
+    expect(f.digest).toBe(digestOf(f));
+    expect(link.reportDoctor(summary(1, 4000))).toBe(false);
+    await until(() => link.spool.size === 0);
+    expect(link.status().doctor).toEqual(current);
+  });
+
+  it('doctor: an Eridani that did not advertise `doctor` gets the hello field only, never a frame', async () => {
+    const { eri, link } = await setup({ doctor: () => ({ at: 1, ok: 1, warn: 0, fail: 0, items: [] }) });
+    expect(link.reportDoctor({ at: 2, ok: 0, warn: 0, fail: 1, items: [{ id: 'x', level: 'fail', summary: 'y' }] })).toBe(false); // not connected
+    link.start();
+    await until(() => link.ready);
+    expect((eri.of('hello')[0] as UpFrame & { doctor?: unknown }).doctor).toMatchObject({ ok: 1 });
+    expect(link.reportDoctor({ at: 3, ok: 0, warn: 0, fail: 1, items: [{ id: 'x', level: 'fail', summary: 'y' }] })).toBe(false);
+    expect(link.spool.pending().some((e) => e.body.t === 'doctor')).toBe(false);
+    expect(eri.of('doctor')).toHaveLength(0);
+  });
+
+  it('doctor: a hello without a summary yet is still valid; the summary computed during the handshake follows the welcome', async () => {
+    let current: { at: number; ok: number; warn: number; fail: number; items: Array<{ id: string; level: 'warn'; summary: string }> } | null = null;
+    const { eri, link } = await setup({ doctor: () => current });
+    eri.welcomeCaps = ['doctor'];
+    eri.beforeWelcome = () => {
+      current = { at: 5, ok: 3, warn: 1, fail: 0, items: [{ id: 'hooks.helper', level: 'warn', summary: 'hook helper not installed' }] };
+    };
+    link.start();
+    await until(() => eri.of('doctor').length === 1);
+    expect('doctor' in (eri.of('hello')[0] as object)).toBe(false);
+    expect(eri.of('doctor')[0]).toMatchObject({ warn: 1, items: [{ id: 'hooks.helper' }] });
+  });
+
   it('a prompt is dropped, not spooled, when Eridani did not advertise `prompt` or the link is down; turns still flow', async () => {
     const { eri, link } = await setup();
     expect(link.prompt(prompt(1))).toBe(false); // not connected yet: no known peer caps

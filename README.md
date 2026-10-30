@@ -57,7 +57,7 @@ remotea token             # the token the app needs
 - Every connection must present the token. The token is effectively shell access to that machine, so treat it like an SSH key. A Tailscale ACL that limits port 7717 to your own devices is a good second fence.
 - **Rotating the token revokes it.** `remotea rotate-token` replaces `~/.config/remotea/token`. The running server watches that file (and re-reads it on every handshake), so within a moment it closes every connection that was admitted with the old token, with WebSocket close code **4401** `token rotated`, and drops anything those sockets were still sending. No restart is needed. What clients experience:
   - Terminals and agents keep running. Only the connections are closed; the sessions and their scrollback stay on the server.
-  - Each app shows "Reconnecting…", then "rejected the token" (Settings → Remote hosts: **Token rejected**), because the old token now gets HTTP 401.
+  - Each app goes straight to "rejected the token" (Settings → Remote hosts: **Token rejected**) on the 4401 close, without first trying to reconnect with the old token, which would only get HTTP 401. If a new token was already pasted there, it reconnects with that one instead.
   - Paste the new token (`remotea token`) into Settings → Remote hosts. The app retries at once and reattaches every pane where it was.
   - Not affected: agent status hooks on `127.0.0.1:7718` (per-session tokens from a separate secret), the outbound Eridani link (its own key), and server-side `remotea` commands, which read the file.
 - Keep WSL from idling out, or the sessions die with it. In `%UserProfile%\.wslconfig`, set `vmIdleTimeout=-1` under `[wsl2]`.
@@ -111,6 +111,7 @@ Server-side CLI (in WSL):
 
 ```bash
 remotea status [--json]                              # sessions, workspaces, agents (stable JSON, "version": 1)
+remotea doctor [--json] [--probe]                    # redacted readiness report, exit 1 on any failure (below)
 remotea open --group "Acme" --cwd ~/acme -- claude   # open a session in a workspace on every device
 remotea close <surf-id>                              # end a session everywhere
 remotea token | rotate-token                         # rotate-token revokes the old token: apps using it are disconnected
@@ -118,6 +119,22 @@ remotea hooks install | remove | status              # agent status hooks (see b
 remotea logs [-f] [--device laptop] [--since 10m]    # what the apps reported: connections, reattaches, agent state
 remotea screen <surf-id>                             # what a session's screen shows right now
 ```
+
+### Readiness check (`remotea doctor`)
+
+```bash
+remotea doctor [--json] [--probe]
+```
+
+One redacted report of whether this host is ready to serve apps and Eridani: the `remotea.service` unit (installed, running, its user and `PATH`), build identity (running vs on-disk sha, dirty, caps and hook versions), the listener on 7717 and the token file (presence and mode only), the collector (mode, last scan, `node:sqlite` available for Codex sessions), the Eridani link (configured, last welcome, backlog, rejected frames), the status hooks per agent (Claude Code, Codex, OpenCode: installed vs expected, Codex hook trust), each execution target (repo, launch readiness per harness, each verify command: binary resolvable under the service `PATH`, `node_modules`/`.venv` present, a database URL when the command looks like it needs one, isolation, MCP key), free disk for the config, temp and worktree roots, upload budget, and recovery warnings (worktrees with unmerged work, sessions still marked live from a previous server boot).
+
+- Every line is `ok`, `warn` or `fail`, and every warn/fail has a one-line fix.
+- Nothing secret is printed: no keys or tokens, no environment dumps, and paths under your home show as `~`.
+- It only reads. It never starts, restarts or installs anything (not even the config file), and never fetches. `--probe` additionally runs each harness's launch probe (the same as `remotea eridani status --probe`).
+- `--json` prints a stable object (`"version": 1`; shape in [docs/remotea/eridani-link.md](docs/remotea/eridani-link.md#doctor)).
+- Exit code 0 when nothing fails, 1 otherwise, so it works as a CI or cron gate.
+
+The running server computes the same report every 5 minutes (and after a reconfigure) and, when the link is up, sends Eridani its warn/fail lines (see [Doctor](docs/remotea/eridani-link.md#doctor)).
 
 ### Agent status (hooks)
 

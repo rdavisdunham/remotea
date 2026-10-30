@@ -42,14 +42,16 @@ import {
   readEridaniToken,
   saveEridaniConfig,
   writeEridaniToken,
+  type CollectorMode,
   type EridaniConfig,
 } from './config';
-import { ERIDANI_PROTO, ERIDANI_SUBPROTOCOL, ERIDANI_TIMING, STAGE_B_CAPS, parseDownFrame, type HelloTarget } from '../../src/shared/eridani-link-protocol';
-import { readLinkStatus, type Advertised, type LinkStatus } from './eridani-link';
+import { ERIDANI_CAPS_VERSION, ERIDANI_PROTO, ERIDANI_SUBPROTOCOL, ERIDANI_TIMING, parseDownFrame, type HelloTarget, type LinkCap } from '../../src/shared/eridani-link-protocol';
+import { helloIdentity, readLinkStatus, type Advertised, type HelloIdentity, type LinkStatus } from './eridani-link';
+import { hookVersion, loadBuildInfo } from './build-info';
 import { Collector, formatRows } from './collector/collector';
 import { CollectorState } from './collector/state';
 import { statusFromRegistry } from './collector/report';
-import { WINDOWS_USERS, serverVersion } from './eridani-runtime';
+import { WINDOWS_USERS, linkCaps, serverVersion } from './eridani-runtime';
 import type { RegistryData } from './registry';
 import { loadTargets, removeTarget, saveTarget, type ExecutionTarget, type VerifySpec } from './eridani-targets';
 import { WorktreeManager, cleanupCommands, writersByPath } from './worktrees';
@@ -140,10 +142,26 @@ async function readKey(): Promise<string> {
 }
 
 /**
- * One hello → welcome against `url` with `key`. Resolves with Eridani's host id;
- * rejects with a sentence a person can act on.
+ * The identity the running server's hello would carry (eridani-runtime.ts):
+ * this checkout's build, the caps shape, the installed hook helper, and the
+ * caps for the configured collector mode.
  */
-export function probeLink(url: string, key: string, hello: { server_id: string; machine: string; version: string }, timeoutMs: number = ERIDANI_TIMING.probeMs): Promise<{ hostId: string | null; connEpoch: number; caps: string[] }> {
+export function localHelloIdentity(version: string, mode: CollectorMode = 'parity'): HelloIdentity & { caps: LinkCap[] } {
+  return {
+    ...helloIdentity({ version, build: loadBuildInfo(), capsVersion: ERIDANI_CAPS_VERSION, hookVersion: hookVersion(defaultHookPaths()).installed }),
+    caps: [...linkCaps(mode)],
+  };
+}
+
+/**
+ * One hello → welcome against `url` with `key`. Resolves with Eridani's host id;
+ * rejects with a sentence a person can act on. The hello carries the same
+ * identity as the real one (build, caps version, hook version, caps), so
+ * Eridani sees the same host on the probe; `identity` defaults to this
+ * checkout's (localHelloIdentity).
+ */
+export function probeLink(url: string, key: string, hello: { server_id: string; machine: string; version: string; identity?: HelloIdentity & { caps: LinkCap[] } }, timeoutMs: number = ERIDANI_TIMING.probeMs): Promise<{ hostId: string | null; connEpoch: number; caps: string[] }> {
+  const identity = hello.identity ?? localHelloIdentity(hello.version);
   return new Promise((resolve, reject) => {
     let settled = false;
     const ws = new WebSocket(url, [ERIDANI_SUBPROTOCOL], {
@@ -174,7 +192,7 @@ export function probeLink(url: string, key: string, hello: { server_id: string; 
       ws.send(JSON.stringify({
         v: 1, id: crypto.randomUUID(), conn_epoch: null, at: Date.now(), t: 'hello',
         server_id: hello.server_id, boot_id: `probe-${crypto.randomUUID()}`, hostname: os.hostname(), machine: hello.machine,
-        proto: ERIDANI_PROTO, version: hello.version, caps: [...STAGE_B_CAPS], harnesses: {},
+        ...identity, proto: ERIDANI_PROTO, version: hello.version, harnesses: {},
       }));
     });
     ws.on('message', (data) => {
@@ -287,7 +305,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
       const key = await readKey();
       if (!ERIDANI_KEY_RE.test(key)) throw new Error('that is not an Eridani link key (it starts with eri_bot_)');
       if (!rest.includes('--no-probe')) {
-        const res = await probeLink(url, key, { server_id: ensureServerId(dir), machine: machine || os.hostname(), version: serverVersion() });
+        const res = await probeLink(url, key, { server_id: ensureServerId(dir), machine: machine || os.hostname(), version: serverVersion(), identity: localHelloIdentity(serverVersion(), prev?.collector) });
         out.write(res.hostId ? `Eridani accepted the key (host ${res.hostId})\n` : 'Eridani accepted the key (new host; it is registered when the server connects)\n');
       }
       writeEridaniToken(dir, key);
@@ -321,6 +339,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
         if (l.error) out.write(`error: ${l.error}\n`);
         if (l.rejected) out.write(`refused by Eridani: ${l.rejected} (last: ${l.lastRejection})\n`);
         if (l.advertised) for (const line of fmtAdvertised(l.advertised)) out.write(`${line}\n`);
+        if (l.doctor) out.write(`doctor (as Eridani sees it, ${fmtTime(l.doctor.at)}): ${l.doctor.ok} ok, ${l.doctor.warn} warn, ${l.doctor.fail} fail${l.doctor.items.length ? `: ${l.doctor.items.slice(0, 3).map((i) => i.id).join(', ')}${l.doctor.items.length > 3 ? ', …' : ''}` : ''} (details: remotea doctor)\n`);
       }
       out.write('\nMCP for coding agents:\n');
       for (const line of fmtWiring(extra.wiring)) out.write(`  ${line}\n`);

@@ -34,6 +34,7 @@ The design is in `docs/remotea/plan.md` and the mission-control plan (v2,
 | `remote-server/src/context.ts` | SessionStart context from Eridani. |
 | `remote-server/src/verify-runner.ts` | One configured verification, with a workspace fingerprint (and whether it is complete). |
 | `remote-server/src/verify-sandbox.ts` | The bubblewrap sandbox verify runs in, and the loopback forwarder. |
+| `remote-server/src/doctor.ts` | `remotea doctor`: the readiness checks, the report, and the summary sent to Eridani ([Doctor](#doctor)). |
 
 ## Configuration
 
@@ -188,6 +189,13 @@ remotea eridani collector [parity|authoritative]
   detail (see [When the journal cannot be written](#commands)).
 - `status` also prints the MCP wiring per harness and each target's readiness
   ([Setup](#setup)); `--json` adds them as `mcpWiring` and `readiness`.
+- `status` prints one `doctor` line when the running server has a doctor
+  summary: its counts and the first warn/fail ids (`remotea doctor` has the
+  detail). `--json` has it as `doctor`.
+- `connect` proves the key with the same identity the server's hello sends
+  (`build_sha`, `build_dirty`, `caps_version`, `hook_version`, and the caps for
+  the configured collector mode), so Eridani sees the probe as this build, not
+  as a stage B host. It still reports no harnesses or targets.
 - `disconnect` disables the link; `--forget` deletes the key too.
 - `collect --dry-run` prints what the collector would report, in the same table
   as `collector.py --dry-run`. Without `--dry-run`, it asks the running server
@@ -236,13 +244,14 @@ remotea sends:
 
 | `t` | Lane | Coalesced by | Notes |
 |---|---|---|---|
-| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)), and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy) |
+| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)), and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy), and `doctor?` (the latest [doctor summary](#doctor); absent until the server has computed one) |
 | `sessions.snapshot` | control | (per connection) | Sent after every welcome. `part {of, i, n}`, `surfaces[]`, `journal {pending, uncertain}`. Never persisted. |
 | `command.outcome` | control | `outcome:<op_id>` | Stage B only reports `rejected` (`unsupported` / `expired`). |
 | `status` | live | `status:<surf>`, numeric `revision` | `surf, incarnation, state, since, reason?, provider?, provider_session_id?` |
 | `turn` | live | never | `surf, incarnation, run_id: null, generation: 0, provider, tool, provider_session_id, provider_turn_id, root: true, seq, text, truncated, missing, source, prompt?, prompt_truncated?, ended_at` |
 | `prompt` | live | never | `surf, incarnation, run_id, generation, provider, tool, provider_session_id, seq, text, truncated, at`. A root prompt as it was submitted, only for a run-bound surface and only to an Eridani whose welcome advertised `prompt` (see Turn capture). |
 | `exit` | live | never | `surf, incarnation, code, exited_at` |
+| `doctor` | bulk | `doctor` (ephemeral) | `at, ok, warn, fail, items[{id, level, summary, fix?}], truncated?`. Only to an Eridani whose welcome advertised `doctor`, and only when the findings changed (see [Doctor](#doctor)). |
 | `session.report` | bulk | `<tool>:<session_id>`, `revision` = fingerprint | `parity, tool, session_id, report` (the HTTP collector's `SessionInput`, unchanged) |
 | `ack` | | | For inbound commands. |
 | `bye` | | | On disable or shutdown. |
@@ -1321,14 +1330,103 @@ Other sessions see at most the fenced candidate list (D6, above).
 
 **Capabilities.** hello adds `digest` (every op frame carries its digest, so
 Eridani may require it), `context.scope`, `prompt` (live `prompt` frames,
-sent only when Eridani advertises `prompt` back) and `worktrees.scan` (the
+sent only when Eridani advertises `prompt` back), `worktrees.scan` (the
 host takes the [`worktrees.scan`](#commands) command; an Eridani that never
-sends it loses nothing). The lag rules:
+sends it loses nothing) and `doctor` (live [`doctor`](#doctor) frames, sent
+only when Eridani advertises `doctor` back; hello carries the summary
+regardless). The lag rules:
 
 - Eridani refuses an `op_id` frame without a digest only from a host that
   advertises `digest`.
 - remotea scopes context strictly only when Eridani advertises
   `context.scope`.
+
+## Doctor
+
+`remotea doctor [--json] [--probe]` (S-Q1) is one readiness report for the
+host: whether the apps and Eridani can rely on it, and what to do when they
+cannot. It only reads: it never starts, restarts or installs anything, does not
+create `config.json`, and never runs `git fetch` (the worktree check uses the
+local refs). `--probe` also runs each harness's launch probe, as
+`remotea eridani status --probe` does; without it, launch readiness comes from
+the running server's last probes in `eridani-status.json`.
+
+Every check is one line with a level (`ok`, `warn`, `fail`) and, for warn and
+fail, a one-line fix. The exit code is 1 when any check fails, else 0.
+
+Redaction, applied to every line before it is printed or sent:
+
+- no keys or tokens (the token check reports presence and file mode only; the
+  link and MCP keys only whether they are configured), and anything shaped like
+  a key is replaced (`redact` in `eridani-setup.ts`);
+- no environment dumps: the service `PATH` is shown, nothing else from the
+  unit or the process environment;
+- paths under `$HOME` are written with `~`.
+
+Checks, by section (ids are stable; `<t>` is a target id, `<h>` a harness,
+`<v>` a verify id):
+
+| Section | Ids | What |
+|---|---|---|
+| service | `service.unit`, `service.active`, `service.user`, `service.path` | The user unit is installed and enabled, is running (`systemctl --user is-active / is-enabled` only), its user, and the `PATH` from the unit file. |
+| build | `build.running`, `build.disk`, `build.caps` | The running server's build (sha, dirty, version, uptime from `server-info.json`) against the one on disk, proto and caps version. |
+| listener | `listener.port`, `listener.token`, `listener.hooks` | Port 7717 accepts and `/healthz` answers; the token file exists and is 0600; the hook bridge accepts. |
+| collector | `collector.mode`, `collector.sqlite`, `collector.scan` | Mode (parity, authoritative, off), `node:sqlite` available for Codex sessions, the last scan's age and result. |
+| eridani | `eridani.link`, `eridani.backlog`, `eridani.journal`, `eridani.rejected` | Configured, link state, last welcome, `degraded_reason`, outbox backlog, journal health, frames refused for good. |
+| hooks | `hooks.helper`, `hooks.claude`, `hooks.codex`, `hooks.codex.trust`, `hooks.opencode` | The helper is current (`hook_version`); per agent, our hook entries installed vs expected; Codex hook trust from `~/.codex/config.toml` (`hooks.state` trusted hash, not disabled); the OpenCode plugin matches the bundled one. |
+| targets | `targets`, `targets.isolation`, `target.<t>.repo`, `target.<t>.launch.<h>`, `target.<t>.verify.<v>`, `target.<t>.verify.<v>.deps`, `target.<t>.verify.<v>.db`, `target.<t>.mcp` | Per target: the repository; each enabled harness's launcher; each verify entry (ready and reason, isolation when the server reports it, else whether `bwrap` is on the service `PATH`; the program resolvable under the service `PATH`; `node_modules` present for a Node runner (npm, npx, pnpm, yarn, bun, node, vitest, jest, tsc) in a `package.json` project, `.venv` for a bare Python runner (pytest, python, alembic) in a Python project, unless the entry installs first; a database URL key (`*DATABASE_URL`, `*DB_URL`, `*_DSN`, `PGHOST`…) in the entry's `env` when the command runs pytest, alembic, manage.py, prisma and the like in a repository with `alembic.ini`: the key name only, never the value; a wrapper script is not judged); the MCP key for spawned agents. |
+| disk | `disk.config`, `disk.temp`, `disk.worktrees.<t>` | Free space where the config, temp files and each target's worktrees live: warn under 5 GiB or 5% free, fail under 1 GiB or 1%. |
+| uploads | `uploads.budget` | Pasted and dropped files in `/tmp/remotea-drop-*` against the upload budget (the server's `uploads-status.json` when it writes one, else a count). |
+| recovery | `recovery.worktrees`, `recovery.sessions` | Managed worktrees with unmerged commits or uncommitted changes (the cleanup report, without fetching); sessions still marked live from an earlier server boot (stale PTY leases). |
+
+`--json` prints (stable; `version` changes only on an incompatible change):
+
+```ts
+{
+  version: 1,
+  at: number,            // epoch ms
+  hostname: string,
+  probed: boolean,       // --probe was given
+  ok: number, warn: number, fail: number,
+  items: Array<{
+    id: string,          // as in the table above
+    section: 'service' | 'build' | 'listener' | 'collector' | 'eridani' | 'hooks' | 'targets' | 'disk' | 'uploads' | 'recovery',
+    level: 'ok' | 'warn' | 'fail',
+    summary: string,     // one line, redacted
+    fix?: string,        // one line, on warn and fail
+  }>,
+}
+```
+
+New ids and sections may appear; consumers ignore ones they do not know.
+
+**To Eridani.** The running server computes the same report (without
+`--probe`; it uses its own launcher probes) every 5 minutes and after each
+reconfigure, and sends the warn and fail lines as a summary:
+
+```ts
+doctor: {
+  at: number, ok: number, warn: number, fail: number,   // the counts cover every check
+  items: Array<{ id: string, level: 'warn' | 'fail', summary: string, fix?: string }>,
+  truncated?: true,     // items were dropped to fit the cap
+}
+```
+
+- At most 40 items (`ERIDANI_LIMITS.doctorItems`), fails first; `summary` and
+  `fix` at most 200 characters (`doctorTextChars`), `id` at most 120
+  (`doctorIdChars`). ok lines are never sent.
+- hello always carries the latest summary as `doctor` (absent until the first
+  one is computed). Eridani's `Hello` model ignores unknown fields, so an older
+  Eridani loses nothing.
+- After welcome, a changed summary goes as a `doctor` frame (bulk lane, op
+  frame with `op_id` and `digest`, coalesced on `doctor` so only the latest
+  waits, ephemeral: never written to the outbox file). It goes only when the
+  welcome's `caps` include `doctor`, the same gate as `prompt`; an older
+  Eridani would refuse a frame type it does not know. "Changed" compares the
+  counts and items, not `at`, so an unchanged host sends nothing.
+- remotea advertises `doctor` in its hello caps (with the stage F caps).
+- Eridani's side (jarvis): add `doctor` to its welcome caps, accept the
+  `doctor` frame and the hello field, and keep the latest summary per host.
 
 ## Not yet implemented (stage F and later)
 
