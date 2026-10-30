@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import * as os from 'os';
+import { decodeHostInfoArg } from '../shared/host-info';
 import { IPC_CHANNELS, type InsertionResult, type NotificationSoundPickResult, type UpdateTriggerResult,
   type KeepAwakeMode, type KeepAwakeState,
   type WorktreeCloseMode, type WorktreeInspectResult, type WorktreeRemoveResult,
@@ -33,6 +33,11 @@ const remoteConsole: RemoteConsoleBridge = {
   },
   replyRenderer: (reqId, result) => ipcRenderer.send(IPC_CHANNELS.REMOTE_RENDERER_REPLY, reqId, result),
 };
+
+// Sandboxed preload (docs/remotea/desktop-security.md): no `os`, no relative
+// requires at run time (this file is bundled by scripts/bundle-preload.mjs).
+// Main hands the two host facts in through process.argv; see shared/host-info.
+const hostInfo = decodeHostInfoArg(process.argv);
 
 contextBridge.exposeInMainWorld('wmux', {
   pty: {
@@ -120,15 +125,18 @@ contextBridge.exposeInMainWorld('wmux', {
   },
   system: {
     platform: 'win32' as const,
+    // Whether this preload runs in Electron's sandbox (it should: see
+    // docs/remotea/desktop-security.md). Read by the `--smoke` check.
+    sandboxed: process.sandboxed === true,
     // Home directory, read once at preload time. Exposed as a plain string
     // rather than an IPC round-trip because the markdown path chip (issue #116)
     // needs it during render to shorten `C:\Users\me\notes.md` → `~\notes.md`.
-    homeDir: os.homedir(),
-    // `os.release()` verbatim (e.g. '10.0.26200'), read once at preload time.
+    homeDir: hostInfo.homeDir,
+    // main's `os.release()` verbatim (e.g. '10.0.26200'), read once at preload time.
     // The renderer needs the Windows build number to hand xterm its ConPTY
     // compatibility block at Terminal-construction time — an async IPC answer
     // would arrive after the terminal already existed. See utils/windows-pty.ts.
-    osRelease: os.release(),
+    osRelease: hostInfo.osRelease,
     getShells: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_GET_SHELLS),
     getFonts: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_GET_FONTS) as Promise<string[]>,
     openExternal: (url: string) => ipcRenderer.send(IPC_CHANNELS.SYSTEM_OPEN_EXTERNAL, url),

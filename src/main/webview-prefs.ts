@@ -27,7 +27,15 @@ export function hardenWebviewPreferences(
   delete webPreferences.preload;
   delete webPreferences.preloadURL;
   webPreferences.nodeIntegration = false;
+  webPreferences.nodeIntegrationInSubFrames = false;
   webPreferences.contextIsolation = true;
+  // A guest is web content: Chromium's sandbox, same-origin policy on, no
+  // mixed content — whatever attributes the DOM carried (desktop-security.md).
+  webPreferences.sandbox = true;
+  webPreferences.webSecurity = true;
+  webPreferences.allowRunningInsecureContent = false;
   webPreferences.autoplayPolicy = WEBVIEW_AUTOPLAY_POLICY;
   params.nodeintegration = 'false';
+  delete params.nodeintegrationinsubframes;
+  delete params.disablewebsecurity;
 }

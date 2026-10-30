@@ -1,4 +1,5 @@
 import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents, safeStorage } from 'electron';
+import { isSafeExternalUrl } from './security-policy';
 import * as path from 'path';
 import { promises as fsp } from 'fs';
 import { IPC_CHANNELS, SurfaceId, WindowId, WorkspaceId, AgentId, type InsertionResult, type ExplorerListError } from '../shared/types';
@@ -856,10 +857,10 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     return listSystemFonts();
   });
 
-  ipcMain.on(IPC_CHANNELS.SYSTEM_OPEN_EXTERNAL, (_event, url: string) => {
-    if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
-      shell.openExternal(url);
-    }
+  // http(s) and mailto only, parsed (security-policy.ts): every other scheme
+  // reaching ShellExecute is a way to launch a local program.
+  ipcMain.on(IPC_CHANNELS.SYSTEM_OPEN_EXTERNAL, (_event, url: unknown) => {
+    if (isSafeExternalUrl(url)) shell.openExternal(url).catch(() => {});
   });
 
   ipcMain.handle(IPC_CHANNELS.SYSTEM_GET_VERSION, () => app.getVersion());

@@ -7,6 +7,7 @@ import { loadSettings } from './settings-store';
 import { closeDialogCopy, decideClose } from './close-guard';
 import { rendererRecoveryCopy, isRecoverableGone, type RendererTrouble } from './renderer-recovery';
 import { logDiagnostic } from './crash-diagnostics';
+import { mainWindowWebPreferences } from './security-policy';
 
 /** The window backdrop when transparency is off — matches --ui-bg-1. */
 const OPAQUE_BG = '#1a1a1a';
@@ -275,17 +276,18 @@ export class WindowManager {
       ...(translucent && backdrop.material !== 'clear'
         ? { backgroundMaterial: backdrop.material }
         : {}),
-      webPreferences: {
-        preload: path.join(__dirname, '../preload/index.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: false,
-        webviewTag: true,
-      },
+      // Sandboxed, context-isolated, no Node: see security-policy.ts and
+      // docs/remotea/desktop-security.md before loosening anything here.
+      webPreferences: mainWindowWebPreferences(
+        path.join(__dirname, '../preload/index.js'),
+        { homeDir: os.homedir(), osRelease: os.release() },
+      ),
     });
 
     // In dev mode, load from Vite dev server; in production, load built files
-    const isDev = !require('electron').app.isPackaged;
+    // A `--smoke` run (smoke.ts) tests the BUILT renderer even unpackaged
+    // (`npx electron . --smoke` after `vite build`), never the dev server.
+    const isDev = !require('electron').app.isPackaged && process.env.REMOTEA_SMOKE !== '1';
     if (isDev) {
       const devPort = process.env.VITE_DEV_PORT || '5199';
       win.loadURL(`http://localhost:${devPort}`);

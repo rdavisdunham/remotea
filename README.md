@@ -159,6 +159,26 @@ Each spawn reads the file, so no restart is needed. Without it, agents still sta
 
 Each app sends the server a stream of what happened: connection state, how each pane reattached (delta or snapshot), resyncs, sequence gaps, and agent-state verdicts. It never includes terminal content, keystrokes or prompts. It lands in `~/.local/state/remotea/diag/<device>.jsonl`, capped and rotated, and `remotea logs` reads it.
 
+## Releases
+
+A `v*` tag runs `.github/workflows/release.yml`: tests, then the NSIS installer and the portable zip, built with electron-builder on Windows.
+
+The Windows smoke workflow (`.github/workflows/smoke.yml`) runs on that tag too, and on every pull request that touches `src/`, `resources/`, `build/`, `package.json`, the lockfile, the electron-builder, Vite or tsconfig configuration, or the workflow itself. It builds the app the same way and then runs the packaged binary's own self-test twice: once from `release/win-unpacked/`, and once after a silent per-user install of the installer into a temp folder, which is uninstalled afterwards. The self-test is `remotea.exe --smoke [--smoke-out=<file>] [--smoke-timeout=<ms>]` (`src/main/smoke.ts`). It runs these checks, then writes a JSON result and exits 0 or 1 within 90 seconds:
+
+- opens the main window
+- checks that the sandboxed preload bridge loaded
+- waits for the renderer's first local terminal to get a PTY
+- types `echo smoke-ok`
+- reads `smoke-ok` back out of the terminal's screen buffer
+
+A `--smoke` run uses its own instance (`%APPDATA%\remotea-smoke…`) and skips agent integration and the updater. The results and app logs are uploaded as the `windows-smoke` artifact. To run it by hand on Windows, after `npm run build`:
+
+```powershell
+pwsh scripts/smoke-windows.ps1 -Exe release\win-unpacked\remotea.exe -Out smoke\result.json
+```
+
+The window's privileges (sandbox, CSP, permissions, `openExternal`) are audited in [docs/remotea/desktop-security.md](docs/remotea/desktop-security.md).
+
 ## Development
 
 | Area | Command |
