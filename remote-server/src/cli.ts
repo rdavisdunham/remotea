@@ -8,7 +8,8 @@
  *                                  <cmd…> once its shell is ready; every connected app places it as a tab
  *   remotea close <surf-id>        end a session on every device
  *   remotea token                  print the access token for the app's Settings → Remote hosts
- *   remotea rotate-token           issue a new token (connected apps must be given the new one)
+ *   remotea rotate-token           issue a new token; the running server closes every connection that used the
+ *                                  old one (sessions keep running) until each app is given the new one
  *   remotea hooks install|remove|status
  *                                  register wmux's hook helper with Claude Code and Codex in this WSL,
  *                                  so agents report their status to the apps (see hook-bridge.ts)
@@ -531,7 +532,7 @@ export async function main(argv: string[]): Promise<number> {
       return eridaniCommand(dir, rest, () => healthy(loadConfig(dir).port));
     case 'rotate-token':
       process.stdout.write(rotateToken(dir) + '\n');
-      process.stderr.write('token rotated: update it in every app\'s Settings → Remote hosts\n');
+      process.stderr.write('token rotated: the old token is revoked and apps using it are disconnected (sessions keep running).\nUpdate it in every app\'s Settings → Remote hosts to reconnect.\n');
       return 0;
     default:
       process.stderr.write(USAGE + '\n');
