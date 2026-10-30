@@ -185,7 +185,7 @@ class Tail {
 }
 
 /** Kill a process and everything under it: SIGTERM now, SIGKILL after the grace. */
-function killTree(pid: number | undefined, graceMs: number): void {
+export function killTree(pid: number | undefined, graceMs: number): void {
   if (!pid || !isSignalablePid(pid)) return;
   const tree = [pid, ...descendants(pid)];
   signalTree(pid, 'SIGTERM');

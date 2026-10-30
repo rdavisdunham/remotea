@@ -346,7 +346,8 @@ export interface HelloTarget {
   /**
    * The harnesses Eridani may spawn here. Older hosts: those the target's
    * `launch` enables. caps_version 2: those it enables AND whose launcher
-   * probe succeeded (always a subset of `enabled`).
+   * probe succeeded (always a subset of `enabled`). Empty when `template`
+   * says the target is not ready (S-Q3).
    */
   harnesses: Array<'claude' | 'codex'>;
   /** caps_version 2: the harnesses the target's `launch` enables (permission, whether or not installed). */
@@ -365,6 +366,32 @@ export interface HelloTarget {
    * present and valid. `reason` says why not. Optional; an older host omits it.
    */
   mcp?: HelloMcp;
+  /**
+   * S-Q3 (additive): the whole target template checked before it is
+   * advertised: repository, worktree root, base, launch, dependency
+   * preparation, verify entries, migrations and resource limits. `ready:
+   * false` (any `fail` problem) empties `harnesses`, so Eridani starts
+   * nothing there; `warn` problems do not. Optional; an older host omits it.
+   */
+  template?: HelloTemplate;
+  /** S-Q3 (additive): the ids of the dependency preparation steps a new worktree gets, in order (never argv or env). */
+  prepare?: string[];
+}
+
+/** S-Q3: a target template's validation, in hello. */
+export interface HelloTemplate {
+  ready: boolean;
+  /** Every problem found, fails first; absent when there are none. */
+  problems?: TemplateProblem[];
+}
+
+export interface TemplateProblem {
+  /** What was checked: `repo`, `worktree_root`, `base`, `launch`, `prepare.<id>`, `verify.<id>`, `migrations`, `limits.disk`. */
+  check: string;
+  /** `fail`: the target is not ready; `warn`: it is, but this part will not work as configured. */
+  level: 'fail' | 'warn';
+  /** One line, never argv, env or a key (≤ ERIDANI_LIMITS.reasonChars). */
+  reason: string;
 }
 
 /** MCP readiness, in a hello target and in a spawn's `command.outcome.result`. */
@@ -770,6 +797,12 @@ export interface WorktreeWriter {
 
 /** The `command.outcome` detail of a spawn refused because another live session writes the branch (S-S4). */
 export const WORKTREE_BUSY = 'worktree_busy';
+
+/** S-Q3: the `command.outcome` detail of a spawn refused because the target is at its `limits.maxRuns`; `result {limit, running}`. */
+export const TARGET_BUSY = 'target_busy';
+
+/** S-Q3: the prefix of the `command.outcome` detail of a spawn refused because the target's template fails (`target_not_ready: <reasons>`). */
+export const TARGET_NOT_READY = 'target_not_ready';
 
 /** The verification a run's frozen plan asks for after each root turn (stage D). */
 export interface RunVerifyConfig {

@@ -80,6 +80,7 @@ import { sameWorktreeState, WorktreeManager, worktreeStateOf, writersByPath } fr
 import { loadTargets } from './eridani-targets';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
+import { runPrepare, templateStatus, withTemplate } from './target-template';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn, type ProbeHarness } from './launch-caps';
 import { hookVersion, loadBuildInfo, readServerInfo, type BuildInfo } from './build-info';
@@ -239,6 +240,9 @@ export class EridaniRuntime {
       targets: () => loadTargets(deps.dir),
       mcp: (t) => resolveMcp(deps.dir, t),
       webUrl: () => resolveWebUrl(deps.dir),
+      // S-Q3: a spawn re-checks the template (it may have broken since hello) and prepares new worktrees.
+      checkTarget: (t) => templateStatus(t, { env: deps.verifyEnv }),
+      prepare: (t, wt, force) => runPrepare(t, wt, { force, env: deps.verifyEnv }),
       questions: this.questions,
       emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
       changed: () => void this.reportWorktrees(),
@@ -454,13 +458,15 @@ export class EridaniRuntime {
   helloTargets(): HelloTarget[] {
     const targets = loadTargets(this.deps.dir);
     // Whether a spawn there gets Eridani's MCP server (eridani-mcp.ts); never the key.
-    return helloTargets(targets, this.probes, { env: this.deps.verifyEnv }).map((h) => {
+    const hello = helloTargets(targets, this.probes, { env: this.deps.verifyEnv }).map((h) => {
       const t = targets.find((x) => x.id === h.id);
       if (!t) return h;
       // S-N4: whether each verify entry would run sandboxed (verify-sandbox.ts).
       const verify_status = h.verify_status ? withIsolation(h.verify_status, t.verify, this.deps.verifyEnv) : undefined;
       return { ...h, ...(verify_status ? { verify_status } : {}), mcp: mcpStatus(resolveMcp(this.deps.dir, t)) };
     });
+    // S-Q3: the whole template checked; a target that fails it is listed with its reasons and `harnesses: []`.
+    return withTemplate(hello, targets, { env: this.deps.verifyEnv });
   }
 
   /**

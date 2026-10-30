@@ -151,6 +151,21 @@ export interface WorktreeStateInfo {
  * An Eridani run executing in a session. No secrets: the run token and the
  * spawn's ERIDANI_* environment live in the server's own eridani-runs.json.
  */
+/** S-Q3: dependency preparation (eridani.json `prepare`) before an agent started in a managed worktree. */
+export interface PrepareFacts {
+  /** The steps ran now (a new worktree, a failed or changed preparation); false: an earlier one in this worktree still holds. */
+  ran: boolean;
+  ok: boolean;
+  /** Each step that ran, in order; the first failure is the last one. */
+  steps: Array<{ id: string; exit_code: number | null; duration_ms: number; timed_out?: boolean; error?: string }>;
+  /** Why it failed, one line (never argv or env). */
+  reason?: string;
+  /** The full output of every step, on the host (in the worktree's git folder). */
+  log?: string;
+  /** On failure only: the last characters the steps printed (≤ 2,000). */
+  tail?: string;
+}
+
 export interface EridaniBinding {
   runId: string;
   /** The run generation this process currently serves (advanced by steer / runs.snapshot). */
@@ -188,6 +203,8 @@ export interface EridaniBinding {
    * eridani-mcp.ts), and why not. Optional: older bindings lack it. Never the key.
    */
   mcp?: { configured: boolean; reason?: string };
+  /** S-Q3: the target's dependency preparation in this worktree at spawn, when the target declares one. */
+  prepare?: PrepareFacts;
   /**
    * The Eridani web app this run belongs to (origin, no trailing slash), for
    * the desktop's "Open in Eridani": `<webUrl>/?view=remotea&run=<runId>`.

@@ -410,10 +410,12 @@ Eridani can only start work where `eridani.json` says it may:
 
 A verify entry may also set `env`, and the sandbox settings `isolation`,
 `network`, `ports` and `mounts` ([Verify isolation](#verify-isolation)).
+A target may also declare dependency preparation and resource limits
+([Target templates](#target-templates-s-q3)).
 
 ```
 remotea eridani targets list [--json]
-remotea eridani targets add --id <id> --repo <path> --worktree-root <path> [--base main] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>]
+remotea eridani targets add --id <id> --repo <path> --worktree-root <path> [--base main] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>] [--prepare <id>=<command>]… [--prepare-timeout <s>] [--max-runs <n>]
 remotea eridani targets add --json '<target>'
 remotea eridani targets remove <id>
 remotea eridani worktrees [--json]
@@ -421,10 +423,60 @@ remotea eridani worktrees [--json]
 
 Targets are read on every use: adding one needs no restart and does not
 reconnect the link. `hello` lists them (`targets: [{id, repo, worktree_root,
-harnesses, enabled, launch, verify, verify_status, migrations?, mcp?}]`, never argv
-or env) for Eridani's target picker; the next connect carries a new target,
-and its launcher is probed on the next 30 s check. What each field means is in
-[Capabilities and build identity](#capabilities-and-build-identity).
+harnesses, enabled, launch, verify, verify_status, migrations?, mcp?,
+template?, prepare?}]`, never argv or env) for Eridani's target picker; the
+next connect carries a new target, and its launcher is probed on the next 30 s
+check. What each field means is in
+[Capabilities and build identity](#capabilities-and-build-identity). An entry
+of `targets` that does not pass the schema check is never listed; `remotea
+doctor` reports it (`target.<id>.config`) and the server logs it.
+
+#### Target templates (S-Q3)
+
+A target is a template: the repository, the harness launch, dependency
+preparation, the verification environment, migrations and resource limits,
+defined once. Two optional keys complete it; a target without them behaves
+exactly as before:
+
+```json
+"prepare": [
+  { "id": "api", "argv": ["/home/davin/.local/bin/uv", "sync", "--locked", "--group", "dev"], "timeout": 900 },
+  { "id": "web", "argv": ["npm", "ci"], "cwd": "apps/web", "timeout": 900, "env": { "PATH": "/home/davin/.nvm/versions/node/v22.12.0/bin:/usr/bin:/bin" } }
+],
+"limits": { "maxRuns": 3, "minFreeMiB": 4096 }
+```
+
+| Key | Meaning |
+|---|---|
+| `prepare[]` | Up to 8 steps `{id, argv, cwd?, timeout, env?}` (timeout ≤ 2 h), run in order in a managed worktree before the agent starts: in a new worktree, and again in a reused one whose last preparation failed, never finished, or ran different steps. Fixed argv, no shell, the minimal verify environment (`PATH`, `HOME`, `LANG`, `CI=1`, `TERM=dumb`, plus the step's `env`), as the server user with its network, not sandboxed (it installs dependencies; it does not run the agent's code). A step over its timeout is killed with its process tree. The first failure stops the steps and the spawn: no agent starts. Every step's output goes to `<worktree git dir>/remotea-prepare.log` (e.g. `<repo>/.git/worktrees/<name>/remotea-prepare.log`: outside the working tree, gone with the worktree), with the state in `remotea-prepare.json` beside it. |
+| `limits.maxRuns` | 1 to 64: at most this many live Eridani sessions on the target at once (spawns in flight count). One more spawn is `rejected` `target_busy` with `result {limit, running}`. |
+| `limits.minFreeMiB` | Below this much free space where the worktrees live, the target is not ready. |
+
+**Validated before it is advertised.** Every hello (and every `remotea
+doctor`) checks the whole template; `remotea eridani targets add` prints the
+same check after saving:
+
+| `check` | Level | When |
+|---|---|---|
+| `repo` | fail | The repository folder does not exist, or is not a git checkout. |
+| `worktree_root` | fail | It exists and is not a writable folder, or does not exist and its nearest existing parent is not writable. |
+| `base` | fail | The base is not a local branch, an `origin/<base>` branch or a tag of the repository (a git failure is a `warn`). |
+| `launch` | fail | No harness is enabled. |
+| `prepare.<id>` | fail | The step's program does not resolve the way it will run (absolute and executable; relative to the cwd and tracked in the repository; or on the service `PATH`, or the step's own `env.PATH`), or its `cwd` is not a folder in the repository. |
+| `limits.disk` | fail | Less free space than `limits.minFreeMiB` where the worktrees live. |
+| `verify.<id>` | warn | The verify entry is not ready (the same reason as `verify_status`). Not blocking: Eridani gates verification per run on `verify_status`. |
+| `migrations` | warn | `migrations.dir` is not a folder in the repository checkout. |
+
+The result is `targets[].template: {ready, problems?: [{check, level,
+reason}]}` (fails first; `reason` is one line and never argv, env or a key)
+and `targets[].prepare: string[]` (the step ids, when the target declares
+any). A target that is not ready is still listed, with its reasons and
+**`harnesses: []`**, so an Eridani that only reads `harnesses` already starts
+nothing there. Dispatch checks the template again at every spawn (it may have
+broken since hello): a spawn on a target that is not ready is `rejected`
+`target_not_ready: <the fail reasons>` with `result {template}`. Both fields
+are optional and additive; an older Eridani ignores them, an older host omits
+them.
 
 ### Capabilities and build identity
 
@@ -438,6 +490,7 @@ hello keeps these facts apart (S-S1); `caps_version: 2` says a host does
 | Target permission | `targets[].enabled: ("claude"\|"codex")[]` | The target's `launch` lists the harness. |
 | Spawnable | `harnesses.<h>.spawn: boolean`; `targets[].harnesses`; `targets[].launch.<h> {ready, version, error?}` | `targets[].harnesses` is `enabled` minus launchers whose probe failed (always a subset of `enabled`). `spawn` is true only when some target enables the harness AND its launcher works. Eridani checks both (jarvis PR #91). |
 | Verification readiness | `targets[].verify: string[]`; `targets[].verify_status: [{id, ready, reason?, isolated?, isolation?, isolation_reason?}]`, same order | The entry's program resolves the way verify-runner.ts runs it: no shell, `verifyEnv` (the service's PATH, or the entry's own `env.PATH`); an absolute program must be executable, a relative one (`./scripts/verify.sh`) is checked in the repository; the `cwd` must exist in the repository. `reason` never contains the argv (`uv` not on the service PATH reads "its program is not on the service PATH …"). |
+| Template (S-Q3, additive) | `targets[].template: {ready, problems?: [{check, level, reason}]}`; `targets[].prepare?: string[]` | The whole target checked before it is advertised ([Target templates](#target-templates-s-q3)). `ready: false` empties `harnesses`. |
 | Verification isolation (S-N4, additive) | `verify_status[].isolated: boolean`, `isolation: "bwrap" \| "none"`, `isolation_reason?: string` | Whether a run of the entry now would be sandboxed ([Verify isolation](#verify-isolation)): `bwrap` is on the service PATH and a probe sandbox works. Not being isolated does not make an entry unready (`ready` stays true, the reason is in `isolation_reason`, e.g. "bwrap (bubblewrap) is not installed on the service PATH"), except for an entry that demands `isolation: "bwrap"`: it would be refused, so it reports `ready: false` with that reason. |
 
 Probes run before the link first starts, so the first hello is already
@@ -611,7 +664,7 @@ changes.
 
 | `t` | Fields | Effect |
 |---|---|---|
-| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, share?, expires_at` | `share` (boolean, optional, S-S4): start even when another live session writes the branch's worktree; without it such a spawn is `rejected` `worktree_busy` with `result {branch, writer {surf, run_id}}` (see [Worktrees](#worktrees)). Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
+| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, share?, expires_at` | `share` (boolean, optional, S-S4): start even when another live session writes the branch's worktree; without it such a spawn is `rejected` `worktree_busy` with `result {branch, writer {surf, run_id}}` (see [Worktrees](#worktrees)). Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. S-Q3 ([Target templates](#target-templates-s-q3)): a target whose template fails is `rejected` `target_not_ready: <reasons>` with `result {template}`; one at `limits.maxRuns` is `rejected` `target_busy` with `result {limit, running}`; with `prepare` steps the worktree is prepared first and `result.prepare` is `{ran, ok, steps: [{id, exit_code, duration_ms, timed_out?, error?}], reason?, log?, tail?}` (`ran: false`: an earlier preparation of the same steps still holds); a failed preparation is `failed` `prepare: <reason>` with `result {worktree, branch, target, prepare}` (with `tail`, the last 2,000 characters of output) and no agent starts. |
 | `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then (800 ms later) the text. Typed as a bracketed paste and Enter (150 ms later). Never counts as a person answering. The outcome is `executed` only once Enter was sent; see [Input and steer outcomes](#input-and-steer-outcomes). |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
@@ -1469,7 +1522,7 @@ Checks, by section (ids are stable; `<t>` is a target id, `<h>` a harness,
 | collector | `collector.mode`, `collector.sqlite`, `collector.scan` | Mode (parity, authoritative, off), `node:sqlite` available for Codex sessions, the last scan's age and result. |
 | eridani | `eridani.link`, `eridani.backlog`, `eridani.journal`, `eridani.rejected` | Configured, link state, last welcome, `degraded_reason`, outbox backlog, journal health, frames refused for good. |
 | hooks | `hooks.helper`, `hooks.claude`, `hooks.codex`, `hooks.codex.trust`, `hooks.opencode` | The helper is current (`hook_version`); per agent, our hook entries installed vs expected; Codex hook trust from `~/.codex/config.toml` (`hooks.state` trusted hash, not disabled); the OpenCode plugin matches the bundled one. |
-| targets | `targets`, `targets.isolation`, `target.<t>.repo`, `target.<t>.launch.<h>`, `target.<t>.verify.<v>`, `target.<t>.verify.<v>.deps`, `target.<t>.verify.<v>.db`, `target.<t>.mcp` | Per target: the repository; each enabled harness's launcher; each verify entry (ready and reason, isolation when the server reports it, else whether `bwrap` is on the service `PATH`; the program resolvable under the service `PATH`; `node_modules` present for a Node runner (npm, npx, pnpm, yarn, bun, node, vitest, jest, tsc) in a `package.json` project, `.venv` for a bare Python runner (pytest, python, alembic) in a Python project, unless the entry installs first; a database URL key (`*DATABASE_URL`, `*DB_URL`, `*_DSN`, `PGHOST`…) in the entry's `env` when the command runs pytest, alembic, manage.py, prisma and the like in a repository with `alembic.ini`: the key name only, never the value; a wrapper script is not judged); the MCP key for spawned agents. |
+| targets | `targets`, `targets.isolation`, `target.<t>.config`, `target.<t>.repo`, `target.<t>.template`, `target.<t>.worktree_root`, `target.<t>.base`, `target.<t>.prepare.<p>`, `target.<t>.migrations`, `target.<t>.limits.disk`, `target.<t>.launch.<h>`, `target.<t>.verify.<v>`, `target.<t>.verify.<v>.deps`, `target.<t>.verify.<v>.db`, `target.<t>.mcp` | Per target: the repository; each enabled harness's launcher; each verify entry (ready and reason, isolation when the server reports it, else whether `bwrap` is on the service `PATH`; the program resolvable under the service `PATH`; `node_modules` present for a Node runner (npm, npx, pnpm, yarn, bun, node, vitest, jest, tsc) in a `package.json` project, `.venv` for a bare Python runner (pytest, python, alembic) in a Python project, unless the entry installs first; a database URL key (`*DATABASE_URL`, `*DB_URL`, `*_DSN`, `PGHOST`…) in the entry's `env` when the command runs pytest, alembic, manage.py, prisma and the like in a repository with `alembic.ini`: the key name only, never the value; a wrapper script is not judged; a Node runner counts as installed when the target has `prepare` steps); the MCP key for spawned agents. S-Q3: an entry of `targets` ignored as invalid (`config`, fail); the template as a whole (`template`: ok, or fail "not advertised as ready" with the reasons) and each of its problems not covered by another item ([Target templates](#target-templates-s-q3)). |
 | disk | `disk.config`, `disk.temp`, `disk.worktrees.<t>` | Free space where the config, temp files and each target's worktrees live: warn under 5 GiB or 5% free, fail under 1 GiB or 1%. |
 | uploads | `uploads.budget` | Pasted and dropped files in `/tmp/remotea-drop-*` against the upload budget (the server's `uploads-status.json` when it writes one, else a count). |
 | recovery | `recovery.worktrees`, `recovery.sessions` | Managed worktrees with unmerged commits or uncommitted changes (the cleanup report, without fetching); sessions still marked live from an earlier server boot (stale PTY leases). |
@@ -1540,6 +1593,12 @@ doctor: {
   `harnesses.claude.question` for every question; it should check
   `harnesses[<question provider>].question_kinds` (jarvis follow-up).
 - Removing worktrees (nominate only, by design).
+- Eridani's side of target templates (S-Q3): Eridani already starts nothing
+  on a target advertised with `harnesses: []`, but its message then reads as
+  if the target did not enable the harness. It should show
+  `targets[].template.problems` on the target picker and in that refusal,
+  and recognise the `target_not_ready` and `target_busy` spawn rejections
+  (jarvis follow-up). Templates hold no CPU or memory limits yet (cgroups).
 - Eridani's side of `mcp.configured: false` (task 3bc2803c): remotea only
   reports it. Eridani should show the reason on the run and on the target
   picker, and should not wait for a `submit_plan` that cannot come. It could
