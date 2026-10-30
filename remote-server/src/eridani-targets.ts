@@ -24,7 +24,9 @@
  * A verify entry runs with a minimal environment (verify-runner.ts): PATH,
  * HOME, LANG, CI=1, TERM=dumb, plus only what its own `env` names, e.g.
  * `"env": { "NODE_OPTIONS": "--max-old-space-size=4096" }`. Nothing else
- * from the server's environment reaches it.
+ * from the server's environment reaches it. Where bubblewrap works it also
+ * runs in a sandbox (verify-sandbox.ts): `isolation`, `network`, `ports` and
+ * `mounts` on the entry, e.g. `"network": "loopback", "ports": [5432]`.
  *
  * Read from disk on every use, so `remotea eridani targets add` takes effect
  * at once and never restarts the link.
@@ -51,6 +53,24 @@ export interface VerifySpec {
   timeout: number;
   /** Extra environment for the run (stage F): the base is minimal, so a test that needs a variable names it here. */
   env?: Record<string, string>;
+  /**
+   * S-N4, the trust choice: `bwrap` runs the command in a bubblewrap sandbox
+   * (verify-sandbox.ts), `none` runs it as the server user. Absent: `bwrap`
+   * when bwrap works on this host, else `none` (hello says so). An explicit
+   * `bwrap` on a host without it refuses to run rather than run unsandboxed.
+   */
+  isolation?: 'bwrap' | 'none';
+  /**
+   * Inside the sandbox only. Absent or false: no network at all (a private
+   * loopback the command can serve itself on). `"loopback"`: also the host's
+   * 127.0.0.1 on the listed `ports` (a test database), nothing else. true: the
+   * host's whole network, the internet included.
+   */
+  network?: boolean | 'loopback';
+  /** With `network: "loopback"`: the host ports the sandbox may reach on 127.0.0.1. */
+  ports?: number[];
+  /** Inside the sandbox only: more paths mounted read-only (absolute or `~/…`), e.g. a uv-managed Python. */
+  mounts?: string[];
 }
 
 /** Where a target keeps numbered migrations (Alembic `NNNN_name.py`); Eridani reserves numbers only for targets with this. */
@@ -118,6 +138,17 @@ export function targetError(t: unknown): string | null {
         if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(k) || typeof val !== 'string' || val.length > 4096 || /[\0\r\n]/.test(val)) return `verify ${vo.id}: env ${k.slice(0, 40)}`;
       }
     }
+    if (vo.isolation !== undefined && vo.isolation !== 'bwrap' && vo.isolation !== 'none') return `verify ${vo.id}: isolation is "bwrap" or "none"`;
+    if (vo.network !== undefined && typeof vo.network !== 'boolean' && vo.network !== 'loopback') return `verify ${vo.id}: network is true, false or "loopback"`;
+    if (vo.network === 'loopback') {
+      if (!Array.isArray(vo.ports) || !vo.ports.length || vo.ports.length > 16 || !vo.ports.every((p) => Number.isInteger(p) && (p as number) >= 1 && (p as number) <= 65535)) return `verify ${vo.id}: network "loopback" needs ports (1 to 16 port numbers)`;
+    } else if (vo.ports !== undefined) return `verify ${vo.id}: ports only with network "loopback"`;
+    if (vo.mounts !== undefined) {
+      if (!Array.isArray(vo.mounts) || vo.mounts.length > 32) return `verify ${vo.id}: mounts is a list of up to 32 paths`;
+      for (const m of vo.mounts as unknown[]) {
+        if (typeof m !== 'string' || m.length > 1024 || /[\0\r\n]/.test(m) || !(path.isAbsolute(m) || m.startsWith('~/')) || path.resolve(m.replace(/^~\//, '/x/')) === '/') return `verify ${vo.id}: mounts are absolute or ~/ paths, not /`;
+      }
+    }
   }
   if (o.mcpKeyFile !== undefined && !keyFileSettingOk(o.mcpKeyFile)) return 'mcpKeyFile: a path to the MCP key file';
   const mig = o.migrations;
@@ -144,7 +175,17 @@ function normalize(t: Record<string, unknown>): ExecutionTarget {
     worktreeRoot: path.resolve(t.worktreeRoot as string),
     base: typeof t.base === 'string' ? t.base : 'main',
     launch: t.launch as ExecutionTarget['launch'],
-    verify: ((t.verify as VerifySpec[] | undefined) ?? []).map((v) => ({ id: v.id, argv: [...v.argv], ...(v.cwd ? { cwd: v.cwd } : {}), timeout: v.timeout, ...(v.env ? { env: { ...v.env } } : {}) })),
+    verify: ((t.verify as VerifySpec[] | undefined) ?? []).map((v) => ({
+      id: v.id,
+      argv: [...v.argv],
+      ...(v.cwd ? { cwd: v.cwd } : {}),
+      timeout: v.timeout,
+      ...(v.env ? { env: { ...v.env } } : {}),
+      ...(v.isolation ? { isolation: v.isolation } : {}),
+      ...(v.network !== undefined ? { network: v.network } : {}),
+      ...(v.ports ? { ports: [...v.ports] } : {}),
+      ...(v.mounts ? { mounts: [...v.mounts] } : {}),
+    })),
     ...(typeof t.mcpKeyFile === 'string' ? { mcpKeyFile: t.mcpKeyFile } : {}),
     ...(t.migrations ? { migrations: { dir: (t.migrations as MigrationsSpec).dir.replace(/\/+$/, ''), ...((t.migrations as MigrationsSpec).pattern ? { pattern: (t.migrations as MigrationsSpec).pattern } : {}) } } : {}),
   };

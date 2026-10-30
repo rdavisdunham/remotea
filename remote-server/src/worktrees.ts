@@ -21,8 +21,9 @@ import fs from 'fs';
 import path from 'path';
 import { BRANCH_RE } from '../../src/shared/eridani-link-protocol';
 import type { ExecutionTarget } from './eridani-targets';
-import type { WorktreeReport } from '../../src/shared/eridani-link-protocol';
-export type { WorktreeReport };
+import type { WorktreeReport, WorktreeWriter } from '../../src/shared/eridani-link-protocol';
+import type { SessionRecord } from '../../src/shared/remote-host-protocol';
+export type { WorktreeReport, WorktreeWriter };
 
 export const WORKTREES_FILE = 'eridani-worktrees.json';
 
@@ -90,6 +91,33 @@ function realOr(p: string): string {
   } catch {
     return path.resolve(p);
   }
+}
+
+/** A worktree's live writer, with where it works. */
+export interface LiveWriter {
+  target: string;
+  branch: string;
+  worktree: string;
+  writer: WorktreeWriter;
+}
+
+/**
+ * S-S4: every Eridani session that is not exited (live, or lost and about to
+ * be resumed) is the writer of its worktree. Oldest first, so with a shared
+ * worktree the first session stays the one reported.
+ */
+export function liveWriters(sessions: Iterable<SessionRecord>): LiveWriter[] {
+  return [...sessions]
+    .filter((r) => r.eridani && r.state !== 'exited')
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((r) => ({ target: r.eridani!.target, branch: r.eridani!.branch, worktree: r.eridani!.worktree, writer: { surf: r.id, run_id: r.eridani!.runId } }));
+}
+
+/** The writer of each worktree path (the oldest live session there). */
+export function writersByPath(sessions: Iterable<SessionRecord>): Map<string, WorktreeWriter> {
+  const out = new Map<string, WorktreeWriter>();
+  for (const w of liveWriters(sessions)) if (!out.has(w.worktree)) out.set(w.worktree, w.writer);
+  return out;
 }
 
 export interface WorktreeRecord {
@@ -318,9 +346,10 @@ export class WorktreeManager {
 
   /**
    * F01: what removing each managed worktree would lose. Never removes.
-   * `active(path)` says whether a live session works there.
+   * `active(path)` says whether a live session works there; `writer(path)`,
+   * when given, names it (the row's `writer`, S-S4).
    */
-  async nominate(targets: ExecutionTarget[], active: (p: string) => boolean): Promise<WorktreeReport[]> {
+  async nominate(targets: ExecutionTarget[], active: (p: string) => boolean, writer?: (p: string) => WorktreeWriter | null): Promise<WorktreeReport[]> {
     const records = readWorktreeRecords(this.opts.dir);
     const out: WorktreeReport[] = [];
     for (const t of targets) {
@@ -339,7 +368,9 @@ export class WorktreeManager {
       const root = realOr(t.worktreeRoot);
       for (const w of entries) {
         if (w.bare || !within(root, realOr(w.path))) continue;
-        out.push(await this.inspect(t, w, records[w.path], active(w.path), fresh?.ref ?? null));
+        const row = await this.inspect(t, w, records[w.path], active(w.path), fresh?.ref ?? null);
+        if (writer) row.writer = writer(w.path) ?? null;
+        out.push(row);
       }
     }
     return out;

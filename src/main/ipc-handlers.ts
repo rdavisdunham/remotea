@@ -10,7 +10,7 @@ import { TerminalRouter } from './terminal-router';
 import { RemoteHosts } from './remote-hosts';
 import { diag as remoteDiag } from './remote-hosts/diag';
 import { isRemoteShellSpec, parseRemoteShellSpec, remoteShellSpec } from '../shared/remote-shell-spec';
-import type { HostSaveRequest } from '../shared/remote-hosts-types';
+import type { HostSaveRequest, HostTestRequest } from '../shared/remote-hosts-types';
 import { PtyLedger, reapOrphans } from './pty-ledger';
 import { SshDetector } from './ssh-detect';
 import { agentIdentity } from './agent-identity';
@@ -796,7 +796,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     }
   });
   ipcMain.handle(IPC_CHANNELS.RHOST_REMOVE, (_event, id: string) => remoteHosts.remove(String(id)));
-  ipcMain.handle(IPC_CHANNELS.RHOST_TEST, (_event, req: { url: string; token?: string; id?: string }) => remoteHosts.test(req));
+  ipcMain.handle(IPC_CHANNELS.RHOST_TEST, (_event, req: HostTestRequest) => remoteHosts.test(req));
   ipcMain.on(IPC_CHANNELS.RHOST_RECONNECT, () => remoteHosts.wakeAll());
   ipcMain.handle(IPC_CHANNELS.RHOST_HOOKS_INSTALL, (_event, hostId: unknown) =>
     typeof hostId === 'string' ? remoteHosts.installHooks(hostId) : { ok: false, error: 'bad host' });

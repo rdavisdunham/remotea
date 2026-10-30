@@ -26,7 +26,9 @@ type Fault =
   | 'none'
   | 'lose'        // the connection dies before the server reads it
   | 'apply-drop'  // the server applies it, then the connection dies before the ack
-  | 'hold';       // the server has not got round to it yet (see release())
+  | 'hold'        // the server has not got round to it yet (see release())
+  | 'apply-noack' // the server applies it and broadcasts the change; the ack is lost, the socket stays up
+  | 'apply-silent'; // the server applies it; the ack and the broadcast are both lost, the socket stays up
 
 const INTENT_TYPES = new Set(['close', 'groupClose', 'hide', 'unhide', 'sessionUpdate', 'groupUpsert']);
 
@@ -155,6 +157,15 @@ class FakeHost {
       this.held.push({ sock, msg });
       return;
     }
+    if (fault === 'apply-noack') {
+      this.received.push(msg);
+      this.apply(sock, msg);
+      return;
+    }
+    if (fault === 'apply-silent') {
+      this.process(sock, msg, false, true);
+      return;
+    }
     this.process(sock, msg, fault === 'apply-drop');
   }
 
@@ -255,13 +266,13 @@ class App {
   readonly intents: PendingIntents;
   readonly client: RemoteHostClient;
   status: HostStatus | undefined;
-  constructor(readonly file: string, readonly host: FakeHost, now?: () => number) {
+  constructor(readonly file: string, readonly host: FakeHost, now?: () => number, opts: { timers?: ClientTimers; requestTimeoutMs?: number } = {}) {
     this.intents = new PendingIntents(file, { now });
     this.client = new RemoteHostClient({
       hostId: HOST, url: () => 'ws://desk:7717', token: () => 'tok', device: DEVICE, appVersion: 'test',
       pinnedServerId: () => undefined, pinServer: () => {}, intents: this.intents,
       onStatus: (s) => { this.status = s; },
-      socket: host.factory, timers, now,
+      socket: host.factory, timers: opts.timers ?? timers, now, requestTimeoutMs: opts.requestTimeoutMs,
     });
   }
   /** Start and get through hello/welcome (the outbox is replayed there). */
@@ -568,7 +579,7 @@ describe('intent outbox: what reconcile sees', () => {
     const dir = tmpDir();
     const make = () => new RemoteHosts({ dataDir: dir, box, appVersion: 'test', broadcast: () => {}, socket: host.factory });
     const first = make();
-    first.save({ name: 'Desk', url: 'ws://desk:7717', token: 'tok' });
+    first.save({ name: 'Desk', url: 'ws://desk.tail1234.ts.net:7717', token: 'tok' });
     host.socket.drop(); // unreachable
     first.client(HOST)!.kill('surf-a');
     first.hide(HOST, 'surf-b');
@@ -578,7 +589,7 @@ describe('intent outbox: what reconcile sees', () => {
     host.fault = 'hold';
     host.sticky = true;
     const second = make();
-    second.save({ id: HOST, name: 'Desk', url: 'ws://desk:7717' });
+    second.save({ id: HOST, name: 'Desk', url: 'ws://desk.tail1234.ts.net:7717' });
     host.socket.open();
     const [view] = second.views();
     expect(view.connected).toBe(true);
@@ -597,5 +608,223 @@ describe('intent outbox: what reconcile sees', () => {
     expect(after.sessions.find((s) => s.id === 'surf-b')!.hiddenBy).toEqual([view.deviceId]);
     expect(second.list()[0].status.outbox).toEqual({ pending: 0, failed: [] });
     second.detachAllNow();
+  });
+});
+
+/**
+ * Timeouts that run when told to: setTimeout fires on advance(); intervals
+ * (the heartbeat) never do, so a quiet fake host is not declared dead.
+ */
+class ManualTimers implements ClientTimers {
+  t = 0;
+  private next = 1;
+  private readonly pending = new Map<number, { at: number; fn: () => void }>();
+  readonly now = (): number => this.t;
+  setTimeout(fn: () => void, ms: number): unknown {
+    const h = this.next++;
+    this.pending.set(h, { at: this.t + ms, fn });
+    return h;
+  }
+  clearTimeout(h: unknown): void {
+    this.pending.delete(h as number);
+  }
+  setInterval(): unknown {
+    return 0;
+  }
+  clearInterval(): void {}
+  advance(ms: number): void {
+    const end = this.t + ms;
+    for (;;) {
+      const due = [...this.pending.entries()].filter(([, p]) => p.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
+      if (!due) break;
+      this.pending.delete(due[0]);
+      this.t = due[1].at;
+      due[1].fn();
+    }
+    this.t = end;
+  }
+}
+
+describe('host status facts for the UI (Astra review A-S2)', () => {
+  it('connectedAt while ready; lastSeenAt survives the drop', () => {
+    const { host, file } = setup();
+    const clock = new ManualTimers();
+    clock.t = 1_000;
+    const app = new App(file, host, clock.now, { timers: clock }).connect();
+    expect(app.status).toMatchObject({ state: 'ready', connectedAt: 1_000, lastSeenAt: 1_000 });
+    clock.t = 9_000;
+    host.socket.drop();
+    expect(app.status?.state).toBe('reconnecting');
+    expect(app.status?.connectedAt).toBeUndefined();
+    expect(app.status?.lastSeenAt).toBe(1_000);
+  });
+
+  it('the registry mirror follows agentState (sent in meta only), and reports tabs still re-opening', () => {
+    const { host, file } = setup();
+    const app = new App(file, host).connect();
+    host.socket.toClient({ t: 'meta', id: 'surf-a', agentState: { state: 'needs_you', since: 5 } });
+    expect(app.client.sessions.get('surf-a')?.agentState).toEqual({ state: 'needs_you', since: 5 });
+    // A meta without agentState (a cwd report) leaves it alone.
+    host.socket.toClient({ t: 'meta', id: 'surf-a', cwd: '/tmp' });
+    expect(app.client.sessions.get('surf-a')?.agentState?.state).toBe('needs_you');
+
+    void app.client.create({ id: 'surf-b' as never, cols: 80, rows: 24, spec: {} as never });
+    expect(app.client.restoringIds()).toEqual(['surf-b']); // the fake never answers the open
+  });
+});
+
+describe('request deadline (Astra review A-S1)', () => {
+  function timed(requestTimeoutMs?: number) {
+    const { host, file } = setup();
+    const clock = new ManualTimers();
+    const app = new App(file, host, clock.now, { timers: clock, requestTimeoutMs }).connect();
+    return { host, file, clock, app };
+  }
+
+  /** The socket dies and the client reconnects at once (a fresh welcome). */
+  function reconnect(app: App, host: FakeHost): void {
+    host.socket.drop();
+    app.client.wake();
+    host.socket.open();
+  }
+
+  it('request() resolves uncertain at the deadline instead of hanging while the socket stays up', async () => {
+    const { app, clock } = timed();
+    let result: unknown;
+    void app.client.request((rid) => ({ t: 'hooksInstall', rid })).then((r) => { result = r; });
+    clock.advance(14_999);
+    await Promise.resolve();
+    expect(result).toBeUndefined();
+    clock.advance(1);
+    await Promise.resolve();
+    expect(result).toMatchObject({ ok: false, uncertain: true });
+    expect(app.client.ready).toBe(true);
+  });
+
+  it('the deadline is configurable', async () => {
+    const { app, clock } = timed(2_000);
+    let result: { uncertain?: boolean } | undefined;
+    void app.client.request((rid) => ({ t: 'hooksInstall', rid })).then((r) => { result = r; });
+    clock.advance(2_000);
+    await Promise.resolve();
+    expect(result?.uncertain).toBe(true);
+  });
+
+  it('a request still waiting when the connection drops is uncertain too, not a plain failure', async () => {
+    const { app, host } = timed();
+    let result: unknown;
+    void app.client.request((rid) => ({ t: 'hooksInstall', rid })).then((r) => { result = r; });
+    host.socket.drop();
+    await Promise.resolve();
+    expect(result).toMatchObject({ ok: false, uncertain: true });
+  });
+
+  it('applied, ack and broadcast lost: uncertain, never resent on the live socket, settled by the next welcome, applied once', () => {
+    const { app, host, clock, file } = timed();
+    host.fault = 'apply-silent';
+    app.client.intent({ t: 'hide', id: 'surf-b' });
+    expect(host.applied).toEqual(['hide surf-b']);
+    expect(app.status?.outbox).toEqual({ pending: 1, failed: [] });
+
+    clock.advance(15_000);
+    expect(app.status?.outbox).toEqual({ pending: 1, uncertain: 1, failed: [] });
+    expect(app.disk().entries(HOST).map((e) => e.state)).toEqual(['uncertain']);
+    // Minutes later, same socket: still not resent.
+    clock.advance(120_000);
+    expect(host.received).toHaveLength(1);
+
+    reconnect(app, host);
+    expect(host.received).toHaveLength(1);
+    expect(host.applied).toEqual(['hide surf-b']);
+    expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
+    expect(new PendingIntents(file).entries(HOST)).toEqual([]);
+  });
+
+  it('applied, only the ack lost: the broadcast already in the mirror settles it at the deadline', () => {
+    const { app, host, clock } = timed();
+    host.fault = 'apply-noack';
+    app.client.kill('surf-a');
+    expect(app.status?.outbox?.pending).toBe(1);
+    clock.advance(15_000);
+    expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
+    expect(host.received).toHaveLength(1);
+    expect(host.applied).toEqual(['close surf-a']);
+  });
+
+  it('uncertain, then a broadcast shows it applied: settled without a reconnect', () => {
+    const { app, host, clock } = timed();
+    host.fault = 'apply-silent';
+    app.client.intent({ t: 'sessionUpdate', id: 'surf-c', title: 'renamed' });
+    clock.advance(15_000);
+    expect(app.status?.outbox?.uncertain).toBe(1);
+    // Some later change to the session reaches this device, carrying the rename.
+    host.socket.toClient({ t: 'sessionUpdated', session: { ...host.sessions.get('surf-c')! } });
+    expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
+    expect(host.received).toHaveLength(1);
+  });
+
+  it('never reached the server: uncertain until the welcome shows it unapplied, then resent exactly once', () => {
+    const { app, host, clock } = timed();
+    host.fault = 'hold'; // read but never processed; the socket stays up
+    app.client.intent({ t: 'sessionUpdate', id: 'surf-c', title: 'renamed', groupId: 'grp-w' });
+    clock.advance(15_000);
+    expect(app.status?.outbox?.uncertain).toBe(1);
+    expect(host.received).toEqual([]);
+
+    reconnect(app, host);
+    expect(host.received).toHaveLength(1);
+    expect(host.applied).toEqual(['sessionUpdate surf-c {"title":"renamed","groupId":"grp-w"}']);
+    expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
+  });
+
+  it('a late ack after the deadline still settles the uncertain intent', () => {
+    const { app, host, clock } = timed();
+    host.fault = 'hold';
+    app.client.intent({ t: 'groupUpsert', id: 'grp-w', name: 'Work 2', color: 'red' });
+    clock.advance(15_000);
+    expect(app.status?.outbox?.uncertain).toBe(1);
+    host.release();
+    expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
+    expect(host.applied).toEqual(['groupUpsert grp-w Work 2']);
+  });
+
+  it('an uncertain intent still overlays the registry, and a newer one about the same target supersedes it', () => {
+    const { app, host, clock } = timed();
+    host.fault = 'hold';
+    app.client.intent({ t: 'hide', id: 'surf-b' });
+    clock.advance(15_000);
+    expect(app.client.outboxOverlay().hiding.has('surf-b')).toBe(true);
+    app.client.intent({ t: 'unhide', id: 'surf-b' }); // sent and acked at once
+    expect(app.disk().entries(HOST).map((e) => [e.intent.t, e.state])).toEqual([['hide', 'superseded']]);
+    reconnect(app, host);
+    // The superseded hide is never sent again; the unhide is already true on the server.
+    expect(host.received).toEqual([expect.objectContaining({ t: 'unhide' })]);
+    expect(host.applied).toEqual([]);
+    expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
+  });
+
+  it('an acked intent clears its deadline: nothing turns uncertain later', () => {
+    const { app, host, clock } = timed();
+    act(app);
+    clock.advance(60_000);
+    expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
+    expectFinal(host);
+  });
+
+  it('every fault at once, then a reconnect: each change applied exactly once', () => {
+    const { app, host, clock } = timed();
+    host.fault = 'apply-silent';
+    app.client.kill('surf-a');
+    host.fault = 'hold';
+    app.client.intent({ t: 'hide', id: 'surf-b' });
+    host.fault = 'apply-noack';
+    app.client.intent({ t: 'sessionUpdate', id: 'surf-c', title: 'renamed', groupId: 'grp-w' });
+    host.fault = 'apply-silent';
+    app.client.intent({ t: 'groupUpsert', id: 'grp-w', name: 'Work 2', color: 'red' });
+    clock.advance(15_000);
+    reconnect(app, host);
+    clock.advance(15_000);
+    expectFinal(host);
+    expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
   });
 });

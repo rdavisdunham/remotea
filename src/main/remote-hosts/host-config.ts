@@ -14,6 +14,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { hostIdFromName, HOST_ID_RE } from '../../shared/remote-shell-spec';
 import { DEVICE_ID_RE, GROUP_ID_RE, SURFACE_ID_RE } from '../../shared/remote-host-protocol';
+import { classifyHostUrl, UNENCRYPTED_ACK_LABEL } from '../../shared/host-url';
 import type { HostSaveRequest, OutboxSummary } from '../../shared/remote-hosts-types';
 
 export interface SecretBox {
@@ -33,6 +34,8 @@ export interface StoredHost {
   serverId?: string;
   /** The user chose "Don't ask again" on the agent-hooks prompt for this host. */
   hooksPromptDeclined?: boolean;
+  /** The plain ws:// URL the user acknowledged as unencrypted on its network (see shared/host-url). */
+  unencryptedAckUrl?: string;
 }
 
 function readJson<T>(file: string): T | null {
@@ -61,6 +64,19 @@ export function validateHostUrl(raw: string): string {
   if (!u.hostname) throw new Error('URL needs a host');
   if (u.username || u.password) throw new Error('Put the token in the token field, not the URL');
   return u.toString().replace(/\/$/, '');
+}
+
+/**
+ * A plain ws:// URL to anything but this computer or a Tailscale address
+ * carries the token and every keystroke unencrypted across that network: it
+ * is used only once the user acknowledged exactly that (`acknowledged`, or an
+ * earlier acknowledgement of this same URL, `ackedUrl`). Loopback, Tailscale
+ * and wss:// pass without one. `url` is already validated.
+ */
+export function assertHostUrlAcknowledged(url: string, acknowledged: boolean | undefined, ackedUrl?: string): void {
+  const c = classifyHostUrl(url);
+  if (!c?.needsAck || acknowledged || ackedUrl === url) return;
+  throw new Error(`ws:// to ${c.host} is unencrypted on this network. Use the host's Tailscale address (100.x or *.ts.net) or wss://, or confirm "${UNENCRYPTED_ACK_LABEL}".`);
 }
 
 export class HostStore {
@@ -95,6 +111,7 @@ export class HostStore {
     const name = req.name.trim().slice(0, 80) || 'Remote';
     const url = validateHostUrl(req.url);
     let host = req.id ? this.hosts.find((h) => h.id === req.id) : undefined;
+    assertHostUrlAcknowledged(url, req.acknowledgeUnencrypted, host?.unencryptedAckUrl);
     let reconnect = false;
     if (!host) {
       host = { id: hostIdFromName(name, new Set(this.hosts.map((h) => h.id))), name, url, enabled: req.enabled ?? true };
@@ -113,6 +130,9 @@ export class HostStore {
         reconnect = true;
       }
     }
+    // Remember the acknowledgement for this exact URL (editing the name later does not ask again); any other URL drops it.
+    if (classifyHostUrl(url)?.needsAck) host.unencryptedAckUrl = url;
+    else delete host.unencryptedAckUrl;
     if (req.token !== undefined) {
       const token = req.token.trim();
       if (!token) {
@@ -189,7 +209,12 @@ function validIntent(i: unknown): i is PendingIntent {
 }
 
 /**
- * Where an intent stands. Only `pending` is ever sent; the others are terminal
+ * Where an intent stands. Only `pending` is ever sent. `uncertain` is not
+ * terminal either: it was sent and the host did not answer within the request
+ * deadline while the connection stayed up, so it may or may not have been
+ * applied. It is never resent blind: the registry mirror (any broadcast) or
+ * the next welcome snapshot settles it first, and only an intent that
+ * snapshot shows unapplied goes back to `pending`. The others are terminal
  * and kept a while so the UI can say what happened:
  *   failed     the server refused it (ack ok:false), or it was sent too many
  *              times without ever being acknowledged;
@@ -198,7 +223,12 @@ function validIntent(i: unknown): i is PendingIntent {
  *              was confirmed (the newer one carries everything still wanted).
  * An applied intent is not a state: its entry is removed.
  */
-export type IntentState = 'pending' | 'failed' | 'expired' | 'superseded';
+export type IntentState = 'pending' | 'uncertain' | 'failed' | 'expired' | 'superseded';
+
+/** Not settled yet: still wanted, laid over the registry, and open to being superseded by a newer intent. */
+function isOpen(e: { state: IntentState }): boolean {
+  return e.state === 'pending' || e.state === 'uncertain';
+}
 
 export interface OutboxEntry {
   /** Stable id: survives restarts and resends. */
@@ -211,6 +241,8 @@ export interface OutboxEntry {
   /** How many times it was written to a connected socket. */
   attempts: number;
   lastSentAt?: number;
+  /** When its ack deadline passed with the connection still up (state `uncertain`). */
+  uncertainAt?: number;
   /** When it reached a terminal state. */
   doneAt?: number;
   error?: string;
@@ -265,7 +297,7 @@ function validEntry(e: unknown): e is OutboxEntry {
   if (!e || typeof e !== 'object') return false;
   const x = e as Partial<OutboxEntry>;
   return typeof x.iid === 'string' && Number.isSafeInteger(x.seq) && validIntent(x.intent)
-    && (x.state === 'pending' || x.state === 'failed' || x.state === 'expired' || x.state === 'superseded')
+    && (x.state === 'pending' || x.state === 'uncertain' || x.state === 'failed' || x.state === 'expired' || x.state === 'superseded')
     && typeof x.createdAt === 'number' && Number.isSafeInteger(x.attempts);
 }
 
@@ -327,7 +359,7 @@ export class PendingIntents {
     let effective: PendingIntent = intent;
     const key = intentKey(intent);
     for (const e of list) {
-      if (e.state !== 'pending') continue;
+      if (!isOpen(e)) continue;
       const k = intentKey(e.intent);
       const sameTarget = k === key;
       // Closing a session (or group) makes every other pending change to it moot.
@@ -345,10 +377,47 @@ export class PendingIntents {
     return entry;
   }
 
-  /** Pending entries of a host, oldest first. Expires the ones past their TTL first. */
+  /** Pending (sendable) entries of a host, oldest first. Expires the ones past their TTL first. */
   pending(hostId: string): OutboxEntry[] {
     this.expire(hostId);
     return (this.byHost[hostId] ?? []).filter((e) => e.state === 'pending').map((e) => ({ ...e }));
+  }
+
+  /** Pending and uncertain entries of a host (everything a snapshot may settle), oldest first. */
+  unsettled(hostId: string): OutboxEntry[] {
+    this.expire(hostId);
+    return (this.byHost[hostId] ?? []).filter(isOpen).map((e) => ({ ...e }));
+  }
+
+  /**
+   * Entry `iid` was sent and its ack deadline passed with the connection still
+   * up: it may have been applied. It is not resent until a snapshot settles
+   * it (see retryUncertain). False when it was no longer pending.
+   */
+  markUncertain(hostId: string, iid: string): boolean {
+    const e = this.find(hostId, iid);
+    if (!e || e.state !== 'pending') return false;
+    e.state = 'uncertain';
+    e.uncertainAt = this.now();
+    this.persist();
+    return true;
+  }
+
+  /**
+   * A full registry snapshot (a welcome) was reconciled and still does not
+   * show these uncertain entries' effects: they were not applied, so they go
+   * back to pending and are resent. Returns how many.
+   */
+  retryUncertain(hostId: string): number {
+    let n = 0;
+    for (const e of this.byHost[hostId] ?? []) {
+      if (e.state !== 'uncertain') continue;
+      e.state = 'pending';
+      delete e.uncertainAt;
+      n++;
+    }
+    if (n) this.persist();
+    return n;
   }
 
   /** Every entry of a host, terminal ones included, oldest first. */
@@ -382,7 +451,8 @@ export class PendingIntents {
 
   /**
    * The server acknowledged entry `iid` (or a snapshot proved it). Applied:
-   * the entry is removed, whatever its state. Refused: a pending entry fails.
+   * the entry is removed, whatever its state. Refused: a pending or uncertain
+   * entry fails.
    * Never touches another entry; an ack for an older intent says nothing
    * about a newer one.
    */
@@ -394,7 +464,7 @@ export class PendingIntents {
       this.byHost[hostId] = list.filter((x) => x !== e);
       this.prune(hostId);
     } else {
-      if (e.state !== 'pending') return;
+      if (!isOpen(e)) return;
       this.finish(e, 'failed', result.error || 'refused by the server');
     }
     this.persist();
@@ -404,7 +474,7 @@ export class PendingIntents {
   clearDone(hostId: string): void {
     const list = this.byHost[hostId];
     if (!list) return;
-    this.byHost[hostId] = list.filter((e) => e.state === 'pending');
+    this.byHost[hostId] = list.filter(isOpen);
     this.prune(hostId);
     this.persist();
   }
@@ -418,12 +488,13 @@ export class PendingIntents {
         failed.push({ iid: e.iid, t: e.intent.t, id: e.intent.id, state: e.state, error: e.error, at: e.doneAt ?? e.createdAt });
       }
     }
-    return { pending: list.filter((e) => e.state === 'pending').length, failed };
+    const uncertain = list.filter((e) => e.state === 'uncertain').length;
+    return { pending: list.filter(isOpen).length, ...(uncertain ? { uncertain } : {}), failed };
   }
 
-  /** The pending intents, oldest first. */
+  /** The intents still wanted (pending or uncertain), oldest first. */
   peek(hostId: string): PendingIntent[] {
-    return (this.byHost[hostId] ?? []).filter((e) => e.state === 'pending').map((e) => e.intent);
+    return (this.byHost[hostId] ?? []).filter(isOpen).map((e) => e.intent);
   }
 
   private find(hostId: string, iid: string): OutboxEntry | undefined {
@@ -440,7 +511,7 @@ export class PendingIntents {
     const cutoff = this.now() - INTENT_TTL_MS;
     let changed = false;
     for (const e of this.byHost[hostId] ?? []) {
-      if (e.state === 'pending' && e.createdAt < cutoff) {
+      if (isOpen(e) && e.createdAt < cutoff) {
         this.finish(e, 'expired', 'not applied within 30 days');
         changed = true;
       }
@@ -453,10 +524,10 @@ export class PendingIntents {
     const list = this.byHost[hostId];
     if (!list) return false;
     const cutoff = this.now() - DONE_KEEP_MS;
-    let done = list.filter((e) => e.state !== 'pending' && (e.doneAt ?? e.createdAt) >= cutoff);
+    let done = list.filter((e) => !isOpen(e) && (e.doneAt ?? e.createdAt) >= cutoff);
     if (done.length > DONE_KEEP_MAX) done = done.slice(done.length - DONE_KEEP_MAX);
     const keep = new Set(done);
-    const next = list.filter((e) => e.state === 'pending' || keep.has(e));
+    const next = list.filter((e) => isOpen(e) || keep.has(e));
     if (next.length) this.byHost[hostId] = next;
     else delete this.byHost[hostId];
     return next.length !== list.length || !next.length;

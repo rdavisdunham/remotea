@@ -13,6 +13,12 @@
  * keystrokes into an agent minutes later is how commands get approved by
  * accident. Registry changes (close a tab, hide it, rename, move) ARE kept — see
  * PendingIntents, a durable outbox — because those are decisions, not keystrokes.
+ *
+ * Every request has a deadline (requestTimeoutMs, 15 s by default). A socket
+ * can stay up while one answer never comes; the operation then resolves as
+ * `uncertain` (it may have been applied) rather than hanging. An uncertain
+ * intent is never resent blind: the registry mirror or the next welcome
+ * snapshot settles it, and only one that snapshot shows unapplied is retried.
  */
 import WebSocket from 'ws';
 import {
@@ -55,6 +61,21 @@ export type SocketFactory = (url: string, headers: Record<string, string>) => So
 
 const OPEN = 1;
 const FS_TIMEOUT_MS = 20_000;
+/** How long a request (or an intent) waits for its ack while the socket stays up. */
+export const REQUEST_TIMEOUT_MS = 15_000;
+/** The reason onDown gives the acks still waiting. */
+const DISCONNECTED = 'disconnected';
+
+/**
+ * The outcome of a request. `uncertain`: it was sent but no answer came (the
+ * deadline passed, or the connection dropped first), so it may or may not
+ * have been applied; check the registry before doing it again.
+ */
+export interface RequestResult {
+  ok: boolean;
+  error?: string;
+  uncertain?: boolean;
+}
 
 const realSocket: SocketFactory = (url, headers) =>
   new WebSocket(url, { headers, perMessageDeflate: false, handshakeTimeout: 8000, maxPayload: 32 * 1024 * 1024 }) as unknown as SocketLike;
@@ -95,6 +116,8 @@ export interface HostClientDeps {
   now?: () => number;
   rand?: () => number;
   log?: (msg: string) => void;
+  /** Deadline for a request's (or an intent's) ack while connected; default REQUEST_TIMEOUT_MS. */
+  requestTimeoutMs?: number;
 }
 
 export interface RemoteCreateOptions {
@@ -160,8 +183,13 @@ export class RemoteHostClient {
   private nextRid = 1;
   private readonly surfs = new Map<string, Surf>();
   private readonly acks = new Map<number, (ok: boolean, error?: string) => void>();
-  /** rid -> outbox entry iid, for intents sent on the current socket. */
+  /** rid -> outbox entry iid, for intents sent on the current socket (kept past the deadline: a late ack still settles). */
   private readonly intentAcks = new Map<number, string>();
+  /** rid -> deadline timer of an intent in flight. */
+  private readonly intentTimers = new Map<number, unknown>();
+  private readonly requestTimeoutMs: number;
+  /** Epoch ms of the current connection's welcome. */
+  private connectedAt: number | undefined;
   private readonly fsWaiters = new Map<number, (result: unknown) => void>();
   private readonly timers: ClientTimers;
   private readonly now: () => number;
@@ -187,6 +215,7 @@ export class RemoteHostClient {
     this.timers = deps.timers ?? realTimers;
     this.now = deps.now ?? Date.now;
     this.log = deps.log ?? (() => {});
+    this.requestTimeoutMs = deps.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -207,6 +236,8 @@ export class RemoteHostClient {
       nextRetryAt: this.fsm.state === 'reconnecting' || this.fsm.state === 'auth-failed' ? this.nextRetryAt : undefined,
       error: this.fsm.error,
       serverHostname: this.serverHostname,
+      connectedAt: this.ready ? this.connectedAt : undefined,
+      lastSeenAt: this.lastInbound || undefined,
       hooks: this.hooks && {
         agents: this.hooks,
         prompt: this.ready && !(this.deps.hooksPromptDeclined?.() ?? false) && this.hooks.some((a) => a.present && !a.installed),
@@ -260,7 +291,7 @@ export class RemoteHostClient {
   }
 
   /** Register the status hooks with the server's agents (the user said yes in the app). */
-  installHooks(): Promise<{ ok: boolean; error?: string }> {
+  installHooks(): Promise<RequestResult> {
     if (!this.features.has('hooks')) return Promise.resolve({ ok: false, error: 'this server cannot install hooks; update it, or run `remotea hooks install` there' });
     return this.request((rid) => ({ t: 'hooksInstall', rid }));
   }
@@ -432,7 +463,11 @@ export class RemoteHostClient {
 
   private onReady(): void {
     this.probed.clear();
+    this.connectedAt = this.now();
     this.settleFromSnapshot();
+    // What the snapshot does not show as applied was not applied: resend it.
+    const retried = this.deps.intents.retryUncertain(this.hostId);
+    if (retried) diag('intent.retry', { host: this.hostId, uncertain: retried });
     this.flushOutbox();
     for (const surf of this.surfs.values()) {
       if (surf.wanted && surf.state !== 'closed') this.sendOpen(surf);
@@ -440,15 +475,18 @@ export class RemoteHostClient {
   }
 
   private onDown(): void {
-    // Unacknowledged intents stay pending in the outbox: resent on the next welcome.
+    // Unacknowledged intents stay in the outbox: settled against, or resent after, the next welcome.
+    this.connectedAt = undefined;
     this.intentAcks.clear();
+    for (const t of this.intentTimers.values()) this.timers.clearTimeout(t);
+    this.intentTimers.clear();
     for (const surf of this.surfs.values()) {
       surf.open = false;
       surf.openRid = null;
     }
     for (const [rid, ack] of this.acks) {
       this.acks.delete(rid);
-      ack(false, 'disconnected');
+      ack(false, DISCONNECTED);
     }
     for (const [rid, w] of this.fsWaiters) {
       this.fsWaiters.delete(rid);
@@ -460,51 +498,62 @@ export class RemoteHostClient {
 
   /**
    * The welcome is the server's state after everything it received on earlier
-   * connections. A pending intent whose effect it already shows was applied
-   * and only its ack was lost: settle it without resending, so an older
-   * choice is never replayed over a state that already moved on.
+   * connections. A pending (or uncertain) intent whose effect it already
+   * shows was applied and only its ack was lost: settle it without resending,
+   * so an older choice is never replayed over a state that already moved on.
    */
   private settleFromSnapshot(): void {
-    const me = this.deps.device.id;
+    this.settleApplied(this.deps.intents.unsettled(this.hostId));
+  }
+
+  /**
+   * Between welcomes the mirror is kept current by broadcasts: an uncertain
+   * intent whose effect shows up there was applied. One that does not show up
+   * stays uncertain (its broadcast may have been lost with the ack) until the
+   * next welcome decides.
+   */
+  private reconcileUncertain(): void {
+    this.settleApplied(this.deps.intents.unsettled(this.hostId).filter((e) => e.state === 'uncertain'));
+  }
+
+  private settleApplied(entries: OutboxEntry[]): void {
     let changed = false;
-    for (const e of this.deps.intents.pending(this.hostId)) {
-      const i = e.intent;
-      let applied = false;
-      switch (i.t) {
-        case 'close': applied = !this.sessions.has(i.id); break;
-        case 'groupClose': applied = !this.groups.has(i.id); break;
-        case 'hide': {
-          const s = this.sessions.get(i.id);
-          // Gone altogether is as hidden as it gets.
-          applied = !s || (s.hiddenBy as string[]).includes(me);
-          break;
-        }
-        case 'unhide': {
-          const s = this.sessions.get(i.id);
-          applied = !!s && !(s.hiddenBy as string[]).includes(me);
-          break;
-        }
-        case 'sessionUpdate': {
-          const s = this.sessions.get(i.id);
-          // The server files a session without a (live) group under the inbox, and stores a null title as none.
-          applied = !!s
-            && (i.groupId === undefined || s.groupId === (i.groupId ?? INBOX_GROUP_ID))
-            && (i.title === undefined || (s.title ?? undefined) === (i.title ?? undefined));
-          break;
-        }
-        case 'groupUpsert': {
-          const g = this.groups.get(i.id);
-          applied = !!g && g.name === i.name && (g.color ?? undefined) === (i.color ?? undefined);
-          break;
-        }
-      }
-      if (applied) {
-        diag('intent.proved', { host: this.hostId, t: i.t, attempts: e.attempts }, i.id);
-        this.deps.intents.settle(this.hostId, e.iid, { ok: true });
-        changed = true;
-      }
+    for (const e of entries) {
+      if (!this.isApplied(e.intent)) continue;
+      diag('intent.proved', { host: this.hostId, t: e.intent.t, attempts: e.attempts, uncertain: e.state === 'uncertain' }, e.intent.id);
+      this.deps.intents.settle(this.hostId, e.iid, { ok: true });
+      changed = true;
     }
     if (changed) this.outboxChanged();
+  }
+
+  /** Whether the registry mirror already shows intent `i`'s effect. */
+  private isApplied(i: PendingIntent): boolean {
+    const me = this.deps.device.id;
+    switch (i.t) {
+      case 'close': return !this.sessions.has(i.id);
+      case 'groupClose': return !this.groups.has(i.id);
+      case 'hide': {
+        const s = this.sessions.get(i.id);
+        // Gone altogether is as hidden as it gets.
+        return !s || (s.hiddenBy as string[]).includes(me);
+      }
+      case 'unhide': {
+        const s = this.sessions.get(i.id);
+        return !!s && !(s.hiddenBy as string[]).includes(me);
+      }
+      case 'sessionUpdate': {
+        const s = this.sessions.get(i.id);
+        // The server files a session without a (live) group under the inbox, and stores a null title as none.
+        return !!s
+          && (i.groupId === undefined || s.groupId === (i.groupId ?? INBOX_GROUP_ID))
+          && (i.title === undefined || (s.title ?? undefined) === (i.title ?? undefined));
+      }
+      case 'groupUpsert': {
+        const g = this.groups.get(i.id);
+        return !!g && g.name === i.name && (g.color ?? undefined) === (i.color ?? undefined);
+      }
+    }
   }
 
   /** Send every pending intent not already sent on this connection, oldest first. */
@@ -522,7 +571,27 @@ export class RemoteHostClient {
     if (!this.deps.intents.beginSend(this.hostId, e.iid)) return;
     const rid = this.nextRid++;
     this.intentAcks.set(rid, e.iid);
-    if (!this.sendIntent(rid, e.intent)) this.intentAcks.delete(rid);
+    if (!this.sendIntent(rid, e.intent)) {
+      this.intentAcks.delete(rid);
+      return;
+    }
+    this.intentTimers.set(rid, this.timers.setTimeout(() => this.onIntentDeadline(rid), this.requestTimeoutMs));
+  }
+
+  /**
+   * No ack within the deadline and the socket is still up: the intent may or
+   * may not have been applied. Mark it uncertain (never resent blind), and
+   * settle it now if the mirror already shows it. A late ack still settles it.
+   */
+  private onIntentDeadline(rid: number): void {
+    this.intentTimers.delete(rid);
+    const iid = this.intentAcks.get(rid);
+    if (iid === undefined || !this.deps.intents.markUncertain(this.hostId, iid)) return;
+    const e = this.deps.intents.get(this.hostId, iid);
+    diag('intent.uncertain', { host: this.hostId, t: e?.intent.t ?? null, attempts: e?.attempts ?? null, ms: this.requestTimeoutMs }, e?.intent.id);
+    this.log(`${this.hostId}: ${e?.intent.t} ${e?.intent.id} not acknowledged within ${this.requestTimeoutMs} ms; the registry will settle it`);
+    this.outboxChanged();
+    this.reconcileUncertain();
   }
 
   private onIntentAck(iid: string, ok: boolean, error?: string): void {
@@ -624,6 +693,9 @@ export class RemoteHostClient {
         const iid = this.intentAcks.get(msg.rid);
         if (iid !== undefined) {
           this.intentAcks.delete(msg.rid);
+          const timer = this.intentTimers.get(msg.rid);
+          if (timer !== undefined) this.timers.clearTimeout(timer);
+          this.intentTimers.delete(msg.rid);
           this.onIntentAck(iid, msg.ok, msg.error);
           return;
         }
@@ -641,9 +713,16 @@ export class RemoteHostClient {
         }
         return;
       }
-      case 'meta':
+      case 'meta': {
         this.deps.onMeta?.(msg.id, { cwd: msg.cwd, agent: msg.agent });
+        // The agent's state reaches the registry through meta only: keep the mirror current for the status UI.
+        const rec = msg.agentState ? this.sessions.get(msg.id) : undefined;
+        if (rec) {
+          this.sessions.set(msg.id, { ...rec, agentState: msg.agentState });
+          this.deps.onRegistry?.();
+        }
         return;
+      }
       case 'fsResult': {
         const w = this.fsWaiters.get(msg.rid);
         this.fsWaiters.delete(msg.rid);
@@ -685,16 +764,19 @@ export class RemoteHostClient {
         this.sessions.set(msg.session.id, msg.session);
         this.closedIds.delete(msg.session.id);
         if (msg.session.hiddenBy.includes(this.deps.device.id)) this.markGone(msg.session.id, { reason: 'hidden' });
+        this.reconcileUncertain();
         this.deps.onRegistry?.();
         return;
       case 'sessionClosed':
         this.sessions.delete(msg.id);
         this.closedIds.add(msg.id);
         this.markGone(msg.id, { reason: 'closed', by: this.deviceLabel(msg.by) });
+        this.reconcileUncertain();
         this.deps.onRegistry?.();
         return;
       case 'groupUpserted':
         this.groups.set(msg.group.id, msg.group);
+        this.reconcileUncertain();
         this.deps.onRegistry?.();
         return;
       case 'groupClosed':
@@ -704,6 +786,7 @@ export class RemoteHostClient {
           this.closedIds.add(id);
           this.markGone(id, { reason: 'closed', by: this.deviceLabel(msg.by) });
         }
+        this.reconcileUncertain();
         this.deps.onRegistry?.();
         return;
       case 'goingAway':
@@ -864,6 +947,13 @@ export class RemoteHostClient {
   has(id: string): boolean {
     const s = this.surfs.get(id);
     return !!s && s.wanted && s.state !== 'closed' && s.waiters.length === 0;
+  }
+
+  /** Terminals open in this app whose (re-)open the server has not confirmed on the current socket. */
+  restoringIds(): string[] {
+    const ids: string[] = [];
+    for (const s of this.surfs.values()) if (s.wanted && s.state !== 'closed' && !s.open) ids.push(s.id);
+    return ids;
   }
 
   attachedCount(): number {
@@ -1041,15 +1131,29 @@ export class RemoteHostClient {
     }
   }
 
-  /** Request/response helper for registry operations (phase 2 sync). */
-  request(build: (rid: number) => ClientMsg): Promise<{ ok: boolean; error?: string }> {
+  /**
+   * Request/response helper. Resolves with the ack; `not connected` when it
+   * could not be sent; `uncertain` when it was sent but no answer came (the
+   * deadline passed with the socket up, or the connection dropped first). A
+   * late ack after the deadline is ignored: the caller already moved on.
+   */
+  request(build: (rid: number) => ClientMsg): Promise<RequestResult> {
     const rid = this.nextRid++;
     return new Promise((resolve) => {
       if (!this.sendJson(build(rid))) {
         resolve({ ok: false, error: 'not connected' });
         return;
       }
-      this.acks.set(rid, (ok, error) => resolve({ ok, error }));
+      const timer = this.timers.setTimeout(() => {
+        if (!this.acks.delete(rid)) return;
+        diag('req.uncertain', { host: this.hostId, ms: this.requestTimeoutMs });
+        resolve({ ok: false, uncertain: true, error: `no answer from the host within ${Math.round(this.requestTimeoutMs / 1000)} s; it may or may not have been applied` });
+      }, this.requestTimeoutMs);
+      this.acks.set(rid, (ok, error) => {
+        this.timers.clearTimeout(timer);
+        if (!ok && error === DISCONNECTED) resolve({ ok: false, uncertain: true, error: 'disconnected before the host answered; it may or may not have been applied' });
+        else resolve({ ok, error });
+      });
     });
   }
 }

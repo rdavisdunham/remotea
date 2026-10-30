@@ -40,7 +40,8 @@ import path from 'path';
 import crypto from 'crypto';
 import http from 'http';
 import WebSocket from 'ws';
-import { LEGACY_TIMER_HINT, configDir, ensureToken, loadConfig, loadEridaniConfig, rotateToken, type CollectorMode } from './config';
+import { LEGACY_TIMER_HINT, configDir, ensureToken, loadConfig, loadEridaniConfig, rotateToken, type CollectorMode, type ServerConfig } from './config';
+import { UploadStore, fmtBytes, readUploadsStatus, type UploadUsage } from './upload';
 import { diagDir } from './diag-log';
 import { defaultHookPaths, hooksStatus, installHooks, removeHooks, removeLegacyCollectorHooks, type HookTarget, type LegacyRemoval } from './hooks-install';
 import { hookVersion, loadBuildInfo, readServerInfo, type BuildInfo, type HookVersion } from './build-info';
@@ -117,7 +118,11 @@ export interface StatusOutput {
   };
   groups: Array<{ id: string; name: string; color: string | null }>;
   sessions: StatusSession[];
+  /** S-S3 (additive): pasted/dropped files in /tmp/remotea-drop-*, against their budget. */
+  uploads: StatusUploads;
 }
+
+export type StatusUploads = Pick<UploadUsage, 'bytes' | 'files' | 'budget' | 'maxAgeDays' | 'tempDir' | 'freeBytes' | 'freeRatio' | 'degraded' | 'at'>;
 
 function readRegistry(dir: string): RegistryData | null {
   try {
@@ -190,7 +195,18 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
     },
     groups: groups.map((g) => ({ id: g.id, name: g.name, color: g.color ?? null })),
     sessions,
+    uploads: uploadsStatus(dir, config, running),
   };
+}
+
+/**
+ * S-S3: pasted/dropped files. What the running server last wrote
+ * (uploads-status.json); otherwise measured here, with the configured budget.
+ */
+export function uploadsStatus(dir: string, config: ServerConfig, running: boolean): StatusUploads {
+  const written = running ? readUploadsStatus(dir) : null;
+  const u = written ?? new UploadStore({ budgetBytes: config.uploadBudgetMiB * 1024 * 1024, maxAgeMs: config.uploadMaxAgeDays * 24 * 60 * 60 * 1000 }).usage();
+  return { bytes: u.bytes, files: u.files, budget: u.budget, maxAgeDays: u.maxAgeDays, tempDir: u.tempDir, freeBytes: u.freeBytes, freeRatio: u.freeRatio, degraded: u.degraded, at: u.at };
 }
 
 /** One line: the running build, the one on disk when it differs, and the hook helper. */
@@ -524,6 +540,8 @@ export async function main(argv: string[]): Promise<number> {
         process.stdout.write(`${s.state.padEnd(6)} ${(s.groupName ?? '-').slice(0, 20).padEnd(20)} ${what.slice(0, 24).padEnd(24)} active ${fmtAge(s.lastActivityAt).padStart(4)}  ${s.lastCwd ?? s.cwd}  ${s.id}\n`);
       }
       if (!status.sessions.length) process.stdout.write('no sessions\n');
+      const u = status.uploads;
+      process.stdout.write(`uploads ${fmtBytes(u.bytes)} in ${u.files} file(s) of ${fmtBytes(u.budget)}, kept up to ${u.maxAgeDays} day(s)${u.degraded ? `; DEGRADED: ${u.degraded}` : ''}\n`);
       return 0;
     }
     case 'open': {

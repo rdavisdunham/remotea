@@ -23,6 +23,10 @@ export interface HostStatus {
   error?: string;
   /** The server's own hostname, once connected. */
   serverHostname?: string;
+  /** Epoch ms of the welcome on the current connection, while ready. */
+  connectedAt?: number;
+  /** Epoch ms of the last traffic from the host (any message or pong), on this or an earlier connection. */
+  lastSeenAt?: number;
   /** Agent status hooks on the server (servers that report them). */
   hooks?: {
     agents: HookAgentStatus[];
@@ -35,8 +39,13 @@ export interface HostStatus {
 
 /** A host's outbox as the UI sees it. */
 export interface OutboxSummary {
-  /** Waiting to be sent, or sent and not acknowledged yet. */
+  /** Waiting to be sent, or sent and not acknowledged yet (uncertain ones included). */
   pending: number;
+  /**
+   * Of those, sent but unanswered past the request deadline while connected:
+   * maybe applied. Not resent until a registry snapshot settles them.
+   */
+  uncertain?: number;
   /** Changes that will not be applied: refused by the server, or given up on. */
   failed: Array<{
     iid: string;
@@ -65,6 +74,8 @@ export interface HostDTO {
   enabled: boolean;
   hasToken: boolean;
   serverId?: string;
+  /** The user acknowledged this (plain ws://, non-Tailscale) URL as unencrypted on its network. */
+  unencryptedAcknowledged?: boolean;
   status: HostStatus;
 }
 
@@ -75,6 +86,16 @@ export interface HostSaveRequest {
   enabled?: boolean;
   /** Set or replace the token; omitted keeps the stored one. */
   token?: string;
+  /** "I understand this connection is unencrypted on this network" (needed for a plain ws:// that is not loopback or Tailscale). */
+  acknowledgeUnencrypted?: boolean;
+}
+
+/** The Settings "Test" button's request. */
+export interface HostTestRequest {
+  url: string;
+  token?: string;
+  id?: string;
+  acknowledgeUnencrypted?: boolean;
 }
 
 export interface HostTestResult {
@@ -108,6 +129,8 @@ export interface RemoteRegistryView {
   /** Sessions closed while this device could not hear about it (from probes). */
   closedIds: string[];
   lost: Record<string, LostInfo>;
+  /** Terminals open in this app whose re-open the server has not confirmed on the current connection. */
+  restoring?: string[];
 }
 
 /** What each window receives: the registries, plus its role in placing sessions. */

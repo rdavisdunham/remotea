@@ -52,7 +52,7 @@ import { statusFromRegistry } from './collector/report';
 import { WINDOWS_USERS, serverVersion } from './eridani-runtime';
 import type { RegistryData } from './registry';
 import { loadTargets, removeTarget, saveTarget, type ExecutionTarget, type VerifySpec } from './eridani-targets';
-import { WorktreeManager, cleanupCommands } from './worktrees';
+import { WorktreeManager, cleanupCommands, writersByPath } from './worktrees';
 import { defaultHookPaths } from './hooks-install';
 import { defaultProbe, launchersToProbe, probeKey, type LauncherProbe } from './launch-caps';
 import { fmtReadiness, fmtWiring, localReadiness, mcpWiring, parseSetupArgs, readSecret, runSetup, serviceEnv, SETUP_USAGE, stdinLinesOnce, ttyPrompter, noPrompter } from './eridani-setup';
@@ -115,7 +115,12 @@ export function fmtAdvertised(a: Advertised): string[] {
       const l = t.launch?.[h];
       return l ? `${h} ${l.ready ? 'ready' : `NOT ready (${l.error ?? '?'})`}` : h;
     });
-    const verify = (t.verify_status ?? t.verify.map((id) => ({ id, ready: true }))).map((v) => ('reason' in v && v.reason ? `${v.id} NOT ready (${v.reason})` : `${v.id} ${v.ready ? 'ready' : 'NOT ready'}`));
+    const verify = (t.verify_status ?? t.verify.map((id) => ({ id, ready: true }))).map((v) => {
+      const state = 'reason' in v && v.reason ? `${v.id} NOT ready (${v.reason})` : `${v.id} ${v.ready ? 'ready' : 'NOT ready'}`;
+      // S-N4: whether it runs in the bubblewrap sandbox.
+      if (!('isolated' in v) || v.isolated === undefined) return state;
+      return v.isolated ? `${state}, sandboxed` : `${state}, NOT sandboxed${v.isolation_reason ? ` (${v.isolation_reason})` : ''}`;
+    });
     lines.push(`target ${t.id}: ${launch.join(', ') || 'no harness enabled'}; verify ${verify.join(', ') || 'none'}`);
   }
   return lines;
@@ -493,8 +498,8 @@ function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream)
 async function worktreesCommand(dir: string, args: string[], out: NodeJS.WritableStream): Promise<number> {
   const targets = loadTargets(dir, (m) => process.stderr.write(`${m}\n`));
   const reg = readRegistry(dir);
-  const active = new Set(Object.values(reg?.sessions ?? {}).filter((r) => r.eridani && r.state !== 'exited').map((r) => r.eridani!.worktree));
-  const rows = await new WorktreeManager({ dir }).nominate(targets, (p) => active.has(p));
+  const writers = writersByPath(Object.values(reg?.sessions ?? {}));
+  const rows = await new WorktreeManager({ dir }).nominate(targets, (p) => writers.has(p), (p) => writers.get(p) ?? null);
   if (args.includes('--json')) {
     out.write(JSON.stringify(rows, null, 2) + '\n');
     return 0;
@@ -505,6 +510,7 @@ async function worktreesCommand(dir: string, args: string[], out: NodeJS.Writabl
   }
   for (const r of rows) {
     out.write(`${r.candidate ? 'candidate ' : 'keep      '} ${r.target}  ${r.branch ?? '(detached)'}  ${r.path}\n`);
+    if (r.writer) out.write(`           writer ${r.writer.surf} (run ${r.writer.run_id})\n`);
     if (r.reasons.length) out.write(`           ${r.reasons.join('; ')}\n`);
     if (r.candidate) {
       const t = targets.find((x) => x.id === r.target);

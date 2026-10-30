@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { refreshRemoteHosts, startRemoteHostStatus, useRemoteHosts } from '../../remote-sessions/status';
 import { parseRemoteShellSpec, remoteShellSpec } from '../../../shared/remote-shell-spec';
-import type { HostConnState, HostDTO, HostSaveRequest, HostStatus, HostTestResult, RemoteRegistryView } from '../../../shared/remote-hosts-types';
+import type { HostDTO, HostSaveRequest, HostStatus, HostTestRequest, HostTestResult, RemoteRegistryView } from '../../../shared/remote-hosts-types';
+import { classifyHostUrl, hostUrlHint, UNENCRYPTED_ACK_LABEL } from '../../../shared/host-url';
 import { closeRemoteSession, unhideRemoteSession } from '../../remote-sessions/sync';
+import RemoteHostHealth from './RemoteHostHealth';
 import '../../styles/remote-hosts.css';
 
 /**
@@ -15,22 +17,39 @@ import '../../styles/remote-hosts.css';
 type Bridge = {
   save(req: HostSaveRequest): Promise<{ ok: boolean; host?: HostDTO; error?: string }>;
   remove(id: string): Promise<boolean>;
-  test(req: { url: string; token?: string; id?: string }): Promise<HostTestResult>;
+  test(req: HostTestRequest): Promise<HostTestResult>;
   dismissOutboxFailures?(hostId: string): void;
 };
 
 const bridge = (): Bridge | null => (window as unknown as { wmux?: { remoteHosts?: Bridge } }).wmux?.remoteHosts ?? null;
 
-const STATE_LABEL: Record<HostConnState, string> = {
-  disabled: 'Off',
-  connecting: 'Connecting…',
-  ready: 'Connected',
-  reconnecting: 'Reconnecting…',
-  'auth-failed': 'Token rejected',
-  'wrong-server': 'Different server',
-  incompatible: 'Incompatible',
-  suspended: 'Paused (sleep)',
-};
+/** The registry views, refreshed while Settings is open (for each host's per-tab health). */
+function useRegistryViews(): RemoteRegistryView[] {
+  const [views, setViews] = useState<RemoteRegistryView[]>([]);
+  useEffect(() => {
+    const api = (window as unknown as { wmux?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).wmux?.remoteSessions;
+    if (!api) return;
+    let live = true;
+    const load = () => void api.views().then((v) => { if (live) setViews(v); }, () => {});
+    load();
+    const t = setInterval(load, 3000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, []);
+  return views;
+}
+
+/** Ticks every few seconds so "last seen 5 min ago" stays true. */
+function useNow(ms = 5000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+  return now;
+}
 
 const OUTBOX_LABEL: Record<NonNullable<HostStatus['outbox']>['failed'][number]['t'], string> = {
   close: 'close',
@@ -47,21 +66,45 @@ interface Draft {
   url: string;
   token: string;
   enabled: boolean;
+  /** "I understand this connection is unencrypted on this network" (plain ws:// off loopback and Tailscale). */
+  ackUnencrypted: boolean;
 }
 
-const EMPTY: Draft = { name: '', url: 'ws://', token: '', enabled: true };
+const EMPTY: Draft = { name: '', url: 'ws://', token: '', enabled: true, ackUnencrypted: false };
+
+/**
+ * Where the URL leads, under the URL field. A plain ws:// to a non-loopback,
+ * non-Tailscale address adds the acknowledgement checkbox; Save and Test stay
+ * disabled until it is ticked (main enforces the same).
+ */
+export function HostUrlGuidance({ url, acknowledged, onAcknowledge }: { url: string; acknowledged: boolean; onAcknowledge: (v: boolean) => void }) {
+  const c = classifyHostUrl(url);
+  if (!c) return <p className="remote-host-url-hint">Expected wss://host:7717, or ws:// to a Tailscale name (*.ts.net) or 100.x address.</p>;
+  if (!c.needsAck) return <p className="remote-host-url-hint">{hostUrlHint(c)}</p>;
+  return (
+    <div className="remote-host-warning" role="alert">
+      {hostUrlHint(c)}
+      <label>
+        <input type="checkbox" checked={acknowledged} onChange={(e) => onAcknowledge(e.target.checked)} />
+        {UNENCRYPTED_ACK_LABEL}
+      </label>
+    </div>
+  );
+}
 
 function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: boolean; onDone: () => void }) {
   const [draft, setDraft] = useState<Draft>(initial);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const b = bridge();
+  // An acknowledgement is for one URL: editing the URL asks again.
+  const ackMissing = !!classifyHostUrl(draft.url)?.needsAck && !draft.ackUnencrypted;
 
   const test = async () => {
     if (!b) return;
     setBusy(true);
     setMessage(null);
-    const res = await b.test({ url: draft.url, token: draft.token || undefined, id: draft.id });
+    const res = await b.test({ url: draft.url, token: draft.token || undefined, id: draft.id, acknowledgeUnencrypted: draft.ackUnencrypted || undefined });
     setBusy(false);
     setMessage(res.ok
       ? { ok: true, text: `Connected to ${res.serverHostname ?? 'the server'}: ${res.sessions ?? 0} session(s) running.` }
@@ -72,7 +115,10 @@ function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: b
     if (!b) return;
     setBusy(true);
     setMessage(null);
-    const res = await b.save({ id: draft.id, name: draft.name, url: draft.url, enabled: draft.enabled, token: draft.token ? draft.token : undefined });
+    const res = await b.save({
+      id: draft.id, name: draft.name, url: draft.url, enabled: draft.enabled, token: draft.token ? draft.token : undefined,
+      acknowledgeUnencrypted: draft.ackUnencrypted || undefined,
+    });
     setBusy(false);
     if (!res.ok) {
       setMessage({ ok: false, text: res.error ?? 'Could not save' });
@@ -91,9 +137,11 @@ function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: b
       </div>
       <div className="settings-row">
         <label className="settings-label">URL</label>
-        <input className="settings-input" value={draft.url} placeholder="ws://my-desktop:7717" spellCheck={false}
-          onChange={(e) => setDraft({ ...draft, url: e.target.value })} />
+        <input className="settings-input" value={draft.url} placeholder="ws://my-desktop.tailnet-name.ts.net:7717" spellCheck={false}
+          onChange={(e) => setDraft({ ...draft, url: e.target.value, ackUnencrypted: e.target.value === initial.url ? initial.ackUnencrypted : false })} />
       </div>
+      <HostUrlGuidance url={draft.url} acknowledged={draft.ackUnencrypted}
+        onAcknowledge={(v) => setDraft({ ...draft, ackUnencrypted: v })} />
       <div className="settings-row">
         <label className="settings-label">Token</label>
         <input className="settings-input" type="password" value={draft.token} autoComplete="off" spellCheck={false}
@@ -106,8 +154,8 @@ function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: b
           onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
       </div>
       <div className="remote-host-actions">
-        <button className="settings-button" disabled={busy || !draft.url} onClick={test}>Test</button>
-        <button className="settings-button" disabled={busy || !draft.name.trim() || !draft.url} onClick={save}>Save</button>
+        <button className="settings-button" disabled={busy || !draft.url || ackMissing} onClick={test}>Test</button>
+        <button className="settings-button" disabled={busy || !draft.name.trim() || !draft.url || ackMissing} onClick={save}>Save</button>
         <button className="settings-button" disabled={busy} onClick={onDone}>Cancel</button>
       </div>
       {message && <div className={`remote-host-message remote-host-message--${message.ok ? 'ok' : 'error'}`}>{message.text}</div>}
@@ -164,6 +212,8 @@ export default function RemoteHostsSettings() {
   const workspacePrefs = useStore((s) => s.workspacePrefs);
   const setWorkspacePrefs = useStore((s) => s.setWorkspacePrefs);
   const [editing, setEditing] = useState<string | 'new' | null>(null);
+  const views = useRegistryViews();
+  const now = useNow();
   const list = Object.values(hosts);
   const defaultHost = parseRemoteShellSpec(workspacePrefs.defaultShell)?.hostId;
 
@@ -192,26 +242,25 @@ export default function RemoteHostsSettings() {
         if (editing === h.id) {
           return (
             <HostEditor key={h.id} hasToken={h.hasToken}
-              initial={{ id: h.id, name: h.name, url: h.url, token: '', enabled: h.enabled }}
+              initial={{ id: h.id, name: h.name, url: h.url, token: '', enabled: h.enabled, ackUnencrypted: !!h.unencryptedAcknowledged }}
               onDone={() => setEditing(null)} />
           );
         }
+        const outbox = status[h.id]?.outbox;
         return (
           <div key={h.id} className="remote-host-card">
             <div className="remote-host-card__head">
               <span className="remote-host-card__name">{h.name}</span>
               <span className="remote-host-card__url">{h.url}</span>
-              <span className={`remote-host-status remote-host-status--${st}`}>
-                <span className="remote-host-status__dot" />
-                {STATE_LABEL[st]}
-              </span>
             </div>
+            <RemoteHostHealth status={status[h.id]} view={views.find((v) => v.hostId === h.id)} now={now} />
             {status[h.id]?.error && st !== 'ready' && (
               <div className="remote-host-message remote-host-message--error">{status[h.id]?.error}</div>
             )}
-            {!!status[h.id]?.outbox?.pending && (
+            {!!outbox?.pending && (
               <div className="remote-host-message">
-                {status[h.id]!.outbox!.pending} change{status[h.id]!.outbox!.pending === 1 ? '' : 's'} made here not yet confirmed by this host
+                {outbox.pending} change{outbox.pending === 1 ? '' : 's'} made here not yet confirmed by this host
+                {outbox.uncertain ? ` (${outbox.uncertain} unanswered: checked against the host's registry before any retry)` : ''}
               </div>
             )}
             {!!status[h.id]?.outbox?.failed.length && (

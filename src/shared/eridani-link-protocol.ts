@@ -263,6 +263,12 @@ export interface HelloVerifyStatus {
   ready: boolean;
   /** Why not ready (never the argv). */
   reason?: string;
+  /** S-N4 (additive): a run now would be sandboxed (bubblewrap works and the entry does not opt out). */
+  isolated?: boolean;
+  /** S-N4: the entry's isolation, `bwrap` or `none` (a default `bwrap` falls back to `none` where bwrap is unusable). */
+  isolation?: 'bwrap' | 'none';
+  /** S-N4: why a run would not be isolated. Not a readiness problem: `ready` stays true. */
+  isolation_reason?: string;
 }
 
 /** One execution target as hello lists it, for Eridani's target picker. */
@@ -586,6 +592,25 @@ export interface VerifyResultBody extends OpFields {
   turn_fingerprint?: string;
   /** Stage D: the host attempt this Eridani attempt adopted (same tuple, already running or finished). */
   adopted?: string;
+  /**
+   * S-N4 (additive): the command ran inside the verify sandbox (bubblewrap:
+   * temporary HOME, only the worktree writable, no network unless the entry
+   * allows it). "Tests passed" and "the check was isolated" are separate facts.
+   */
+  isolated?: boolean;
+  /** S-N4: the isolation the verify entry gets, `bwrap` or `none`. */
+  isolation?: 'bwrap' | 'none';
+  /** S-N4: why it was not isolated, e.g. "bwrap (bubblewrap) is not installed on the service PATH". */
+  isolation_reason?: string;
+  /**
+   * S-S2 (additive): `workspace_fingerprint` covers the whole workspace.
+   * False: part of it is hashed by metadata or missing (`workspace_reasons`),
+   * so the fingerprint cannot prove the tree is unchanged; treat the result
+   * as not fresh.
+   */
+  workspace_complete?: boolean;
+  /** S-S2: what the fingerprint missed, one line each; empty when complete. */
+  workspace_reasons?: string[];
 }
 
 // ── Both ways ──────────────────────────────────────────────────────────────
@@ -661,8 +686,23 @@ export interface SpawnCommand extends OpFields {
   verify?: RunVerifyConfig | null;
   /** The migration number Eridani reserved for this run's plan; a reused, stale worktree's prompt then says to re-point it. */
   migration?: { number: number; dir: string } | null;
+  /**
+   * S-S4: start even though another live session already writes the branch's
+   * worktree (both then edit it). Absent or false: such a spawn is `rejected`
+   * with detail `worktree_busy` and result `{branch, writer}`.
+   */
+  share?: boolean;
   expires_at: number | string;
 }
+
+/** The live session writing a worktree (S-S4): its surface and the run bound to it. */
+export interface WorktreeWriter {
+  surf: string;
+  run_id: string;
+}
+
+/** The `command.outcome` detail of a spawn refused because another live session writes the branch (S-S4). */
+export const WORKTREE_BUSY = 'worktree_busy';
 
 /** The verification a run's frozen plan asks for after each root turn (stage D). */
 export interface RunVerifyConfig {
@@ -770,6 +810,8 @@ export interface WorktreeReport {
   candidate: boolean;
   /** Why it is unmerged work (empty for a candidate). */
   reasons: string[];
+  /** S-S4: the live session writing this worktree, null when none. Optional: older hosts. */
+  writer?: WorktreeWriter | null;
 }
 
 /** Every managed worktree, after sessions.snapshot and whenever the list changes. */
@@ -974,6 +1016,7 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
         const mg = m.migration;
         if (!isObj(mg) || !isInt(mg.number, 1) || !isStr(mg.dir, 200) || !noControl(mg.dir) || /[\r\n]/.test(mg.dir)) return 'bad migration';
       }
+      if (m.share !== undefined && typeof m.share !== 'boolean') return 'bad share';
       if (m.run_token !== undefined && !(isStr(m.run_token, 512) && /^[\x21-\x7e]+$/.test(m.run_token))) return 'bad run_token';
       if (m.env !== undefined) {
         if (!isObj(m.env) || Object.keys(m.env).length > 32) return 'bad env';

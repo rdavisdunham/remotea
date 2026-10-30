@@ -186,7 +186,8 @@ describe('verify-runner', () => {
     const { repo: r, root } = repo();
     const pidFile = path.join(root, 'child.pid');
     const script = `const { spawn } = require('child_process'); const c = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' }); require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(c.pid)); setInterval(() => {}, 1000);`;
-    const out = await runVerify({ spec: { id: 'hang', argv: [process.execPath, '-e', script], timeout: 30 }, worktree: r, timeoutMs: 1500, killGraceMs: 200 });
+    // Unsandboxed: the child's pid file lives outside the worktree (verify-isolation.test.ts covers the sandboxed tree).
+    const out = await runVerify({ spec: { id: 'hang', argv: [process.execPath, '-e', script], timeout: 30, isolation: 'none' }, worktree: r, timeoutMs: 1500, killGraceMs: 200 });
     expect(out.timed_out).toBe(true);
     const child = Number(fs.readFileSync(pidFile, 'utf8'));
     const alive = () => { try { process.kill(child, 0); return true; } catch { return false; } };
