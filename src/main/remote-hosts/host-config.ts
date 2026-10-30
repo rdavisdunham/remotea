@@ -15,7 +15,7 @@ import crypto from 'crypto';
 import { hostIdFromName, HOST_ID_RE } from '../../shared/remote-shell-spec';
 import { DEVICE_ID_RE, GROUP_ID_RE, SURFACE_ID_RE } from '../../shared/remote-host-protocol';
 import { classifyHostUrl, UNENCRYPTED_ACK_LABEL } from '../../shared/host-url';
-import type { HostSaveRequest, OutboxSummary } from '../../shared/remote-hosts-types';
+import type { HostSaveRequest, OutboxIntent, OutboxSummary } from '../../shared/remote-hosts-types';
 
 export interface SecretBox {
   isEncryptionAvailable(): boolean;
@@ -183,13 +183,8 @@ export function loadDevice(file: string): { id: string; name: string } {
   return device;
 }
 
-export type PendingIntent =
-  | { t: 'close'; id: string }
-  | { t: 'groupClose'; id: string }
-  | { t: 'hide'; id: string }
-  | { t: 'unhide'; id: string }
-  | { t: 'sessionUpdate'; id: string; groupId?: string | null; group?: { name: string; color?: string }; title?: string | null }
-  | { t: 'groupUpsert'; id: string; name: string; color?: string };
+/** One registry change in the outbox. The shape lives in shared types so the UI can describe it. */
+export type PendingIntent = OutboxIntent;
 
 type SessionUpdateIntent = Extract<PendingIntent, { t: 'sessionUpdate' }>;
 
@@ -479,17 +474,36 @@ export class PendingIntents {
     this.persist();
   }
 
+  /**
+   * The user chose to forget an unconfirmed change (Settings → Remote hosts,
+   * pending changes): drop the open entry `iid`. It is no longer sent or laid
+   * over the registry; if the host already applied it, it stays applied there
+   * (a late ack finds no entry and is ignored). False when it was not open.
+   */
+  forget(hostId: string, iid: string): boolean {
+    const list = this.byHost[hostId];
+    const e = list?.find((x) => x.iid === iid);
+    if (!list || !e || !isOpen(e)) return false;
+    this.byHost[hostId] = list.filter((x) => x !== e);
+    this.prune(hostId);
+    this.persist();
+    return true;
+  }
+
   /** What the UI is told (HostStatus.outbox). */
   summary(hostId: string): OutboxSummary {
     const list = this.byHost[hostId] ?? [];
     const failed: OutboxSummary['failed'] = [];
+    const open: NonNullable<OutboxSummary['open']> = [];
     for (const e of list) {
       if (e.state === 'failed' || e.state === 'expired') {
         failed.push({ iid: e.iid, t: e.intent.t, id: e.intent.id, state: e.state, error: e.error, at: e.doneAt ?? e.createdAt });
+      } else if (isOpen(e)) {
+        open.push({ iid: e.iid, state: e.state as 'pending' | 'uncertain', intent: { ...e.intent }, createdAt: e.createdAt, attempts: e.attempts, ...(e.lastSentAt ? { lastSentAt: e.lastSentAt } : {}) });
       }
     }
     const uncertain = list.filter((e) => e.state === 'uncertain').length;
-    return { pending: list.filter(isOpen).length, ...(uncertain ? { uncertain } : {}), failed };
+    return { pending: open.length, ...(uncertain ? { uncertain } : {}), failed, ...(open.length ? { open } : {}) };
   }
 
   /** The intents still wanted (pending or uncertain), oldest first. */

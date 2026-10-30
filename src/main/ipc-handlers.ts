@@ -806,6 +806,8 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.on(IPC_CHANNELS.RHOST_OUTBOX_DISMISS, (_event, hostId: unknown) => {
     if (typeof hostId === 'string') remoteHosts.dismissOutboxFailures(hostId);
   });
+  ipcMain.handle(IPC_CHANNELS.RHOST_OUTBOX_FORGET, (_event, hostId: unknown, iid: unknown) =>
+    typeof hostId === 'string' && typeof iid === 'string' ? remoteHosts.forgetIntent(hostId, iid) : false);
   ipcMain.handle(IPC_CHANNELS.RSESS_VIEWS, () => remoteHosts.views());
   ipcMain.on(IPC_CHANNELS.RSESS_REPORT, (event, r: { ready?: unknown; surfaceIds?: unknown }) => {
     const wc = event.sender;

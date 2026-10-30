@@ -6,6 +6,7 @@ import { jumpTo } from '../../utils/prompt-marks';
 import { togglePinnedPromptEntry } from '../../store/prompt-actions';
 import { promptSummary, type PromptEntry } from '../../store/prompt-slice';
 import '../../styles/prompt-marks.css';
+import { FIXED_SHORTCUTS, shortcutTooltip } from '../../shortcuts';
 
 /** hh:mm in the user's own locale — the outline lists a session, not a log file. */
 function clockOf(at: number): string {
@@ -209,7 +210,7 @@ export default function PromptOutline({ surfaceId }: { surfaceId: string }) {
           type="button"
           className="prompt-outline__close"
           onClick={close}
-          title={t('prompt.outlineClose', 'Close (Esc)')}
+          title={shortcutTooltip(t('prompt.outlineClose', 'Close (Esc)'), FIXED_SHORTCUTS.dismiss)}
         >
           &#x00D7;
         </button>

@@ -3,17 +3,19 @@
  *
  * A leaf module (no store import) so the store's close routing and the close
  * dialog can read what sync.ts last received without an import cycle
- * (sync.ts imports the store).
+ * (sync.ts imports the store). Also a tiny zustand store, so the host
+ * attention row and the sidebar's run chips re-render on each push.
  */
+import { create } from 'zustand';
 import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
 
-let latest: RemoteRegistryView[] | null = null;
+export const useRemoteRegistry = create<{ views: RemoteRegistryView[] | null }>(() => ({ views: null }));
 
 export function setLatestRemoteViews(views: RemoteRegistryView[] | null): void {
-  latest = views;
+  useRemoteRegistry.setState({ views });
 }
 
 /** null until the first registry push (or after a test resets it). */
 export function latestRemoteViews(): RemoteRegistryView[] | null {
-  return latest;
+  return useRemoteRegistry.getState().views;
 }

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useT } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
+import { useStore } from '../../store';
+import { DEFAULT_SHORTCUTS, type ShortcutAction, type ShortcutBinding } from '../../store/settings-slice';
+import { formatAccelerator, liveShortcutText } from '../../shortcuts';
 import '../../styles/tutorial.css';
 
 interface TutorialProps {
@@ -10,7 +13,8 @@ interface TutorialProps {
 interface Step {
   title: string;
   body: string;
-  shortcuts: string[];
+  /** The actions whose LIVE bindings the step shows (and whose defaults its text names). */
+  shortcuts: ShortcutAction[];
 }
 
 function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step[] {
@@ -29,7 +33,7 @@ function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step
         'tutorial.step.workspaces.body',
         'The sidebar on the left shows your workspaces. Each workspace is an independent session with its own terminal layout. Create new ones with Ctrl+N. Double-click a workspace title to rename it.',
       ),
-      shortcuts: ['Ctrl+N', 'Ctrl+B'],
+      shortcuts: ['newWorkspace', 'toggleSidebar'],
     },
     {
       title: t('tutorial.step.splitPanes.title', 'Split Panes'),
@@ -37,7 +41,7 @@ function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step
         'tutorial.step.splitPanes.body',
         'Split your terminals horizontally or vertically. Each pane runs its own shell. Drag dividers to resize. Zoom any pane to full size with Ctrl+Shift+Enter.',
       ),
-      shortcuts: ['Ctrl+D', 'Ctrl+Shift+D'],
+      shortcuts: ['splitRight', 'splitDown'],
     },
     {
       title: t('tutorial.step.surfaceTabs.title', 'Surface Tabs'),
@@ -45,7 +49,7 @@ function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step
         'tutorial.step.surfaceTabs.body',
         'Each pane can have multiple tabs — terminals, browser panels, or markdown views. Drag tabs between panes to reorganize. Create new tabs with Ctrl+T.',
       ),
-      shortcuts: ['Ctrl+T', 'Ctrl+W'],
+      shortcuts: ['newSurface', 'closeSurfaceOrPane'],
     },
     {
       title: t('tutorial.step.browserPanel.title', 'Browser Panel'),
@@ -53,7 +57,7 @@ function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step
         'tutorial.step.browserPanel.body',
         'The browser panel on the right lets you preview what your agents build. Toggle it with Ctrl+Shift+I. Navigate to localhost or any URL. The browser is scriptable via the socket API.',
       ),
-      shortcuts: ['Ctrl+Shift+I'],
+      shortcuts: ['openBrowser'],
     },
     {
       title: t('tutorial.step.notifications.title', 'Notifications'),
@@ -61,7 +65,7 @@ function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step
         'tutorial.step.notifications.body',
         'When an agent needs your attention, its pane gets a blue ring and the workspace badge increments. A Windows toast notification fires too. Jump to the latest unread with Ctrl+Shift+U.',
       ),
-      shortcuts: ['Ctrl+Shift+U'],
+      shortcuts: ['jumpToUnread'],
     },
     {
       title: t('tutorial.step.allSet.title', "You're all set"),
@@ -69,7 +73,7 @@ function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step
         'tutorial.step.allSet.body',
         "You can always reopen this guide from the help button (?) in the title bar. For the full keyboard shortcuts, open Settings with Ctrl+, or the Command Palette with Ctrl+Shift+P.",
       ),
-      shortcuts: [],
+      shortcuts: ['toggleShortcutCheatSheet', 'openSettings', 'commandPalette'],
     },
   ];
 }
@@ -78,7 +82,10 @@ export default function Tutorial({ onClose }: TutorialProps) {
   const t = useT();
   const [currentStep, setCurrentStep] = useState(0);
 
-  const STEPS = buildSteps(t);
+  const live = useStore((s) => s.shortcuts) as Record<ShortcutAction, ShortcutBinding>;
+  // Text that names a default key (and the chips under it) shows the live binding.
+  const prose: ShortcutAction[] = ['newWorkspace', 'toggleZoom', 'newSurface', 'openBrowser', 'jumpToUnread', 'openSettings', 'commandPalette'];
+  const STEPS = buildSteps(t).map((st) => ({ ...st, body: liveShortcutText(st.body, prose, live, DEFAULT_SHORTCUTS) }));
   const step = STEPS[currentStep];
   const isFirst = currentStep === 0;
   const isLast = currentStep === STEPS.length - 1;
@@ -114,7 +121,7 @@ export default function Tutorial({ onClose }: TutorialProps) {
 
         {step.shortcuts.length > 0 && (
           <div className="tutorial-shortcuts">
-            {step.shortcuts.map((shortcut) => (
+            {step.shortcuts.map((action) => formatAccelerator(live[action])).filter(Boolean).map((shortcut) => (
               <span key={shortcut} className="tutorial-shortcut">
                 {shortcut}
               </span>

@@ -724,10 +724,11 @@ describe('request deadline (Astra review A-S1)', () => {
     host.fault = 'apply-silent';
     app.client.intent({ t: 'hide', id: 'surf-b' });
     expect(host.applied).toEqual(['hide surf-b']);
-    expect(app.status?.outbox).toEqual({ pending: 1, failed: [] });
+    expect(app.status?.outbox).toMatchObject({ pending: 1, failed: [], open: [{ state: 'pending', intent: { t: 'hide', id: 'surf-b' }, attempts: 1 }] });
+    expect(app.status?.outbox?.uncertain).toBeUndefined();
 
     clock.advance(15_000);
-    expect(app.status?.outbox).toEqual({ pending: 1, uncertain: 1, failed: [] });
+    expect(app.status?.outbox).toMatchObject({ pending: 1, uncertain: 1, failed: [], open: [{ state: 'uncertain', intent: { t: 'hide', id: 'surf-b' } }] });
     expect(app.disk().entries(HOST).map((e) => e.state)).toEqual(['uncertain']);
     // Minutes later, same socket: still not resent.
     clock.advance(120_000);
@@ -826,5 +827,52 @@ describe('request deadline (Astra review A-S1)', () => {
     clock.advance(15_000);
     expectFinal(host);
     expect(app.status?.outbox).toEqual({ pending: 0, failed: [] });
+  });
+});
+
+describe('forgetting an unconfirmed change (pending-changes summary)', () => {
+  it('lists each open change with what it would do, oldest first', () => {
+    const { host, file } = setup();
+    const app = new App(file, host);
+    app.client.intent({ t: 'hide', id: 'surf-a' });
+    app.client.intent({ t: 'sessionUpdate', id: 'surf-b', title: 'renamed' });
+    const open = app.client.status().outbox?.open ?? [];
+    expect(open.map((o) => [o.state, o.intent.t, o.intent.id])).toEqual([['pending', 'hide', 'surf-a'], ['pending', 'sessionUpdate', 'surf-b']]);
+    expect(open[1].intent).toMatchObject({ title: 'renamed' });
+    expect(app.client.status().outbox?.pending).toBe(2);
+  });
+
+  it('a forgotten change is not sent on reconnect, leaves the overlay, and survives a restart as forgotten', () => {
+    const { host, file } = setup();
+    const app = new App(file, host);
+    app.client.intent({ t: 'close', id: 'surf-a' });
+    expect(app.client.outboxOverlay().closing.has('surf-a')).toBe(true);
+    const iid = app.client.status().outbox!.open![0].iid;
+    expect(app.client.forgetIntent(iid)).toBe(true);
+    expect(app.client.outboxOverlay().closing.has('surf-a')).toBe(false);
+    expect(app.client.status().outbox).toEqual({ pending: 0, failed: [] });
+    expect(new PendingIntents(file).entries(HOST)).toEqual([]);
+    app.connect();
+    expect(host.received).toEqual([]);
+    expect(app.client.forgetIntent(iid)).toBe(false);
+  });
+
+  it('a late ack for a forgotten in-flight change is ignored', () => {
+    const { host, file } = setup();
+    const app = new App(file, host).connect();
+    host.fault = 'hold';
+    app.client.intent({ t: 'hide', id: 'surf-b' });
+    const iid = app.client.status().outbox!.open![0].iid;
+    expect(app.client.forgetIntent(iid)).toBe(true);
+    host.release();
+    expect(app.client.status().outbox).toEqual({ pending: 0, failed: [] });
+  });
+
+  it('failed entries are not forgettable (Dismiss clears those)', () => {
+    const disk = new PendingIntents(path.join(tmpDir(), 'p.json'));
+    const e = disk.add(HOST, { t: 'hide', id: 'surf-a' });
+    disk.settle(HOST, e.iid, { ok: false, error: 'nope' });
+    expect(disk.forget(HOST, e.iid)).toBe(false);
+    expect(disk.summary(HOST).failed).toHaveLength(1);
   });
 });

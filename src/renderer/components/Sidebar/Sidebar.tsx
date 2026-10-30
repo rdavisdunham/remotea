@@ -8,6 +8,7 @@ import NewWorkspaceButton from './NewWorkspaceButton';
 import NewWorktreeModal from './NewWorktreeModal';
 import OrchestrationPanel from './OrchestrationPanel';
 import AgentRosterBanner from './AgentRosterBanner';
+import HostAttentionBar from './HostAttentionBar';
 import type { AgentRosterEntry } from '../../store/agent-rollup';
 import { DropEdge, edgeForListPointer, edgeForPointer, reorderByDrop } from './reorder';
 import ErrorBoundary from '../ErrorBoundary';
@@ -50,6 +51,8 @@ interface SidebarProps {
   /** Jump to one agent — selects its workspace AND raises its tab. */
   onFocusAgent?: (entry: AgentRosterEntry) => void;
   onOpenAgentNavigator?: () => void;
+  /** remotea: open Settings → Remote hosts (the host attention row's "unconfirmed" chip). */
+  onOpenHostSettings?: () => void;
 }
 
 export default function Sidebar({
@@ -74,6 +77,7 @@ export default function Sidebar({
   onFocusAgentPane,
   onFocusAgent,
   onOpenAgentNavigator,
+  onOpenHostSettings,
 }: SidebarProps) {
   const t = useT();
   const textScale = useStore((s) => sidebarTextScale(s.sidebarPrefs.textScale));
@@ -324,6 +328,10 @@ export default function Sidebar({
     >
       <ErrorBoundary label="agent-roster" silent>
         <AgentRosterBanner onFocusAgent={onFocusAgent} onOpenNavigator={onOpenAgentNavigator} />
+      </ErrorBoundary>
+
+      <ErrorBoundary label="host-attention" silent>
+        <HostAttentionBar onOpenHosts={onOpenHostSettings} />
       </ErrorBoundary>
 
       <ErrorBoundary label="orchestration" silent>

@@ -238,3 +238,115 @@
 .remote-size-badge__fit:hover {
   background: color-mix(in srgb, var(--text-primary, #e8e8e8) 10%, transparent);
 }
+
+/* Host attention overview (sidebar, above the workspaces): one compact row per host. */
+.host-attention {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 8px 6px 8px;
+  border: 1px solid var(--ui-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--ui-bg-3, transparent);
+}
+
+.host-attention__row {
+  display: flex;
+  align-items: stretch;
+}
+
+.host-attention__row[data-tone='error'] {
+  background: rgba(var(--ui-agent-blocked-rgb, 229, 83, 75), 0.1);
+}
+
+.host-attention__main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: var(--ui-text-secondary, #b8b8b8);
+  font-size: calc(11px * var(--sidebar-text-scale, 1));
+  text-align: left;
+  cursor: pointer;
+}
+
+.host-attention__main:hover:not(:disabled) {
+  background: rgba(var(--ui-overlay-rgb, 255, 255, 255), 0.06);
+}
+
+.host-attention__main:disabled {
+  cursor: default;
+}
+
+.host-attention__name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.host-attention__conn {
+  color: var(--ui-text-muted, #888);
+  white-space: nowrap;
+}
+
+.host-attention__count {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.host-attention__count--error { color: var(--ui-agent-blocked, #e5534b); }
+.host-attention__count--pending { color: #e0a800; }
+
+.host-attention__pending {
+  flex: none;
+  padding: 0 8px;
+  border: none;
+  border-left: 1px solid var(--ui-border, rgba(255, 255, 255, 0.12));
+  background: transparent;
+  font-size: calc(11px * var(--sidebar-text-scale, 1));
+  cursor: pointer;
+}
+
+.host-attention__pending:hover {
+  background: rgba(var(--ui-overlay-rgb, 255, 255, 255), 0.06);
+}
+
+/* Settings → Remote hosts: unconfirmed changes, each with what it would do and a Forget action. */
+.remote-pending {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.remote-pending__title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.remote-pending__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+.remote-pending__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.remote-pending__status {
+  opacity: 0.7;
+}
+
+.remote-pending__item[data-state='uncertain'] .remote-pending__status {
+  color: #e0a800;
+  opacity: 1;
+}

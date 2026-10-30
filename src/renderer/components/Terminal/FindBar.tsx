@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useT } from '../../i18n';
+import { FIXED_SHORTCUTS, shortcutTooltip } from '../../shortcuts';
 
 interface FindBarProps {
   onSearch: (query: string) => void;
@@ -41,9 +42,9 @@ export default function FindBar({ onSearch, onNext, onPrevious, onClose, matchCo
       {matchCount !== undefined && (
         <span className="find-bar__count">{currentMatch ?? 0}/{matchCount}</span>
       )}
-      <button className="find-bar__btn" onClick={onPrevious} title={t('terminal.findPrevious', 'Previous (Shift+Enter)')}>&#x2191;</button>
-      <button className="find-bar__btn" onClick={onNext} title={t('terminal.findNext', 'Next (Enter)')}>&#x2193;</button>
-      <button className="find-bar__btn" onClick={onClose} title={t('terminal.findClose', 'Close (Esc)')}>&#x00D7;</button>
+      <button className="find-bar__btn" onClick={onPrevious} title={shortcutTooltip(t('terminal.findPrevious', 'Previous (Shift+Enter)'), FIXED_SHORTCUTS.previousMatch)}>&#x2191;</button>
+      <button className="find-bar__btn" onClick={onNext} title={shortcutTooltip(t('terminal.findNext', 'Next (Enter)'), FIXED_SHORTCUTS.nextMatch)}>&#x2193;</button>
+      <button className="find-bar__btn" onClick={onClose} title={shortcutTooltip(t('terminal.findClose', 'Close (Esc)'), FIXED_SHORTCUTS.dismiss)}>&#x00D7;</button>
     </div>
   );
 }

@@ -719,6 +719,7 @@ export const IPC_CHANNELS = {
   RHOST_HOOKS_INSTALL: 'rhost:hooks-install',
   RHOST_HOOKS_DISMISS: 'rhost:hooks-dismiss',
   RHOST_OUTBOX_DISMISS: 'rhost:outbox-dismiss',
+  RHOST_OUTBOX_FORGET: 'rhost:outbox-forget',
   RSESS_VIEWS: 'rsess:views',
   RSESS_REGISTRY: 'rsess:registry',
   RSESS_REPORT: 'rsess:report',

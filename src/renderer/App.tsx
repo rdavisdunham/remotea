@@ -70,6 +70,8 @@ import { SESSION_SAVE_NOW_EVENT } from './utils/session-save-now';
 import { followOutputFor, togglePinnedPromptFor, togglePromptOutlineFor } from './store/prompt-actions';
 import { v4 as uuid } from 'uuid';
 import { FOCUS_SURFACE_EVENT, gitSurfacesIn, openGitView, toggleGitView } from './components/Git/open-git';
+import { liveShortcutText, shortcutTooltip } from './shortcuts';
+import { DEFAULT_SHORTCUTS } from './store/settings-slice';
 import { useT } from './i18n';
 import type { TranslationKey } from './i18n';
 
@@ -613,6 +615,8 @@ export default function App() {
   const [agentNavigatorOpen, setAgentNavigatorOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
   const hubEnabled = useStore((s) => s.appearancePrefs.hubEnabled);
+  // Tooltips and banners name the LIVE binding (shortcuts.ts).
+  const liveShortcuts = useStore((s) => s.shortcuts);
   // Focus mode: a class on <html> deepens the dim every unfocused pane already
   // has (`.pane-wrapper__unfocused-overlay`). CSS-only on purpose — no pane
   // re-renders when it flips. Remembered per window in localStorage, which can
@@ -1756,6 +1760,7 @@ export default function App() {
             }}
             onFocusAgent={focusAgent}
             onOpenAgentNavigator={() => setAgentNavigatorOpen(true)}
+            onOpenHostSettings={() => openSettings('Hosts')}
           />
         ) : (
           <div
@@ -1779,7 +1784,7 @@ export default function App() {
               document.addEventListener('mousemove', onMove);
               document.addEventListener('mouseup', onUp);
             }}
-            title={t('app.expandSidebar', 'Expand sidebar (Ctrl+B)')}
+            title={shortcutTooltip(t('app.expandSidebar', 'Expand sidebar (Ctrl+B)'), liveShortcuts.toggleSidebar)}
           >
             <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
               <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/>
@@ -2054,7 +2059,7 @@ export default function App() {
 
       {broadcastInputActive && (
         <div className="broadcast-input-banner" title={t('app.broadcastInputTooltip', 'Typed input is sent to every terminal pane in this workspace')}>
-          {t('app.broadcastInputBanner', 'Broadcast input ON — typing goes to all panes (Ctrl+Alt+B to stop)')}
+          {liveShortcutText(t('app.broadcastInputBanner', 'Broadcast input ON — typing goes to all panes (Ctrl+Alt+B to stop)'), ['broadcastInput'], liveShortcuts, DEFAULT_SHORTCUTS)}
         </div>
       )}
 
