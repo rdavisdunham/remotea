@@ -440,7 +440,7 @@ describe.skipIf(process.platform !== 'win32')('PowerShell launcher arguments', (
     const shim = path.resolve('src/codex-bin-ps/codex.ps1').replace(/'/g, "''");
     writeFileSync(script, `& '${shim}' 'Explain > and < & | literally' '-c' 'model="a b"' '' 'C:\\space dir\\'`);
     execFileSync('powershell.exe', ['-NoProfile', '-File', script], {
-      windowsHide: true, timeout: 10000,
+      windowsHide: true, timeout: 60000, // PowerShell 5.1 cold start on a loaded CI runner has exceeded 10 s (ETIMEDOUT flakes)
       env: { ...process.env, WMUX_CODEX_RUNTIME: process.execPath, WMUX_CODEX_LAUNCHER: capture, WMUX_TEST_OUTPUT: output },
     });
     expect(JSON.parse(require('fs').readFileSync(output, 'utf8'))).toEqual([
