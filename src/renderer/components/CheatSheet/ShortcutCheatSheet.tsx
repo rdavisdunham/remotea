@@ -6,6 +6,7 @@ import { KeyboardPrefs, ShortcutAction, ShortcutBinding } from '../../store/sett
 import { formatIndexShortcut } from '../../utils/index-shortcuts';
 import { actionLabel, formatBinding, CATEGORY, CATEGORY_ORDER, CATEGORY_LABEL_KEY } from '../Settings/KeyboardSettings';
 import '../../styles/cheat-sheet.css';
+import { FIXED_SHORTCUTS, shortcutTooltip } from '../../shortcuts';
 
 interface ShortcutCheatSheetProps {
   onClose: () => void;
@@ -83,7 +84,7 @@ export default function ShortcutCheatSheet({ onClose }: ShortcutCheatSheetProps)
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('cheatSheet.filterPlaceholder', 'Filter shortcuts…')}
           />
-          <button className="cheat-sheet__close" onClick={onClose} title={t('cheatSheet.closeTitle', 'Close (Esc)')}>×</button>
+          <button className="cheat-sheet__close" onClick={onClose} title={shortcutTooltip(t('cheatSheet.closeTitle', 'Close (Esc)'), FIXED_SHORTCUTS.dismiss)}>×</button>
         </div>
         <div className="cheat-sheet__body">
           {grouped.length === 0 ? (
@@ -91,7 +92,7 @@ export default function ShortcutCheatSheet({ onClose }: ShortcutCheatSheetProps)
           ) : (
             grouped.map((group) => (
               <div key={group.category} className="cheat-sheet__group">
-                <h3 className="cheat-sheet__group-title">{t(CATEGORY_LABEL_KEY[group.category] ?? 'cheatSheet.category.other', group.category)}</h3>
+                <h3 className="cheat-sheet__group-title">{t(CATEGORY_LABEL_KEY[group.category as keyof typeof CATEGORY_LABEL_KEY] ?? 'cheatSheet.category.other', group.category)}</h3>
                 {group.rows.map((row) => (
                   <div key={`${row.category}:${row.label}`} className="cheat-sheet__row">
                     <span className="cheat-sheet__label">{row.label}</span>

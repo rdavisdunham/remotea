@@ -4,6 +4,7 @@ import { useT } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 import { ShortcutAction, ShortcutBinding } from '../../store/settings-slice';
 import ShortcutRecorder from './ShortcutRecorder';
+import { actionLabel, CATEGORY_LABEL_KEY, CATEGORY_ORDER, formatAccelerator, SHORTCUT_TABLE, type ShortcutCategory } from '../../shortcuts';
 import ShortcutFilterCapture from './ShortcutFilterCapture';
 import { bindingsEqual } from '../../utils/shortcut-binding';
 import {
@@ -12,130 +13,26 @@ import {
   formatIndexShortcut,
 } from '../../utils/index-shortcuts';
 
-// Human-readable labels for each action
-export const ACTION_LABELS: Record<ShortcutAction, string> = {
-  newWorkspace: 'New workspace',
-  newWindow: 'New window',
-  closeWorkspace: 'Close workspace',
-  closeWindow: 'Close window',
-  openFolder: 'Open folder',
-  toggleSidebar: 'Toggle sidebar',
-  nextWorkspace: 'Next workspace',
-  prevWorkspace: 'Previous workspace',
-  renameSurface: 'Rename surface',
-  renameWorkspace: 'Rename workspace',
-  splitRight: 'Split right',
-  splitDown: 'Split down',
-  splitBrowserRight: 'Split browser right',
-  splitBrowserDown: 'Split browser down',
-  toggleZoom: 'Toggle zoom',
-  focusLeft: 'Focus left',
-  focusRight: 'Focus right',
-  focusUp: 'Focus up',
-  focusDown: 'Focus down',
-  closeSurfaceOrPane: 'Close surface or pane',
-  newSurface: 'New surface (tab)',
-  nextSurface: 'Next surface',
-  prevSurface: 'Previous surface',
-  jumpToUnread: 'Jump to unread',
-  jumpToBlocked: 'Jump to agent needing you',
-  openAgentNavigator: 'All agents',
-  openHub: 'Agent office',
-  showNotifications: 'Show notifications',
-  flashFocused: 'Flash focused pane',
-  openBrowser: 'Open browser',
-  browserDevTools: 'Browser DevTools',
-  browserConsole: 'Browser console',
-  find: 'Find',
-  copyMode: 'Copy mode',
-  copy: 'Copy',
-  paste: 'Paste',
-  fontSizeIncrease: 'Increase font size',
-  fontSizeDecrease: 'Decrease font size',
-  fontSizeReset: 'Reset font size',
-  openSettings: 'Open settings',
-  commandPalette: 'Command palette',
-  openMarkdownPanel: 'Open markdown panel',
-  toggleMarkdownSource: 'Toggle markdown source view',
-  openDiffPanel: 'Open diff panel',
-  openGitPanel: 'Open Git view',
-  reopenClosedSurface: 'Reopen closed tab',
-  findNext: 'Find next',
-  findPrevious: 'Find previous',
-  resizePaneLeft: 'Resize pane left',
-  resizePaneRight: 'Resize pane right',
-  resizePaneUp: 'Resize pane up',
-  resizePaneDown: 'Resize pane down',
-  broadcastInput: 'Broadcast input to all panes',
-  togglePinWorkspace: 'Pin / unpin workspace',
-  markWorkspaceRead: 'Mark workspace read',
-  toggleShortcutCheatSheet: 'Shortcut cheat-sheet',
-  resetTerminal: 'Reset terminal state',
-  toggleExplorer: 'Toggle file explorer',
-  togglePromptOutline: 'Prompt outline',
-  togglePinnedPrompt: 'Pin / unpin prompt',
-  followOutput: 'Follow output',
-};
+// The labels, categories and key spelling live in ../../shortcuts.ts, the one
+// shortcut table every view (this list, the F1 overlay, the command palette,
+// tooltips) reads. Re-exported here for the callers that import them from
+// Settings.
+export { actionLabel, CATEGORY_ORDER, CATEGORY_LABEL_KEY } from '../../shortcuts';
 
-/** Translated label for an action, falling back to the English `ACTION_LABELS` map. */
-export function actionLabel(action: ShortcutAction, t: (key: TranslationKey, fallback?: string) => string): string {
-  return t(`shortcutAction.${action}` as TranslationKey, ACTION_LABELS[action] ?? action);
-}
+/** English labels by action (from the shortcut table). */
+export const ACTION_LABELS: Record<ShortcutAction, string> = Object.fromEntries(
+  Object.entries(SHORTCUT_TABLE).map(([action, e]) => [action, e.label]),
+) as Record<ShortcutAction, string>;
 
-/** Render a binding as "Ctrl+Shift+T". Shared with the shortcut cheat-sheet
- *  (F1) so both views always show the user's live (possibly remapped) bindings. */
+/** Category of each action (from the shortcut table). */
+export const CATEGORY: Partial<Record<ShortcutAction, ShortcutCategory>> = Object.fromEntries(
+  Object.entries(SHORTCUT_TABLE).map(([action, e]) => [action, e.category]),
+) as Partial<Record<ShortcutAction, ShortcutCategory>>;
+
+/** Render a binding as "Ctrl+Shift+T" (see shortcuts.ts for the vocabulary). '' when unbound. */
 export function formatBinding(binding: ShortcutBinding | undefined): string {
-  // Tolerates a missing entry: `shortcuts` is DEFAULT_SHORTCUTS spread with
-  // whatever was persisted, and a persisted null/undefined for an action would
-  // otherwise throw here and take out both this screen and the F1 cheat sheet.
-  if (!binding?.key) return '';
-  const parts: string[] = [];
-  if (binding.ctrl) parts.push('Ctrl');
-  if (binding.alt) parts.push('Alt');
-  if (binding.shift) parts.push('Shift');
-  parts.push(binding.key.length === 1 ? binding.key.toUpperCase() : binding.key);
-  return parts.join('+');
+  return formatAccelerator(binding);
 }
-
-/** Group every action under a readable category. Actions absent here fall under
- *  "Other", so newly-added shortcuts still appear without touching this map.
- *  Shared with the cheat-sheet (F1) so the two views can never drift. */
-export const CATEGORY: Partial<Record<ShortcutAction, string>> = {
-  newWorkspace: 'Workspaces', closeWorkspace: 'Workspaces', nextWorkspace: 'Workspaces',
-  prevWorkspace: 'Workspaces', renameWorkspace: 'Workspaces', jumpToUnread: 'Workspaces',
-  togglePinWorkspace: 'Workspaces', markWorkspaceRead: 'Workspaces', openFolder: 'Workspaces',
-  newWindow: 'Workspaces', closeWindow: 'Workspaces',
-  jumpToBlocked: 'Agents', openAgentNavigator: 'Agents', openHub: 'Agents',
-  newSurface: 'Tabs', nextSurface: 'Tabs', prevSurface: 'Tabs', reopenClosedSurface: 'Tabs',
-  renameSurface: 'Tabs', openMarkdownPanel: 'Tabs', openDiffPanel: 'Tabs', openGitPanel: 'Tabs',
-  toggleMarkdownSource: 'Tabs', toggleExplorer: 'Tabs',
-  splitRight: 'Panes', splitDown: 'Panes', splitBrowserRight: 'Panes', splitBrowserDown: 'Panes',
-  focusLeft: 'Panes', focusRight: 'Panes', focusUp: 'Panes', focusDown: 'Panes',
-  resizePaneLeft: 'Panes', resizePaneRight: 'Panes', resizePaneUp: 'Panes', resizePaneDown: 'Panes',
-  toggleZoom: 'Panes', closeSurfaceOrPane: 'Panes', broadcastInput: 'Panes',
-  find: 'Terminal', findNext: 'Terminal', findPrevious: 'Terminal', copyMode: 'Terminal',
-  copy: 'Terminal', paste: 'Terminal', fontSizeIncrease: 'Terminal', fontSizeDecrease: 'Terminal',
-  fontSizeReset: 'Terminal', resetTerminal: 'Terminal',
-  // Issue #207. Terminal rather than View: all three act on one pane's
-  // scrollback — where its prompts are, which one is pinned above it, and
-  // whether the viewport chases its output — not on the window's chrome.
-  togglePromptOutline: 'Terminal', togglePinnedPrompt: 'Terminal', followOutput: 'Terminal',
-  toggleSidebar: 'View', showNotifications: 'View', flashFocused: 'View', openBrowser: 'View',
-  browserDevTools: 'View', browserConsole: 'View', openSettings: 'View', commandPalette: 'View',
-  toggleShortcutCheatSheet: 'View',
-};
-
-export const CATEGORY_ORDER = ['Workspaces', 'Tabs', 'Panes', 'Terminal', 'View', 'Other'];
-
-/** Internal (English) category constant → its translation key. */
-export const CATEGORY_LABEL_KEY: Record<string, TranslationKey> = {
-  Workspaces: 'cheatSheet.category.workspaces',
-  Tabs: 'cheatSheet.category.tabs',
-  Panes: 'cheatSheet.category.panes',
-  Terminal: 'cheatSheet.category.terminal',
-  View: 'cheatSheet.category.view',
-  Other: 'cheatSheet.category.other',
-};
 
 type ShortcutRow = {
   action: ShortcutAction;

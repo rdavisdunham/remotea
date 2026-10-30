@@ -16,6 +16,7 @@ import { NotificationInfo, WorkspaceId, PaneId, SurfaceId } from '../../../share
 import { useT } from '../../i18n';
 import { useStore } from '../../store';
 import { formatBinding } from '../Settings/KeyboardSettings';
+import { shortcutTooltip } from '../../shortcuts';
 import '../../styles/titlebar.css';
 
 interface TitlebarProps {
@@ -70,14 +71,15 @@ export default function Titlebar({
   onToggleGit,
 }: TitlebarProps) {
   const t = useT();
-  const sidebarLabel = sidebarVisible
+  const shortcuts = useStore((s) => s.shortcuts);
+  const sidebarLabel = shortcutTooltip(sidebarVisible
     ? t('sidebar.collapse', 'Collapse sidebar (Ctrl+B)')
-    : t('app.expandSidebar', 'Expand sidebar (Ctrl+B)');
+    : t('app.expandSidebar', 'Expand sidebar (Ctrl+B)'), shortcuts.toggleSidebar);
   // The tooltip names the CONFIGURED key, not the default: a rebound shortcut
   // advertised as Ctrl+Shift+X would teach the user a key that does nothing.
-  const explorerBinding = formatBinding(useStore((s) => s.shortcuts.toggleExplorer));
+  const explorerBinding = formatBinding(shortcuts.toggleExplorer);
   const explorerLabel = t('shortcutAction.toggleExplorer', 'Toggle file explorer');
-  const gitBinding = formatBinding(useStore((s) => s.shortcuts.openGitPanel));
+  const gitBinding = formatBinding(shortcuts.openGitPanel);
   const gitLabel = t('titlebar.gitView', 'Toggle Git view');
   // Clear-transparency windows are frameless and have no native caption
   // buttons, so this is where they come from.
@@ -131,7 +133,7 @@ export default function Titlebar({
         <button
           className="titlebar__btn"
           onClick={onSettingsClick}
-          title={t('titlebar.settings')}
+          title={shortcutTooltip(t('titlebar.settings'), shortcuts.openSettings)}
         >
           <IconSettings />
         </button>
@@ -148,7 +150,7 @@ export default function Titlebar({
           <button
             className={`titlebar__btn${explorerOpen ? ' titlebar__btn--active' : ''}`}
             onClick={onToggleExplorer}
-            title={explorerBinding ? `${explorerLabel} (${explorerBinding})` : explorerLabel}
+            title={explorerBinding ? shortcutTooltip(explorerLabel, shortcuts.toggleExplorer) : explorerLabel}
             aria-label={explorerLabel}
             aria-pressed={!!explorerOpen}
           >

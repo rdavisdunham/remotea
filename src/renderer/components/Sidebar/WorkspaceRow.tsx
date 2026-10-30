@@ -105,6 +105,8 @@ interface WorkspaceRowProps {
   /** surfaceId → declared agent state (issue #128). */
   agentStates?: Record<string, any>;
   onFocusAgentPane?: (paneId: PaneId) => void;
+  /** remotea: the Eridani run state chip of a task workspace (see eridani-groups.ts). */
+  runChip?: React.ReactNode;
 }
 
 export default function WorkspaceRow({
@@ -124,6 +126,7 @@ export default function WorkspaceRow({
   claudeActivity,
   agentStates,
   onFocusAgentPane,
+  runChip,
 }: WorkspaceRowProps) {
   const t = useT();
   const [isRenaming, setIsRenaming] = useState(false);
@@ -552,6 +555,7 @@ export default function WorkspaceRow({
           </span>
         )}
 
+        {runChip}
         {!sidebarPrefs.fullWidthTitles && rowBadges}
         {!sidebarPrefs.fullWidthTitles && closeButton}
       </div>

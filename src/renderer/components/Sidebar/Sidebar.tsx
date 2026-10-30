@@ -8,6 +8,10 @@ import NewWorkspaceButton from './NewWorkspaceButton';
 import NewWorktreeModal from './NewWorktreeModal';
 import OrchestrationPanel from './OrchestrationPanel';
 import AgentRosterBanner from './AgentRosterBanner';
+import HostAttentionBar from './HostAttentionBar';
+import TaskRunChip from './TaskRunChip';
+import { groupSidebarWorkspaces, taskRunHealth } from './eridani-groups';
+import { useRemoteRegistry } from '../../remote-sessions/registry-cache';
 import type { AgentRosterEntry } from '../../store/agent-rollup';
 import { DropEdge, edgeForListPointer, edgeForPointer, reorderByDrop } from './reorder';
 import ErrorBoundary from '../ErrorBoundary';
@@ -50,6 +54,8 @@ interface SidebarProps {
   /** Jump to one agent — selects its workspace AND raises its tab. */
   onFocusAgent?: (entry: AgentRosterEntry) => void;
   onOpenAgentNavigator?: () => void;
+  /** remotea: open Settings → Remote hosts (the host attention row's "unconfirmed" chip). */
+  onOpenHostSettings?: () => void;
 }
 
 export default function Sidebar({
@@ -74,6 +80,7 @@ export default function Sidebar({
   onFocusAgentPane,
   onFocusAgent,
   onOpenAgentNavigator,
+  onOpenHostSettings,
 }: SidebarProps) {
   const t = useT();
   const textScale = useStore((s) => sidebarTextScale(s.sidebarPrefs.textScale));
@@ -205,6 +212,33 @@ export default function Sidebar({
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null);
   }, []);
 
+  // ── remotea: Eridani task workspaces grouped by target (0ec167e4) ────────
+  const groupEridani = useStore((s) => s.workspacePrefs?.groupEridaniRuns !== false);
+  const registryViews = useRemoteRegistry((s) => s.views);
+
+  const renderRow = (ws: WorkspaceInfo, runChip?: React.ReactNode) => (
+    <WorkspaceRow
+      key={ws.id}
+      workspace={ws}
+      isActive={ws.id === activeWorkspaceId}
+      onSelect={() => onSelect(ws.id)}
+      onClose={() => onClose(ws.id)}
+      onRename={(newTitle) => onRename(ws.id, newTitle)}
+      onContextMenu={(e) => handleContextMenu(e, ws.id)}
+      draggable
+      onDragStart={(e) => handleDragStart(e, ws.id)}
+      onDragOver={(e) => handleDragOver(e, ws.id)}
+      onDrop={(e) => handleDrop(e, ws.id)}
+      onDragEnd={handleDragEnd}
+      dropEdge={dropTarget?.id === ws.id ? dropTarget.edge : null}
+      hookActivity={hookActivity}
+      claudeActivity={claudeActivity}
+      agentStates={agentStates}
+      onFocusAgentPane={(paneId) => onFocusAgentPane?.(ws.id, paneId)}
+      runChip={runChip}
+    />
+  );
+
   // ── Context menu ─────────────────────────────────────────────────────────
   const handleContextMenu = useCallback((e: React.MouseEvent, id: WorkspaceId) => {
     e.preventDefault();
@@ -326,6 +360,10 @@ export default function Sidebar({
         <AgentRosterBanner onFocusAgent={onFocusAgent} onOpenNavigator={onOpenAgentNavigator} />
       </ErrorBoundary>
 
+      <ErrorBoundary label="host-attention" silent>
+        <HostAttentionBar onOpenHosts={onOpenHostSettings} />
+      </ErrorBoundary>
+
       <ErrorBoundary label="orchestration" silent>
         <OrchestrationPanel />
       </ErrorBoundary>
@@ -340,27 +378,17 @@ export default function Sidebar({
           if (e.button === 0 && e.target === e.currentTarget && !draggedId) onCreate();
         }}
       >
-        {workspaces.map((ws) => (
-          <WorkspaceRow
-            key={ws.id}
-            workspace={ws}
-            isActive={ws.id === activeWorkspaceId}
-            onSelect={() => onSelect(ws.id)}
-            onClose={() => onClose(ws.id)}
-            onRename={(newTitle) => onRename(ws.id, newTitle)}
-            onContextMenu={(e) => handleContextMenu(e, ws.id)}
-            draggable
-            onDragStart={(e) => handleDragStart(e, ws.id)}
-            onDragOver={(e) => handleDragOver(e, ws.id)}
-            onDrop={(e) => handleDrop(e, ws.id)}
-            onDragEnd={handleDragEnd}
-            dropEdge={dropTarget?.id === ws.id ? dropTarget.edge : null}
-            hookActivity={hookActivity}
-            claudeActivity={claudeActivity}
-            agentStates={agentStates}
-            onFocusAgentPane={(paneId) => onFocusAgentPane?.(ws.id, paneId)}
-          />
-        ))}
+        {groupSidebarWorkspaces(workspaces, groupEridani).map((item) => (item.kind === 'workspace'
+          ? renderRow(item.workspace)
+          : (
+            <div key={`target:${item.key}`} className="sidebar__task-group" data-target={item.target}>
+              <div className="sidebar__task-group-head" title={`Eridani runs on ${item.target} (${item.hostId})`}>
+                <span className="sidebar__task-group-label">{item.label}</span>
+                <span className="sidebar__task-group-count">{item.workspaces.length}</span>
+              </div>
+              {item.workspaces.map((ws) => renderRow(ws, <TaskRunChip run={taskRunHealth(ws, registryViews)} />))}
+            </div>
+          )))}
       </div>
 
       <div className="sidebar__footer">

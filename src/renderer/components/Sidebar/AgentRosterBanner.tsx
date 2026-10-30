@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useWorkspaceLabels } from '../SplitPane/use-osc-title';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
+import { shortcutTooltip } from '../../shortcuts';
 import { firstWaiting, rollupAgents } from '../../store/agent-rollup';
 import type { AgentRosterEntry } from '../../store/agent-rollup';
 
@@ -27,6 +28,7 @@ export default function AgentRosterBanner({ onFocusAgent, onOpenNavigator }: {
   const agentIdentities = useStore((s) => s.agentIdentities);
   const agentDetections = useStore((s) => s.agentDetections);
   const workspaceLabels = useWorkspaceLabels(workspaces);
+  const navigatorBinding = useStore((s) => s.shortcuts.openAgentNavigator);
   const [now, setNow] = useState(() => Date.now());
 
   const rollup = useMemo(
@@ -89,8 +91,8 @@ export default function AgentRosterBanner({ onFocusAgent, onOpenNavigator }: {
       <button
         className="agent-roster__expand"
         onClick={() => onOpenNavigator?.()}
-        title={t('agentRoster.openNavigator', 'All agents (Ctrl+Shift+A)')}
-        aria-label={t('agentRoster.openNavigator', 'All agents (Ctrl+Shift+A)')}
+        title={shortcutTooltip(t('agentRoster.openNavigator', 'All agents (Ctrl+Shift+A)'), navigatorBinding)}
+        aria-label={shortcutTooltip(t('agentRoster.openNavigator', 'All agents (Ctrl+Shift+A)'), navigatorBinding)}
       >
         <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M2 4h12v1.5H2V4zm0 3.25h12v1.5H2v-1.5zM2 10.5h12V12H2v-1.5z" />

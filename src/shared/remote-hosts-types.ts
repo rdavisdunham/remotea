@@ -46,6 +46,12 @@ export interface OutboxSummary {
    * maybe applied. Not resent until a registry snapshot settles them.
    */
   uncertain?: number;
+  /**
+   * Each still-open change (pending or uncertain), oldest first, so the UI can
+   * say what it would do and offer to forget it. Absent when there are none
+   * (and from builds before it existed: fall back to the counts).
+   */
+  open?: OutboxOpenItem[];
   /** Changes that will not be applied: refused by the server, or given up on. */
   failed: Array<{
     iid: string;
@@ -56,6 +62,26 @@ export interface OutboxSummary {
     error?: string;
     at: number;
   }>;
+}
+
+/** One unconfirmed registry change made on this device (mirrors main's PendingIntent). */
+export type OutboxIntent =
+  | { t: 'close'; id: string }
+  | { t: 'groupClose'; id: string }
+  | { t: 'hide'; id: string }
+  | { t: 'unhide'; id: string }
+  | { t: 'sessionUpdate'; id: string; groupId?: string | null; group?: { name: string; color?: string }; title?: string | null }
+  | { t: 'groupUpsert'; id: string; name: string; color?: string };
+
+export interface OutboxOpenItem {
+  iid: string;
+  /** `uncertain`: sent, unanswered past the deadline; maybe applied. */
+  state: 'pending' | 'uncertain';
+  intent: OutboxIntent;
+  createdAt: number;
+  /** Times it was written to a connected socket. */
+  attempts: number;
+  lastSentAt?: number;
 }
 
 /** A remote terminal's size as its server has it; `owner`: this device sets it (the last one focused or typed in). */

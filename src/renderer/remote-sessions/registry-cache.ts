@@ -3,31 +3,30 @@
  *
  * A leaf module (no store import) so the store's close routing and the close
  * dialog can read what sync.ts last received without an import cycle
- * (sync.ts imports the store).
+ * (sync.ts imports the store). Also a tiny zustand store, so the host
+ * attention row and the sidebar's run chips re-render on each push.
  */
+import { create } from 'zustand';
 import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
 
-let latest: RemoteRegistryView[] | null = null;
-const listeners = new Set<() => void>();
+export const useRemoteRegistry = create<{ views: RemoteRegistryView[] | null }>(() => ({ views: null }));
 
 export function setLatestRemoteViews(views: RemoteRegistryView[] | null): void {
-  latest = views;
-  for (const fn of [...listeners]) {
+  useRemoteRegistry.setState({ views });
+}
+
+/** Called after every registry push (for useSyncExternalStore). Returns the unsubscribe. */
+export function subscribeRemoteViews(fn: () => void): () => void {
+  return useRemoteRegistry.subscribe(() => {
     try {
       fn();
     } catch {
       /* a listener's failure is its own */
     }
-  }
-}
-
-/** Called after every registry push (for useSyncExternalStore). Returns the unsubscribe. */
-export function subscribeRemoteViews(fn: () => void): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+  });
 }
 
 /** null until the first registry push (or after a test resets it). */
 export function latestRemoteViews(): RemoteRegistryView[] | null {
-  return latest;
+  return useRemoteRegistry.getState().views;
 }

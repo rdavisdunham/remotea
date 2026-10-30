@@ -609,6 +609,20 @@ export interface WorkspacePrefs {
   newWorkspacePanes: number;
   newWorkspaceLayout: WorkspaceLayout;
   /**
+   * remotea: sessions Eridani starts land in one workspace per task (one per
+   * run when it has no task), shown in the sidebar under their execution
+   * target with the run's state, instead of all sharing the server's
+   * "Eridani" group workspace. Manual sessions are untouched. On by default.
+   */
+  groupEridaniRuns: boolean;
+  /**
+   * remotea: after a start or a reconnect, show the recovery inventory only
+   * when something needs a decision (a process that exited or a session
+   * closed while away, a worktree with unmerged work), not when every tab
+   * just restores. On by default.
+   */
+  recoverySkipClean: boolean;
+  /**
    * How often the live layout is snapshotted as a named session, in minutes;
    * `0` switches it off (issue #238).
    *
@@ -646,6 +660,8 @@ export const DEFAULT_WORKSPACE_PREFS: WorkspacePrefs = {
   detectAgentScreens: true,
   newWorkspacePanes: 3,
   newWorkspaceLayout: 'grid',
+  groupEridaniRuns: true,
+  recoverySkipClean: true,
   // On by default, unlike the two confirmation guards above: those change what
   // a click does, and this only writes a file the user never has to look at.
   sessionSnapshotMinutes: 5,

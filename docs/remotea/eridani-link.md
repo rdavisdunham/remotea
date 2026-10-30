@@ -595,6 +595,18 @@ recovery ref first (`refs/remotea/recovery/<branch>`), then
 worktree, so "unmerged work" can say who is still on it; the CLI prints it as
 `writer <surf> (run <run_id>)`.
 
+**To the desktop app (additive).** After each successful worktree scan, every
+Eridani session whose worktree was scanned gets `worktreeState {uncommitted,
+untracked, ahead, merged, unpushed, baseRef, at}` on its `SessionRecord` in the
+app protocol (`src/shared/remote-host-protocol.ts`), pushed with the next
+registry update only when it changed. `ahead`, `merged` and `unpushed` are
+null when unknown. The app's recovery dialog uses it to say what an ended
+run left behind ("2 uncommitted changes, not merged into origin/main"). It is
+only refreshed while the Eridani link is ready (scans run then). An app
+without the field ignores it; a server without it leaves the dialog showing
+exits and closes only, without worktree items. Nothing on the Eridani wire
+changes.
+
 ### Commands
 
 | `t` | Fields | Effect |

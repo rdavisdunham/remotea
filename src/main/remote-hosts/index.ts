@@ -338,6 +338,11 @@ export class RemoteHosts {
     });
   }
 
+  /** Forget one unconfirmed change (Settings → Remote hosts, pending changes). */
+  forgetIntent(hostId: string, iid: string): boolean {
+    return this.clients.get(hostId)?.forgetIntent(iid) ?? false;
+  }
+
   /** The user has seen a host's failed or expired changes (Settings). */
   dismissOutboxFailures(hostId: string): void {
     this.clients.get(hostId)?.dismissOutboxFailures();

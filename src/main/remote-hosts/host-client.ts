@@ -644,6 +644,19 @@ export class RemoteHostClient {
     return o;
   }
 
+  /**
+   * The user forgot one unconfirmed change: it is not sent again, and the
+   * registry views stop laying it over the mirror (a tab it closed or hid
+   * may come back). An ack already on its way finds no entry and is ignored.
+   */
+  forgetIntent(iid: string): boolean {
+    const e = this.deps.intents.get(this.hostId, iid);
+    if (!this.deps.intents.forget(this.hostId, iid)) return false;
+    diag('intent.forgotten', { host: this.hostId, t: e?.intent.t ?? null, state: e?.state ?? null, attempts: e?.attempts ?? null }, e?.intent.id);
+    this.outboxChanged();
+    return true;
+  }
+
   /** The user has seen this host's failed or expired changes. */
   dismissOutboxFailures(): void {
     this.deps.intents.clearDone(this.hostId);

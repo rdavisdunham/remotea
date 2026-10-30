@@ -3,6 +3,7 @@ import { useStore } from '../../store';
 import { SurfaceId } from '../../../shared/types';
 import { ShortcutAction, ShortcutBinding } from '../../store/settings-slice';
 import { actionLabel } from '../Settings/KeyboardSettings';
+import { formatAccelerator } from '../../shortcuts';
 import { useT } from '../../i18n';
 import { RESET_TERMINAL_LEAVE_ALT_ACTION } from '../../utils/alt-screen-owner';
 import { useWorkspaceLabels } from '../SplitPane/use-osc-title';
@@ -23,14 +24,9 @@ interface PaletteItem {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatBinding(binding: ShortcutBinding): string {
-  const parts: string[] = [];
-  if (binding.ctrl) parts.push('Ctrl');
-  if (binding.alt) parts.push('Alt');
-  if (binding.shift) parts.push('Shift');
-  parts.push(binding.key.length === 1 ? binding.key.toUpperCase() : binding.key);
-  return parts.join('+');
-}
+// One spelling for every shortcut (shortcuts.ts); this palette used to carry
+// its own copy of the formatter.
+const formatBinding = (binding: ShortcutBinding): string => formatAccelerator(binding);
 
 // Labels come from the same map Settings and the F1 cheat-sheet read, so the
 // three views cannot drift and the palette is translated like everything else.

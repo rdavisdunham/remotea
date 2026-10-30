@@ -120,6 +120,31 @@ export interface SessionRecord {
   eridani?: EridaniBinding;
   /** Stage D: the latest verification attempt (remote-server/src/verify-attempts.ts). */
   verify?: VerifyAttemptStatus;
+  /**
+   * For a session with an Eridani binding: its worktree as the server last
+   * inspected it (the same scan as worktrees.report, eridani-runtime.ts).
+   * Additive and optional: older servers never set it, and a server without
+   * a ready Eridani link does not scan. The desktop's recovery inventory
+   * reads it to offer the worktree of a run that ended with unmerged work.
+   */
+  worktreeState?: WorktreeStateInfo;
+}
+
+/** A session's worktree, from the server's worktree scan (see SessionRecord.worktreeState). */
+export interface WorktreeStateInfo {
+  /** Tracked files changed and not committed. */
+  uncommitted: number;
+  untracked: number;
+  /** Commits on the branch not on its base (null: unknown). */
+  ahead: number | null;
+  /** Merged into its base; null when unknown or the branch has no commits of its own. */
+  merged: boolean | null;
+  /** Commits not on its upstream (null: no upstream, or unknown). */
+  unpushed: number | null;
+  /** The ref ahead/merged were measured against. */
+  baseRef: string;
+  /** When the server inspected it, epoch ms. */
+  at: number;
 }
 
 /**

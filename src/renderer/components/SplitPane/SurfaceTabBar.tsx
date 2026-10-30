@@ -14,6 +14,7 @@ import { parseSurfaceDragData } from './surface-drag-preview';
 import { getSurfaceLabel } from './surface-label';
 import { useOscTitleLookup } from './use-osc-title';
 import StartupCommandDialog from './StartupCommandDialog';
+import { formatAccelerator } from '../../shortcuts';
 
 interface SurfaceTabBarProps {
   paneId: PaneId;
@@ -99,6 +100,8 @@ export default function SurfaceTabBar({
   isFocused,
 }: SurfaceTabBarProps) {
   const t = useT();
+  const splitRightBinding = useStore((s) => s.shortcuts.splitRight);
+  const splitDownBinding = useStore((s) => s.shortcuts.splitDown);
   const [draggingSurfaceId, setDraggingSurfaceId] = useState<SurfaceId | null>(null);
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
   const [renamingId, setRenamingId] = useState<SurfaceId | null>(null);
@@ -626,13 +629,13 @@ export default function SurfaceTabBar({
               <button role="menuitem" onClick={() => pickSplit('right')}>
                 <span className="surface-tab-menu__icon"><IconSplit size={15} /></span>
                 {t('surfaceTab.splitRight', 'Split right')}
-                <span className="surface-tab-menu__kbd">Ctrl+D</span>
+                <span className="surface-tab-menu__kbd">{formatAccelerator(splitRightBinding)}</span>
               </button>
               {onSplitDown && (
                 <button role="menuitem" onClick={() => pickSplit('down')}>
                   <span className="surface-tab-menu__icon"><IconSplitDown size={15} /></span>
                   {t('surfaceTab.splitDown', 'Split down')}
-                  <span className="surface-tab-menu__kbd">Ctrl+Shift+D</span>
+                  <span className="surface-tab-menu__kbd">{formatAccelerator(splitDownBinding)}</span>
                 </button>
               )}
             </>

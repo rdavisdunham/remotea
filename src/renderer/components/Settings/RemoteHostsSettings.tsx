@@ -6,6 +6,8 @@ import type { HostDTO, HostSaveRequest, HostStatus, HostTestRequest, HostTestRes
 import { classifyHostUrl, hostUrlHint, UNENCRYPTED_ACK_LABEL } from '../../../shared/host-url';
 import { closeRemoteSession, unhideRemoteSession } from '../../remote-sessions/sync';
 import RemoteHostHealth from './RemoteHostHealth';
+import RemotePendingChanges from './RemotePendingChanges';
+import { forgetPendingChange, pendingChanges } from '../../remote-sessions/pending-changes';
 import '../../styles/remote-hosts.css';
 
 /**
@@ -215,6 +217,7 @@ export default function RemoteHostsSettings() {
   const views = useRegistryViews();
   const now = useNow();
   const list = Object.values(hosts);
+  const pending = pendingChanges(hosts, status, views);
   const defaultHost = parseRemoteShellSpec(workspacePrefs.defaultShell)?.hostId;
 
   const remove = async (id: string) => {
@@ -246,7 +249,6 @@ export default function RemoteHostsSettings() {
               onDone={() => setEditing(null)} />
           );
         }
-        const outbox = status[h.id]?.outbox;
         return (
           <div key={h.id} className="remote-host-card">
             <div className="remote-host-card__head">
@@ -257,11 +259,8 @@ export default function RemoteHostsSettings() {
             {status[h.id]?.error && st !== 'ready' && (
               <div className="remote-host-message remote-host-message--error">{status[h.id]?.error}</div>
             )}
-            {!!outbox?.pending && (
-              <div className="remote-host-message">
-                {outbox.pending} change{outbox.pending === 1 ? '' : 's'} made here not yet confirmed by this host
-                {outbox.uncertain ? ` (${outbox.uncertain} unanswered: checked against the host's registry before any retry)` : ''}
-              </div>
+            {pending.find((p) => p.hostId === h.id) && (
+              <RemotePendingChanges host={pending.find((p) => p.hostId === h.id)!} onForget={forgetPendingChange} />
             )}
             {!!status[h.id]?.outbox?.failed.length && (
               <div className="remote-host-message remote-host-message--error">
@@ -291,6 +290,24 @@ export default function RemoteHostsSettings() {
       {editing === 'new'
         ? <HostEditor initial={EMPTY} hasToken={false} onDone={() => setEditing(null)} />
         : <button className="settings-button" onClick={() => setEditing('new')}>Add remote host</button>}
+      <div className="settings-divider" />
+      <h3 className="settings-section-title">Eridani runs and recovery</h3>
+      <div className="settings-row">
+        <label className="settings-label" htmlFor="remote-group-eridani">
+          Group Eridani runs by repository and task
+          <span className="settings-hint"> A workspace per task, under its execution target in the sidebar, with the run&apos;s state. Off: they share the host&apos;s &quot;Eridani&quot; workspace. Manual sessions are never moved.</span>
+        </label>
+        <input id="remote-group-eridani" type="checkbox" className="settings-toggle" checked={workspacePrefs.groupEridaniRuns !== false}
+          onChange={(e) => setWorkspacePrefs({ groupEridaniRuns: e.target.checked })} />
+      </div>
+      <div className="settings-row">
+        <label className="settings-label" htmlFor="remote-recovery-skip-clean">
+          Skip the recovery dialog when everything restores cleanly
+          <span className="settings-hint"> After a start or a reconnect, ask only about terminals that exited or were closed while away and worktrees with unmerged work.</span>
+        </label>
+        <input id="remote-recovery-skip-clean" type="checkbox" className="settings-toggle" checked={workspacePrefs.recoverySkipClean !== false}
+          onChange={(e) => setWorkspacePrefs({ recoverySkipClean: e.target.checked })} />
+      </div>
       <HiddenSessions />
     </div>
   );

@@ -11,6 +11,7 @@ import {
   toRelativePath,
 } from './markdown-utils';
 import '../../styles/markdown.css';
+import { FIXED_SHORTCUTS, shortcutTooltip } from '../../shortcuts';
 
 export type MarkdownViewMode = 'preview' | 'source';
 
@@ -342,7 +343,7 @@ function MarkdownToolbar(props: ToolbarProps) {
             type="button"
             className="markdown-pane__btn markdown-pane__btn--primary"
             onClick={onSave}
-            title={t('markdown.saveHint', 'Write the buffer back to the file (Ctrl+S)')}
+            title={shortcutTooltip(t('markdown.saveHint', 'Write the buffer back to the file (Ctrl+S)'), FIXED_SHORTCUTS.save)}
           >
             {t('markdown.save', 'Save')}
           </button>

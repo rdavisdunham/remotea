@@ -40,6 +40,7 @@ import type {
   ExplorerErrorCode, SplitNode, SurfaceId, SurfaceRef,
 } from '../../../shared/types';
 import '../../styles/code.css';
+import { FIXED_SHORTCUTS, shortcutTooltip } from '../../shortcuts';
 
 export function CodePane({ surfaceId }: { surfaceId: SurfaceId }): React.JSX.Element | null {
   const t = useT();
@@ -252,10 +253,10 @@ export function CodePane({ surfaceId }: { surfaceId: SurfaceId }): React.JSX.Ele
             <button
               className="code-pane__action code-pane__action--primary"
               disabled={!dirty || saving}
-              title={t('code.save', 'Save (Ctrl+S)')}
+              title={shortcutTooltip(t('code.save', 'Save (Ctrl+S)'), FIXED_SHORTCUTS.save)}
               onClick={() => { save().catch(() => setSaveError('write_failed')); }}
             >
-              {saving ? '…' : t('code.save', 'Save (Ctrl+S)')}
+              {saving ? '…' : shortcutTooltip(t('code.save', 'Save (Ctrl+S)'), FIXED_SHORTCUTS.save)}
             </button>
             <button
               className="code-pane__action"

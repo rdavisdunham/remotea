@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { getAppDataDir } from '../shared/instance';
 import type { BrowserHistory } from '../shared/browser-history';
-import type { WorktreeMetadata } from '../shared/types';
+import type { EridaniTaskRef, WorktreeMetadata } from '../shared/types';
 
 const APPDATA_DIR = getAppDataDir();
 const SESSIONS_DIR = path.join(APPDATA_DIR, 'sessions');
@@ -46,6 +46,7 @@ export interface SessionData {
       explorerExpanded?: Record<string, string[]>;
       explorerShowHidden?: boolean;
       remoteGroups?: Record<string, string>;
+      eridaniTask?: EridaniTaskRef;
       // Which wmux-created worktree this workspace is (#366). Carried through
       // EVERY copy — auto-session, the version-change Auto-backup, named
       // sessions, snapshots — because a restore that drops it turns a live
@@ -176,6 +177,7 @@ function backupAutoSession(previousVersion: string): void {
         explorerExpanded: w.explorerExpanded,
         explorerShowHidden: w.explorerShowHidden,
         remoteGroups: w.remoteGroups,
+        eridaniTask: w.eridaniTask,
         worktree: w.worktree,
       })),
       sidebarWidth: windows[0]?.sidebarWidth ?? 260,
@@ -480,6 +482,7 @@ export function writeSessionSnapshot(data: SessionData, at: number = Date.now())
         explorerExpanded: w.explorerExpanded,
         explorerShowHidden: w.explorerShowHidden,
         remoteGroups: w.remoteGroups,
+        eridaniTask: w.eridaniTask,
         worktree: w.worktree,
       })),
       sidebarWidth: windows[0]?.sidebarWidth ?? 260,
