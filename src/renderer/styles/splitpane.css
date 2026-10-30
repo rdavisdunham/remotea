@@ -226,6 +226,25 @@ html.wmux-transparent .split-divider--horizontal {
 .surface-tab:hover .surface-tab__close,
 .surface-tab--active .surface-tab__close { display: flex; }
 .surface-tab__close:hover { background: rgba(var(--ui-overlay-rgb),0.15); color: var(--ui-text-primary); }
+/* remotea: a tab Eridani started links back to its run ("Open in Eridani"). */
+.surface-tab__eridani {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.surface-tab__eridani:hover { opacity: 1; background: rgba(var(--ui-overlay-rgb),0.15); color: var(--ui-text-primary); }
 /* ─── Control cluster (New / Layout / Close) — issue #34 ─────────────────── */
 .surface-tab-bar__cluster {
   display: flex;

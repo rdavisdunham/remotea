@@ -92,6 +92,8 @@ import type { TurnFields } from './turn-capture';
 import { claudeMcpConfig, codexMcpArgs, ERIDANI_MCP_DIR, MCP_TOKEN_ENV, mcpStatus, writePrivate, type McpResolution, type McpStatus } from './eridani-mcp';
 
 export const RUNS_FILE = 'eridani-runs.json';
+/** S-Q5: the M7 launch record per surface, so a process the PTY keeper kept is still vouched for after a restart. */
+export const LAUNCHED_FILE = 'eridani-launched.json';
 export const ERIDANI_DEVICE = { id: 'eridani', name: 'Eridani' };
 const COLS = 120;
 const ROWS = 32;
@@ -265,6 +267,8 @@ export interface DispatchDeps {
   mcp?: (target: ExecutionTarget) => McpResolution;
   /** Where per-run Claude MCP configs go (default `<dir>/eridani-mcp`, or a private temp folder when dir is null). */
   mcpDir?: string;
+  /** Eridani's web app (config.ts resolveWebUrl), recorded on each binding for the desktop's "Open in Eridani". */
+  webUrl?: () => string | null;
 }
 
 export const DEFAULT_TIMING = {
@@ -303,10 +307,14 @@ export class Dispatch {
   /**
    * M7: the incarnation of each surface dispatch itself launched with the
    * run's agent command (spawn or resume line), and whether that agent has
-   * since reported its session through its hook. In memory on purpose: a
-   * server restart ends every process, so nothing survives it to vouch for.
+   * since reported its session through its hook. Mirrored to LAUNCHED_FILE
+   * (S-Q5), but read back only for a surface whose process the PTY keeper
+   * kept across the restart, in the same incarnation: a respawned one is a
+   * new incarnation and is vouched for afresh.
    */
   private readonly launchedWith = new Map<string, { incarnation: number; agentSeen: boolean }>();
+  /** S-Q5: draining for a restart: no queued input starts (the next server replays it). */
+  private draining = false;
   /** The write (steer or queued input) pending per surface: see PendingWrite. */
   private readonly writes = new Map<string, PendingWrite>();
   /** Bumped each time the link becomes ready: a write begun before a reconnect writes nothing more. */
@@ -375,6 +383,32 @@ export class Dispatch {
         return qs.length ? { questions: qs } : {};
       },
     };
+  }
+
+  private webUrl(): string | null {
+    try {
+      return this.deps.webUrl?.() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Bindings recorded before `webUrl` existed (or while it could not be
+   * derived) get the current one, so the desktop can link them to Eridani
+   * too. Never changes a binding that already has one. Returns how many.
+   */
+  backfillWebUrl(): number {
+    const url = this.webUrl();
+    if (!url) return 0;
+    let n = 0;
+    for (const rec of this.deps.registry.sessions()) {
+      if (!rec.eridani || rec.eridani.webUrl || rec.state === 'exited') continue;
+      this.deps.hub.updateRecord(rec.id, { eridani: { ...rec.eridani, webUrl: url } });
+      n++;
+    }
+    if (n) this.deps.registry.saveNow();
+    return n;
   }
 
   runToken(surf: string): string | null {
@@ -475,7 +509,50 @@ export class Dispatch {
     if (!launched || !rec?.eridani || launched.incarnation !== (rec.incarnation ?? 0)) return;
     if (params.event === 'SessionEnd' || typeof params.sessionId !== 'string' || !params.sessionId) return;
     const provider = params.provider === 'codex' ? 'codex' : params.provider ? null : 'claude';
-    if (provider === rec.eridani.harness) launched.agentSeen = true;
+    if (provider === rec.eridani.harness && !launched.agentSeen) {
+      launched.agentSeen = true;
+      this.saveLaunched();
+    }
+  }
+
+  private noteLaunched(surf: string, incarnation: number): void {
+    this.launchedWith.set(surf, { incarnation, agentSeen: false });
+    this.saveLaunched();
+  }
+
+  /** Best effort: losing it only means an adopted run's input waits for its agent's next hook. */
+  private saveLaunched(): void {
+    if (!this.deps.dir) return;
+    const out: Record<string, { incarnation: number; agentSeen: boolean }> = {};
+    for (const [id, v] of this.launchedWith) if (this.deps.registry.session(id)) out[id] = v;
+    const file = path.join(this.deps.dir, LAUNCHED_FILE);
+    try {
+      const tmp = `${file}.tmp-${process.pid}`;
+      fs.writeFileSync(tmp, JSON.stringify(out) + '\n', { mode: 0o600 });
+      fs.renameSync(tmp, file);
+    } catch (err) {
+      this.log(`eridani: cannot write ${LAUNCHED_FILE}: ${(err as Error).message}`);
+    }
+  }
+
+  private loadLaunched(): Record<string, { incarnation: number; agentSeen: boolean }> {
+    if (!this.deps.dir) return {};
+    try {
+      const v = JSON.parse(fs.readFileSync(path.join(this.deps.dir, LAUNCHED_FILE), 'utf8')) as unknown;
+      return v && typeof v === 'object' ? v as Record<string, { incarnation: number; agentSeen: boolean }> : {};
+    } catch {
+      return {};
+    }
+  }
+
+  /** S-Q5 (`remotea upgrade`): while draining no queued input starts; it stays accepted for the next server. */
+  setDraining(on: boolean): void {
+    this.draining = on;
+  }
+
+  /** Surfaces with a steer or input write under way (a drain waits for them). */
+  pendingWrites(): string[] {
+    return [...this.writes.keys()];
   }
 
   /** The newest session bound to a run. */
@@ -497,8 +574,12 @@ export class Dispatch {
         // No session was recorded, so no process survived: nothing to reconcile, and it is not re-run.
         return { state: 'failed', detail: 'the server restarted before the session started' };
       }
-      case 'stop':
+      case 'stop': {
+        const surf = typeof body?.surf === 'string' ? body.surf : null;
+        // S-Q5: the PTY keeper kept the process; the stop stays requested and boot sent it again.
+        if (surf && this.deps.hub.isLive(surf)) return { state: 'failed', detail: 'interrupted by a server restart; the process outlived it, the stop stays requested and was sent again' };
         return { state: 'executed', detail: 'the process ended with the server restart' };
+      }
       case 'verify':
         return { state: 'failed', detail: 'interrupted by a server restart' };
       default:
@@ -634,7 +715,11 @@ export class Dispatch {
         ...(cmd.verify ? { verify: { verifyId: cmd.verify.verify_id, planRevision: cmd.verify.plan_revision } } : {}),
         // F07: the prompt typed at launch belongs to the spawn's generation.
         ...(prompt ? { acceptedInput: { generation: cmd.generation, at: this.now() } } : {}),
+        // What the desktop needs to link back to the run (no secrets): only what this spawn and config carry.
+        ...(cmd.title ? { taskTitle: cmd.title } : {}),
       };
+      const webUrl = this.webUrl();
+      if (webUrl) binding.webUrl = webUrl;
       const mcp = this.prepareMcp(surf, target, cmd.harness);
       if (mcp) binding.mcp = mcp.status;
       const { groupId, group } = this.groupFor(cmd.group ?? 'Eridani');
@@ -653,7 +738,7 @@ export class Dispatch {
         return { state: 'failed', detail: `spawn: ${res.message}` };
       }
       const rec = this.deps.hub.updateRecord(surf, { eridani: binding });
-      this.launchedWith.set(surf, { incarnation: rec?.incarnation ?? 1, agentSeen: false });
+      this.noteLaunched(surf, rec?.incarnation ?? 1);
       this.deps.registry.saveNow();
       this.deps.changed?.();
       this.log(`eridani: spawned ${cmd.harness} for run ${cmd.run_id} g${cmd.generation} in ${wt.path} (${surf})${mcp ? `; Eridani MCP ${mcp.status.configured ? 'configured' : `not configured: ${mcp.status.reason}`}` : ''}`);
@@ -848,7 +933,7 @@ export class Dispatch {
       const st = this.deps.registry.session(surf)?.agentState;
       const fresh = st && st.since > (this.delivered.get(surf) ?? 0);
       // One write per surface at a time: the previous input's Enter may still be due.
-      if (!this.writes.has(surf) && this.deps.linkReady() && st?.state === 'idle' && fresh) {
+      if (!this.draining && !this.writes.has(surf) && this.deps.linkReady() && st?.state === 'idle' && fresh) {
         list.shift();
         try {
           head.ctx.begin();
@@ -1028,7 +1113,7 @@ export class Dispatch {
     if (!line) this.dropMcp(rec.id);
     // The hub respawns with this line as the next incarnation.
     this.cancelWrites(rec.id, 'the process is being respawned');
-    if (line) this.launchedWith.set(rec.id, { incarnation: (rec.incarnation ?? 0) + 1, agentSeen: false });
+    if (line) this.noteLaunched(rec.id, (rec.incarnation ?? 0) + 1);
     return line;
   }
 
@@ -1040,6 +1125,20 @@ export class Dispatch {
    */
   resumeOnBoot(): void {
     for (const rec of this.deps.registry.sessions()) this.attempts.recover(rec);
+    // S-Q5: a process the PTY keeper kept is the same incarnation: what vouched for it still does.
+    const launched = this.loadLaunched();
+    for (const rec of this.deps.registry.sessions()) {
+      if (!rec.eridani || !this.deps.hub.isLive(rec.id)) continue;
+      const l = launched[rec.id];
+      if (l && l.incarnation === (rec.incarnation ?? 0)) this.launchedWith.set(rec.id, { incarnation: l.incarnation, agentSeen: !!l.agentSeen });
+      const stop = rec.eridani.stopRequested;
+      if (stop) {
+        this.log(`eridani: ${rec.id} outlived the restart with a stop requested; stopping it again (${stop.mode})`);
+        void this.terminate(rec.id, stop.mode);
+      }
+    }
+    // Rewritten (pruned) only when there is something to keep or to drop.
+    if (this.launchedWith.size || Object.keys(launched).length) this.saveLaunched();
     for (const rec of this.deps.registry.sessions()) {
       if (!rec.eridani || rec.state !== 'lost') continue;
       if (rec.eridani.stopRequested) {

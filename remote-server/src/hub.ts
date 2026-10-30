@@ -23,7 +23,7 @@ import {
 } from '../../src/shared/remote-host-protocol';
 import { Registry } from './registry';
 import { TermSession, type ConnLike, type Timers } from './session';
-import type { SpawnFn } from './pty-spawn';
+import type { PtyLike, SpawnFn } from './pty-spawn';
 import { DEFAULT_THEME, type ThemeColors } from './queries';
 import { probeSession, type ProbeResult } from './agent-probe';
 import type { FsRequest } from './remote-fs';
@@ -121,9 +121,23 @@ export interface HubEridaniHooks {
   turn?(t: TurnFields): void;
 }
 
+/** A process the PTY keeper kept across a server restart (pty-backend.ts), offered to the new boot. */
+export interface AdoptedPty {
+  id: string;
+  pty: PtyLike;
+  alive: boolean;
+  exitCode: number | null;
+  cols: number;
+  rows: number;
+  /** The bytes that rebuild its screen: the last checkpoint and the output after it. */
+  replay: string;
+}
+
 export interface HubConn extends ConnLike {
   /** Set by hello. Messages before it are rejected. */
   device: { id: string; name: string } | null;
+  /** What the app said it understands (hello.features); absent for older apps. */
+  features?: ReadonlySet<string>;
   close(code: number, reason: string): void;
 }
 
@@ -296,6 +310,8 @@ export class Hub {
     if (this.deps.diag) f.push('diag');
     if (this.deps.hooks) f.push('hooks');
     if (this.deps.fs) f.push('fs');
+    // This server may send `focus` (Eridani's terminal.focus) to apps whose hello listed it.
+    f.push('focus');
     return f;
   }
 
@@ -383,6 +399,7 @@ export class Hub {
       return;
     }
     conn.device = { id: msg.device.id, name: msg.device.name };
+    conn.features = new Set(msg.features ?? []);
     this.registry.touchDevice(msg.device.id, msg.device.name);
     conn.sendJson({
       t: 'welcome',
@@ -503,8 +520,9 @@ export class Hub {
    * persisted, so a respawn does not see it), then the run's ERIDANI_* (from
    * dispatch), then the hook identity, which nothing can override.
    */
-  private makeSession(rec: SessionRecord, spawn: SpawnFn | null, cols: number, rows: number, startupCommands?: string[], cmd = rec.cmd, specEnv?: Record<string, string>): TermSession {
-    const env = { ...specEnv, ...this.eridani.env?.(rec.id), ...this.deps.sessionEnv?.(rec.id) };
+  private makeSession(rec: SessionRecord, spawn: SpawnFn | null, cols: number, rows: number, startupCommands?: string[], cmd = rec.cmd, specEnv?: Record<string, string>, adopt?: AdoptedPty): TermSession {
+    // An adopted process already has its environment; the Eridani env hook consumes one-launch values, so it is not asked.
+    const env = adopt ? {} : { ...specEnv, ...this.eridani.env?.(rec.id), ...this.deps.sessionEnv?.(rec.id) };
     const session = new TermSession({
       id: rec.id,
       bootId: this.deps.bootId,
@@ -520,6 +538,7 @@ export class Hub {
       timers: this.deps.timers,
       log: (m) => this.log(`${rec.id}: ${m}`),
       onExit: (code) => this.onSessionExit(rec.id, code),
+      ...(adopt ? { adopt: { pty: adopt.pty, alive: adopt.alive, exitCode: adopt.exitCode ?? undefined, replay: adopt.replay } } : {}),
     });
     this.sessions.set(rec.id, session);
     return session;
@@ -575,6 +594,25 @@ export class Hub {
     if (!s || s.state !== 'live') return false;
     s.kill();
     return true;
+  }
+
+  /**
+   * Ask the apps to bring session `id`'s tab to the front (Eridani's
+   * `terminal.focus`). Only apps whose hello listed `focus` are told (an
+   * older app would drop the message), and not a device that hid the
+   * session. Returns how many apps were sent it: 0 means nobody can show it.
+   */
+  focus(id: string, runId?: string): number {
+    const rec = this.registry.session(id);
+    if (!rec) return 0;
+    let sent = 0;
+    for (const c of this.conns.values()) {
+      if (!c.device || !c.features?.has('focus') || rec.hiddenBy.includes(c.device.id)) continue;
+      c.sendJson({ t: 'focus', id: id as RemoteSurfaceId, ...(runId ? { runId } : {}) });
+      sent++;
+    }
+    this.log(`focus ${id}: sent to ${sent} app${sent === 1 ? '' : 's'}`);
+    return sent;
   }
 
   /** Persist and announce a record change made outside a client request (dispatch.ts). */
@@ -732,15 +770,57 @@ export class Hub {
     }
   }
 
-  /** Server shutdown: tell clients, persist, and hang up every session. */
-  shutdown(): void {
+  /**
+   * Boot, before any client connects: take over the processes the PTY keeper
+   * kept (docs/remotea/upgrade.md). A session the registry still has (the
+   * boot marked it lost) comes back `live` in this boot with the same
+   * incarnation, binding and turn numbering; one that exited meanwhile is
+   * recorded as exited with its code; one the registry closed or never had is
+   * handed to `discard` (the keeper hangs it up). Returns what happened.
+   */
+  adopt(list: AdoptedPty[], discard: (id: string) => void): { adopted: string[]; exited: string[]; discarded: string[] } {
+    const out = { adopted: [] as string[], exited: [] as string[], discarded: [] as string[] };
+    for (const a of list) {
+      const rec = this.registry.session(a.id);
+      if (!rec || rec.state === 'exited' || this.sessions.has(a.id) || this.registry.sessionTombstone(a.id as RemoteSurfaceId)) {
+        discard(a.id);
+        out.discarded.push(a.id);
+        continue;
+      }
+      const live = this.registry.updateSession(a.id, { state: 'live', bootId: this.deps.bootId })!;
+      this.makeSession(live, null, a.cols > 0 ? a.cols : this.cfg.defaultCols, a.rows > 0 ? a.rows : this.cfg.defaultRows, undefined, live.cmd, undefined, a);
+      if (a.alive) out.adopted.push(a.id);
+      else {
+        this.onSessionExit(a.id as RemoteSurfaceId, a.exitCode ?? -1);
+        out.exited.push(a.id);
+      }
+    }
+    if (list.length) this.registry.saveNow();
+    return out;
+  }
+
+  /** Server shutdown: tell clients, persist, hand keeper-held processes over, hang up the rest. */
+  async shutdown(): Promise<string[]> {
     this.shuttingDown = true;
     this.broadcast({ t: 'goingAway' });
+    const kept: Promise<string | null>[] = [];
     for (const s of this.sessions.values()) {
+      if (s.keepable) {
+        kept.push(s.release().then((ok) => {
+          if (!ok) s.kill();
+          s.dispose();
+          return ok ? s.id : null;
+        }, () => {
+          s.dispose();
+          return null;
+        }));
+        continue;
+      }
       s.kill();
       s.dispose();
     }
     this.sessions.clear();
     this.registry.saveNow();
+    return (await Promise.all(kept)).filter((id): id is string => id !== null);
   }
 }

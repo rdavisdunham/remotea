@@ -39,6 +39,7 @@ export class RemoteHosts {
   private readonly hooksNotNow = new Set<string>();
   private metaListener: ((surfaceId: string, meta: { cwd?: string }) => void) | undefined;
   private rpcListener: ((surfaceId: string, method: string, params: Record<string, unknown>, replay: boolean) => void) | undefined;
+  private focusListener: ((surfaceId: string, windowIds: number[]) => void) | undefined;
   /** Per renderer window: whether its layout is restored, and the remote tabs it shows. */
   private readonly windows = new Map<number, { ready: boolean; ids: Set<string>; send: (payload: RegistryPayload) => void }>();
 
@@ -57,6 +58,20 @@ export class RemoteHosts {
   /** Where agent status relayed from a remote session goes (the same handlers the named pipe feeds). */
   setRpcListener(fn: (surfaceId: string, method: string, params: Record<string, unknown>, replay: boolean) => void): void {
     this.rpcListener = fn;
+  }
+
+  /**
+   * Where a server's request to bring a session's tab to the front goes
+   * (Eridani's terminal.focus): the session and the renderer windows
+   * (webContents ids) that show it, oldest first; empty when none does yet.
+   */
+  setFocusListener(fn: (surfaceId: string, windowIds: number[]) => void): void {
+    this.focusListener = fn;
+  }
+
+  /** The windows showing a remote tab, oldest first. */
+  windowsShowing(surfaceId: string): number[] {
+    return [...this.windows].filter(([, w]) => w.ids.has(surfaceId)).map(([id]) => id).sort((a, b) => a - b);
   }
 
   start(): void {
@@ -84,6 +99,7 @@ export class RemoteHosts {
         onRegistry: () => this.registryChanged(),
         onMeta: (id, meta) => this.metaListener?.(id, meta),
         onRpc: (id, method, params, replay) => this.rpcListener?.(id, method, params, replay),
+        onFocus: (id) => this.focusListener?.(id, this.windowsShowing(id)),
         hooksPromptDeclined: () => this.hooksNotNow.has(host.id) || !!this.store.get(host.id)?.hooksPromptDeclined,
         socket: this.deps.socket,
         log: this.log,

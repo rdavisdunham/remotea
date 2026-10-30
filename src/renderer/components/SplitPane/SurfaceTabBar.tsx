@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { hideRemoteSurface, isRemoteSurface } from '../../remote-sessions/sync';
+import { latestRemoteViews, subscribeRemoteViews } from '../../remote-sessions/registry-cache';
+import { eridaniLinkForSurface, eridaniTabTitle, type EridaniTabLink } from '../../../shared/eridani-deep-link';
 import { createPortal } from 'react-dom';
 import { SurfaceRef, SurfaceId, PaneId, QuickLaunchProfile, ShellInfo } from '../../../shared/types';
 import { useStore } from '../../store';
@@ -46,6 +48,11 @@ interface SurfaceTabBarProps {
   onSurfaceDragEnd?: () => void;
   isDragActive?: boolean;
   isFocused?: boolean;
+}
+
+/** remotea: open an Eridani run's page in the system browser (main allows only http/https). */
+function openEridani(link: EridaniTabLink): void {
+  window.wmux?.system?.openExternal?.(link.url);
 }
 
 function surfaceIcon(type: string, isAgent: boolean): string {
@@ -130,6 +137,12 @@ export default function SurfaceTabBar({
   const agentDetections = useStore((state) => state.agentDetections);
   const tabAgentState = (surfaceId: string): string | null =>
     surfaceAgentState(agentStates[surfaceId], agentDetections[surfaceId])?.state ?? null;
+
+  // remotea: a tab Eridani started links back to its run (the server records
+  // Eridani's web URL on the session's binding). Re-renders on every registry push.
+  const remoteViews = useSyncExternalStore(subscribeRemoteViews, latestRemoteViews);
+  const eridaniLink = (surfaceId: string): EridaniTabLink | null => eridaniLinkForSurface(remoteViews, surfaceId);
+  const ctxEridani = ctxMenu ? eridaniLink(ctxMenu.surfaceId) : null;
 
   // Live binding labels for control tooltips (issue #64): read from the store so
   // they stay in sync when the user remaps a shortcut in Settings → Keyboard.
@@ -436,6 +449,23 @@ export default function SurfaceTabBar({
                   {getSurfaceLabel(surface, agentMeta?.label, workspaceShell, t, oscTitleFor(surface.id))}
                 </span>
               )}
+              {!isRenaming && (() => {
+                const link = eridaniLink(surface.id);
+                return link && (
+                  <button
+                    className="surface-tab__eridani"
+                    aria-label={eridaniTabTitle(link)}
+                    title={eridaniTabTitle(link)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEridani(link);
+                    }}
+                    tabIndex={-1}
+                  >
+                    ↗
+                  </button>
+                );
+              })()}
               {surfaces.length > 1 && !isRenaming && (
                 <button
                   className="surface-tab__close"
@@ -656,6 +686,29 @@ export default function SurfaceTabBar({
             >
               {t('surfaceTab.startupCommand', 'Startup command…')}
             </div>
+          )}
+          {ctxEridani && (
+            <>
+              <div
+                className="ctx-menu__item"
+                role="menuitem"
+                title={ctxEridani.url}
+                onClick={() => { openEridani(ctxEridani); setCtxMenu(null); }}
+              >
+                Open in Eridani
+              </div>
+              <div
+                className="ctx-menu__item"
+                role="menuitem"
+                title={ctxEridani.url}
+                onClick={() => {
+                  window.wmux?.clipboard?.writeText?.(ctxEridani.url)?.catch(() => { /* ignore, as for Copy full path */ });
+                  setCtxMenu(null);
+                }}
+              >
+                Copy run link
+              </div>
+            </>
           )}
           {isRemoteSurface(ctxMenu.surfaceId) && (
             <div

@@ -4,7 +4,7 @@
  * `warn` or `fail`, with a one-line fix for anything that is not ok:
  *
  *   service    the systemd user unit: installed, active, enabled, the user it
- *              runs as and the PATH it gives the server
+ *              runs as and the PATH it gives the server; the PTY keeper (S-Q5)
  *   build      the running server's commit (dirty?), the one on disk, the
  *              link protocol and caps version
  *   listener   port 7717 accepts a connection and answers /healthz; the
@@ -56,6 +56,7 @@ import { WorktreeManager, runGit, type GitRunner } from './worktrees';
 import { COLLECTOR_STATE_FILES } from './collector/state';
 import { probeSqlite } from './collector/codex-sqlite';
 import { UploadStore, readUploadsStatus } from './upload';
+import { observeKeeperStatus, type KeeperObservation } from './pty-backend';
 
 export const DOCTOR_VERSION = 1;
 
@@ -162,6 +163,8 @@ export interface DoctorFacts {
   /** Managed worktrees (null: no targets); `error` when they could not be inspected. */
   worktrees: WorktreeReport[] | { error: string } | null;
   registry: RegistryData | null;
+  /** S-Q5 (optional): the PTY keeper as an observer sees it; absent in facts built before it existed. */
+  keeper?: KeeperObservation | null;
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -228,6 +231,19 @@ export function evaluate(f: DoctorFacts): DoctorItem[] {
     add('service', 'service.user', 'ok', `runs as ${s.user}`);
     if (s.path) add('service', 'service.path', 'ok', `PATH from the unit: ${s.path.split(':').map(t).join(':')}`);
     else add('service', 'service.path', 'warn', 'the unit sets no PATH: verify entries and probes see the default PATH', 'run ./scripts/install.sh again (it writes PATH into the unit)');
+  }
+  // S-Q5: whether a restart of the server ends the sessions.
+  const k = f.keeper;
+  if (k) {
+    const holds = `holds ${k.sessions} session(s), ${k.alive} running`;
+    if (k.enabled && k.running) {
+      if (!k.owner && serverUp) add('service', 'service.pty_keeper', 'warn', `pty keeper pid ${k.pid} ${holds}, but no server is attached to it`, 'systemctl --user restart remotea (it reattaches the keeper\'s sessions)');
+      else add('service', 'service.pty_keeper', 'ok', `pty keeper pid ${k.pid} ${holds}: sessions survive a server restart (remotea upgrade)`);
+    } else if (k.enabled) {
+      if (serverUp) add('service', 'service.pty_keeper', 'warn', 'ptyKeeper is on but no keeper answers: sessions run inside the server and end with a restart', 'journalctl --user -u remotea -n 50 (the server starts the keeper), then systemctl --user restart remotea');
+      else add('service', 'service.pty_keeper', 'ok', 'ptyKeeper is on; the keeper starts with the server');
+    } else if (k.running && k.alive) add('service', 'service.pty_keeper', 'warn', `ptyKeeper is off, but a keeper (pid ${k.pid}) still ${holds}: new sessions run in the server`, 'set "ptyKeeper": true in config.json and restart, or end those sessions (remotea close <surf-id>)');
+    else add('service', 'service.pty_keeper', 'ok', 'pty keeper off (ptyKeeper in config.json): a server restart ends every session');
   }
 
   // build
@@ -533,6 +549,8 @@ export interface GatherOptions {
   git?: GitRunner;
   serverInfo?: ServerInfo | null;
   diskBuild?: BuildInfo;
+  /** S-Q5: the PTY keeper observation (null: leave the check out). Default: ask the keeper's socket. */
+  keeper?: KeeperObservation | null;
 }
 
 const run = (file: string, args: string[], timeoutMs = 3000): Promise<string | null> =>
@@ -592,7 +610,7 @@ function existingAncestor(p: string): string {
 }
 
 /** config.json without creating it (loadConfig writes a default one). */
-function readServerConfig(dir: string): { port: number; hookPort: number; uploadBudgetMiB: number } {
+function readServerConfig(dir: string): { port: number; hookPort: number; uploadBudgetMiB: number; ptyKeeper: boolean } {
   let user: Record<string, unknown> = {};
   try {
     user = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')) as Record<string, unknown>;
@@ -600,7 +618,7 @@ function readServerConfig(dir: string): { port: number; hookPort: number; upload
     /* defaults */
   }
   const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
-  return { port: num(user.port, DEFAULT_CONFIG.port), hookPort: num(user.hookPort, DEFAULT_CONFIG.hookPort), uploadBudgetMiB: num(user.uploadBudgetMiB, DEFAULT_CONFIG.uploadBudgetMiB) };
+  return { port: num(user.port, DEFAULT_CONFIG.port), hookPort: num(user.hookPort, DEFAULT_CONFIG.hookPort), uploadBudgetMiB: num(user.uploadBudgetMiB, DEFAULT_CONFIG.uploadBudgetMiB), ptyKeeper: user.ptyKeeper === true };
 }
 
 function readRegistry(dir: string): RegistryData | null {
@@ -772,6 +790,7 @@ export async function gatherFacts(o: GatherOptions): Promise<DoctorFacts> {
     uploads: uploadFacts(dir, tmpDir, cfg.uploadBudgetMiB, healthy, now),
     worktrees,
     registry,
+    keeper: o.keeper !== undefined ? o.keeper : await observeKeeperStatus(dir, cfg.ptyKeeper),
   };
 }
 

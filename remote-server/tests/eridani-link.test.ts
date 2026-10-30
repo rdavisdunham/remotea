@@ -690,3 +690,67 @@ describe('EridaniLink: stage C commands', () => {
     });
   });
 });
+
+describe('EridaniLink: draining for a restart (S-Q5)', () => {
+  const EXPIRES = Date.now() + 10 * 60_000;
+  const cmdOf = (over: Record<string, unknown> = {}) => {
+    const body = { t: 'test.cmd', op_id: 'op-d', expires_at: EXPIRES, value: 1, ...over };
+    return { ...body, digest: digestOf(body) };
+  };
+
+  it('holds new commands (journaled and acked accepted, not run), then runs them once draining stops', async () => {
+    const dir = tmpDir();
+    let runs = 0;
+    const { eri, link } = await setup({ dir, handlers: { 'test.cmd': async () => (runs++, { state: 'executed' as const }) } });
+    link.start();
+    await until(() => link.ready);
+    link.setDraining(true);
+    expect(link.status().draining).toMatchObject({ reason: 'restart' });
+    eri.send(eri.sockets[0], { ...cmdOf(), id: 'c1' });
+    await until(() => eri.of('ack').some((a) => (a as { acked_id: string }).acked_id === 'c1'));
+    expect(eri.of('ack').find((a) => (a as { acked_id: string }).acked_id === 'c1')).toMatchObject({ ok: true, outcome: { state: 'accepted' } });
+    link.replayAccepted(); // a reconnect's replay waits too
+    await new Promise((r) => setTimeout(r, 30));
+    expect(runs).toBe(0);
+    expect(eri.of('command.outcome')).toHaveLength(0);
+    link.setDraining(false);
+    link.replayAccepted();
+    await until(() => eri.of('command.outcome').length === 1);
+    expect(runs).toBe(1);
+  });
+
+  it('tracks commands that began and have not settled (what a drain waits for)', async () => {
+    let finish: () => void = () => {};
+    const { eri, link } = await setup({ handlers: { 'test.cmd': (_c, ctx) => (ctx.begin(), new Promise((r) => (finish = () => r({ state: 'executed' })))) } });
+    link.start();
+    await until(() => link.ready);
+    eri.send(eri.sockets[0], { ...cmdOf(), id: 'c1' });
+    await until(() => link.begunOps().length === 1);
+    expect(link.begunOps()).toEqual([{ op_id: 'op-d', t: 'test.cmd' }]);
+    finish();
+    await until(() => link.begunOps().length === 0);
+  });
+
+  it('hello says draining; host.state goes only to an Eridani that advertised `draining`', async () => {
+    const old = await setup();
+    old.link.start();
+    await until(() => old.link.ready);
+    old.link.setDraining(true);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(old.eri.of('host.state')).toHaveLength(0);
+    expect(old.eri.of('hello')[0]).not.toHaveProperty('draining');
+
+    const next = await setup();
+    next.eri.welcomeCaps = ['draining'];
+    next.link.setDraining(true);
+    next.link.start();
+    await until(() => next.link.ready);
+    expect(next.eri.of('hello')[0]).toMatchObject({ draining: true });
+    next.link.setDraining(false);
+    await until(() => next.eri.of('host.state').length === 1);
+    expect(next.eri.of('host.state')[0]).toMatchObject({ draining: false });
+    next.link.setDraining(true, 'restart');
+    await until(() => next.eri.of('host.state').length === 2);
+    expect(next.eri.of('host.state')[1]).toMatchObject({ draining: true, reason: 'restart' });
+  });
+});

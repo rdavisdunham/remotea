@@ -10,7 +10,8 @@ import { configDir, ensureHookSecret, ensureServerId, ensureToken, loadConfig, r
 import { Registry } from './registry';
 import { Hub } from './hub';
 import { RemoteaServer } from './server';
-import { spawnPty } from './pty-spawn';
+import { PtyBackend } from './pty-backend';
+import { Drainer } from './drain';
 import { HookBridge, hookEnv } from './hook-bridge';
 import { DiagLog, diagDir } from './diag-log';
 import { defaultHookPaths, hooksStatus, installHooks, toAgentStatus } from './hooks-install';
@@ -43,9 +44,20 @@ async function main(): Promise<void> {
   });
   const hookSecret = ensureHookSecret(dir);
   const diag = new DiagLog(diagDir());
+  const build = loadBuildInfo();
+  const version = serverVersion();
+  // S-Q5: sessions in the PTY keeper outlive a restart of this server (docs/remotea/upgrade.md).
+  const ptys = new PtyBackend({
+    dir,
+    enabled: config.ptyKeeper,
+    idleMs: Math.max(1, config.ptyKeeperIdleMinutes) * 60_000,
+    ringBytes: config.ringBytes,
+    version: `${version}+${build.sha.slice(0, 12)}`,
+    log,
+  });
   const hub = new Hub({
     registry,
-    spawn: spawnPty,
+    spawn: ptys.spawn,
     bootId,
     serverId,
     hostname: os.hostname(),
@@ -100,6 +112,24 @@ async function main(): Promise<void> {
     log,
   });
   server.checkToken();
+
+  // The Eridani side is wired into the hub before the keeper's sessions are adopted, so an exit
+  // that happened while no server ran reaches dispatch like any other. It starts after.
+  // REMOTEA_COLLECTOR_HOME points the collector at another home (tests and the e2e); it then skips /mnt/c.
+  const collectorHome = process.env.REMOTEA_COLLECTOR_HOME || undefined;
+  const eridani = new EridaniRuntime({
+    dir, hub, registry, serverId, bootId, hostname: os.hostname(), version, build, log,
+    collectorHome, windowsUsers: collectorHome ? null : undefined, resumeAgents: config.resumeAgents,
+  });
+  eridaniRt = eridani;
+
+  // Before anyone connects: take back what the PTY keeper kept.
+  const adopted = await ptys.start();
+  if (adopted.length) {
+    const r = hub.adopt(adopted, ptys.discard);
+    log(`pty keeper: ${r.adopted.length} session(s) reattached, ${r.exited.length} exited while no server ran, ${r.discarded.length} closed meanwhile and hung up`);
+  }
+
   // `remotea rotate-token` only writes the file; this is how the running server learns of it. Rotation is
   // revocation: connections admitted with the old token are closed (4401 "token rotated"), sessions stay.
   const tokenWatch = watchTokenFile(dir, () => server.checkToken());
@@ -128,8 +158,6 @@ async function main(): Promise<void> {
   }
 
   // What is running now (S-S5): `remotea status` compares it with the build on disk.
-  const build = loadBuildInfo();
-  const version = serverVersion();
   try {
     writeServerInfo(dir, serverInfo({ bootId, version, build }));
   } catch (err) {
@@ -138,14 +166,20 @@ async function main(): Promise<void> {
   log(`remotea-server ${version} build ${build.sha}${build.dirty ? ' (dirty)' : ''} ${serverId} boot ${bootId}; ${registry.sessions().length} session(s) in registry; token at ${tokenFile}`);
 
   // The Eridani link: constructed only while eridani.json enables it; follows the file (30 s).
-  // REMOTEA_COLLECTOR_HOME points the collector at another home (tests and the e2e); it then skips /mnt/c.
-  const collectorHome = process.env.REMOTEA_COLLECTOR_HOME || undefined;
-  const eridani = new EridaniRuntime({
-    dir, hub, registry, serverId, bootId, hostname: os.hostname(), version, build, log,
-    collectorHome, windowsUsers: collectorHome ? null : undefined, resumeAgents: config.resumeAgents,
-  });
-  eridaniRt = eridani;
   eridani.start();
+
+  // S-Q5: `remotea upgrade` asks for a drain with SIGUSR2 (drain.ts).
+  const drainer = new Drainer({
+    dir,
+    bootId,
+    target: () => eridani,
+    flush: () => {
+      registry.saveNow();
+      eridani.current?.writeStatusNow();
+    },
+    log,
+  });
+  process.on('SIGUSR2', () => drainer.requested());
 
   const lagTimer = setInterval(() => hub.pumpLagging(), 250);
   const probeTimer = setInterval(() => hub.probeAgents(), 5_000);
@@ -162,8 +196,12 @@ async function main(): Promise<void> {
     clearInterval(pruneTimer);
     clearInterval(uploadTimer);
     tokenWatch.close();
-    hub.shutdown();
+    drainer.dispose();
+    // Keeper-held sessions are handed over (checkpoint, then let go); the rest are hung up.
+    const kept = await Promise.race([hub.shutdown(), new Promise<string[]>((r) => setTimeout(() => r([]), 5_000))]);
+    if (kept.length) log(`${kept.length} session(s) left running in the pty keeper`);
     eridani.stop();
+    await ptys.stop();
     await Promise.all([server.close(), bridge.close()]);
     process.exit(0);
   };

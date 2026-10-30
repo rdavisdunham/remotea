@@ -29,6 +29,13 @@ export interface ServerConfig {
   uploadBudgetMiB: number;
   /** S-S3: an unreferenced pasted/dropped file is removed after this many days. */
   uploadMaxAgeDays: number;
+  /**
+   * S-Q5: spawn sessions in the PTY keeper, so restarting the server
+   * (`remotea upgrade`) does not end them (docs/remotea/upgrade.md). Off by default.
+   */
+  ptyKeeper: boolean;
+  /** S-Q5: the keeper exits after this many minutes with no server attached and no live session. */
+  ptyKeeperIdleMinutes: number;
 }
 
 export const DEFAULT_CONFIG: ServerConfig = {
@@ -43,6 +50,8 @@ export const DEFAULT_CONFIG: ServerConfig = {
   hookPort: 7718,
   uploadBudgetMiB: 2048,
   uploadMaxAgeDays: 7,
+  ptyKeeper: false,
+  ptyKeeperIdleMinutes: 10,
 };
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {
@@ -245,6 +254,54 @@ export function loadEridaniConfig(dir: string): EridaniConfig | null {
   } catch {
     return null;
   }
+}
+
+/** Loopback hosts, where cleartext ws/http is allowed (a local Eridani). */
+function isLoopback(host: string): boolean {
+  const h = host.replace(/^\[|\]$/g, '');
+  return h === 'localhost' || h === '127.0.0.1' || h === '::1';
+}
+
+/**
+ * Eridani's web app for a link URL: `wss://host/…` → `https://host`
+ * (`ws://localhost…` → `http://localhost…`), or null.
+ */
+export function webUrlFromLink(linkUrl: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(linkUrl);
+  } catch {
+    return null;
+  }
+  if (u.protocol === 'wss:') return `https://${u.host}`;
+  if (u.protocol === 'ws:' && isLoopback(u.hostname)) return `http://${u.host}`;
+  return null;
+}
+
+/** An http(s) URL as a web base (origin plus path, no query, no trailing slash), or null. */
+export function normalizeWebUrl(v: unknown): string | null {
+  if (typeof v !== 'string' || v.length > 1024) return null;
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && isLoopback(u.hostname))) return null;
+  if (u.username || u.password) return null;
+  return `${u.origin}${u.pathname.replace(/\/+$/, '')}`;
+}
+
+/**
+ * Where Eridani's web app is, for deep links into a run: eridani.json
+ * `webUrl` (https, or http to this machine only), else derived from the link
+ * URL. Null when neither gives one.
+ */
+export function resolveWebUrl(dir: string): string | null {
+  const file = readEridaniFile(dir);
+  if (file.webUrl !== undefined) return normalizeWebUrl(file.webUrl);
+  const cfg = loadEridaniConfig(dir);
+  return cfg ? webUrlFromLink(cfg.url) : null;
 }
 
 /** The file as written, unknown keys included (execution targets live beside the link settings). */

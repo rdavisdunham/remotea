@@ -1680,6 +1680,20 @@ app.whenReady().then(() => {
     const request = { method, params: { ...params, surfaceId, ...(replay ? { replay: true } : {}) } };
     pipeServer.emit('v2', request, () => {}, () => {});
   });
+  // Eridani's "Open terminal in remotea" (terminal.focus): bring the window
+  // that shows the run's tab to the front and select the tab. A tab no window
+  // shows yet (just placed, or hidden here) still raises the app.
+  remoteHosts.setFocusListener((surfaceId, windowIds) => {
+    const wins = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+    const win = windowIds.map((id) => wins.find((w) => w.webContents.id === id)).find((w) => !!w) ?? wins[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    if (windowIds.length) {
+      win.webContents.executeJavaScript(`window.__wmux_focusSurface?.(${JSON.stringify(surfaceId)})`).catch(() => {});
+    }
+  });
   remoteHosts.start();
   powerMonitor.on('suspend', () => remoteHosts.suspendAll());
   powerMonitor.on('resume', () => remoteHosts.wakeAll('resume'));

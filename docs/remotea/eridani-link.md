@@ -56,6 +56,11 @@ Both files live in the server's config dir (`~/.config/remotea`, or
 only in the `Authorization` header. It is never logged, never written to the
 outbox or the status file, and never put in a session's environment.
 
+`webUrl` (optional) is Eridani's web app, for links back to a run (see
+[Open in Eridani, and the terminal from Eridani](#open-in-eridani-and-the-terminal-from-eridani)).
+It must be `https://` (`http://` only for localhost); without it the host
+derives it from `url` (`wss://host/…` → `https://host`).
+
 `eridani-mcp-token` (optional, mode 0600) holds a **separate** bot key that
 spawned agents use for Eridani's MCP server; see
 [Eridani MCP for spawned agents](#eridani-mcp-for-spawned-agents). Two more
@@ -211,7 +216,10 @@ remotea eridani collector [parity|authoritative]
 [Capabilities and build identity](#capabilities-and-build-identity); null
 without a running link). Build identity adds `server.build`,
 `server.diskBuild`, `server.proto`, `server.capsVersion` and `server.hooks`
-(same section).
+(same section). The PTY keeper (S-Q5, [upgrade.md](upgrade.md)) adds
+`server.ptyKeeper {enabled, running, socket, pid, version, proto, startedAt,
+owner, sessions, alive, ids, aliveIds}` and `sessions[].inKeeper`; the status
+file (`remotea eridani status --json`) adds `draining {reason, since} | null`.
 
 ## Connection
 
@@ -244,13 +252,14 @@ remotea sends:
 
 | `t` | Lane | Coalesced by | Notes |
 |---|---|---|---|
-| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)), and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy), and `doctor?` (the latest [doctor summary](#doctor); absent until the server has computed one) |
+| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)), and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy), and `doctor?` (the latest [doctor summary](#doctor); absent until the server has computed one), and `draining?: true` (S-Q5: only while the server drains for a restart, see [Draining for a restart](#draining-for-a-restart)) |
 | `sessions.snapshot` | control | (per connection) | Sent after every welcome. `part {of, i, n}`, `surfaces[]`, `journal {pending, uncertain}`. Never persisted. |
 | `command.outcome` | control | `outcome:<op_id>` | Stage B only reports `rejected` (`unsupported` / `expired`). |
 | `status` | live | `status:<surf>`, numeric `revision` | `surf, incarnation, state, since, reason?, provider?, provider_session_id?` |
 | `turn` | live | never | `surf, incarnation, run_id: null, generation: 0, provider, tool, provider_session_id, provider_turn_id, root: true, seq, text, truncated, missing, source, prompt?, prompt_truncated?, ended_at` |
 | `prompt` | live | never | `surf, incarnation, run_id, generation, provider, tool, provider_session_id, seq, text, truncated, at`. A root prompt as it was submitted, only for a run-bound surface and only to an Eridani whose welcome advertised `prompt` (see Turn capture). |
 | `exit` | live | never | `surf, incarnation, code, exited_at` |
+| `host.state` | control | `host.state` (ephemeral) | `draining, reason?`. S-Q5: the server started (`draining: true, reason: "restart"`) or stopped draining. Only to an Eridani whose welcome advertised `draining`; see [Draining for a restart](#draining-for-a-restart). |
 | `doctor` | bulk | `doctor` (ephemeral) | `at, ok, warn, fail, items[{id, level, summary, fix?}], truncated?`. Only to an Eridani whose welcome advertised `doctor`, and only when the findings changed (see [Doctor](#doctor)). |
 | `session.report` | bulk | `<tool>:<session_id>`, `revision` = fingerprint | `parity, tool, session_id, report` (the HTTP collector's `SessionInput`, unchanged) |
 | `ack` | | | For inbound commands. |
@@ -595,13 +604,14 @@ worktree, so "unmerged work" can say who is still on it; the CLI prints it as
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
 | `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id, expires_at` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, a minimal environment, the target's timeout), then sends `verify.result`. Shares the attempt machinery of [stage D](#stage-d-verification-after-turns). |
+| `terminal.focus` | `surf, run_id, generation, expires_at` (Eridani gives it 30 s) | Eridani's "Open terminal in remotea": sent only to a host whose hello `caps` has `terminal.focus`. The hub sends `{t: "focus", id: surf, runId}` to every connected app whose hello listed the `focus` feature and that has not hidden the session; the app raises its window and selects the tab. `executed` with `result {desktops: <how many apps were told>}`; `rejected` `no_desktop` when none was (no app connected, only older apps, or every app hid the tab), so Eridani shows where the terminal is instead; `rejected` `unknown_surf` when the surface is gone, exited, or not bound to `run_id`. The generation is informational (a stale one is harmless). `expires_at` is required. Journaled like every command; found `executing` after a restart it settles as `failed`. See [Open in Eridani](#open-in-eridani-and-the-terminal-from-eridani). |
 | `worktrees.scan` | `run_id, generation, branch, turn_seq, tool?, session_id?, expires_at` (Eridani gives it 2 min) | The judge's PR evidence (Eridani PR #94): sent only to a host whose hello `caps` has `worktrees.scan`, while a judge verdict waits for a PR record newer than the turn. Rescans the worktrees and sends `worktrees.report` **even if nothing changed**; when `tool` and `session_id` are given (both or neither), re-reads that session with the collector and sends its `session.report` even if its fingerprint is unchanged. Then `executed` with `result {worktrees: "reported", session?: "reported" \| "not_found" \| "collector_off"}`; `failed` (with the reason) when a scan fails or the outbox refuses a report. The run fence is informational: a stale `run_id`/`generation` is harmless and not rejected, but `expires_at` is required and a past one is `rejected` ("expired"). Journaled like every command (refused with `journal_unavailable` when the journal cannot record it); found `executing` after a restart it settles as `failed`. |
 
-Every command (except `worktrees.scan`, which only reads) needs a fence that matches: an `input`/`stop` names the surface
+Every command (except `worktrees.scan`, which only reads, and `terminal.focus`, which only raises a tab) needs a fence that matches: an `input`/`stop` names the surface
 and its `incarnation`, the run, and the generation (a queued input must match
 the current generation; steer and stop may name a newer one). Every effectful
 command (`spawn`, `input`, `answer`, `stop`, `verify`) must carry
-`expires_at`, and so must `worktrees.scan`. A missing one is rejected (`expires_at required`, since stage
+`expires_at`, and so must `worktrees.scan` and `terminal.focus`. A missing one is rejected (`expires_at required`, since stage
 F), and so is one that is past or more than 7 days out (the replay horizon,
 the time the journal remembers an `op_id`).
 
@@ -616,7 +626,10 @@ ack of an accepted command already says
   has been applied (or 10 s after the link is ready without one);
 - `executing` commands are settled without being run again: a `spawn` by
   whether its session exists (`executed` / `failed`), a `stop` as `executed`
-  (the process ended with the server), a `verify` as `failed`; an `input` or
+  (the process ended with the server) or, when the PTY keeper kept the
+  process, as `failed` ("interrupted by a server restart; the process
+  outlived it…": the stop stays requested and boot sends it again), a
+  `verify` as `failed`; an `input` or
   `answer` becomes `uncertain`, since its bytes may or may not have arrived;
 - a duplicate `op_id` gets its recorded outcome, never a second run.
 
@@ -680,6 +693,37 @@ holds whether the server notices it on boot or an app reopens the tab. To get
 a shell there, open a new tab in the worktree yourself. It is not bound to the
 run. This happens whether or not the link is enabled.
 
+A session whose process the PTY keeper kept ([upgrade.md](upgrade.md), off by
+default) was not lost: it is adopted before anything else runs and stays
+`live` with the **same incarnation**, binding, generation and turn numbering,
+so the new boot's `sessions.snapshot` reports it exactly as the old one did
+(only `boot_id` in hello changes). Dispatch still vouches for its agent (M7):
+the launch record is mirrored to `eridani-launched.json` and read back only
+for a kept process in the same incarnation. A kept session with a stop
+requested is stopped again on boot. One that exited while no server ran is
+reported as a normal `exit` with its code.
+
+#### Draining for a restart
+
+`remotea upgrade` (S-Q5) asks the server to drain (SIGUSR2) before it
+restarts it. While draining:
+
+- commands are still journaled and acked `accepted`, but not run; the next
+  boot replays them after its `runs.snapshot`, with every fence checked again
+  then (the usual path for `accepted` commands after a restart);
+- no queued `input` starts; a steer or input already typing finishes;
+- the server waits (up to `--timeout`, 30 s) until no command that called
+  `begin()` is unsettled and no steer or input write is pending, then the
+  CLI restarts the unit;
+- the link says so: hello carries `draining: true`, and an Eridani whose
+  welcome advertised `draining` gets `host.state {draining: true, reason:
+  "restart"}` at once (and `{draining: false}` if the drain is abandoned).
+  An Eridani that does not advertise it is sent nothing new and sees a short
+  disconnect.
+
+A drain that no restart follows expires after its timeout plus 60 s: the
+server stops draining and runs what it held.
+
 **runs.snapshot** (Eridani → remotea, after welcome, chunked like the
 snapshot): `runs [{run_id, generation, desired: continue|stop|none,
 stop_mode?, verify? {verify_id, plan_revision} | null}]`. A newer generation is adopted (an older queued input is then
@@ -742,6 +786,44 @@ sequence.
 
 A restart while an `input` is `executing` still settles it as `uncertain`
 (see **Journal** above): the bytes may or may not have arrived.
+
+### Open in Eridani, and the terminal from Eridani
+
+Both directions between a run's terminal tab and its page in Eridani (roadmap
+task 03ff84bf).
+
+**From the tab to Eridani.** A spawn's binding (`SessionRecord.eridani`, which
+every app receives in `welcome`, `sessionAdded` and `sessionUpdated`) carries,
+besides `runId`, `taskId` and `generation`:
+
+| Field | From | |
+|---|---|---|
+| `webUrl` | `eridani.json` `webUrl`, else derived from the link `url` | Eridani's web app (origin and path, no trailing slash). Absent when neither gives an http(s) URL. Bindings recorded before this field existed are filled in when the link is (re)configured; one that has it is never changed. |
+| `taskTitle` | the spawn's `title` | Absent when the spawn carried none. |
+
+No secret is in it. The app shows a small ↗ button on such a tab and, in the
+tab's context menu, **Open in Eridani** (the system browser, through
+`shell.openExternal`) and **Copy run link**. The link is
+`<webUrl>/?view=remotea&run=<runId>`, Eridani's existing deep link to the run
+panel (`src/shared/eridani-deep-link.ts`). The app builds it only from an
+`http:`/`https:` URL without credentials and a plain run id; anything else
+shows no link, and the main process refuses any other scheme as well. An
+older server sends no `webUrl`: the tab simply has no link.
+
+**From Eridani to the tab.** `terminal.focus` (see [Commands](#commands)).
+App ↔ server, additively:
+
+- The app's `hello` may carry `features: ["focus"]` (an app that can raise a
+  tab). An older server ignores the field; a newer server ignores names it
+  does not know.
+- `welcome.features` lists `focus` (this server may send it).
+- `{t: "focus", id, runId?}` goes only to apps that listed `focus`; an
+  older app never gets it (it would drop it anyway: unknown types are
+  ignored), which is why the host answers `no_desktop` when only older apps
+  are connected.
+
+The app raises the window that shows the tab (restoring a minimized one) and
+selects the tab; if no window shows it yet, it raises the main window.
 
 ### Questions (Claude)
 
@@ -1332,9 +1414,10 @@ Other sessions see at most the fenced candidate list (D6, above).
 Eridani may require it), `context.scope`, `prompt` (live `prompt` frames,
 sent only when Eridani advertises `prompt` back), `worktrees.scan` (the
 host takes the [`worktrees.scan`](#commands) command; an Eridani that never
-sends it loses nothing) and `doctor` (live [`doctor`](#doctor) frames, sent
-only when Eridani advertises `doctor` back; hello carries the summary
-regardless). The lag rules:
+sends it loses nothing), `terminal.focus` (the host takes the
+[`terminal.focus`](#commands) command; likewise optional) and `doctor` (live
+[`doctor`](#doctor) frames, sent only when Eridani advertises `doctor` back;
+hello carries the summary regardless). The lag rules:
 
 - Eridani refuses an `op_id` frame without a digest only from a host that
   advertises `digest`.
