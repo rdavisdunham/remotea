@@ -25,6 +25,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import WebSocket from 'ws';
+import { resolveMcp } from './eridani-mcp';
 import {
   ERIDANI_COLLECT_REQUEST,
   ERIDANI_KEY_RE,
@@ -385,6 +386,8 @@ function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream)
         const harnesses = (['claude', 'codex'] as const).filter((h) => t.launch[h]).join(', ') || 'none';
         out.write(`${t.id}  ${t.repo}  worktrees in ${t.worktreeRoot}  base ${t.base}  harnesses ${harnesses}\n`);
         for (const v of t.verify) out.write(`  verify ${v.id}: ${v.argv.join(' ')}${v.cwd ? ` (in ${v.cwd})` : ''}, ${v.timeout} s\n`);
+        const mcp = resolveMcp(dir, t);
+        out.write(`  eridani mcp: ${mcp.configured ? `configured (${mcp.url})` : `not configured: ${mcp.reason}`}\n`);
       }
       return 0;
     }

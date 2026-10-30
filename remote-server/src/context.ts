@@ -23,6 +23,9 @@
  * surface is dropped too; an older Eridani's unscoped answer is printed as
  * before (it can lag one release).
  *
+ * A run's surface also gets one line saying whether its agent was launched
+ * with Eridani's MCP server (the tools it reports through), and why not.
+ *
  * Claude drops SessionStart output silently when the hook times out and does
  * not block input meanwhile (stage A); the hook's timeout is set to 10 s in
  * claude-hooks.ts, well above this budget plus node start-up.
@@ -30,6 +33,7 @@
 import crypto from 'crypto';
 import { ERIDANI_LIMITS, ERIDANI_TIMING, truncateText } from '../../src/shared/eridani-link-protocol';
 import type { SessionRecord } from '../../src/shared/remote-host-protocol';
+import { ERIDANI_MCP_TOOLS, MCP_SERVER_NAME } from './eridani-mcp';
 
 const SESSION_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 const SOURCES = new Set(['startup', 'resume', 'clear', 'compact']);
@@ -98,6 +102,12 @@ export class ContextService {
       lines.push(`remotea: this is ${tool} session ${sessionId || '(unknown)'} on ${surf}${b ? `, Eridani run ${b.runId} (generation ${b.generation})` : ''}. Eridani's context was not available.`);
     }
     if (token) lines.push(`Eridani run token: ${token} (pass it as run_token to Eridani's task tools)`);
+    // Whether the spawn gave the agent Eridani's MCP server (dispatch, eridani-mcp.ts).
+    if (b?.mcp?.configured) {
+      lines.push(`Eridani tools: ${ERIDANI_MCP_TOOLS.join(', ')} are available via the ${MCP_SERVER_NAME} MCP server.`);
+    } else if (b?.mcp) {
+      lines.push(`Eridani's MCP tools (${ERIDANI_MCP_TOOLS.join(', ')}) are not available in this session: ${b.mcp.reason ?? 'not configured on this host'}.`);
+    }
     return lines.join('\n\n') + '\n';
   }
 }

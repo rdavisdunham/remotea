@@ -51,6 +51,7 @@ import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
 import { WorktreeManager } from './worktrees';
 import { loadTargets } from './eridani-targets';
+import { mcpStatus, resolveMcp } from './eridani-mcp';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 
 export const COLLECTOR_STATE_FILE = 'eridani-collector.json';
@@ -186,6 +187,7 @@ export class EridaniRuntime {
       dir: deps.dir,
       worktrees: (this.worktrees = new WorktreeManager({ dir: deps.dir })),
       targets: () => loadTargets(deps.dir),
+      mcp: (t) => resolveMcp(deps.dir, t),
       questions: this.questions,
       emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
       changed: () => this.reportWorktrees(),
@@ -347,8 +349,8 @@ export class EridaniRuntime {
     this.scanTimer.unref?.();
   }
 
-  /** Execution targets for hello: ids, repos and verify ids only. */
-  private helloTargets(): HelloTarget[] {
+  /** Execution targets for hello: ids, repos, verify ids and MCP readiness only. */
+  helloTargets(): HelloTarget[] {
     return loadTargets(this.deps.dir).map((t) => ({
       id: t.id,
       repo: t.repo,
@@ -356,6 +358,8 @@ export class EridaniRuntime {
       harnesses: (['claude', 'codex'] as const).filter((h) => !!t.launch[h]),
       verify: t.verify.map((v) => v.id),
       ...(t.migrations ? { migrations: { ...t.migrations } } : {}),
+      // Whether a spawn here gets Eridani's MCP server (eridani-mcp.ts); never the key.
+      mcp: mcpStatus(resolveMcp(this.deps.dir, t)),
     }));
   }
 

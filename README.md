@@ -121,6 +121,15 @@ Agents in remotea terminals report their state (working, needs you, done) the sa
 - Each session gets its own token (`WMUX_REMOTE_TOKEN`), which can only report status for that session. The main token never enters a session's environment.
 - Outside a remotea terminal the helper exits immediately.
 
+### Eridani (optional)
+
+The server can link to [Eridani](docs/remotea/eridani-link.md), which then starts Claude Code and Codex runs in managed worktrees here. `remotea eridani connect` sets up the link key (`~/.config/remotea/eridani-token`). A run's agent reports its plan and steps through Eridani's MCP tools (`submit_plan`, `task_step`, `task_interview`, `session_link`), so it needs a **second** key, used only for MCP:
+
+1. In Eridani, open Settings → Connections → Bot keys and create a bot key with the scopes **agents:session**, **tasks** (read/write) and **notes** (read/write). The owner does this once per machine.
+2. Save it on this machine: `install -m 600 /dev/null ~/.config/remotea/eridani-mcp-token`, then paste the key into that file (one line, `eri_bot_…`). Do not reuse the link key; remotea refuses it.
+
+Each spawn reads the file, so no restart is needed. Without it, agents still start but have no Eridani tools, and Eridani is told why (`mcp.configured: false`). `remotea eridani targets list` shows whether each target is ready. Details, including `mcpKeyFile` and `mcpUrl` in `eridani.json`: [docs/remotea/eridani-link.md](docs/remotea/eridani-link.md#eridani-mcp-for-spawned-agents).
+
 ### Diagnostics
 
 Each app sends the server a stream of what happened: connection state, how each pane reattached (delta or snapshot), resyncs, sequence gaps, and agent-state verdicts. It never includes terminal content, keystrokes or prompts. It lands in `~/.local/state/remotea/diag/<device>.jsonl`, capped and rotated, and `remotea logs` reads it.
