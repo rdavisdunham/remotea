@@ -9,6 +9,7 @@
 import os from 'os';
 import {
   PROTO,
+  agentResumeCommand,
   type AgentHandle,
   type ClientMsg,
   type DiagEvent,
@@ -69,14 +70,7 @@ export const DEFAULT_HUB_CONFIG: HubConfig = {
 };
 
 /** The command that reopens an agent conversation, or null when the provider has none. */
-export function resumeCommand(agent: AgentHandle): string | null {
-  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(agent.sessionId)) return null;
-  switch (agent.provider) {
-    case 'claude': return `claude --resume ${agent.sessionId}`;
-    case 'codex': return `codex resume ${agent.sessionId}`;
-    default: return null;
-  }
-}
+export const resumeCommand: (agent: AgentHandle) => string | null = agentResumeCommand;
 
 /** How stale the persisted lastActivityAt may get. */
 const ACTIVITY_PERSIST_MS = 30_000;

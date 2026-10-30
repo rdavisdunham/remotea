@@ -73,6 +73,21 @@ export interface AgentHandle {
   seenAt: number;
 }
 
+/**
+ * The command that reopens an agent conversation (`claude --resume <id>`,
+ * `codex resume <id>`), or null when the provider has none or the id is not
+ * plain. Shared by the server (a lost session respawns with it, hub.ts) and
+ * the desktop (Reopen in the recovery inventory starts the new tab with it).
+ */
+export function agentResumeCommand(agent: Pick<AgentHandle, 'provider' | 'sessionId'>): string | null {
+  if (!/^[A-Za-z0-9._:-]{1,128}$/.test(agent.sessionId)) return null;
+  switch (agent.provider) {
+    case 'claude': return `claude --resume ${agent.sessionId}`;
+    case 'codex': return `codex resume ${agent.sessionId}`;
+    default: return null;
+  }
+}
+
 export interface GroupRecord {
   id: GroupId;
   name: string;
