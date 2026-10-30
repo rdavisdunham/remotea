@@ -48,7 +48,7 @@ vi.mock('electron', async () => {
     dialog: { showMessageBox: vi.fn() },
   };
 });
-vi.mock('os', () => ({ default: { release: () => '10.0.22631' } }));
+vi.mock('os', () => ({ default: { release: () => '10.0.22631', homedir: () => 'C:\\Users\\me' } }));
 vi.mock('../../src/main/settings-store', () => ({ loadSettings: () => mocks.settings }));
 vi.mock('../../src/main/crash-diagnostics', () => ({ logDiagnostic: vi.fn() }));
 
