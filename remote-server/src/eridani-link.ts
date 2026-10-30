@@ -155,6 +155,8 @@ export interface LinkStatus {
   doctor?: DoctorSummary | null;
   /** S-Q1 (optional): the collector as the running server sees it. */
   collector?: CollectorLinkStatus | null;
+  /** S-Q5 (optional): the server is draining for a restart (`remotea upgrade`): commands are held, not run. */
+  draining?: { reason: string; since: number } | null;
 }
 
 /** The collector's last scan (for `remotea doctor`'s parity age). */
@@ -314,6 +316,11 @@ export class EridaniLink {
   private probeTimer: unknown = null;
   /** The doctor summary this connection's Eridani has (doctorKey): what hello carried, then each `doctor` frame. */
   private doctorSent: string | null = null;
+  /** S-Q5: set while draining for a restart. */
+  private draining: { reason: string; since: number } | null = null;
+  private hostStateRev = 0;
+  /** op_id → kind of every command that called begin() and has not settled. */
+  private readonly begun = new Map<string, string>();
   /** What the hello on the current socket carried, until welcome makes it `doctorSent`. */
   private doctorInHello: string | null = null;
   private doctorRev = 0;
@@ -411,6 +418,7 @@ export class EridaniLink {
       advertised: this.advertised(),
       ...(this.deps.doctor ? { doctor: this.deps.doctor() } : {}),
       ...(this.deps.collectorStatus ? { collector: this.deps.collectorStatus() } : {}),
+      draining: this.draining,
     };
   }
 
@@ -465,6 +473,34 @@ export class EridaniLink {
    * only the newest matters, and the next hello carries it after a
    * disconnect. Returns true when a frame was queued.
    */
+  /**
+   * S-Q5 (`remotea upgrade`, docs/remotea/upgrade.md): drain for a restart,
+   * or stop draining. While draining, commands are still journaled and
+   * acked `accepted` but not run (the next server replays them after its
+   * runs.snapshot), and hello says `draining: true`. An Eridani whose welcome
+   * advertised `draining` is also told at once with an ephemeral
+   * `host.state {draining, reason?}`; an older one is sent nothing new.
+   */
+  setDraining(on: boolean, reason = 'restart'): void {
+    const was = this.draining !== null;
+    this.draining = on ? this.draining ?? { reason, since: this.now() } : null;
+    if (was === on) return;
+    this.log(on ? `eridani: draining for a ${reason}; commands are held for the next server` : 'eridani: no longer draining');
+    if (this.ready && this.peerHas('draining')) {
+      this.enqueue({ t: 'host.state', draining: on, ...(on ? { reason } : {}) }, 0, 'host.state', ++this.hostStateRev, true);
+    }
+    this.writeStatus();
+  }
+
+  get isDraining(): boolean {
+    return this.draining !== null;
+  }
+
+  /** Commands whose effect has begun (`executing`) and that have not settled: what a drain waits for. */
+  begunOps(): Array<{ op_id: string; t: string }> {
+    return [...this.begun].map(([op_id, t]) => ({ op_id, t }));
+  }
+
   reportDoctor(summary: DoctorSummary | null): boolean {
     this.writeStatus(); // the status file shows the latest summary (deps.doctor)
     if (!summary || !this.ready || !this.peerHas('doctor')) return false;
@@ -581,6 +617,8 @@ export class EridaniLink {
         machine: this.deps.machine,
         ...this.advertised(),
         ...(this.degradedReason() ? { degraded_reason: this.degradedReason() } : {}),
+        // S-Q5, additive: a restart is coming (`remotea upgrade`).
+        ...(this.draining ? { draining: true } : {}),
         // Additive: an Eridani that does not know it ignores it (its hello model ignores extra fields).
         ...(doctor ? { doctor } : {}),
       });
@@ -721,6 +759,7 @@ export class EridaniLink {
    * checked against the current state.
    */
   replayAccepted(): void {
+    if (this.draining) return; // held for the next server
     for (const rec of this.journal.acceptedOps()) {
       if (this.running.has(rec.op_id) || this.unrecorded.has(rec.op_id)) continue;
       const cmd = { ...rec.body, op_id: rec.op_id, digest: rec.digest } as CommandBody;
@@ -901,6 +940,11 @@ export class EridaniLink {
     // Never ack an acceptance that is not on disk.
     if (!this.journalWrite(cmd.op_id, { digest, t: cmd.t, state: 'accepted', body })) return this.refuseUnjournaled(cmd);
     this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: 'accepted', ...this.acceptFacts(cmd) } });
+    if (this.draining) {
+      // S-Q5: accepted and on disk; the next server runs it (replayAccepted), with its fences checked then.
+      this.log(`eridani: ${cmd.t} ${cmd.op_id} held for the restart`);
+      return;
+    }
     await this.run(cmd, digest, false);
   }
 
@@ -1046,6 +1090,7 @@ export class EridaniLink {
           throw err instanceof JournalUnavailableError ? err : new JournalUnavailableError(String(reason));
         }
         began = true;
+        this.begun.set(cmd.op_id, cmd.t);
         this.journalUp();
       },
     };
@@ -1056,6 +1101,7 @@ export class EridaniLink {
       res = { state: 'failed', detail: ((err as Error)?.message ?? String(err)).slice(0, ERIDANI_LIMITS.reasonChars) };
     } finally {
       this.running.delete(cmd.op_id);
+      this.begun.delete(cmd.op_id);
     }
     this.settle(cmd.op_id, { digest, t: cmd.t, state: res.state, detail: res.detail, outcome: res.result });
   }

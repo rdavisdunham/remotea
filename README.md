@@ -26,7 +26,7 @@ SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the s
   - Each device keeps its own splits, windows and monitor layout.
   - **End sessions on this host** closes a session (or a whole workspace's sessions) everywhere. It always asks first, and lists what it would stop.
   - **Hide on this device** removes it from one machine only.
-- **Survives server restarts, partly.** If WSL restarts, the processes are gone, but sessions come back in their saved directories, and Claude Code sessions are resumed (`claude --resume <id>`).
+- **Survives server restarts, partly.** If WSL restarts, the processes are gone, but sessions come back in their saved directories, and Claude Code sessions are resumed (`claude --resume <id>`). With the PTY keeper on (`"ptyKeeper": true`, below), restarting or upgrading the server itself keeps every process running.
 - **Everything wmux does** still works for remote panes: xterm scrollback and search, notifications, cwd tracking, and agent-state detection. The server streams raw PTY bytes, not repainted frames.
 
 ## Layout
@@ -63,6 +63,7 @@ remotea token             # the token the app needs
 - Keep WSL from idling out, or the sessions die with it. In `%UserProfile%\.wslconfig`, set `vmIdleTimeout=-1` under `[wsl2]`.
 - Logs: `journalctl --user -u remotea -f`
 - Restart: `systemctl --user restart remotea`. A restart ends running processes. The apps respawn them, and Claude Code and Codex sessions are resumed.
+- **Upgrades without ending sessions (opt-in).** Set `"ptyKeeper": true` in `~/.config/remotea/config.json` and restart once (that restart still ends the sessions it had). From then on new sessions run in a small PTY keeper process, its own transient unit `remotea-pty.service`, which outlives the server. After rebuilding, run `remotea upgrade`: it drains (Eridani's new commands are held for the next server, nothing half-typed is cut off), restarts `remotea.service` only, and checks that every session came back, live, with the same process. The apps just reattach: no restore notice, no respawn. `install.sh` uses it when the keeper is on. `remotea status` and `remotea doctor` show the keeper. Stopping the keeper (`systemctl --user stop remotea-pty`) ends its sessions; it exits by itself after `ptyKeeperIdleMinutes` (10) with no server and no session. Details: [docs/remotea/upgrade.md](docs/remotea/upgrade.md).
 
 **Eridani quick start (optional).** To let [Eridani](docs/remotea/eridani-link.md) start agents here, run `remotea eridani setup` in WSL and paste the setup code Eridani shows after **Enable** (Settings → Connections); it is read without echo. The wizard writes the link key and URL, offers the git repositories it finds as execution targets (with a launch config and a detected verify command), saves the MCP bot key that spawned agents use (`~/.config/remotea/eridani-mcp-token`, 0600, never the link key), offers a user-level `eridani` MCP entry for each installed harness (Claude Code, Codex, OpenCode; an existing entry is only replaced with `--replace`), reports whether the hooks are current, and ends with a per-target readiness table and a list of what it changed and what it skipped. It is safe to run again: a second run changes nothing. Every answer has a flag for scripts (`remotea eridani setup --help`), and `remotea eridani status` shows the same wiring and readiness later. Details: [Setup](docs/remotea/eridani-link.md#setup).
 
@@ -114,6 +115,7 @@ remotea status [--json]                              # sessions, workspaces, age
 remotea doctor [--json] [--probe]                    # redacted readiness report, exit 1 on any failure (below)
 remotea open --group "Acme" --cwd ~/acme -- claude   # open a session in a workspace on every device
 remotea close <surf-id>                              # end a session everywhere
+remotea upgrade [--yes] [--timeout <s>] [--unit <name>]  # drain, restart the server only, check the sessions came back
 remotea token | rotate-token                         # rotate-token revokes the old token: apps using it are disconnected
 remotea hooks install | remove | status              # agent status hooks (see below)
 remotea logs [-f] [--device laptop] [--since 10m]    # what the apps reported: connections, reattaches, agent state

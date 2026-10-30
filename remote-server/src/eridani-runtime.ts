@@ -181,6 +181,8 @@ export function stageBCaps(versions: { claude: string | null; codex: string | nu
 
 export class EridaniRuntime {
   private link: EridaniLink | null = null;
+  /** S-Q5: draining for a restart (`remotea upgrade`); a link made meanwhile drains too. */
+  private draining: string | null = null;
   private stamp = '';
   private checkTimer: NodeJS.Timeout | null = null;
   private scanTimer: NodeJS.Timeout | null = null;
@@ -269,6 +271,22 @@ export class EridaniRuntime {
     if (this.checkTimer) clearInterval(this.checkTimer);
     this.checkTimer = null;
     this.teardown('shutdown');
+  }
+
+  /**
+   * S-Q5 (drain.ts): hold Eridani's commands for the next server and start
+   * no queued input; or stop draining and run what was held.
+   */
+  setDraining(on: boolean, reason = 'restart'): void {
+    this.draining = on ? reason : null;
+    this.dispatch.setDraining(on);
+    this.link?.setDraining(on, reason);
+    if (!on && this.link?.ready) this.link.replayAccepted();
+  }
+
+  /** What a drain still waits for: commands that began and have not settled, and pending steer/input writes. */
+  inflight(): { commands: Array<{ op_id: string; t: string }>; writes: string[] } {
+    return { commands: this.link?.begunOps() ?? [], writes: this.dispatch.pendingWrites() };
   }
 
   get current(): EridaniLink | null {
@@ -396,6 +414,7 @@ export class EridaniRuntime {
       ...this.deps.linkOverrides,
     });
     this.link = link;
+    if (this.draining) link.setDraining(true, this.draining);
     this.deps.hub.setSink({
       status: (s) => void link.agentStatus(s),
       turn: (t) => void link.turn(t),

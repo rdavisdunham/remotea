@@ -104,6 +104,12 @@ export interface SessionOptions {
   onExit: (code: number, signal?: number) => void;
   timers?: Timers;
   log?: (msg: string) => void;
+  /**
+   * A process that outlived the previous server in the PTY keeper
+   * (docs/remotea/upgrade.md): its PTY, whether it still runs, and the bytes
+   * that rebuild its screen (the last checkpoint and the output after it).
+   */
+  adopt?: { pty: PtyLike; alive: boolean; exitCode?: number; replay: string };
 }
 
 export interface AttachRequest {
@@ -142,6 +148,10 @@ export class TermSession {
   private paused = false;
   private killTimer: unknown = null;
   private disposed = false;
+  /** While a replay is parsed, the emulator's own query replies must not reach the process (it asked long ago). */
+  private muted = false;
+  /** Handed over to the PTY keeper: this server no longer drives it. */
+  private released = false;
   private cancelStartup: (() => void) | null = null;
   private readonly timers: Timers;
   /** Latest agent-status RPC of each kind (see relayRpc), replayed to apps that attach later. */
@@ -161,10 +171,27 @@ export class TermSession {
     this.term.unicode.activeVersion = '11';
     // Query replies (DA, DSR/CPR, DECRQM, ...) from the headless terminal go
     // straight back to the PTY: the server answers whether or not anyone is attached.
-    installQueryResponders(this.term, (d) => this.writePty(d), opts.theme);
-    this.term.onData((d) => this.writePty(d));
+    installQueryResponders(this.term, (d) => this.termReply(d), opts.theme);
+    this.term.onData((d) => this.termReply(d));
 
-    if (opts.spawn) {
+    if (opts.adopt) {
+      const a = opts.adopt;
+      this.pty = a.pty;
+      if (a.replay) {
+        this.muted = true;
+        this.mouse = applyMouseModeSequences(this.mouse, a.replay);
+        this.term.write(a.replay, () => {
+          this.muted = false;
+        });
+      }
+      if (a.alive) {
+        this.alive = true;
+        this.pty.onData((d) => this.onPtyData(d));
+        this.pty.onExit(({ exitCode, signal }) => this.onPtyExit(exitCode, signal));
+      } else {
+        this.exitCode = a.exitCode;
+      }
+    } else if (opts.spawn) {
       this.pty = opts.spawn({ ...opts.spawnRequest, sessionId: opts.id, cols: opts.cols, rows: opts.rows });
       this.alive = true;
       this.pty.onData((d) => this.onPtyData(d));
@@ -373,6 +400,10 @@ export class TermSession {
     if (this.alive && this.pty) this.pty.write(data);
   }
 
+  private termReply(data: string): void {
+    if (!this.muted) this.writePty(data);
+  }
+
   /** Human input from a client. Typing at a device is the strongest "I'm here" signal: it claims the size. */
   /** Bytes for the process that come from no client (Eridani's input). */
   write(data: string): void {
@@ -470,6 +501,35 @@ export class TermSession {
         }
       }
     }, FLOW.killGraceMs);
+  }
+
+  /** The process can be handed over to the PTY keeper instead of being hung up. */
+  get keepable(): boolean {
+    return this.alive && !this.released && !!this.pty?.hold && !!this.pty.release;
+  }
+
+  /**
+   * Hand-over on shutdown (PTY keeper): stop taking output, serialize the
+   * emulator once it has parsed everything taken, give that checkpoint to the
+   * keeper and let go. The process keeps running. False when not keepable.
+   */
+  async release(): Promise<boolean> {
+    if (!this.keepable) return false;
+    const pty = this.pty!;
+    this.released = true;
+    const seq = pty.hold!();
+    this.cancelStartup?.();
+    this.cancelStartup = null;
+    this.flush();
+    let data: string | null = null;
+    try {
+      data = await new Promise<string>((resolve) => this.term.write('', () => resolve(buildSnapshot(this.term, this.serializer, this.mouse, this.opts.scrollback))));
+    } catch {
+      data = null; // the keeper replays its ring instead
+    }
+    pty.release!(data === null ? null : { seq, data });
+    this.alive = false;
+    return true;
   }
 
   dispose(): void {

@@ -26,6 +26,13 @@ export interface PtyLike {
   kill(signal?: string): void;
   pause(): void;
   resume(): void;
+  /**
+   * Keeper-backed only (pty-keeper/client.ts): stop taking output (it stays
+   * in the keeper's ring) and return the last sequence number taken.
+   */
+  hold?(): number;
+  /** Keeper-backed only: hand the keeper the emulator checkpoint taken after `seq`, and let go. The process keeps running. */
+  release?(checkpoint: { seq: number; data: string } | null): void;
 }
 
 export interface SpawnRequest {
@@ -100,16 +107,22 @@ export function shellArgs(cmd: string | undefined): string[] {
   return cmd ? ['-l', '-i', '-c', cmd] : ['-l'];
 }
 
+/** Exactly what a session runs: the same whether this server or the PTY keeper starts it. */
+export function spawnSpec(req: SpawnRequest): { file: string; args: string[]; cwd: string; env: Record<string, string>; cols: number; rows: number } {
+  return { file: loginShell(), args: shellArgs(req.cmd), cwd: resolveSessionCwd(req.cwd), env: buildEnv(req.sessionId, req.env), cols: req.cols, rows: req.rows };
+}
+
 export const spawnPty: SpawnFn = (req) => {
   // Loaded lazily so unit tests that inject a fake spawn never need the native module.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const pty = require('node-pty') as typeof import('node-pty');
-  const proc: IPty = pty.spawn(loginShell(), shellArgs(req.cmd), {
+  const spec = spawnSpec(req);
+  const proc: IPty = pty.spawn(spec.file, spec.args, {
     name: 'xterm-256color',
-    cols: req.cols,
-    rows: req.rows,
-    cwd: resolveSessionCwd(req.cwd),
-    env: buildEnv(req.sessionId, req.env),
+    cols: spec.cols,
+    rows: spec.rows,
+    cwd: spec.cwd,
+    env: spec.env,
     encoding: 'utf8',
   });
   return proc;
