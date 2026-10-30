@@ -33,6 +33,12 @@
  *             reporting) keeps the generation of the turn it belongs to.
  *   interim   A root Stop while background tasks still run is an interim
  *             answer (`interim: true`): the real one follows the hand-back.
+ *   prompt    A root, non-synthetic UserPromptSubmit on a surface bound to a
+ *             run is also emitted at once as a `prompt` (so Eridani's timeline
+ *             shows it before the turn ends). Its `seq` is `turnSeq + 1`, the
+ *             number the Stop that follows assigns to its turn, so
+ *             `prompt.seq === turn.seq` for the turn (or interim turn) that
+ *             answers it. The turn still carries `prompt` for older Eridanis.
  *
  * The cursor (which turn a conversation is on, recent ids) and the per-surface
  * `turnSeq` live in the registry, so a server restart neither repeats nor
@@ -40,11 +46,12 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { ERIDANI_LIMITS, truncateText, type SessionTool, type TurnBody } from '../../src/shared/eridani-link-protocol';
+import { ERIDANI_LIMITS, truncateText, type PromptBody, type SessionTool, type TurnBody } from '../../src/shared/eridani-link-protocol';
 import type { SessionRecord, TurnCursor } from '../../src/shared/remote-host-protocol';
 import { redact } from './collector/redact';
 
 export type TurnFields = Omit<TurnBody, 't' | 'op_id' | 'digest'>;
+export type PromptFields = Omit<PromptBody, 't' | 'op_id' | 'digest'>;
 
 const RECENT_IDS = 32;
 /** How long an input Eridani typed may wait for the agent to accept it as a prompt (F07). */
@@ -57,6 +64,8 @@ export interface TurnCaptureDeps {
   session(id: string): SessionRecord | undefined;
   update(id: string, patch: Partial<SessionRecord>): void;
   emit(turn: TurnFields): void;
+  /** A root prompt was submitted on a run-bound surface (absent: nobody wants prompts live). */
+  prompt?(p: PromptFields): void;
   /** The Eridani run the surface serves now, or null. */
   binding?(id: string): { runId: string; generation: number; accepted?: { generation: number; at: number } } | null;
   /** The accepted input's generation was bound to a prompt: forget it. */
@@ -154,6 +163,25 @@ export class TurnCapture {
       }
       this.prompts.set(surf, { sessionId, text, synthetic });
       this.deps.update(surf, { turnCursor: cursor });
+      if (!synthetic && cursor.runId && this.deps.prompt) {
+        const cut = truncateText(redact(text), ERIDANI_LIMITS.promptChars);
+        if (cut.text) {
+          this.deps.prompt({
+            surf,
+            incarnation: rec.incarnation ?? 0,
+            run_id: cursor.runId,
+            generation: cursor.generation ?? 0,
+            provider,
+            tool: toolFor(provider),
+            provider_session_id: sessionId,
+            // The Stop that ends this turn assigns `turnSeq + 1`; nothing else advances turnSeq.
+            seq: (rec.turnSeq ?? 0) + 1,
+            text: cut.text,
+            truncated: cut.truncated,
+            at: typeof params.at === 'number' && Number.isFinite(params.at) ? params.at : this.now(),
+          });
+        }
+      }
       return null;
     }
 

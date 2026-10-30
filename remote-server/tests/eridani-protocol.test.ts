@@ -61,6 +61,11 @@ describe('eridani link protocol', () => {
     expect(parseUpFrame(env({ t: 'session.report', ...op, entity: 'claude_code:x', tool: 'claude_code', session_id: 'x', parity: true, report: {} }))).not.toBeNull();
     expect(parseUpFrame(env({ t: 'session.report', ...op, entity: 'claude_code:x', tool: 'claude_code', session_id: 'x', report: {} }))).toBeNull();
     expect(parseUpFrame(env({ t: 'turn', surf: 's', provider_turn_id: 'p', seq: 1, text: 'x', truncated: false }))).toBeNull();
+    const prompt = { t: 'prompt', ...op, surf: 's', run_id: 'r', generation: 0, seq: 1, text: 'x', truncated: false, at: 1 };
+    expect(parseUpFrame(env(prompt))).not.toBeNull();
+    expect(parseUpFrame(env({ ...prompt, run_id: null }))).toBeNull();
+    expect(parseUpFrame(env({ ...prompt, text: 'x'.repeat(ERIDANI_LIMITS.promptChars + 1), truncated: true }))).toBeNull();
+    expect(parseUpFrame(env({ ...prompt, op_id: undefined }))).toBeNull();
   });
 
   it('truncates by code point and says so', () => {

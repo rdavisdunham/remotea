@@ -42,6 +42,7 @@ import {
   type LinkCap,
   type RunsSnapshotBody,
   type ExitBody,
+  type PromptBody,
   type SessionReportInput,
   type SessionTool,
   type SnapshotSurface,
@@ -326,6 +327,17 @@ export class EridaniLink {
 
   turn(t: Omit<TurnBody, 't' | 'op_id' | 'digest'>): boolean {
     return this.enqueue({ t: 'turn', ...t }, 1);
+  }
+
+  /**
+   * A root prompt as it was submitted. Only for an Eridani whose welcome
+   * advertised `prompt`: an older one learns the prompt from the turn, and a
+   * frame it does not know would only be refused. Not spooled while
+   * disconnected for the same reason (the turn carries the prompt anyway).
+   */
+  prompt(p: Omit<PromptBody, 't' | 'op_id' | 'digest'>): boolean {
+    if (!this.peerHas('prompt')) return false;
+    return this.enqueue({ t: 'prompt', ...p }, 1);
   }
 
   agentStatus(s: Omit<StatusBody, 't' | 'op_id' | 'digest' | 'entity'>): boolean {

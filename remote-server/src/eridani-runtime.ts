@@ -304,6 +304,7 @@ export class EridaniRuntime {
     this.deps.hub.setSink({
       status: (s) => void link.agentStatus(s),
       turn: (t) => void link.turn(t),
+      prompt: (p) => void link.prompt(p),
       exit: (e) => void link.exit(e),
       turnCaptured: (provider, sessionId) => {
         if (!this.collector || !link.ready || link.spool.fill > MAX_FILL_FOR_SCAN) return;
