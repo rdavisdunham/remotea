@@ -178,7 +178,8 @@ export class VerifyAttempts {
     if (cur) this.cancel(surf, `replaced by attempt ${cmd.attempt_id}`);
     // Already verified this exact tuple, and nothing changed since: send that result under Eridani's id.
     const done = this.last.get(surf);
-    if (done && sameTuple(done.tuple, tuple) && !done.result.canceled && !done.result.stale_workspace && done.result.workspace_fingerprint !== 'none:') {
+    // An incomplete fingerprint (S-S2) cannot prove the tree is unchanged: run again.
+    if (done && sameTuple(done.tuple, tuple) && !done.result.canceled && !done.result.stale_workspace && done.result.workspace_fingerprint !== 'none:' && done.result.workspace_complete !== false) {
       const rec = this.deps.session(surf);
       const now = rec?.eridani ? await this.deps.fingerprint(rec.eridani.worktree).catch(() => null) : null;
       if (now && now === done.result.workspace_fingerprint && !this.current.has(surf)) {

@@ -230,6 +230,21 @@ describe('verify attempts: Eridani commands share the machinery', () => {
     expect(emitted[2].adopted).toBeUndefined();
   });
 
+  it('a finished host attempt whose fingerprint was incomplete is not resent: the command runs again (S-S2)', async () => {
+    const { a, timers, runner, emitted } = unit();
+    a.onTurn(turn(1));
+    timers.advance(2000);
+    runner.calls[0].finish({ workspace_complete: false, workspace_reasons: ['git status failed'] });
+    await until(() => emitted.length === 1);
+    expect(emitted[0]).toMatchObject({ workspace_complete: false, workspace_reasons: ['git status failed'] });
+    const p = a.command('surf-1', vcmd());
+    await until(() => runner.calls.length === 2);
+    runner.calls[1].finish({ workspace_complete: true, workspace_reasons: [], isolated: true, isolation: 'bwrap' });
+    await p;
+    expect(emitted[1]).toMatchObject({ attempt_id: 'att-E', workspace_complete: true, isolated: true, isolation: 'bwrap' });
+    expect(emitted[1].adopted).toBeUndefined();
+  });
+
   it('refuses a command for an older turn than the running attempt; a newer one replaces it', async () => {
     const { a, timers, runner, emitted } = unit();
     a.onTurn(turn(2));
