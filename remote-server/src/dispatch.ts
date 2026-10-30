@@ -22,6 +22,14 @@
  *           character but newline and tab (refused at the shape check and
  *           stripped again here), so nothing can end the paste early. Injected input never
  *           counts as a person answering (agent-state.ts is not told).
+ *           S-N1: each steer or delivery is a PendingWrite with both delays
+ *           (Esc→text, text→Enter) inside its lifetime. Immediately before
+ *           every injection the write is re-fenced (run, generation,
+ *           incarnation, stop, process, agent, link epoch); a stop, a newer
+ *           steer, a newer snapshot generation, an exit, a respawn or a
+ *           reconnect cancels it at once. `executed` means Enter was sent;
+ *           otherwise `failed` with result.outcome "interrupted" and what
+ *           was written ({escape, text, enter}).
  *   stop    durable desired state: `stopRequested` is persisted on the
  *           binding before anything is sent and cleared only when the process
  *           is seen to exit; a stopped run is never resumed. interrupt = Ctrl-C
@@ -194,6 +202,25 @@ interface Queued {
   resolve: (r: CommandResult) => void;
 }
 
+/**
+ * A write in progress on a surface: a steer (Esc, delay, paste, delay,
+ * Enter) or a queued input (paste, delay, Enter). Every injection is fenced
+ * on the fields captured when it began (Dispatch.blocked); a cancel wakes its
+ * delay at once and nothing more is written.
+ */
+interface PendingWrite {
+  readonly surf: string;
+  readonly runId: string;
+  readonly kind: 'steer' | 'queue';
+  readonly generation: number;
+  readonly incarnation: number;
+  readonly linkEpoch: number;
+  readonly written: { escape: boolean; text: boolean; enter: boolean };
+  canceled: string | null;
+  timer: unknown;
+  wake: ((ok: boolean) => void) | null;
+}
+
 export interface DispatchDeps {
   hub: Hub;
   registry: Registry;
@@ -256,6 +283,10 @@ export class Dispatch {
    * server restart ends every process, so nothing survives it to vouch for.
    */
   private readonly launchedWith = new Map<string, { incarnation: number; agentSeen: boolean }>();
+  /** The write (steer or queued input) pending per surface: see PendingWrite. */
+  private readonly writes = new Map<string, PendingWrite>();
+  /** Bumped each time the link becomes ready: a write begun before a reconnect writes nothing more. */
+  private linkEpoch = 0;
 
   constructor(private readonly deps: DispatchDeps) {
     this.timers = deps.timers ?? realTimers;
@@ -539,34 +570,153 @@ export class Dispatch {
 
   // ── input ────────────────────────────────────────────────────────────────
 
-  private type(surf: string, text: string): void {
+  /**
+   * Begin a write on a surface (a steer, or the delivery of a queued input),
+   * fenced on what holds now: the run, the generation, the process
+   * incarnation and the link epoch. At most one is pending per surface; the
+   * caller cancels an older one first when a newer one supersedes it.
+   */
+  private startWrite(rec: SessionRecord, kind: PendingWrite['kind'], generation: number): PendingWrite {
+    const w: PendingWrite = {
+      surf: rec.id,
+      runId: rec.eridani!.runId,
+      kind,
+      generation,
+      incarnation: rec.incarnation ?? 0,
+      linkEpoch: this.linkEpoch,
+      written: { escape: false, text: false, enter: false },
+      canceled: null,
+      timer: null,
+      wake: null,
+    };
+    this.writes.set(rec.id, w);
+    return w;
+  }
+
+  private endWrite(w: PendingWrite): void {
+    if (this.writes.get(w.surf) === w) this.writes.delete(w.surf);
+    if (w.timer !== null) this.timers.clearTimeout(w.timer);
+    w.timer = null;
+    w.wake = null;
+  }
+
+  /** Cancel the surface's pending write (when `which` agrees): it writes nothing more, and reports why. */
+  private cancelWrites(surf: string, reason: string, which: (w: PendingWrite) => boolean = () => true): void {
+    const w = this.writes.get(surf);
+    if (!w || !which(w)) return;
+    w.canceled ??= reason;
+    this.writes.delete(surf);
+    if (w.timer !== null) this.timers.clearTimeout(w.timer);
+    w.timer = null;
+    const wake = w.wake;
+    w.wake = null;
+    wake?.(false);
+  }
+
+  /** Wait `ms` as part of the write's lifetime. False: it was canceled meanwhile (it is woken at once). */
+  private hold(w: PendingWrite, ms: number): Promise<boolean> {
+    if (w.canceled) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      w.wake = resolve;
+      w.timer = this.timers.setTimeout(() => {
+        w.timer = null;
+        w.wake = null;
+        resolve(!w.canceled);
+      }, ms);
+    });
+  }
+
+  /**
+   * Checked immediately before every byte a write injects: why it may no
+   * longer write, or null. The surface must still carry the same run, in the
+   * same generation and process incarnation, with no stop requested and the
+   * run's agent present (M7), and the link must not have dropped since the
+   * write began (Eridani's reconcile decides what happens after a reconnect).
+   */
+  private blocked(w: PendingWrite): string | null {
+    if (w.canceled) return w.canceled;
+    const rec = this.deps.registry.session(w.surf);
+    const b = rec?.eridani;
+    if (!rec || !b || b.runId !== w.runId) return 'the surface is no longer bound to the run';
+    if ((rec.incarnation ?? 0) !== w.incarnation) return `the process was replaced (incarnation ${rec.incarnation ?? 0})`;
+    if (b.generation !== w.generation) return `superseded by generation ${b.generation}`;
+    if (b.stopRequested) return 'a stop was requested';
+    if (!this.deps.hub.isLive(w.surf)) return 'the process ended';
+    if (w.linkEpoch !== this.linkEpoch || !this.deps.linkReady()) return 'the link to Eridani dropped';
+    return this.agentPresent(rec);
+  }
+
+  /** One fenced injection of a write. Null when written, else why not. */
+  private put(w: PendingWrite, step: keyof PendingWrite['written'], data: string): string | null {
+    const why = this.blocked(w);
+    if (why) return why;
+    if (!this.deps.hub.inject(w.surf, data)) return 'the process ended';
+    w.written[step] = true;
+    return null;
+  }
+
+  /**
+   * Type text as a bracketed paste, then Enter `pasteEnterMs` later. Both
+   * injections are fenced, and the Enter delay is part of the write: a cancel
+   * during it means Enter is never sent. Null when the text was submitted.
+   */
+  private async type(w: PendingWrite, text: string): Promise<string | null> {
     // M6: no ESC (or C1 CSI) reaches the terminal, so nothing can end the
     // paste early or arrive as a key (commandShapeError already refuses them).
     // eslint-disable-next-line no-control-regex -- removing control characters is the point
     const clean = text.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '');
-    this.deps.hub.inject(surf, `\x1b[200~${clean}\x1b[201~`);
-    this.timers.setTimeout(() => this.deps.hub.inject(surf, '\r'), this.timing.pasteEnterMs);
+    const pasted = this.put(w, 'text', `\x1b[200~${clean}\x1b[201~`);
+    if (pasted) return pasted;
+    if (!(await this.hold(w, this.timing.pasteEnterMs))) return w.canceled ?? 'canceled';
+    return this.put(w, 'enter', '\r');
+  }
+
+  /** The outcome of a write that did not submit its text, saying what was and was not written. */
+  private interrupted(w: PendingWrite, reason: string): CommandResult {
+    const { escape, text } = w.written;
+    const sent = w.kind === 'steer'
+      ? (text ? 'Esc and the text were sent; Enter was not' : escape ? 'Esc was sent; the text and Enter were not' : 'nothing was sent')
+      : (text ? 'the text was pasted; Enter was not sent' : 'nothing was typed');
+    const left = text ? ', so the text was not submitted (it may still sit in the agent\'s input)' : '';
+    return {
+      state: 'failed',
+      detail: `interrupted: ${reason}. ${sent}${left}.`,
+      result: { mode: w.kind, generation: w.generation, outcome: 'interrupted', reason, written: { ...w.written } },
+    };
   }
 
   private wait(ms: number): Promise<void> {
     return new Promise((r) => this.timers.setTimeout(r, ms));
   }
 
-  private async input(cmd: InputCommand, ctx: CommandContext): Promise<CommandResult> {
-    if (cmd.mode === 'steer') {
-      const rec = this.deps.registry.session(cmd.surf)!;
-      // The generation advances BEFORE the new turn starts, so its prompt binds to it.
-      this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation, acceptedInput: { generation: cmd.generation, at: this.now() } } });
-      this.deps.registry.saveNow();
-      this.rejectQueued(cmd.surf, 'superseded by a steer');
-      this.attempts.cancel(cmd.surf, 'steer');
-      ctx.begin();
-      this.deps.hub.inject(cmd.surf, '\x1b');
-      await this.wait(this.timing.steerDelayMs);
-      if (!this.deps.hub.isLive(cmd.surf)) return { state: 'failed', detail: 'the process ended before the text was typed' };
-      this.type(cmd.surf, cmd.text);
+  private async steer(cmd: InputCommand, ctx: CommandContext): Promise<CommandResult> {
+    // Fenced again: an accepted command can run later than its precheck (a replay).
+    const stale = this.fence(cmd, 'steer');
+    if (stale) return { state: 'rejected', detail: stale };
+    // A newer steer cancels the older pending write (a steer, or a queued input before its Enter).
+    this.cancelWrites(cmd.surf, 'superseded by a newer steer');
+    const rec = this.deps.registry.session(cmd.surf)!;
+    // The generation advances BEFORE the new turn starts, so its prompt binds to it.
+    const updated = this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation, acceptedInput: { generation: cmd.generation, at: this.now() } } });
+    this.deps.registry.saveNow();
+    this.rejectQueued(cmd.surf, 'superseded by a steer');
+    this.attempts.cancel(cmd.surf, 'steer');
+    const w = this.startWrite(updated ?? rec, 'steer', cmd.generation);
+    ctx.begin();
+    try {
+      const esc = this.put(w, 'escape', '\x1b');
+      if (esc) return this.interrupted(w, esc);
+      if (!(await this.hold(w, this.timing.steerDelayMs))) return this.interrupted(w, w.canceled ?? 'canceled');
+      const why = await this.type(w, cmd.text);
+      if (why) return this.interrupted(w, why);
       return { state: 'executed', result: { mode: 'steer', generation: cmd.generation } };
+    } finally {
+      this.endWrite(w);
     }
+  }
+
+  private async input(cmd: InputCommand, ctx: CommandContext): Promise<CommandResult> {
+    if (cmd.mode === 'steer') return this.steer(cmd, ctx);
     return new Promise<CommandResult>((resolve) => {
       const list = this.queues.get(cmd.surf) ?? [];
       list.push({ cmd, ctx, resolve });
@@ -592,13 +742,18 @@ export class Dispatch {
       }
       const st = this.deps.registry.session(surf)?.agentState;
       const fresh = st && st.since > (this.delivered.get(surf) ?? 0);
-      if (this.deps.linkReady() && st?.state === 'idle' && fresh) {
+      // One write per surface at a time: the previous input's Enter may still be due.
+      if (!this.writes.has(surf) && this.deps.linkReady() && st?.state === 'idle' && fresh) {
         list.shift();
         head.ctx.begin();
         this.delivered.set(surf, this.now());
         this.acceptInput(surf, head.cmd.generation);
-        this.type(surf, head.cmd.text);
-        head.resolve({ state: 'executed', result: { mode: 'queue', generation: head.cmd.generation } });
+        const w = this.startWrite(this.deps.registry.session(surf)!, 'queue', head.cmd.generation);
+        // `executed` only once Enter was sent; a cancel before it is reported as interrupted.
+        void this.type(w, head.cmd.text).then((why) => {
+          this.endWrite(w);
+          head.resolve(why ? this.interrupted(w, why) : { state: 'executed', result: { mode: 'queue', generation: head.cmd.generation } });
+        });
       }
       if (list.length) this.pollTimers.set(surf, this.timers.setTimeout(tick, this.timing.queuePollMs));
       else this.queues.delete(surf);
@@ -637,6 +792,7 @@ export class Dispatch {
     };
     const updated = this.deps.hub.updateRecord(surf, { eridani: b });
     this.deps.registry.saveNow();
+    this.cancelWrites(surf, 'a stop was requested');
     this.rejectQueued(surf, 'stopping');
     this.attempts.cancel(surf, 'stop requested');
     return updated;
@@ -705,6 +861,7 @@ export class Dispatch {
     const waiters = this.exitWaiters.get(surf);
     this.exitWaiters.delete(surf);
     for (const w of waiters ?? []) w(code);
+    this.cancelWrites(surf, 'the process exited');
     this.rejectQueued(surf, 'the process exited');
     this.attempts.cancel(surf, 'the process exited');
     this.deps.questions.surfaceExited(surf);
@@ -730,6 +887,18 @@ export class Dispatch {
     return out.state === 'executed' ? { state: 'executed', result: out.result } : { state: 'rejected', detail: out.detail };
   }
 
+  // ── Link ─────────────────────────────────────────────────────────────────
+
+  /**
+   * The link (re)became ready. A write that began before it may be stale:
+   * Eridani's runs.snapshot is the reconcile, and it has not been applied
+   * yet. Every pending write is canceled (and says so); none is resumed.
+   */
+  linkUp(): void {
+    this.linkEpoch++;
+    for (const surf of [...this.writes.keys()]) this.cancelWrites(surf, 'the link to Eridani dropped and reconnected');
+  }
+
   // ── Recovery ─────────────────────────────────────────────────────────────
 
   private resumeCommand(rec: SessionRecord): string | null | undefined {
@@ -739,6 +908,7 @@ export class Dispatch {
     const t = this.target(b.target);
     const line = resumeLine(b, t?.launch[b.harness], rec.agent.sessionId);
     // The hub respawns with this line as the next incarnation.
+    this.cancelWrites(rec.id, 'the process is being respawned');
     if (line) this.launchedWith.set(rec.id, { incarnation: (rec.incarnation ?? 0) + 1, agentSeen: false });
     return line;
   }
@@ -786,6 +956,7 @@ export class Dispatch {
           b = { ...b, generation: r.generation };
           this.deps.hub.updateRecord(rec.id, { eridani: b });
           this.deps.registry.saveNow();
+          this.cancelWrites(rec.id, `superseded by generation ${r.generation} (runs.snapshot)`, (w) => w.generation < r.generation);
         }
         if (r.verify !== undefined && rec.state !== 'exited') {
           const { verify: _old, ...rest } = b;

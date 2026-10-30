@@ -335,7 +335,7 @@ recovery ref first (`refs/remotea/recovery/<branch>`), then
 | `t` | Fields | Effect |
 |---|---|---|
 | `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, expires_at` | Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. |
-| `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then the text. Typed as a bracketed paste and Enter. Never counts as a person answering. |
+| `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then (800 ms later) the text. Typed as a bracketed paste and Enter (150 ms later). Never counts as a person answering. The outcome is `executed` only once Enter was sent; see [Input and steer outcomes](#input-and-steer-outcomes). |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
 | `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id, expires_at` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, a minimal environment, the target's timeout), then sends `verify.result`. Shares the attempt machinery of [stage D](#stage-d-verification-after-turns). |
@@ -426,7 +426,65 @@ run. This happens whether or not the link is enabled.
 **runs.snapshot** (Eridani → remotea, after welcome, chunked like the
 snapshot): `runs [{run_id, generation, desired: continue|stop|none,
 stop_mode?, verify? {verify_id, plan_revision} | null}]`. A newer generation is adopted (an older queued input is then
-refused); `desired: stop` is carried out like a stop command.
+refused, and a steer or input still waiting to type is canceled);
+`desired: stop` is carried out like a stop command.
+
+#### Input and steer outcomes
+
+A steer is three writes with two delays: Esc, 800 ms, the bracketed paste,
+150 ms, Enter. A queued input is the last two (paste, 150 ms, Enter), typed
+once the agent is idle and the link is up. Each is one pending write per
+surface, and both delays belong to it: the handler does not return until Enter
+was sent or the write was canceled. (Before S-N1 the Enter was a detached
+timer, and a steer only checked that the process was alive after its Esc
+delay, so a steer at generation 2 could be pasted and submitted after
+runs.snapshot had stopped the run at generation 3, and still report
+`executed`.)
+
+Immediately before **every** byte (Esc, the paste, Enter) the write is fenced
+again. It must still find:
+
+- the same run on the surface, in the same generation;
+- the same process incarnation, still running;
+- no `stopRequested`;
+- the run's agent present in that incarnation (stage F, M7);
+- the link up, and not reconnected since the write began.
+
+These cancel a pending write at once (its delay is woken, its timer cleared):
+
+- a `stop` command, or a runs.snapshot `desired: stop`;
+- a newer steer on the surface (it also cancels a queued input waiting for
+  its Enter);
+- a runs.snapshot that adopts a newer generation;
+- the process exiting, or being respawned;
+- the link becoming ready again. A reconnect is followed by Eridani's
+  runs.snapshot, the reconcile; a write begun before it is never resumed.
+  Eridani decides again.
+
+A steer is also re-fenced when its handler starts, so a steer accepted before
+the run moved on is `rejected` before any byte.
+
+Outcomes, through the usual `command.outcome`:
+
+| What happened | `state` | `result` |
+|---|---|---|
+| Enter was sent | `executed` | `{mode, generation}` |
+| canceled or fenced out once the write began | `failed` | `{mode, generation, outcome: "interrupted", reason, written: {escape, text, enter}}` |
+| refused before anything was written | `rejected` | none (`detail` says why) |
+
+The `detail` of an interrupted write says what was and was not sent, for
+example `interrupted: a stop was requested. Esc and the text were sent; Enter
+was not, so the text was not submitted (it may still sit in the agent's
+input).` The wire state stays `failed`: Eridani's `command.outcome` accepts
+only `executed | failed | rejected | uncertain`, so "interrupted" travels in
+`result.outcome`. Nothing was submitted, so it is not `uncertain`. When a
+newer steer cancels an older one between its paste and its Enter, the older
+text can stay in the agent's input box and be submitted together with the newer
+steer's text. Clearing the input box would need an agent-specific key
+sequence.
+
+A restart while an `input` is `executing` still settles it as `uncertain`
+(see **Journal** above): the bytes may or may not have arrived.
 
 ### Questions (Claude)
 
