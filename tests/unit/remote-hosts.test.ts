@@ -114,7 +114,7 @@ describe('HostStore', () => {
   it('stores the token encrypted and never in plain text', () => {
     const dir = tmp();
     const store = new HostStore(path.join(dir, 'hosts.json'), fakeBox);
-    const { host } = store.save({ name: 'Desk', url: 'ws://desk:7717', token: 'secret-token' });
+    const { host } = store.save({ name: 'Desk', url: 'ws://desk.tail1234.ts.net:7717', token: 'secret-token' });
     expect(host.id).toBe('desk');
     expect(store.token('desk')).toBe('secret-token');
     const raw = fs.readFileSync(path.join(dir, 'hosts.json'), 'utf8');
@@ -125,13 +125,13 @@ describe('HostStore', () => {
 
   it('changing the URL drops the server pin; an empty token clears it', () => {
     const store = new HostStore(path.join(tmp(), 'hosts.json'), fakeBox);
-    store.save({ name: 'Desk', url: 'ws://desk:7717', token: 't' });
+    store.save({ name: 'Desk', url: 'ws://desk.tail1234.ts.net:7717', token: 't' });
     store.pinServer('desk', 'srv-1');
-    expect(store.save({ id: 'desk', name: 'Desk', url: 'ws://desk:7717' }).reconnect).toBe(false);
+    expect(store.save({ id: 'desk', name: 'Desk', url: 'ws://desk.tail1234.ts.net:7717' }).reconnect).toBe(false);
     expect(store.get('desk')?.serverId).toBe('srv-1');
-    expect(store.save({ id: 'desk', name: 'Desk', url: 'ws://other:7717' }).reconnect).toBe(true);
+    expect(store.save({ id: 'desk', name: 'Desk', url: 'ws://other.tail1234.ts.net:7717' }).reconnect).toBe(true);
     expect(store.get('desk')?.serverId).toBeUndefined();
-    store.save({ id: 'desk', name: 'Desk', url: 'ws://other:7717', token: '' });
+    store.save({ id: 'desk', name: 'Desk', url: 'ws://other.tail1234.ts.net:7717', token: '' });
     expect(store.token('desk')).toBeNull();
   });
 
@@ -143,7 +143,7 @@ describe('HostStore', () => {
 
   it('refuses to save a token without secure storage', () => {
     const store = new HostStore(path.join(tmp(), 'hosts.json'), { ...fakeBox, isEncryptionAvailable: () => false });
-    expect(() => store.save({ name: 'Desk', url: 'ws://desk:7717', token: 't' })).toThrow(/Secure storage/);
+    expect(() => store.save({ name: 'Desk', url: 'ws://desk.tail1234.ts.net:7717', token: 't' })).toThrow(/Secure storage/);
   });
 });
 
