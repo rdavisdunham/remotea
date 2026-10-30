@@ -336,6 +336,8 @@ export interface HelloVerifyStatus {
   isolation?: 'bwrap' | 'none';
   /** S-N4: why a run would not be isolated. Not a readiness problem: `ready` stays true. */
   isolation_reason?: string;
+  /** Additive: the entry's timeout in seconds, as verify-runner applies it. Eridani's verify deadline follows it. */
+  timeout_s?: number;
 }
 
 /** One execution target as hello lists it, for Eridani's target picker. */

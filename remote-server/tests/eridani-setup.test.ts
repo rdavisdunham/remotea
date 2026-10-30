@@ -180,7 +180,7 @@ describe('remotea eridani setup', () => {
     expect(fs.existsSync(path.join(w.home, '.config', 'opencode'))).toBe(false);
     expect(first.skipped.join('\n')).toMatch(/opencode: not installed/);
     // The readiness table: what hello sends.
-    expect(first.readiness).toEqual([expect.objectContaining({ id: 'proj', enabled: ['claude'], harnesses: ['claude'], launch: { claude: { ready: true, version: '2.0.0' } }, verify_status: [{ id: 'test', ready: true }], mcp: { configured: true } })]);
+    expect(first.readiness).toEqual([expect.objectContaining({ id: 'proj', enabled: ['claude'], harnesses: ['claude'], launch: { claude: { ready: true, version: '2.0.0' } }, verify_status: [{ id: 'test', ready: true, timeout_s: 600 }], mcp: { configured: true } })]);
     const text = w.out.text();
     expect(text).toMatch(/TARGET\s+CHECK\s+STATUS\s+DETAIL/);
     expect(text).toMatch(/proj\s+launch claude\s+ready\s+2\.0\.0/);
