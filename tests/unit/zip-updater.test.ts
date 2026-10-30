@@ -382,20 +382,22 @@ describe('buildApplyUpdateCmd', () => {
   it.skipIf(process.platform !== 'win32')('waits for the pid, copies the payload and leaves no wait file', async () => {
     const root = tempDir();
     const src = path.join(root, 'payload');
-    const dst = path.join(root, 'install');
+    const dst = path.join(root, 'install dir'); // a space, as in "Program Files"
     fs.mkdirSync(src);
     fs.mkdirSync(dst);
-    fs.writeFileSync(path.join(src, 'wmux.exe'), 'new');
-    fs.writeFileSync(path.join(dst, 'wmux.exe'), 'old');
+    // The payload must hold the exe the install relaunches (EXENAME = %~nx4), so the "new"
+    // remotea.exe is rundll32: run with no arguments it exits at once and shows nothing, a
+    // relaunch that does not open a window in the middle of a test run.
+    const rundll32 = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'rundll32.exe');
+    fs.copyFileSync(rundll32, path.join(src, 'remotea.exe'));
+    fs.writeFileSync(path.join(dst, 'remotea.exe'), 'old');
     const helper = path.join(root, 'helper.cmd');
     fs.writeFileSync(helper, buildApplyUpdateCmd());
     const { spawn } = await vi.importActual<typeof import('child_process')>('child_process');
     // Stands in for the old wmux: alive for ~2 s, then gone.
     const old = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 2000)'], { stdio: 'ignore', windowsHide: true });
     const oldPid = old.pid!;
-    // rundll32 with no arguments exits at once and shows nothing — a relaunch
-    // that does not open a window in the middle of a test run.
-    const relaunch = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'rundll32.exe');
+    const relaunch = path.join(dst, 'remotea.exe');
     const started = Date.now();
     const code = await new Promise<number | null>((resolve) => {
       const child = spawn('cmd.exe', buildHelperArgs(helper, [String(oldPid), src, dst, relaunch]), {
@@ -405,7 +407,7 @@ describe('buildApplyUpdateCmd', () => {
     });
     expect(code).toBe(0);
     expect(Date.now() - started).toBeGreaterThanOrEqual(1500);
-    expect(fs.readFileSync(path.join(dst, 'wmux.exe'), 'utf8')).toBe('new');
+    expect(fs.readFileSync(path.join(dst, 'remotea.exe')).equals(fs.readFileSync(rundll32))).toBe(true);
     expect(fs.existsSync(path.join(root, `wmux-update-wait-${oldPid}.txt`))).toBe(false);
   }, 60_000);
 
