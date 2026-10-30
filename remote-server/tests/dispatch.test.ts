@@ -220,6 +220,32 @@ describe('dispatch: fenced input', () => {
     expect(pty.written.join('')).toContain('\x1b[200~next step\x1b[201~');
   });
 
+  it('a queued input whose begin() throws fails alone: nothing is typed, and the input behind it is still delivered', async () => {
+    const { run, hub, sp, dispatch } = setup();
+    await run(spawnCmd());
+    const pty = sp.last();
+    const surf = surfFor('run-1', 1, 1);
+    hub.agentState.report(surf, { runDepth: 1 });
+    const h = dispatch.handlers();
+    const first = h.input({ t: 'input', mode: 'queue', text: 'first', ...fence({ op_id: 'op-a' }) } as CommandBody, {
+      begin: () => {
+        throw new Error('journal_unavailable (write failed: ENOSPC)');
+      },
+    });
+    let began = false;
+    const second = h.input({ t: 'input', mode: 'queue', text: 'second', ...fence({ op_id: 'op-b' }) } as CommandBody, { begin: () => (began = true) });
+    await new Promise((r) => setTimeout(r, 10));
+    hub.agentState.report(surf, { runDepth: 0 });
+    expect(await first).toMatchObject({ state: 'failed', detail: expect.stringContaining('not delivered: journal_unavailable') });
+    // The tick rescheduled itself: the next input goes out once the agent is (still) idle.
+    expect(await second).toMatchObject({ state: 'executed' });
+    expect(began).toBe(true);
+    await until(() => pty.written.includes('\r'));
+    const typed = pty.written.join('');
+    expect(typed).toContain('second');
+    expect(typed).not.toContain('first');
+  });
+
   it('steer advances the generation first, interrupts with Esc, then types', async () => {
     const { run, sp, registry } = setup();
     await run(spawnCmd());

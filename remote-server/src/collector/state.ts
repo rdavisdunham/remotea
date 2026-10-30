@@ -8,6 +8,14 @@
 import fs from 'fs';
 import path from 'path';
 import type { Terminals } from './report';
+import type { CollectorMode } from '../config';
+
+export const COLLECTOR_STATE_FILE = 'eridani-collector.json';
+/** Delivered fingerprints per mode: a parity ack says nothing about what Eridani stored. */
+export const COLLECTOR_STATE_FILES: Record<Exclude<CollectorMode, 'off'>, string> = {
+  parity: COLLECTOR_STATE_FILE,
+  authoritative: 'eridani-collector-authoritative.json',
+};
 
 export interface SourceRecord {
   version: unknown;

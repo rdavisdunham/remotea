@@ -77,6 +77,9 @@ export interface RequestResult {
   uncertain?: boolean;
 }
 
+/** The server closes sockets admitted with a rotated token with this code (remote-server/src/server.ts TOKEN_ROTATED_CODE). */
+export const TOKEN_ROTATED_CLOSE = 4401;
+
 const realSocket: SocketFactory = (url, headers) =>
   new WebSocket(url, { headers, perMessageDeflate: false, handshakeTimeout: 8000, maxPayload: 32 * 1024 * 1024 }) as unknown as SocketLike;
 
@@ -431,6 +434,13 @@ export class RemoteHostClient {
       if (this.ws !== ws || refused) return;
       diag('conn.close', { host: this.hostId, code, reason: String(reason ?? '') });
       this.ws = null;
+      // `remotea rotate-token` revoked the token this socket was admitted with. Reconnecting with it
+      // would only be refused (HTTP 401), so go straight to "Token rejected", unless the token was
+      // already replaced here: then the next attempt uses the new one.
+      if (code === TOKEN_ROTATED_CLOSE && this.deps.token() === token) {
+        this.dispatch({ type: 'auth-failed' });
+        return;
+      }
       this.dispatch({ type: 'closed', error: this.fsm.state === 'connecting' ? 'Cannot reach the server' : undefined });
     });
   }
