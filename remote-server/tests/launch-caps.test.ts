@@ -16,7 +16,7 @@ import { saveEridaniConfig, writeEridaniToken } from '../src/config';
 import { saveTarget, type ExecutionTarget } from '../src/eridani-targets';
 import { EridaniRuntime } from '../src/eridani-runtime';
 import { readLinkStatus } from '../src/eridani-link';
-import { harnessMatrix, helloTargets, launchersToProbe, probeKey, probeLauncher, verifyStatus, type LauncherProbe } from '../src/launch-caps';
+import { harnessMatrix, helloTargets, launchersToProbe, probeKey, probeLauncher, verifyStatus, type LauncherProbe, type ProbeHarness } from '../src/launch-caps';
 import { fileVersion, hookVersion, loadBuildInfo, readServerInfo, serverInfo, UNKNOWN_BUILD, writeServerInfo } from '../src/build-info';
 import { buildStatus, fmtBuild } from '../src/cli';
 import { fmtAdvertised } from '../src/eridani-cli';
@@ -94,9 +94,9 @@ describe('probeLauncher: `<bin> --version` the way a spawn runs it', () => {
 
 describe('harnessMatrix: host-wide flags', () => {
   it('spawn only for a harness whose probe succeeded on a target that enables it', () => {
-    const probes = new Map([[probeKey('claude', 'claude'), ok('2.0.1')], [probeKey('codex', 'codex'), no()]]);
-    const m = harnessMatrix(probes, [target({ launch: { claude: {}, codex: {} } })]);
-    expect(m.claude).toMatchObject({ version: '2.0.1', installed: true, spawn: true, observe: true, question: true, steer: 'interrupt' });
+    const probes = new Map([[probeKey('claude', 'claude'), ok('2.1.314')], [probeKey('codex', 'codex'), no()]]);
+    const m = harnessMatrix(probes, [target({ launch: { claude: {}, codex: {} } })], { claudeAsk: true, codexApproval: true });
+    expect(m.claude).toMatchObject({ version: '2.1.314', installed: true, spawn: true, observe: true, question: true, question_kinds: ['ask'], steer: 'interrupt', loop: true, permission: 'capture' });
     expect(m.codex).toMatchObject({ version: null, installed: false, spawn: false, launch_error: expect.stringMatching(/not on the login shell's PATH/) });
   });
 
@@ -115,7 +115,7 @@ describe('harnessMatrix: host-wide flags', () => {
 
   it('launchersToProbe: both bare names plus every target bin, once each', () => {
     const l = launchersToProbe([target({ launch: { codex: { bin: '/opt/codex' } } }), target({ id: 'b', launch: { claude: {}, codex: { bin: '/opt/codex' } } })]);
-    expect(l).toEqual([{ harness: 'claude', bin: 'claude' }, { harness: 'codex', bin: 'codex' }, { harness: 'codex', bin: '/opt/codex' }]);
+    expect(l).toEqual([{ harness: 'claude', bin: 'claude' }, { harness: 'codex', bin: 'codex' }, { harness: 'opencode', bin: 'opencode' }, { harness: 'codex', bin: '/opt/codex' }]);
   });
 });
 
@@ -262,7 +262,7 @@ class FakeEridani {
 }
 
 describe('EridaniRuntime hello (caps_version 2)', () => {
-  async function runtime(probe: (h: 'claude' | 'codex', bin: string) => Promise<LauncherProbe>) {
+  async function runtime(probe: (h: ProbeHarness, bin: string) => Promise<LauncherProbe>) {
     const eri = new FakeEridani();
     cleanups.push(() => eri.close());
     await new Promise((r) => eri.wss.once('listening', r));
@@ -284,6 +284,7 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
       probe,
       build: { sha: 'e'.repeat(40), dirty: true, builtAt: null },
       hookPaths: { cliDir, sourceDir: tmpDir() },
+      adapterHooks: () => ({ claudeAsk: true, codexApproval: true }),
       verifyEnv: { PATH: '/nonexistent-bin' },
     });
     cleanups.push(() => rt.stop());
@@ -297,16 +298,16 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
     const { eri, dir, rt, logs, cliDir } = await runtime(async (h, bin) => {
       asked.push(`${h}:${bin}`);
       await gate;
-      return h === 'claude' ? { ok: true, version: '2.0.30' } : { ok: false, version: null, error: '`codex` is not on the login shell\'s PATH' };
+      return h === 'claude' ? { ok: true, version: '2.0.30' } : h === 'opencode' ? { ok: true, version: '1.17.20' } : { ok: false, version: null, error: '`codex` is not on the login shell\'s PATH' };
     });
     rt.start();
-    await until(() => asked.length === 2);
+    await until(() => asked.length === 3);
     await new Promise((r) => setTimeout(r, 100));
     expect(eri.hellos()).toHaveLength(0);
     release();
     await until(() => eri.hellos().length === 1);
     const hello = eri.hellos()[0];
-    expect(asked.sort()).toEqual(['claude:claude', 'codex:codex']);
+    expect(asked.sort()).toEqual(['claude:claude', 'codex:codex', 'opencode:opencode']);
     expect(hello).toMatchObject({
       version: '0.1.0',
       build_sha: 'e'.repeat(40),
@@ -315,7 +316,9 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
       hook_version: fileVersion(path.join(cliDir, 'wmux-hook.js')),
       proto: 1,
     });
-    expect(hello.harnesses.claude).toMatchObject({ version: '2.0.30', installed: true, spawn: true });
+    // 2.0.30 is below the range the AskUserQuestion adapter was tested on: not advertised, hook or no hook.
+    expect(hello.harnesses.claude).toMatchObject({ version: '2.0.30', installed: true, spawn: true, question: false, question_kinds: [] });
+    expect(hello.harnesses.opencode).toMatchObject({ version: '1.17.20', installed: true, observe: true, capture: false, question: false, spawn: false, resume: false, loop: false });
     expect(hello.harnesses.codex).toMatchObject({ version: null, installed: false, spawn: false, launch_error: expect.stringMatching(/codex/) });
     const byId = Object.fromEntries((hello.targets ?? []).map((t) => [t.id, t]));
     expect(byId.jarvis).toMatchObject({ harnesses: ['claude'], enabled: ['claude'], verify: ['api'], verify_status: [{ id: 'api', ready: false, reason: expect.stringMatching(/service PATH/) }] });

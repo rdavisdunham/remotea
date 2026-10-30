@@ -62,6 +62,7 @@ async function main(): Promise<void> {
     secret: hookSecret,
     relay: (id, method, params) => hub.relayRpc(id, method, params),
     question: (id, params, closed) => eridaniRt?.questions.hold(id, params, closed) ?? Promise.resolve({ reason: 'not-remote' }),
+    approval: (id, params, closed) => eridaniRt?.questions.holdApproval(id, params, closed) ?? Promise.resolve({ reason: 'not-remote' }),
     context: (id, params) => eridaniRt?.context.sessionStart(id, params) ?? Promise.resolve(''),
     log,
   });
