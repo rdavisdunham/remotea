@@ -296,7 +296,13 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
       const l = s.link;
       if (l) {
         out.write(`host ${l.hostId ?? '-'}  epoch ${l.connEpoch ?? '-'}  last connected ${fmtTime(l.lastConnectedAt)}  last ack ${fmtTime(l.lastAckAt)}\n`);
-        out.write(`outbox ${l.unacked} unacked, ${l.spool.entries} entries, ${Math.round(l.spool.fill * 100)}% full${l.dirty ? `, ${l.dirty} to re-read` : ''}${l.degraded ? `, DEGRADED: ${l.degraded}` : ''}\n`);
+        // An older server's status file has no `journal`, and its `degraded` is the outbox's.
+        const outboxDegraded = l.journal ? l.spool.degraded ?? null : l.degraded;
+        out.write(`outbox ${l.unacked} unacked, ${l.spool.entries} entries, ${Math.round(l.spool.fill * 100)}% full${l.dirty ? `, ${l.dirty} to re-read` : ''}${outboxDegraded ? `, DEGRADED: ${outboxDegraded}` : ''}\n`);
+        if (l.journal?.degraded) {
+          out.write(`journal DEGRADED: ${l.journal.degraded}; commands are refused (journal_unavailable) until a write succeeds${l.journal.unrecorded ? `, ${l.journal.unrecorded} outcome(s) waiting to be recorded` : ''}\n`);
+        }
+        if (l.journal?.refused) out.write(`commands refused with journal_unavailable: ${l.journal.refused}\n`);
         if (l.error) out.write(`error: ${l.error}\n`);
         if (l.rejected) out.write(`refused by Eridani: ${l.rejected} (last: ${l.lastRejection})\n`);
         if (l.advertised) for (const line of fmtAdvertised(l.advertised)) out.write(`${line}\n`);

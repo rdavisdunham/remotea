@@ -70,7 +70,9 @@ remotea eridani collector [parity|authoritative]
 - `status` reads `eridani-status.json`, which the running server rewrites at
   most once a second. `state` is `disabled`, `stopped` (enabled but no server is
   running it), or the link's state (`connecting`, `ready`, `reconnecting`,
-  `auth-failed`).
+  `auth-failed`). `degraded` says why the link is degraded, the journal first;
+  `journal {degraded, unrecorded, refused}` and `spool.degraded` give the
+  detail (see [When the journal cannot be written](#commands)).
 - `disconnect` disables the link; `--forget` deletes the key too.
 - `collect --dry-run` prints what the collector would report, in the same table
   as `collector.py --dry-run`. Without `--dry-run`, it asks the running server
@@ -119,7 +121,7 @@ remotea sends:
 
 | `t` | Lane | Coalesced by | Notes |
 |---|---|---|---|
-| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)) |
+| `hello` | | | `server_id, boot_id, hostname, machine, proto: 1, version, build_sha, build_dirty?, caps_version?, hook_version?, caps, harnesses, targets?` (see [Capabilities and build identity](#capabilities-and-build-identity)), and `degraded_reason?` (string, only while degraded: `journal_unavailable (<stage> failed: <code>)` first, else the outbox's `disk-full` / `write-failed: <code>` / `read-failed: <code>` / `spool-full`; absent when healthy) |
 | `sessions.snapshot` | control | (per connection) | Sent after every welcome. `part {of, i, n}`, `surfaces[]`, `journal {pending, uncertain}`. Never persisted. |
 | `command.outcome` | control | `outcome:<op_id>` | Stage B only reports `rejected` (`unsupported` / `expired`). |
 | `status` | live | `status:<surf>`, numeric `revision` | `surf, incarnation, state, since, reason?, provider?, provider_session_id?` |
@@ -166,9 +168,18 @@ Eridani sends:
   that source's fingerprint and sends it again.
 - `turn` and `exit` are never evicted. Past twice the bound they are refused,
   and the status shows `degraded: spool-full`.
-- A torn final line from a crash is cut off at load. A failed write
-  (ENOSPC, EIO, …) keeps events in memory and marks `degraded: disk-full`.
-  The next successful compaction clears it.
+- A torn final line from a crash is cut off at load. A failed write keeps
+  events in memory and marks the outbox degraded: `disk-full` for ENOSPC, EIO
+  and the like, or `write-failed: <code>` for anything else, such as EACCES
+  or a short write. After a failed write nothing more is appended, because
+  the file may end in a torn line. The next write rewrites the whole file
+  from memory instead, and the first rewrite that succeeds clears the
+  degradation. An outbox that cannot be read at start (`read-failed: <code>`)
+  is never overwritten. Events stay in memory until it can be read, and then
+  the two are merged. `spool-full` clears once acks make room. The outbox is
+  memory-first on purpose: a degraded outbox can lose events across a
+  restart, but it never runs anything. The status file shows it as
+  `spool.degraded`, and as `degraded` when the journal is healthy.
 
 ## Turn capture
 
@@ -407,6 +418,54 @@ ack of an accepted command already says
   (the process ended with the server), a `verify` as `failed`; an `input` or
   `answer` becomes `uncertain`, since its bytes may or may not have arrived;
 - a duplicate `op_id` gets its recorded outcome, never a second run.
+
+**When the journal cannot be written** (disk full, an I/O or sync error, a
+permission change, a failed rewrite). Everything above relies on what the
+journal says being on disk, so:
+
+- A state change is appended and fdatasynced first, and only then does the
+  server's memory of the op change. A failed write is cut back off the file
+  (best effort), leaves memory as it was, and marks the journal degraded. A
+  duplicate, `replayAccepted` and the reconnect snapshot
+  (`journal {pending, uncertain}`) therefore only ever see durable states.
+- While the journal cannot record a command's first state, the command is
+  refused with `ack {ok: false, error: "journal_unavailable", outcome:
+  {state: "rejected", detail: "journal_unavailable", durable: false}}`. Nothing
+  is journaled, nothing runs, and no `command.outcome` follows. Eridani treats
+  it as a final refusal ("refused by the host: journal_unavailable"); the
+  `op_id` is not remembered, so a resend is judged afresh. This holds for
+  rejections too: a refusal that cannot be recorded is never acked as a
+  recorded `rejected`.
+- If `executing` cannot be recorded, the handler is stopped before its
+  effect (the `begin()` it calls throws) and the command's outcome is
+  `failed` ("journal_unavailable: not started"). If the final outcome cannot
+  be recorded, the effect has happened but nothing is reported. Either way
+  the outcome waits in memory and the journal keeps saying
+  `accepted`/`executing`. Once the journal can be written again the outcome
+  is recorded, then sent as `command.outcome`. A restart before that settles
+  the op from what is on disk (an `accepted` one is re-run, an `executing`
+  one goes through `recover` or becomes `uncertain`), never from memory.
+- Settlements a restart makes (`executing` → settled or `uncertain`) reach
+  memory and are reported only once they are written. A journal that exists
+  but cannot be read is never overwritten: commands are refused until it can
+  be read, and then it is merged.
+- After a failed write the file may hold a torn or unsynced line, so the next
+  write first rewrites the whole journal from memory (temp file, fsync,
+  rename). The first write that succeeds clears the degradation. That is the
+  next command Eridani sends, or a probe every 30 s while degraded. A
+  compaction that fails while the journal is healthy changes nothing, since
+  every appended line is already synced.
+- The terminals are not affected. The hub and every PTY keep running, and
+  people keep typing; only Eridani's effectful commands are refused. Every
+  asynchronous entry into command handling (each inbound frame, each replay,
+  and dispatch's timers such as a queued input starting) catches and logs
+  instead of letting an exception or a rejected promise reach the process.
+- The link reports it. `eridani-status.json` (`remotea eridani status`) has
+  `degraded: "journal_unavailable (<stage> failed: <code>)"`, where stage is
+  `open`, `write`, `sync`, `compaction` or `read`, and
+  `journal {degraded, unrecorded, refused}`. The CLI prints a `journal
+  DEGRADED` line. The next `hello` carries the same text as
+  `degraded_reason` (see below).
 
 **Recovery on boot.** Eridani sessions the restart lost are respawned with
 their conversation (`claude --resume <id> --model <m> --permission-mode auto`,

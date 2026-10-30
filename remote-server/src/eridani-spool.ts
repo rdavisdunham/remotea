@@ -20,9 +20,17 @@
  *     without an entity (turns, exits) are protected: they may run to
  *     `hardFactor` × the bounds, past which the spool refuses and reports
  *     itself degraded.
- *   - A torn final line (a crash mid-append) is cut off on load; disk full
- *     keeps the entry in memory, marks the spool degraded, and retries the
- *     file on the next compaction.
+ *   - A torn final line (a crash mid-append) is cut off on load.
+ *   - Any failed write (disk full, EIO, a permission change, a short write)
+ *     keeps the entry in memory and marks the spool degraded. The file may
+ *     then hold a torn line or miss one, so nothing more is appended to it:
+ *     the next write rewrites it whole from memory (a compaction), and the
+ *     first compaction that succeeds clears the degradation. Unlike the
+ *     inbound journal, the outbox is memory-first by design: a degraded
+ *     outbox only risks losing events across a restart, never running
+ *     anything, and the status says so.
+ *   - An outbox that exists but cannot be read is never overwritten: events
+ *     stay in memory until a later read succeeds and the two are merged.
  *   - `ephemeral` entries (a connection's reconcile snapshot) never touch disk.
  */
 import fs from 'fs';
@@ -68,13 +76,25 @@ export class Spool {
   private bytesTotal = 0;
   private deadLines = 0;
   private fd: number | null = null;
-  degraded: string | null = null;
+  /** Why the file is behind memory (`disk-full`, `write-failed: EACCES`, `read-failed: …`); null when it is not. */
+  private writeError: string | null = null;
+  /** The file may disagree with memory: rewrite it whole before appending again. */
+  private needsRewrite = false;
+  /** The file exists but could not be read: never overwrite it. */
+  private unread = false;
+  /** Protected events are being refused (past the hard bound). */
+  private full = false;
   evictedTotal = 0;
   private readonly now: () => number;
 
   constructor(private readonly opts: SpoolOptions) {
     this.now = opts.now ?? Date.now;
     this.load();
+  }
+
+  /** Why the outbox is not keeping up (a failed write wins over `spool-full`), or null. */
+  get degraded(): string | null {
+    return this.writeError ?? (this.full ? 'spool-full' : null);
   }
 
   get size(): number {
@@ -137,10 +157,11 @@ export class Spool {
     }
     if (protectedEntry && (this.entries.size > hardEntries || this.bytesTotal > hardBytes)) {
       this.remove(entry.op_id);
-      this.degraded = 'spool-full';
-      this.opts.log?.('eridani spool: full of protected events; refusing new ones');
+      if (!this.full) this.opts.log?.('eridani spool: full of protected events; refusing new ones');
+      this.full = true;
       return { ok: false, reason: 'spool-full' };
     }
+    if (protectedEntry) this.full = false;
     if (!entry.ephemeral) this.write({ k: 'put', e: entry });
     return { ok: true, op_id: entry.op_id, evicted };
   }
@@ -150,6 +171,7 @@ export class Spool {
     const e = this.entries.get(op);
     if (!e) return undefined;
     this.remove(op);
+    if (this.full && this.entries.size < this.opts.maxEntries * this.opts.hardFactor && this.bytesTotal < this.opts.maxBytes * this.opts.hardFactor) this.full = false;
     return e;
   }
 
@@ -204,15 +226,19 @@ export class Spool {
     this.opts.onDirty?.(entity);
   }
 
+  /**
+   * Persist one change already made in memory. After any failed write the file
+   * is only ever rewritten whole (a compaction captures this change too), never
+   * appended to, so a torn or missing line cannot corrupt the lines after it.
+   */
   private write(line: Record<string, unknown>): void {
     const file = this.opts.file;
     if (!file) return;
     if (line.k !== 'put') this.deadLines++;
-    if (this.degraded === 'disk-full' || this.deadLines > Math.max(1000, this.entries.size * 2)) {
+    if (this.unread || this.needsRewrite || this.deadLines > Math.max(1000, this.entries.size * 2)) {
       this.compact();
-      if (this.degraded !== 'disk-full') return;
+      return;
     }
-    if (this.degraded === 'disk-full') return;
     try {
       this.appendLine(file, JSON.stringify(line) + '\n');
     } catch (err) {
@@ -223,20 +249,26 @@ export class Spool {
   private appendLine(file: string, text: string): void {
     if (this.opts.append) return this.opts.append(file, text);
     if (this.fd === null) this.fd = fs.openSync(file, 'a', 0o600);
-    fs.writeSync(this.fd, text);
+    const buf = Buffer.from(text);
+    const n = fs.writeSync(this.fd, buf);
+    if (n !== buf.length) throw Object.assign(new Error(`short write (${n} of ${buf.length} bytes)`), { code: 'ESHORTWRITE' });
     fs.fdatasyncSync(this.fd);
   }
 
   private onWriteError(err: unknown): void {
-    const code = (err as NodeJS.ErrnoException).code ?? '';
-    this.degraded = DISK_ERRORS.has(code) || code === 'TEST_DISK_FULL' ? 'disk-full' : `write-failed: ${code || (err as Error).message}`;
-    this.opts.log?.(`eridani spool: cannot write (${this.degraded}); keeping events in memory`);
+    const code = (err as NodeJS.ErrnoException)?.code ?? '';
+    const reason = DISK_ERRORS.has(code) || code === 'TEST_DISK_FULL' ? 'disk-full' : `write-failed: ${code || (err as Error)?.message || String(err)}`;
+    this.needsRewrite = true;
+    this.close();
+    if (this.writeError !== reason) this.opts.log?.(`eridani spool: cannot write (${reason}); keeping events in memory`);
+    this.writeError = reason;
   }
 
   /** Rewrite the file with only the live entries and dirty marks. */
   compact(): void {
     const file = this.opts.file;
     if (!file) return;
+    if (this.unread && !this.reread(file)) return;
     const lines = [...this.entries.values()].filter((e) => !e.ephemeral).sort((a, b) => a.n - b.n).map((e) => JSON.stringify({ k: 'put', e }));
     for (const entity of this.dirtySet) lines.push(JSON.stringify({ k: 'dirty', entity }));
     const text = lines.length ? lines.join('\n') + '\n' : '';
@@ -247,7 +279,9 @@ export class Spool {
       } else {
         const fd = fs.openSync(tmp, 'w', 0o600);
         try {
-          fs.writeSync(fd, text);
+          const buf = Buffer.from(text);
+          const n = fs.writeSync(fd, buf);
+          if (n !== buf.length) throw Object.assign(new Error(`short write (${n} of ${buf.length} bytes)`), { code: 'ESHORTWRITE' });
           fs.fsyncSync(fd);
         } finally {
           fs.closeSync(fd);
@@ -255,8 +289,6 @@ export class Spool {
       }
       this.close();
       fs.renameSync(tmp, file);
-      this.deadLines = 0;
-      if (this.degraded === 'disk-full') this.degraded = null;
     } catch (err) {
       try {
         fs.rmSync(tmp, { force: true });
@@ -264,17 +296,27 @@ export class Spool {
         /* nothing to clean */
       }
       this.onWriteError(err);
+      return;
     }
+    this.deadLines = 0;
+    this.needsRewrite = false;
+    if (this.writeError) this.opts.log?.(`eridani spool: writing again (was: ${this.writeError})`);
+    this.writeError = null;
   }
 
   private load(): void {
     const file = this.opts.file;
     if (!file) return;
-    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    } catch {
+      /* reading, or the first write, says what is wrong */
+    }
     let text: string;
     try {
       text = fs.readFileSync(file, 'utf8');
-    } catch {
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') this.markUnread(err);
       return;
     }
     // A crash mid-append leaves a final line without its newline: cut it off.
@@ -282,9 +324,23 @@ export class Spool {
     if (lastNl !== text.length - 1) {
       const keep = text.slice(0, lastNl + 1);
       this.opts.log?.(`eridani spool: dropped a torn final line (${text.length - keep.length} bytes)`);
-      fs.truncateSync(file, Buffer.byteLength(keep));
+      try {
+        fs.truncateSync(file, Buffer.byteLength(keep));
+      } catch {
+        // Appending after the torn line would corrupt the next one: rewrite instead.
+        this.needsRewrite = true;
+      }
       text = keep;
     }
+    this.parse(text);
+    try {
+      fs.chmodSync(file, 0o600);
+    } catch {
+      /* not ours to fix */
+    }
+  }
+
+  private parse(text: string): void {
     for (const line of text.split('\n')) {
       if (!line) continue;
       let rec: { k?: string; e?: SpoolEntry; op?: string; entity?: string };
@@ -305,10 +361,47 @@ export class Spool {
       } else if (rec.k === 'dirty' && rec.entity) this.dirtySet.add(rec.entity);
       else if (rec.k === 'clean' && rec.entity) this.dirtySet.delete(rec.entity);
     }
+  }
+
+  private markUnread(err: unknown): void {
+    this.unread = true;
+    const reason = `read-failed: ${(err as NodeJS.ErrnoException)?.code || (err as Error)?.message || String(err)}`;
+    if (this.writeError !== reason) this.opts.log?.(`eridani spool: cannot read the outbox (${reason}); keeping events in memory and leaving the file alone`);
+    this.writeError = reason;
+  }
+
+  /**
+   * The outbox could not be read at start: try again, and merge what it holds
+   * under what memory gathered since (memory is newer for the same entity;
+   * the file's events go first). False while it still cannot be read.
+   */
+  private reread(file: string): boolean {
+    let text: string;
     try {
-      fs.chmodSync(file, 0o600);
-    } catch {
-      /* not ours to fix */
+      text = fs.readFileSync(file, 'utf8');
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        this.markUnread(err);
+        return false;
+      }
+      text = '';
     }
+    const mine = [...this.entries.values()];
+    const myDirty = [...this.dirtySet];
+    for (const e of mine) this.remove(e.op_id, false);
+    this.counter = 0;
+    const lastNl = text.lastIndexOf('\n');
+    this.parse(text.slice(0, lastNl + 1));
+    const base = this.counter;
+    for (const e of mine.sort((a, b) => a.n - b.n)) {
+      const prev = e.entity ? this.byEntity.get(e.entity) : undefined;
+      if (prev) this.remove(prev, false);
+      this.insert({ ...e, n: base + e.n });
+    }
+    this.counter = base + mine.reduce((m, e) => Math.max(m, e.n), 0);
+    for (const entity of myDirty) this.dirtySet.add(entity);
+    this.unread = false;
+    this.opts.log?.('eridani spool: the outbox is readable again; merged it with the events kept in memory');
+    return true;
   }
 }
