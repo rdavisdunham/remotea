@@ -30,6 +30,10 @@
  *     and the named session's session.report, both sent even when nothing
  *     changed, then `executed`. Journaled like every command; its fence is
  *     informational (a stale scan is harmless), only `expires_at` is enforced.
+ *   - `terminal.focus` (Eridani's "Open terminal in remotea"): the hub asks
+ *     every connected app that understands `focus` to bring the run's tab to
+ *     the front. `executed` when at least one app was told, `rejected`
+ *     `no_desktop` when none was, `unknown_surf` when the surface is gone.
  *   - What hello advertises comes from the launch environment (S-S1,
  *     launch-caps.ts): every launcher is probed through the login shell
  *     before the link first starts (later starts reuse the last results and
@@ -49,6 +53,7 @@ import {
   type DoctorSummary,
   type HarnessCaps,
   type LinkCap,
+  type TerminalFocusCommand,
   type WorktreeReport,
   type WorktreesScanCommand,
 } from '../../src/shared/eridani-link-protocol';
@@ -57,6 +62,7 @@ import {
   eridaniConfigStamp,
   linkUrlError,
   loadEridaniConfig,
+  resolveWebUrl,
   readEridaniToken,
   type CollectorMode,
   type EridaniConfig,
@@ -230,6 +236,7 @@ export class EridaniRuntime {
       worktrees: (this.worktrees = new WorktreeManager({ dir: deps.dir })),
       targets: () => loadTargets(deps.dir),
       mcp: (t) => resolveMcp(deps.dir, t),
+      webUrl: () => resolveWebUrl(deps.dir),
       questions: this.questions,
       emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
       changed: () => void this.reportWorktrees(),
@@ -303,6 +310,8 @@ export class EridaniRuntime {
       return;
     }
     this.cfg = cfg;
+    // Runs started before the binding carried Eridani's web URL can be linked to it too.
+    this.dispatch.backfillWebUrl();
     const machine = cfg!.machine || this.deps.hostname;
     const mode = cfg!.collector;
     const parity = mode !== 'authoritative';
@@ -350,10 +359,16 @@ export class EridaniRuntime {
         this.replayTimer = setTimeout(() => this.replay(), REPLAY_FALLBACK_MS);
         this.replayTimer.unref?.();
       },
-      handlers: { ...this.dispatch.handlers(), 'worktrees.scan': (c, ctx) => this.scanCommand(c, ctx) },
+      handlers: {
+        ...this.dispatch.handlers(),
+        'worktrees.scan': (c, ctx) => this.scanCommand(c, ctx),
+        'terminal.focus': async (c, ctx) => this.focusCommand(c, ctx),
+      },
       precheck: (cmd) => this.dispatch.precheck(cmd),
-      // A scan cut off by a restart already sent whatever it sent; Eridani's hold bounds the wait.
-      recover: (rec) => (rec.t === 'worktrees.scan' ? { state: 'failed', detail: 'interrupted by a server restart' } : this.dispatch.recover(rec)),
+      // A scan (or a focus) cut off by a restart already did whatever it did; Eridani's wait bounds it.
+      recover: (rec) => (rec.t === 'worktrees.scan' || rec.t === 'terminal.focus'
+        ? { state: 'failed', detail: 'interrupted by a server restart' }
+        : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
       caps: () => linkCaps(mode),
       targets: () => this.helloTargets(),
@@ -566,6 +581,24 @@ export class EridaniRuntime {
       }
     }
     return { state: 'executed', result };
+  }
+
+  /**
+   * `terminal.focus`: bring the run's tab to the front in the connected
+   * apps. The surface must still exist, be running, and belong to the run;
+   * otherwise `unknown_surf`. `no_desktop` when no app that understands
+   * `focus` (and has not hidden the tab) is connected, so Eridani can show
+   * where the terminal is instead.
+   */
+  private focusCommand(cmd: CommandBody, ctx: CommandContext): CommandResult {
+    const c = cmd as unknown as TerminalFocusCommand;
+    const rec = this.deps.registry.session(c.surf);
+    if (!rec || rec.state === 'exited' || !this.deps.hub.isLive(c.surf) || rec.eridani?.runId !== c.run_id) {
+      return { state: 'rejected', detail: 'unknown_surf' };
+    }
+    ctx.begin();
+    const desktops = this.deps.hub.focus(c.surf, c.run_id);
+    return desktops ? { state: 'executed', result: { desktops } } : { state: 'rejected', detail: 'no_desktop' };
   }
 
   /** Run what was accepted before a restart and never started (once per connection). */

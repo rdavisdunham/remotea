@@ -265,6 +265,8 @@ export interface DispatchDeps {
   mcp?: (target: ExecutionTarget) => McpResolution;
   /** Where per-run Claude MCP configs go (default `<dir>/eridani-mcp`, or a private temp folder when dir is null). */
   mcpDir?: string;
+  /** Eridani's web app (config.ts resolveWebUrl), recorded on each binding for the desktop's "Open in Eridani". */
+  webUrl?: () => string | null;
 }
 
 export const DEFAULT_TIMING = {
@@ -375,6 +377,32 @@ export class Dispatch {
         return qs.length ? { questions: qs } : {};
       },
     };
+  }
+
+  private webUrl(): string | null {
+    try {
+      return this.deps.webUrl?.() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Bindings recorded before `webUrl` existed (or while it could not be
+   * derived) get the current one, so the desktop can link them to Eridani
+   * too. Never changes a binding that already has one. Returns how many.
+   */
+  backfillWebUrl(): number {
+    const url = this.webUrl();
+    if (!url) return 0;
+    let n = 0;
+    for (const rec of this.deps.registry.sessions()) {
+      if (!rec.eridani || rec.eridani.webUrl || rec.state === 'exited') continue;
+      this.deps.hub.updateRecord(rec.id, { eridani: { ...rec.eridani, webUrl: url } });
+      n++;
+    }
+    if (n) this.deps.registry.saveNow();
+    return n;
   }
 
   runToken(surf: string): string | null {
@@ -634,7 +662,11 @@ export class Dispatch {
         ...(cmd.verify ? { verify: { verifyId: cmd.verify.verify_id, planRevision: cmd.verify.plan_revision } } : {}),
         // F07: the prompt typed at launch belongs to the spawn's generation.
         ...(prompt ? { acceptedInput: { generation: cmd.generation, at: this.now() } } : {}),
+        // What the desktop needs to link back to the run (no secrets): only what this spawn and config carry.
+        ...(cmd.title ? { taskTitle: cmd.title } : {}),
       };
+      const webUrl = this.webUrl();
+      if (webUrl) binding.webUrl = webUrl;
       const mcp = this.prepareMcp(surf, target, cmd.harness);
       if (mcp) binding.mcp = mcp.status;
       const { groupId, group } = this.groupFor(cmd.group ?? 'Eridani');

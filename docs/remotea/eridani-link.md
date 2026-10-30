@@ -56,6 +56,11 @@ Both files live in the server's config dir (`~/.config/remotea`, or
 only in the `Authorization` header. It is never logged, never written to the
 outbox or the status file, and never put in a session's environment.
 
+`webUrl` (optional) is Eridani's web app, for links back to a run (see
+[Open in Eridani, and the terminal from Eridani](#open-in-eridani-and-the-terminal-from-eridani)).
+It must be `https://` (`http://` only for localhost); without it the host
+derives it from `url` (`wss://host/…` → `https://host`).
+
 `eridani-mcp-token` (optional, mode 0600) holds a **separate** bot key that
 spawned agents use for Eridani's MCP server; see
 [Eridani MCP for spawned agents](#eridani-mcp-for-spawned-agents). Two more
@@ -595,13 +600,14 @@ worktree, so "unmerged work" can say who is still on it; the CLI prints it as
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
 | `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id, expires_at` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, a minimal environment, the target's timeout), then sends `verify.result`. Shares the attempt machinery of [stage D](#stage-d-verification-after-turns). |
+| `terminal.focus` | `surf, run_id, generation, expires_at` (Eridani gives it 30 s) | Eridani's "Open terminal in remotea": sent only to a host whose hello `caps` has `terminal.focus`. The hub sends `{t: "focus", id: surf, runId}` to every connected app whose hello listed the `focus` feature and that has not hidden the session; the app raises its window and selects the tab. `executed` with `result {desktops: <how many apps were told>}`; `rejected` `no_desktop` when none was (no app connected, only older apps, or every app hid the tab), so Eridani shows where the terminal is instead; `rejected` `unknown_surf` when the surface is gone, exited, or not bound to `run_id`. The generation is informational (a stale one is harmless). `expires_at` is required. Journaled like every command; found `executing` after a restart it settles as `failed`. See [Open in Eridani](#open-in-eridani-and-the-terminal-from-eridani). |
 | `worktrees.scan` | `run_id, generation, branch, turn_seq, tool?, session_id?, expires_at` (Eridani gives it 2 min) | The judge's PR evidence (Eridani PR #94): sent only to a host whose hello `caps` has `worktrees.scan`, while a judge verdict waits for a PR record newer than the turn. Rescans the worktrees and sends `worktrees.report` **even if nothing changed**; when `tool` and `session_id` are given (both or neither), re-reads that session with the collector and sends its `session.report` even if its fingerprint is unchanged. Then `executed` with `result {worktrees: "reported", session?: "reported" \| "not_found" \| "collector_off"}`; `failed` (with the reason) when a scan fails or the outbox refuses a report. The run fence is informational: a stale `run_id`/`generation` is harmless and not rejected, but `expires_at` is required and a past one is `rejected` ("expired"). Journaled like every command (refused with `journal_unavailable` when the journal cannot record it); found `executing` after a restart it settles as `failed`. |
 
-Every command (except `worktrees.scan`, which only reads) needs a fence that matches: an `input`/`stop` names the surface
+Every command (except `worktrees.scan`, which only reads, and `terminal.focus`, which only raises a tab) needs a fence that matches: an `input`/`stop` names the surface
 and its `incarnation`, the run, and the generation (a queued input must match
 the current generation; steer and stop may name a newer one). Every effectful
 command (`spawn`, `input`, `answer`, `stop`, `verify`) must carry
-`expires_at`, and so must `worktrees.scan`. A missing one is rejected (`expires_at required`, since stage
+`expires_at`, and so must `worktrees.scan` and `terminal.focus`. A missing one is rejected (`expires_at required`, since stage
 F), and so is one that is past or more than 7 days out (the replay horizon,
 the time the journal remembers an `op_id`).
 
@@ -742,6 +748,44 @@ sequence.
 
 A restart while an `input` is `executing` still settles it as `uncertain`
 (see **Journal** above): the bytes may or may not have arrived.
+
+### Open in Eridani, and the terminal from Eridani
+
+Both directions between a run's terminal tab and its page in Eridani (roadmap
+task 03ff84bf).
+
+**From the tab to Eridani.** A spawn's binding (`SessionRecord.eridani`, which
+every app receives in `welcome`, `sessionAdded` and `sessionUpdated`) carries,
+besides `runId`, `taskId` and `generation`:
+
+| Field | From | |
+|---|---|---|
+| `webUrl` | `eridani.json` `webUrl`, else derived from the link `url` | Eridani's web app (origin and path, no trailing slash). Absent when neither gives an http(s) URL. Bindings recorded before this field existed are filled in when the link is (re)configured; one that has it is never changed. |
+| `taskTitle` | the spawn's `title` | Absent when the spawn carried none. |
+
+No secret is in it. The app shows a small ↗ button on such a tab and, in the
+tab's context menu, **Open in Eridani** (the system browser, through
+`shell.openExternal`) and **Copy run link**. The link is
+`<webUrl>/?view=remotea&run=<runId>`, Eridani's existing deep link to the run
+panel (`src/shared/eridani-deep-link.ts`). The app builds it only from an
+`http:`/`https:` URL without credentials and a plain run id; anything else
+shows no link, and the main process refuses any other scheme as well. An
+older server sends no `webUrl`: the tab simply has no link.
+
+**From Eridani to the tab.** `terminal.focus` (see [Commands](#commands)).
+App ↔ server, additively:
+
+- The app's `hello` may carry `features: ["focus"]` (an app that can raise a
+  tab). An older server ignores the field; a newer server ignores names it
+  does not know.
+- `welcome.features` lists `focus` (this server may send it).
+- `{t: "focus", id, runId?}` goes only to apps that listed `focus`; an
+  older app never gets it (it would drop it anyway: unknown types are
+  ignored), which is why the host answers `no_desktop` when only older apps
+  are connected.
+
+The app raises the window that shows the tab (restoring a minimized one) and
+selects the tab; if no window shows it yet, it raises the main window.
 
 ### Questions (Claude)
 
@@ -1332,9 +1376,10 @@ Other sessions see at most the fenced candidate list (D6, above).
 Eridani may require it), `context.scope`, `prompt` (live `prompt` frames,
 sent only when Eridani advertises `prompt` back), `worktrees.scan` (the
 host takes the [`worktrees.scan`](#commands) command; an Eridani that never
-sends it loses nothing) and `doctor` (live [`doctor`](#doctor) frames, sent
-only when Eridani advertises `doctor` back; hello carries the summary
-regardless). The lag rules:
+sends it loses nothing), `terminal.focus` (the host takes the
+[`terminal.focus`](#commands) command; likewise optional) and `doctor` (live
+[`doctor`](#doctor) frames, sent only when Eridani advertises `doctor` back;
+hello carries the summary regardless). The lag rules:
 
 - Eridani refuses an `op_id` frame without a digest only from a host that
   advertises `digest`.

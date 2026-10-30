@@ -124,6 +124,8 @@ export interface HubEridaniHooks {
 export interface HubConn extends ConnLike {
   /** Set by hello. Messages before it are rejected. */
   device: { id: string; name: string } | null;
+  /** What the app said it understands (hello.features); absent for older apps. */
+  features?: ReadonlySet<string>;
   close(code: number, reason: string): void;
 }
 
@@ -296,6 +298,8 @@ export class Hub {
     if (this.deps.diag) f.push('diag');
     if (this.deps.hooks) f.push('hooks');
     if (this.deps.fs) f.push('fs');
+    // This server may send `focus` (Eridani's terminal.focus) to apps whose hello listed it.
+    f.push('focus');
     return f;
   }
 
@@ -383,6 +387,7 @@ export class Hub {
       return;
     }
     conn.device = { id: msg.device.id, name: msg.device.name };
+    conn.features = new Set(msg.features ?? []);
     this.registry.touchDevice(msg.device.id, msg.device.name);
     conn.sendJson({
       t: 'welcome',
@@ -575,6 +580,25 @@ export class Hub {
     if (!s || s.state !== 'live') return false;
     s.kill();
     return true;
+  }
+
+  /**
+   * Ask the apps to bring session `id`'s tab to the front (Eridani's
+   * `terminal.focus`). Only apps whose hello listed `focus` are told (an
+   * older app would drop the message), and not a device that hid the
+   * session. Returns how many apps were sent it: 0 means nobody can show it.
+   */
+  focus(id: string, runId?: string): number {
+    const rec = this.registry.session(id);
+    if (!rec) return 0;
+    let sent = 0;
+    for (const c of this.conns.values()) {
+      if (!c.device || !c.features?.has('focus') || rec.hiddenBy.includes(c.device.id)) continue;
+      c.sendJson({ t: 'focus', id: id as RemoteSurfaceId, ...(runId ? { runId } : {}) });
+      sent++;
+    }
+    this.log(`focus ${id}: sent to ${sent} app${sent === 1 ? '' : 's'}`);
+    return sent;
   }
 
   /** Persist and announce a record change made outside a client request (dispatch.ts). */
