@@ -107,7 +107,12 @@ export function fmtAdvertised(a: Advertised): string[] {
       const l = t.launch?.[h];
       return l ? `${h} ${l.ready ? 'ready' : `NOT ready (${l.error ?? '?'})`}` : h;
     });
-    const verify = (t.verify_status ?? t.verify.map((id) => ({ id, ready: true }))).map((v) => ('reason' in v && v.reason ? `${v.id} NOT ready (${v.reason})` : `${v.id} ${v.ready ? 'ready' : 'NOT ready'}`));
+    const verify = (t.verify_status ?? t.verify.map((id) => ({ id, ready: true }))).map((v) => {
+      const state = 'reason' in v && v.reason ? `${v.id} NOT ready (${v.reason})` : `${v.id} ${v.ready ? 'ready' : 'NOT ready'}`;
+      // S-N4: whether it runs in the bubblewrap sandbox.
+      if (!('isolated' in v) || v.isolated === undefined) return state;
+      return v.isolated ? `${state}, sandboxed` : `${state}, NOT sandboxed${v.isolation_reason ? ` (${v.isolation_reason})` : ''}`;
+    });
     lines.push(`target ${t.id}: ${launch.join(', ') || 'no harness enabled'}; verify ${verify.join(', ') || 'none'}`);
   }
   return lines;

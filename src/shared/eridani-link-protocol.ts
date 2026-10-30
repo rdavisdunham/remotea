@@ -250,6 +250,12 @@ export interface HelloVerifyStatus {
   ready: boolean;
   /** Why not ready (never the argv). */
   reason?: string;
+  /** S-N4 (additive): a run now would be sandboxed (bubblewrap works and the entry does not opt out). */
+  isolated?: boolean;
+  /** S-N4: the entry's isolation, `bwrap` or `none` (a default `bwrap` falls back to `none` where bwrap is unusable). */
+  isolation?: 'bwrap' | 'none';
+  /** S-N4: why a run would not be isolated. Not a readiness problem: `ready` stays true. */
+  isolation_reason?: string;
 }
 
 /** One execution target as hello lists it, for Eridani's target picker. */
@@ -570,6 +576,25 @@ export interface VerifyResultBody extends OpFields {
   turn_fingerprint?: string;
   /** Stage D: the host attempt this Eridani attempt adopted (same tuple, already running or finished). */
   adopted?: string;
+  /**
+   * S-N4 (additive): the command ran inside the verify sandbox (bubblewrap:
+   * temporary HOME, only the worktree writable, no network unless the entry
+   * allows it). "Tests passed" and "the check was isolated" are separate facts.
+   */
+  isolated?: boolean;
+  /** S-N4: the isolation the verify entry gets, `bwrap` or `none`. */
+  isolation?: 'bwrap' | 'none';
+  /** S-N4: why it was not isolated, e.g. "bwrap (bubblewrap) is not installed on the service PATH". */
+  isolation_reason?: string;
+  /**
+   * S-S2 (additive): `workspace_fingerprint` covers the whole workspace.
+   * False: part of it is hashed by metadata or missing (`workspace_reasons`),
+   * so the fingerprint cannot prove the tree is unchanged; treat the result
+   * as not fresh.
+   */
+  workspace_complete?: boolean;
+  /** S-S2: what the fingerprint missed, one line each; empty when complete. */
+  workspace_reasons?: string[];
 }
 
 // ── Both ways ──────────────────────────────────────────────────────────────

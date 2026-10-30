@@ -70,6 +70,7 @@ import { ContextService } from './context';
 import { WorktreeManager } from './worktrees';
 import { loadTargets } from './eridani-targets';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
+import { withIsolation } from './verify-sandbox';
 import type { HelloTarget } from '../../src/shared/eridani-link-protocol';
 import { defaultProbe, harnessMatrix, helloTargets, launchersToProbe, probeKey, type LauncherProbe, type ProbeFn } from './launch-caps';
 import { hookVersion, loadBuildInfo, type BuildInfo } from './build-info';
@@ -382,7 +383,10 @@ export class EridaniRuntime {
     // Whether a spawn there gets Eridani's MCP server (eridani-mcp.ts); never the key.
     return helloTargets(targets, this.probes, { env: this.deps.verifyEnv }).map((h) => {
       const t = targets.find((x) => x.id === h.id);
-      return t ? { ...h, mcp: mcpStatus(resolveMcp(this.deps.dir, t)) } : h;
+      if (!t) return h;
+      // S-N4: whether each verify entry would run sandboxed (verify-sandbox.ts).
+      const verify_status = h.verify_status ? withIsolation(h.verify_status, t.verify, this.deps.verifyEnv) : undefined;
+      return { ...h, ...(verify_status ? { verify_status } : {}), mcp: mcpStatus(resolveMcp(this.deps.dir, t)) };
     });
   }
 

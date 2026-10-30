@@ -28,7 +28,8 @@ The design is in `docs/remotea/plan.md` and the mission-control plan (v2,
 | `remote-server/src/worktrees.ts` | One worktree per branch; the nominate-only cleanup report. |
 | `remote-server/src/questions-claude.ts` | Holding Claude's AskUserQuestion for Eridani. |
 | `remote-server/src/context.ts` | SessionStart context from Eridani. |
-| `remote-server/src/verify-runner.ts` | One configured verification, with a workspace fingerprint. |
+| `remote-server/src/verify-runner.ts` | One configured verification, with a workspace fingerprint (and whether it is complete). |
+| `remote-server/src/verify-sandbox.ts` | The bubblewrap sandbox verify runs in, and the loopback forwarder. |
 
 ## Configuration
 
@@ -276,6 +277,9 @@ Eridani can only start work where `eridani.json` says it may:
 }]
 ```
 
+A verify entry may also set `env`, and the sandbox settings `isolation`,
+`network`, `ports` and `mounts` ([Verify isolation](#verify-isolation)).
+
 ```
 remotea eridani targets list [--json]
 remotea eridani targets add --id <id> --repo <path> --worktree-root <path> [--base main] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>]
@@ -302,7 +306,8 @@ hello keeps these facts apart (S-S1); `caps_version: 2` says a host does
 | Installed harness | `harnesses.<h>.installed: boolean`, `version: string \| null`, `launch_error?: string` | `<bin> --version` run exactly as a spawn runs it: the login shell (`$SHELL -l -i -c`), the session environment (pty-spawn.ts), from `$HOME`. One probe per distinct `(harness, bin)`: the bare name, plus each target's `launch.<h>.bin`. The server runs under systemd with a minimal PATH, so a plain exec would prove nothing. |
 | Target permission | `targets[].enabled: ("claude"\|"codex")[]` | The target's `launch` lists the harness. |
 | Spawnable | `harnesses.<h>.spawn: boolean`; `targets[].harnesses`; `targets[].launch.<h> {ready, version, error?}` | `targets[].harnesses` is `enabled` minus launchers whose probe failed (always a subset of `enabled`). `spawn` is true only when some target enables the harness AND its launcher works. Eridani checks both (jarvis PR #91). |
-| Verification readiness | `targets[].verify: string[]`; `targets[].verify_status: [{id, ready, reason?}]`, same order | The entry's program resolves the way verify-runner.ts runs it: no shell, `verifyEnv` (the service's PATH, or the entry's own `env.PATH`); an absolute program must be executable, a relative one (`./scripts/verify.sh`) is checked in the repository; the `cwd` must exist in the repository. `reason` never contains the argv (`uv` not on the service PATH reads "its program is not on the service PATH …"). |
+| Verification readiness | `targets[].verify: string[]`; `targets[].verify_status: [{id, ready, reason?, isolated?, isolation?, isolation_reason?}]`, same order | The entry's program resolves the way verify-runner.ts runs it: no shell, `verifyEnv` (the service's PATH, or the entry's own `env.PATH`); an absolute program must be executable, a relative one (`./scripts/verify.sh`) is checked in the repository; the `cwd` must exist in the repository. `reason` never contains the argv (`uv` not on the service PATH reads "its program is not on the service PATH …"). |
+| Verification isolation (S-N4, additive) | `verify_status[].isolated: boolean`, `isolation: "bwrap" \| "none"`, `isolation_reason?: string` | Whether a run of the entry now would be sandboxed ([Verify isolation](#verify-isolation)): `bwrap` is on the service PATH and a probe sandbox works. Not being isolated does not make an entry unready (`ready` stays true, the reason is in `isolation_reason`, e.g. "bwrap (bubblewrap) is not installed on the service PATH"), except for an entry that demands `isolation: "bwrap"`: it would be refused, so it reports `ready: false` with that reason. |
 
 Probes run before the link first starts, so the first hello is already
 right (a slow login shell delays the connect, by at most 20 s per probe).
@@ -659,7 +664,9 @@ remotea also sends: `question`, `question.resolved`, `verify.result
 {attempt_id, run_id, generation, turn_seq, plan_revision, verify_id,
 workspace_fingerprint ("<HEAD>:<sha256 of the branch, status, diff and
 untracked contents>"), exit_code, tail (last 4000 chars), truncated, duration_ms,
-timed_out, canceled, error?}` and `worktrees.report {worktrees: [...], heads?: [...]}` (on
+timed_out, canceled, error?, isolated?, isolation?, isolation_reason?,
+workspace_complete?, workspace_reasons?}` (the last five: see
+[stage D](#stage-d-verification-after-turns)) and `worktrees.report {worktrees: [...], heads?: [...]}` (on
 ready, after a spawn or exit, and every 2 min when it changed; on `worktrees.scan`
 always). `turn` now
 carries the run binding taken when the turn's prompt was submitted, Claude's
@@ -726,11 +733,45 @@ changed the tree), the result says `stale_workspace: true`. A verify command
 that writes files git does not ignore therefore always reports stale: ignore
 its outputs.
 
+**Fingerprint completeness (S-S2).** The fingerprint is exact only when it
+covered everything. `workspace_complete: false` says it did not, and
+`workspace_reasons` says what it missed, one line per gap:
+
+| Gap | Reason line |
+|---|---|
+| `git status` exited non-zero | `git status failed` |
+| `git diff HEAD` exited non-zero (including output over 16 MiB, which cuts it) | `git diff failed` |
+| more than 2,000 untracked files (only the first 2,000 are hashed) | `untracked files capped at 2000 (<n> found)` |
+| untracked files over 4 MiB (hashed by size and mtime, not content) | `<n> untracked file(s) over 4 MiB hashed by size and mtime` |
+| untracked entries that are not regular files, e.g. a nested repository | `<n> untracked entr(y/ies) not a regular file (e.g. a nested repository) hashed by size and mtime` |
+| untracked files that vanished or could not be read | `<n> untracked file(s) could not be read` |
+| the workspace was not read at all (missing worktree, refused cwd) | `the workspace was not read` / `the workspace could not be read` |
+
+Both fields describe the fingerprint taken BEFORE the run (the one in
+`workspace_fingerprint`); `workspace_reasons` is `[]` when complete. Eridani
+should treat `workspace_complete: false` as **not fresh** for auto-completion:
+the hash cannot prove the tree it tested is the tree the turn left. remotea
+itself does not resend a finished host attempt under an Eridani `verify`
+command when its fingerprint was incomplete; it runs again. Untracked
+symlinks are hashed by their target name (exact). A repository with no commit
+yet hashes `git diff --cached` and `git diff` instead of `git diff HEAD`.
+
 `verify.result` now: `{attempt_id, run_id, generation, turn_seq,
 plan_revision, verify_id, workspace_fingerprint, workspace {head, branch,
 tree}, turn_fingerprint?, stale_workspace, initiator: host|eridani,
 adopted?, exit_code|null, tail, truncated, duration_ms, timed_out, canceled,
-error?}`. Output is the last 4000 characters of stdout and stderr together.
+error?, isolated?, isolation?, isolation_reason?, workspace_complete?,
+workspace_reasons?}`. Output is the last 4000 characters of stdout and stderr
+together. The S-N4 / S-S2 fields are additive and optional (an older host
+omits them):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `isolated` | boolean | The command ran inside the bubblewrap sandbox. False also when it never ran (a refusal, a missing worktree). "Tests passed" (`exit_code: 0`) and "the check was isolated" are separate facts. |
+| `isolation` | `"bwrap"` \| `"none"` | The isolation the entry gets: its `isolation`, or the default (`bwrap` where bwrap works, else `none`). `bwrap` with `isolated: false` and an `error` means the entry demanded the sandbox and the host could not provide it, so nothing ran. |
+| `isolation_reason` | string, ≤ 300 | Why not isolated, e.g. `the entry sets isolation "none"`, `bwrap (bubblewrap) is not installed on the service PATH`, `bwrap does not work on this host (…)`. Absent when isolated. |
+| `workspace_complete` | boolean | The fingerprint covers the whole workspace (above). |
+| `workspace_reasons` | string[] | What it missed; `[]` when complete. |
 
 **Restart.** The latest attempt per surface is kept on the session record.
 A waiting or running attempt at a restart becomes `interrupted`: a host
@@ -753,6 +794,75 @@ generation that produced them. A duplicate Stop for the same logical turn
 **Status.** `remotea status --json` adds, per session, `verify {attemptId,
 state: pending|running|passed|failed|timed_out|canceled|error|interrupted,
 startedAt}` (null when none ran).
+
+### Verify isolation
+
+Code: `remote-server/src/verify-sandbox.ts` (S-N4). Verify runs the
+worktree's code, which the agent edits (`package.json` scripts,
+`conftest.py`). Where [bubblewrap](https://github.com/containers/bubblewrap)
+works, that code runs in a sandbox:
+
+| | Inside the sandbox |
+|---|---|
+| Namespaces | its own user, pid, ipc, uts and network (`--unshare-all`); killed with the server (`--die-with-parent`); its own session (`--new-session`) |
+| Read-only | `/usr`, `/bin`, `/sbin`, `/lib*`, `/etc`; the run's `PATH` folders; the install prefix of the node that runs remotea; the worktree's `node_modules`, `.venv`, `venv` (at the worktree root and at the entry's `cwd`) when they are symlinks to somewhere else, and a venv's base Python (`home` in `pyvenv.cfg`); a linked worktree's git folders (`.git` points into the repository's); the entry's `mounts` |
+| Read-write | the worktree; a private `/tmp` (tmpfs, gone after the run) with `HOME=/tmp/home` in it, empty; a tmpfs over `.vite-temp`, `.vite`, `.cache` inside a read-only `node_modules`, where they exist (vite writes there) |
+| Absent | everything else: the real `$HOME` and its keys, dotfiles, `~/.config`, other checkouts, `/run`, `/var` |
+| Root | remounted read-only after the mounts, so nothing else can be created |
+| Network | none (only a private loopback the command can serve itself on), unless the entry says otherwise (below) |
+| Limits | no core dumps (`ulimit -c 0`); the entry's timeout kills the whole tree (as before) |
+| Environment | the minimal one (`PATH`, `LANG`, `CI=1`, `TERM=dumb`, the entry's `env`), with `HOME=/tmp/home` unless the entry's `env` sets `HOME` |
+
+**The trust choice** is per verify entry in `eridani.json`:
+
+```json
+"verify": [{
+  "id": "tests", "argv": ["uv", "run", "--no-sync", "python", "-m", "pytest", "tests", "-q"], "timeout": 600,
+  "isolation": "bwrap",
+  "network": "loopback", "ports": [5432],
+  "mounts": ["~/.local/share/uv/python"]
+}]
+```
+
+| Field | Values | Meaning |
+|---|---|---|
+| `isolation` | `"bwrap"` \| `"none"`; absent | Absent: `bwrap` where it works, else `none`, and hello (`verify_status[].isolated: false, isolation_reason`) and every `verify.result` (`isolated: false`) say so. `"bwrap"`: required; where bwrap is missing or broken the run is **refused** (`exit_code: null`, `error: isolation "bwrap" is required but …`, `ready: false` in hello), never run unsandboxed. `"none"`: run as the server user, the old way, by choice (`isolation_reason: the entry sets isolation "none"`). |
+| `network` | absent / `false`; `"loopback"`; `true` | `false`: no network. `"loopback"`: only the HOST's `127.0.0.1` on the listed `ports` (below). `true`: the host's whole network namespace, the internet included. |
+| `ports` | 1 to 16 port numbers | Only with `network: "loopback"`. |
+| `mounts` | up to 32 absolute or `~/` paths (not `/`) | More read-only folders, e.g. a uv-managed Python (`~/.local/share/uv/python`) or a tool outside `/usr`. A missing path is skipped. |
+
+**A test database on localhost** (`network: "loopback"`). The sandbox has its
+own network namespace, so the host's `127.0.0.1:5432` is not reachable
+directly. For each listed port remotea opens a unix socket in a private
+folder (`$TMPDIR/remotea-loopback-*`, mode 0700, removed after the run) that
+forwards to the host's `127.0.0.1:<port>`, mounts that folder read-only at
+`/run/remotea-loopback`, and starts the command behind a small forwarder
+(run by remotea's own node) that listens on the sandbox's `127.0.0.1:<port>`
+(and `::1`) and relays each connection through the socket. The test connects
+to `localhost:5432` as usual; every other port, and every other address, is
+unreachable. A database reached through its unix socket instead (e.g.
+`/var/run/postgresql`) can be added to `mounts` with `network` left off;
+connecting to a socket works through a read-only mount.
+
+**Where the check is not isolated.** A host without `bwrap`, or where the
+probe sandbox fails (unprivileged user namespaces disabled), runs default
+entries unsandboxed with `isolated: false` and the reason. WSL2 with
+`apt install bubblewrap` works (bubblewrap 0.9). `remotea eridani status`
+prints `sandboxed` / `NOT sandboxed (reason)` per verify entry.
+
+**Practical notes.**
+
+- A `node_modules` symlinked from the main checkout is read-only: an install
+  step inside verify fails. Install into the worktree (a real folder there is
+  read-write) or keep the install outside verify.
+- Tools that need files under the real `$HOME` (a uv-managed Python, a
+  `~/.cargo` toolchain, git's `user.name`) need `mounts` or `env`: the
+  sandbox's `HOME` is empty. Never mount a folder with credentials.
+- The repository's git folder is mounted read-only (tests that read git
+  state work; ones that commit to the worktree's own repository fail). A
+  token written into a remote URL in `.git/config` is readable inside.
+- No memory or process-count limit (that needs cgroups); the timeout and the
+  tree kill are what bound a run.
 
 ## Stage E: collector cutover
 
@@ -905,10 +1015,15 @@ not cover.
 **Verify.**
 
 - Verify runs the worktree's code: `package.json` scripts, test files,
-  `conftest.py`. The agent edits that code freely. It runs **outside the
-  agent's sandbox**, with network and Davin's privileges, 2 s after every
-  root turn, so a sandboxed Codex agent's edits run unsandboxed and a
-  Claude agent's commands skip the auto-mode classifier.
+  `conftest.py`. The agent edits that code freely. It runs 2 s after every
+  root turn, outside the agent's own sandbox. Since S-N4 it runs in a
+  bubblewrap sandbox where bwrap works ([Verify isolation](#verify-isolation)):
+  a temporary HOME, the worktree the only writable folder besides a private
+  /tmp, no network unless the entry allows it. An entry with
+  `isolation: "none"`, or any entry on a host without bwrap, still runs with
+  network and Davin's privileges, so a sandboxed Codex agent's edits run
+  unsandboxed and a Claude agent's commands skip the auto-mode classifier;
+  `verify.result` then says `isolated: false`.
 - Stage F does the cheap parts:
   - The child gets a minimal environment: `PATH`, `HOME`, `LANG`, `CI=1`,
     `TERM=dumb`, plus only what the verify entry's own `env` names
@@ -921,8 +1036,8 @@ not cover.
     the target's repository. A remote-tracking ref is accepted only for the
     target's own configured base. An arbitrary ref such as
     `origin/<someone's PR>` is refused.
-- Running verify inside a sandbox (bubblewrap or `codex sandbox`, no network)
-  is **deferred**. Automatic verify stays on. See the list below.
+- S-N4 runs verify inside bubblewrap, with no network by default (see
+  [Verify isolation](#verify-isolation)). Automatic verify stays on.
 
 **What leaves the machine.**
 
@@ -967,10 +1082,13 @@ sends it loses nothing). The lag rules:
 
 ## Not yet implemented (stage F and later)
 
-- **Verify sandboxing** (deferred in stage F): run verify inside the agent's
-  sandbox, through bubblewrap or `codex sandbox linux`, with no network, or
-  make automatic verify opt-in per target. Until then verify runs agent-edited
-  code unsandboxed (see the security model above).
+- **Verify sandbox gaps** (S-N4 did the rest): no memory or process-count
+  limit (cgroups); a `node_modules` shared from another checkout is
+  read-only rather than a throwaway overlay (bubblewrap 0.10's
+  `--tmp-overlay`); where bwrap is missing, default entries still run
+  unsandboxed (`isolated: false`). Eridani's side: show `isolated` next to the
+  result, and treat `workspace_complete: false` as not fresh (jarvis
+  follow-up).
 - Answering permission prompts (captured only) and Codex questions (no hook).
 - Removing worktrees (nominate only, by design).
 - Eridani's side of `mcp.configured: false` (task 3bc2803c): remotea only
