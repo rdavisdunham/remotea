@@ -29,6 +29,13 @@ export interface ServerConfig {
   uploadBudgetMiB: number;
   /** S-S3: an unreferenced pasted/dropped file is removed after this many days. */
   uploadMaxAgeDays: number;
+  /**
+   * S-Q5: spawn sessions in the PTY keeper, so restarting the server
+   * (`remotea upgrade`) does not end them (docs/remotea/upgrade.md). Off by default.
+   */
+  ptyKeeper: boolean;
+  /** S-Q5: the keeper exits after this many minutes with no server attached and no live session. */
+  ptyKeeperIdleMinutes: number;
 }
 
 export const DEFAULT_CONFIG: ServerConfig = {
@@ -43,6 +50,8 @@ export const DEFAULT_CONFIG: ServerConfig = {
   hookPort: 7718,
   uploadBudgetMiB: 2048,
   uploadMaxAgeDays: 7,
+  ptyKeeper: false,
+  ptyKeeperIdleMinutes: 10,
 };
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {

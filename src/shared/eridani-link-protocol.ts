@@ -262,6 +262,23 @@ export interface HelloBody {
    * an Eridani that advertised `doctor`.
    */
   doctor?: DoctorSummary;
+  /**
+   * S-Q5: the server is draining for a restart (`remotea upgrade`): commands
+   * are acked `accepted` and held for the next boot, which replays them.
+   * Absent when not draining. While connected, the change travels as
+   * HostStateBody, only to an Eridani that advertised `draining`.
+   */
+  draining?: boolean;
+}
+
+/** S-Q5: the host's drain state changed (`remotea upgrade`). Ephemeral, coalesced; sent only to an Eridani that advertised `draining`. */
+export interface HostStateBody {
+  t: 'host.state';
+  op_id: string;
+  digest: string;
+  draining: boolean;
+  /** Why (`restart`), while draining. */
+  reason?: string;
 }
 
 /**
@@ -908,6 +925,7 @@ export type UpBody =
   | TurnBody
   | PromptBody
   | DoctorBody
+  | HostStateBody
   | StatusBody
   | ExitBody
   | SessionsSnapshotBody
@@ -996,6 +1014,8 @@ export function parseUpFrame(raw: unknown): UpFrame | null {
         && typeof m.text === 'string' && m.text.length <= ERIDANI_LIMITS.promptChars && typeof m.truncated === 'boolean' ? (m as unknown as UpFrame) : null;
     case 'doctor':
       return op && isDoctorSummary(m) ? (m as unknown as UpFrame) : null;
+    case 'host.state':
+      return op && typeof m.draining === 'boolean' && (m.reason === undefined || isStr(m.reason, 40)) ? (m as unknown as UpFrame) : null;
     case 'status':
       return op && isStr(m.surf, 120) && isNum(m.since) && isNum(m.revision)
         && ['working', 'needs_you', 'idle', 'exited'].includes(m.state as string) ? (m as unknown as UpFrame) : null;

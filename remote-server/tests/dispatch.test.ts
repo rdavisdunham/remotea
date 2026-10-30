@@ -11,7 +11,7 @@ import type { ExecutionTarget } from '../src/eridani-targets';
 import type { WorktreeManager } from '../src/worktrees';
 import type { CommandBody } from '../../src/shared/eridani-link-protocol';
 import { commandShapeError } from '../../src/shared/eridani-link-protocol';
-import { fakeSpawner, ManualTimers } from './helpers';
+import { FakePty, fakeSpawner, ManualTimers } from './helpers';
 
 const cleanups: Array<() => unknown> = [];
 afterEach(() => {
@@ -487,5 +487,56 @@ describe('stage F: text reaches only the run\'s agent (M6, M7)', () => {
     // Exactly one paste start and one paste end: nothing closed it early.
     expect(typed.split('\x1b[201~')).toHaveLength(2);
     expect(typed.split('\x1b[200~')).toHaveLength(2);
+  });
+});
+
+describe('S-Q5: a run whose process the PTY keeper kept across a restart', () => {
+  async function kept(opts: { stop?: boolean } = {}) {
+    const dir = tmpDir();
+    const file = path.join(dir, 'registry.json');
+    const first = setup({ registry: Registry.load({ file, bootId: 'boot-1' }), dir });
+    await first.run(spawnCmd());
+    const surf = surfFor('run-1', 1, 1);
+    if (opts.stop) {
+      const b = first.registry.session(surf)!.eridani!;
+      first.registry.updateSession(surf, { eridani: { ...b, stopRequested: { at: 1, mode: 'interrupt', op: 'op-stop' } } });
+    }
+    first.registry.saveNow();
+    const second = setup({ registry: Registry.load({ file, bootId: 'boot-2' }), dir, bootId: 'boot-2' });
+    const pty = new FakePty({ sessionId: surf, cols: 120, rows: 32 });
+    const res = second.hub.adopt([{ id: surf, pty, alive: true, exitCode: null, cols: 120, rows: 32, replay: '' }], () => {});
+    expect(res.adopted).toEqual([surf]);
+    second.dispatch.resumeOnBoot();
+    return { ...second, surf, pty, inc: first.registry.session(surf)!.incarnation! };
+  }
+
+  it('is not respawned, keeps its incarnation, and its agent is still vouched for (M7) without a new hook', async () => {
+    const { sp, registry, dispatch, surf, inc } = await kept();
+    expect(sp.ptys).toHaveLength(0);
+    expect(registry.session(surf)).toMatchObject({ state: 'live', incarnation: inc, bootId: 'boot-2' });
+    const input = { t: 'input', mode: 'queue', text: 'go on', op_id: 'op-i', digest: 'd', surf, incarnation: inc, run_id: 'run-1', generation: 1 } as CommandBody;
+    expect(dispatch.precheck(input)).toBeNull();
+  });
+
+  it('a stop requested before the restart is sent again; an executing stop is reported interrupted, not done', async () => {
+    const { pty, dispatch, surf } = await kept({ stop: true });
+    await until(() => pty.written.filter((w) => w === '\x03').length >= 1);
+    expect(dispatch.recover({ op_id: 'op-stop', digest: 'd', t: 'stop', state: 'executing', at: 1, updatedAt: 1, body: { surf } })).toMatchObject({ state: 'failed', detail: expect.stringMatching(/outlived/) });
+  });
+
+  it('while draining, a queued input is not started; it is delivered once draining stops', async () => {
+    const { run, hub, sp, dispatch } = setup();
+    await run(spawnCmd());
+    const surf = surfFor('run-1', 1, 1);
+    const pty = sp.last();
+    dispatch.setDraining(true);
+    hub.agentState.report(surf, { runDepth: 1 });
+    const p = run({ t: 'input', mode: 'queue', text: 'held', op_id: 'op-in', digest: 'd', surf, incarnation: 1, run_id: 'run-1', generation: 1, expires_at: Date.now() + 60_000 });
+    hub.agentState.report(surf, { runDepth: 0 });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(pty.written.join('')).not.toContain('held');
+    expect(dispatch.pendingWrites()).toEqual([]);
+    dispatch.setDraining(false);
+    expect(await p).toMatchObject({ state: 'executed' });
   });
 });
