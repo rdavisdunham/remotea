@@ -29,6 +29,7 @@ import {
   encodeInput,
   parseServerMsg,
   TIMING,
+  type ClientFeature,
   type ClientMsg,
   type CreateSpec,
   type DiagEvent,
@@ -111,6 +112,12 @@ export interface HostClientDeps {
   hooksPromptDeclined?: () => boolean;
   /** An agent in a session attached here reported status (the server's hook bridge). */
   onRpc?: (id: RemoteSurfaceId, method: string, params: Record<string, unknown>, replay: boolean) => void;
+  /**
+   * The server asks this app to bring session `id`'s tab to the front
+   * (Eridani's "Open terminal in remotea"). Hello lists the `focus` feature
+   * only when this is set.
+   */
+  onFocus?: (id: RemoteSurfaceId, runId?: string) => void;
   socket?: SocketFactory;
   timers?: ClientTimers;
   now?: () => number;
@@ -409,7 +416,10 @@ export class RemoteHostClient {
       if (this.ws !== ws) return;
       this.lastInbound = this.now();
       this.dispatch({ type: 'opened' });
-      this.sendJson({ t: 'hello', proto: PROTO, device: this.deps.device, app: { name: 'remotea', version: this.deps.appVersion } });
+      this.sendJson({
+        t: 'hello', proto: PROTO, device: this.deps.device, app: { name: 'remotea', version: this.deps.appVersion },
+        ...(this.deps.onFocus ? { features: ['focus'] as ClientFeature[] } : {}),
+      });
       this.heartbeat = this.timers.setInterval(() => this.beat(), TIMING.pingMs);
     });
     ws.on('unexpected-response', (_req, res) => {
@@ -723,6 +733,10 @@ export class RemoteHostClient {
         }
         return;
       }
+      case 'focus':
+        diag('surf.focus', { host: this.hostId }, msg.id);
+        this.deps.onFocus?.(msg.id, msg.runId);
+        return;
       case 'fsResult': {
         const w = this.fsWaiters.get(msg.rid);
         this.fsWaiters.delete(msg.rid);

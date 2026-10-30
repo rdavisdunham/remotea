@@ -403,7 +403,7 @@ describe('diagnostics', () => {
     hub.handle(c, { t: 'diag', events: [{ at: 1, src: 'main', kind: 'early' }] });
     expect(fs.existsSync(path.join(dir, 'device-aaaaaaaa.jsonl'))).toBe(false);
     hub.handle(c, { t: 'hello', proto: 1, device: { id: 'device-aaaaaaaa', name: 'Laptop' }, app: { name: 't', version: '0' } });
-    expect(c.json('welcome')[0].features).toEqual(['rpc', 'diag']);
+    expect(c.json('welcome')[0].features).toEqual(['rpc', 'diag', 'focus']);
     hub.handle(c, { t: 'diag', events: [{ at: 2, src: 'renderer', kind: 'detect.verdict', surf: 'surf-1', data: { state: 'idle' } }] });
     const lines = fs.readFileSync(path.join(dir, 'device-aaaaaaaa.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     expect(lines).toEqual([{ recv: now, device: 'Laptop', at: 2, src: 'renderer', kind: 'detect.verdict', surf: 'surf-1', data: { state: 'idle' } }]);
@@ -433,7 +433,7 @@ describe('hook status for the app\'s prompt', () => {
     };
     const a = connect(1, 'device-aaaaaaaa');
     const b = connect(2, 'device-bbbbbbbb');
-    expect(a.json('welcome')[0]).toMatchObject({ features: ['rpc', 'hooks'], hooks: [{ agent: 'claude', present: true, installed: false }, { agent: 'codex', present: false }] });
+    expect(a.json('welcome')[0]).toMatchObject({ features: ['rpc', 'hooks', 'focus'], hooks: [{ agent: 'claude', present: true, installed: false }, { agent: 'codex', present: false }] });
     expect(parseClientMsg({ t: 'hooksInstall', rid: 4 })).not.toBeNull();
     hub.handle(a, { t: 'hooksInstall', rid: 4 });
     expect(a.json('ack').at(-1)).toEqual({ t: 'ack', rid: 4, ok: true });
