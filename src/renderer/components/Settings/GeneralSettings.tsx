@@ -3,7 +3,6 @@ import { useStore } from '../../store';
 import { LANGUAGES, Language, useT } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 import type { AppearancePrefs } from '../../store/settings-slice';
-import AgentIntegrationSettings from './AgentIntegrationSettings';
 import { formatBinding } from './KeyboardSettings';
 import { MIN_TERMINAL_OPACITY_PCT, opacityToAlpha } from '../../store/backdrop';
 import { MAX_INACTIVE_PANE_DIM_PCT, inactivePaneDimAlpha } from '../../../shared/inactive-pane-dim';
@@ -371,7 +370,6 @@ export default function GeneralSettings() {
         </div>
       )}
 
-      <AgentIntegrationSettings />
 
       <h3 className="settings-section-title">{t('settings.general.easterEggSection', 'Easter eggs')}</h3>
 

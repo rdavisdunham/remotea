@@ -586,3 +586,13 @@
 .changelog__notes .markdown-body pre,
 .changelog__notes .markdown-body table { overflow-x: auto; max-width: 100%; }
 .changelog__stale { color: var(--ui-text-muted); }
+
+.settings-window { width: 960px; }
+.settings-tabs { width: 220px; flex: 0 0 220px; overflow-y: auto; }
+.settings-global-search { width: 100%; box-sizing: border-box; margin-bottom: 12px; }
+.settings-nav-group h3 { font-size: 11px; color: var(--ui-text-secondary); margin: 12px 8px 4px; }
+.settings-nav-group .settings-tab { width: 100%; text-align: left; }
+.settings-scope { font-size: 12px; color: var(--ui-text-secondary); border: 1px solid rgba(var(--ui-overlay-rgb), .15); border-radius: 6px; padding: 10px; margin-bottom: 18px; }
+.settings-scope summary { cursor: pointer; }
+.settings-scope p { line-height: 1.5; margin: 8px 0; }
+.settings-effective { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; user-select: text; }
