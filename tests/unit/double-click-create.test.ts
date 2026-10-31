@@ -9,6 +9,7 @@ import Sidebar from '../../src/renderer/components/Sidebar/Sidebar';
 
 const store = create(() => ({
   activeWorkspaceId: 'ws-1' as WorkspaceId,
+  workspaces: [] as WorkspaceInfo[],
   agentMeta: new Map(),
   agentStates: {},
   agentDetections: {},
@@ -28,7 +29,10 @@ const store = create(() => ({
   saveCurrentLayoutAsPreset: vi.fn(),
 }));
 vi.mock('../../src/renderer/store', () => ({ get useStore() { return store; } }));
-vi.mock('../../src/renderer/i18n', () => ({ useT: () => (_key: string, fallback: string) => fallback }));
+vi.mock('../../src/renderer/i18n', async () => {
+  const { makeT } = await import('../../src/renderer/i18n/core');
+  return { useT: () => makeT('en') };
+});
 // These independent panels are unrelated to workspace-list gestures.
 vi.mock('../../src/renderer/components/Sidebar/OrchestrationPanel', () => ({ default: () => null }));
 vi.mock('../../src/renderer/components/Sidebar/AgentRosterBanner', () => ({ default: () => null }));
@@ -47,6 +51,7 @@ let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 beforeEach(() => {
+  store.setState({ workspaces });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -99,6 +104,9 @@ function renderTabs(overrides: Partial<React.ComponentProps<typeof SurfaceTabBar
     onReorderSurface: vi.fn(), onDropSurface: vi.fn(), onSurfaceDragEnd: vi.fn(),
     ...overrides,
   };
+  // Tab location now resolves against workspace ownership. Keep the gesture
+  // fixture consistent with the exact surfaces this render displays.
+  store.setState({ workspaces: [{ ...workspaces[0], splitTree: { type: 'leaf', paneId, activeSurfaceIndex: props.activeSurfaceIndex, surfaces: props.surfaces } }] });
   act(() => root.render(React.createElement(SurfaceTabBar, props)));
   return props;
 }
@@ -114,6 +122,18 @@ function renderSidebar(overrides: Partial<React.ComponentProps<typeof Sidebar>> 
   act(() => root.render(React.createElement(Sidebar, props)));
   return props;
 }
+
+describe('tab execution location with gesture fixtures', () => {
+  it('keeps a remote tab owner visible while middle-click closes that exact tab', () => {
+    const remoteSurface: SurfaceRef = { id: 'surf-host' as SurfaceId, type: 'terminal', shell: 'remote:desk', cwd: '/repo' };
+    const props = renderTabs({ surfaces: [remoteSurface] });
+    expect(element('.surface-tab__location').textContent).toBe('Remote host: desk');
+    expect(element('.surface-tab').title).toContain('/repo');
+    auxClick(element('.surface-tab'));
+    expect(props.onClose).toHaveBeenCalledExactlyOnceWith(remoteSurface.id);
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+});
 
 describe('middle-click tab close', () => {
   it.each([
