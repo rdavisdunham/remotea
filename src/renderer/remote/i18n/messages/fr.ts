@@ -17,12 +17,12 @@ export const fr: Readonly<Record<string, string>> = {
   'pair.pairing': 'Association…',
   'pair.failed': 'L’association a échoué. Générez un nouveau code sur votre ordinateur et réessayez.',
   'pair.rate': 'Trop de tentatives. Patientez un instant, puis touchez Associer à nouveau.',
-  'pair.deviceCap': 'Trop d’appareils sont associés. Sur votre ordinateur, révoquez-en un dans Paramètres → Distant, puis générez un nouveau code.',
+  "pair.deviceCap": "Trop d’appareils sont associés. Sur votre ordinateur, révoquez-en un dans Paramètres → Accès téléphone, puis générez un nouveau code.",
 
   'expired.title': 'Code expiré',
   'expired.body': 'Ce code a expiré — générez-en un nouveau sur votre ordinateur.',
   'unpaired.title': 'Non associé',
-  'unpaired.body': 'Ce navigateur n’est pas associé à wmux. Sur votre ordinateur, ouvrez Paramètres → Distant → Associer un appareil, puis scannez le code.',
+  "unpaired.body": "Ce navigateur n’est pas associé à remotea. Sur votre ordinateur, ouvrez Paramètres → Accès téléphone → Associer un appareil, puis scannez le code.",
   'revoked.title': 'Accès retiré',
   'revoked.body': 'Cet appareil a été retiré de remotea sur votre ordinateur. Associez-le à nouveau pour vous reconnecter.',
   'replaced.title': 'Associé à nouveau dans un autre onglet',
@@ -49,7 +49,7 @@ export const fr: Readonly<Record<string, string>> = {
   'console.waiting': 'En attente de votre ordinateur…',
   'console.viewerNotice': 'Lecture seule — cette connexion ne peut ni écrire ni répondre.',
   'console.controlLimited': 'Lecture seule ici — cet appareil est associé avec le contrôle, mais votre ordinateur désactive le contrôle pour les connexions HTTP non chiffrées.',
-  'console.repairForControl': 'Lecture seule ici — cet appareil est associé avec le contrôle, mais son association a déjà transité en HTTP non chiffré, donc le contrôle est coupé. Pour utiliser le contrôle, créez un nouveau code sur votre ordinateur (Paramètres → Distant → Associer un appareil) et scannez-le avec ce téléphone.',
+  "console.repairForControl": "Lecture seule ici — cet appareil est associé avec le contrôle, mais son association a déjà transité en HTTP non chiffré, donc le contrôle est coupé. Pour utiliser le contrôle, créez un nouveau code sur votre ordinateur (Paramètres → Accès téléphone → Associer un appareil) et scannez-le avec ce téléphone.",
   'console.needsYouCount_one': '{n} agent vous attend',
   'console.needsYouCount_other': '{n} agents vous attendent',
 

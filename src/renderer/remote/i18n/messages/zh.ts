@@ -17,12 +17,12 @@ export const zh: Readonly<Record<string, string>> = {
   'pair.pairing': '正在配对…',
   'pair.failed': '配对失败。请在电脑上生成新的代码后重试。',
   'pair.rate': '尝试次数过多。请稍候，然后再次点按“配对”。',
-  'pair.deviceCap': '已配对的设备过多。请在电脑的 设置 → 远程 中撤销一台设备，然后生成新代码。',
+  "pair.deviceCap": "已配对的设备过多。请在电脑的 设置 → 手机访问 中撤销一台设备，然后生成新代码。",
 
   'expired.title': '代码已过期',
   'expired.body': '此代码已过期，请在电脑上生成新的代码。',
   'unpaired.title': '未配对',
-  'unpaired.body': '此浏览器尚未与 remotea 配对。请在电脑上打开 设置 → 远程 → 配对设备，然后扫描二维码。',
+  "unpaired.body": "此浏览器尚未与 remotea 配对。请在电脑上打开 设置 → 手机访问 → 配对设备，然后扫描二维码。",
   'revoked.title': '访问已移除',
   'revoked.body': '此设备已从你电脑上的 remotea 中移除。请重新配对以重新连接。',
   'replaced.title': '已在另一个标签页重新配对',
@@ -49,7 +49,7 @@ export const zh: Readonly<Record<string, string>> = {
   'console.waiting': '正在等待你的电脑…',
   'console.viewerNotice': '仅查看 — 此连接无法输入或回答。',
   'console.controlLimited': '此处仅查看 — 此设备以控制权限配对，但你的电脑对未加密的 HTTP 连接关闭了控制。',
-  'console.repairForControl': '此处仅查看 — 此设备以控制权限配对，但其配对曾经通过未加密的 HTTP 使用，因此控制已关闭。要使用控制，请在电脑上生成新代码（设置 → 远程 → 配对设备），并用这部手机扫描。',
+  "console.repairForControl": "此处仅查看 — 此设备以控制权限配对，但其配对曾经通过未加密的 HTTP 使用，因此控制已关闭。要使用控制，请在电脑上生成新代码（设置 → 手机访问 → 配对设备），并用这部手机扫描。",
   'console.needsYouCount_other': '{n} 个代理在等你处理',
 
   'card.openToAnswer': '打开以回答',

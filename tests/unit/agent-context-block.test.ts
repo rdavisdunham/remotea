@@ -29,33 +29,30 @@ describe('global agent-context block (issue #152)', () => {
     expect(BLOCK).not.toMatch(/^wmux is a terminal multiplexer.*\bthat you are\b/mi);
   });
 
-  it('gives the reader a way to find out, before anything depends on the answer', () => {
+  it('discovers endpoint capabilities before selecting a command family', () => {
     const beforeBrowser = BLOCK.substring(0, BLOCK.indexOf('## Browser'));
-    // `wmux ping` is answered before the pipe's auth gate and fails fast when
-    // nothing is listening, which is what makes it usable as the gate here.
-    expect(beforeBrowser).toContain('wmux ping');
+    expect(beforeBrowser).toContain('wmux identify');
+    expect(beforeBrowser).toContain('wmux capabilities');
+    expect(beforeBrowser).toMatch(/successful `wmux ping`[^]*does \*\*not\*\* establish/);
+    expect(beforeBrowser).toContain('features: ["status"]');
   });
 
-  it('says what to do when the check fails, so a false premise has an exit', () => {
-    // \s+ because the source is hard-wrapped — the sentence may straddle a line.
-    expect(BLOCK).toMatch(/remotea is not\s+running for this\s+session/i);
-    expect(BLOCK).toMatch(/use your (normal|own)\s+tools/i);
+  it('keeps normal tools available when discovery fails without claiming the app stopped', () => {
+    expect(BLOCK).toMatch(/endpoint is unavailable to this session/i);
+    expect(BLOCK).toMatch(/use your\s+(normal|own)\s+tools/i);
+    expect(BLOCK).toMatch(/failure does not prove the app or host is stopped/i);
   });
 
-  it('does not read a missing — or WRONG — CLI as a missing wmux (issues #158, #282)', () => {
-    // wmux only puts `wmux` on PATH for terminals it spawns, so "command not
-    // found" is the NORMAL state of every session this globally-loaded block
-    // was written to reach (#158). And since #282 a bare `wmux` may be another
-    // app's CLI (openwong2kim/wmux puts its own on the user PATH), which
-    // answers something other than `pong` while this wmux runs fine. So no
-    // first answer is evidence of absence: anything but `pong` leads to the
-    // absolute path, and only THAT failing concludes.
+  it('checks the install directly when PATH names a missing or different CLI', () => {
     expect(BLOCK).toMatch(/anything else[^]*do not\s+conclude yet/i);
-    expect(BLOCK).toMatch(/different program also called `wmux`/i);
-    const absolute = BLOCK.indexOf('{{WMUX_CLI_BIN}}/wmux" ping');
-    const conclusion = BLOCK.search(/remotea is not\s+running for this\s+session/i);
+    expect(BLOCK).toMatch(/PATH may omit this install or name a different\s+program/i);
+    const absolute = BLOCK.indexOf('{{WMUX_CLI_BIN}}/wmux" identify');
+    const capabilities = BLOCK.indexOf('{{WMUX_CLI_BIN}}/wmux" capabilities');
+    const conclusion = BLOCK.search(/endpoint is unavailable to this session/i);
     expect(absolute).toBeGreaterThan(-1);
-    expect(conclusion).toBeGreaterThan(absolute);
+    expect(capabilities).toBeGreaterThan(absolute);
+    expect(conclusion).toBeGreaterThan(capabilities);
+    expect(BLOCK).toMatch(/Do not redirect a\s+host session to an unrelated desktop/);
   });
 
   it('never removes the reader\'s alternatives outright', () => {

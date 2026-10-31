@@ -27,12 +27,12 @@ export const en = {
   'pair.pairing': 'Pairing…',
   'pair.failed': 'Pairing failed. Make a new code on your computer and try again.',
   'pair.rate': 'Too many attempts. Wait a moment, then tap Pair again.',
-  'pair.deviceCap': 'Too many devices are paired. On your computer, revoke one in Settings → Remote, then make a new code.',
+  "pair.deviceCap": "Too many devices are paired. On your computer, revoke one in Settings → Phone access, then make a new code.",
 
   'expired.title': 'Code expired',
   'expired.body': 'This code expired — make a new one on your computer.',
   'unpaired.title': 'Not paired',
-  'unpaired.body': 'This browser is not paired with wmux. On your computer, open Settings → Remote → Pair a device, then scan the code.',
+  "unpaired.body": "This browser is not paired with remotea. On your computer, open Settings → Phone access → Pair a device, then scan the code.",
   'revoked.title': 'Access removed',
   'revoked.body': 'This device was removed from remotea on your computer. Pair it again to reconnect.',
   'replaced.title': 'Paired again in another tab',
@@ -59,7 +59,7 @@ export const en = {
   'console.waiting': 'Waiting for your computer…',
   'console.viewerNotice': 'View only — this connection cannot type or answer.',
   'console.controlLimited': 'View only here — this device is paired with Control, but your computer turns Control off for plain-HTTP connections.',
-  'console.repairForControl': 'View only here — this device is paired with Control, but its pairing was once used over plain HTTP, so Control is off for it. To use Control, make a new code on your computer (Settings → Remote → Pair a device) and scan it with this phone.',
+  "console.repairForControl": "View only here — this device is paired with Control, but its pairing was once used over plain HTTP, so Control is off for it. To use Control, make a new code on your computer (Settings → Phone access → Pair a device) and scan it with this phone.",
   'console.needsYouCount_one': '{n} agent needs you',
   'console.needsYouCount_other': '{n} agents need you',
 

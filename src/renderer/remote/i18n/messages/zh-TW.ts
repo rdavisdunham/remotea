@@ -17,12 +17,12 @@ export const zhTW: Readonly<Record<string, string>> = {
   'pair.pairing': '正在配對…',
   'pair.failed': '配對失敗。請在電腦上產生新的代碼後再試一次。',
   'pair.rate': '嘗試次數過多。請稍候，然後再點一下「配對」。',
-  'pair.deviceCap': '已配對的裝置過多。請在電腦的 設定 → 遠端 中撤銷一台裝置，然後產生新代碼。',
+  "pair.deviceCap": "已配對的裝置過多。請在電腦的 設定 → 手機存取 中撤銷一台裝置，然後產生新代碼。",
 
   'expired.title': '代碼已過期',
   'expired.body': '此代碼已過期，請在電腦上產生新的代碼。',
   'unpaired.title': '尚未配對',
-  'unpaired.body': '此瀏覽器尚未與 remotea 配對。請在電腦上開啟 設定 → 遠端 → 配對裝置，然後掃描代碼。',
+  "unpaired.body": "此瀏覽器尚未與 remotea 配對。請在電腦上開啟 設定 → 手機存取 → 配對裝置，然後掃描代碼。",
   'revoked.title': '存取權已移除',
   'revoked.body': '此裝置已從你電腦上的 remotea 移除。請重新配對以重新連線。',
   'replaced.title': '已在另一個分頁重新配對',
@@ -49,7 +49,7 @@ export const zhTW: Readonly<Record<string, string>> = {
   'console.waiting': '正在等候你的電腦…',
   'console.viewerNotice': '僅檢視 — 此連線無法輸入或回答。',
   'console.controlLimited': '此處僅檢視 — 此裝置以控制權限配對，但你的電腦對未加密的 HTTP 連線關閉了控制。',
-  'console.repairForControl': '此處僅檢視 — 此裝置以控制權限配對，但其配對曾經透過未加密的 HTTP 使用，因此控制已關閉。要使用控制，請在電腦上產生新代碼（設定 → 遠端 → 配對裝置），並用這支手機掃描。',
+  "console.repairForControl": "此處僅檢視 — 此裝置以控制權限配對，但其配對曾經透過未加密的 HTTP 使用，因此控制已關閉。要使用控制，請在電腦上產生新代碼（設定 → 手機存取 → 配對裝置），並用這支手機掃描。",
   'console.needsYouCount_other': '{n} 個代理程式在等你處理',
 
   'card.openToAnswer': '開啟以回答',

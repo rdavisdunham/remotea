@@ -156,6 +156,7 @@ describe('"Not paired" instructions name the real desktop menu (#254)', () => {
     for (const { code, dict } of REMOTE_LANGUAGES) {
       const desk = DICTIONARIES[code as keyof typeof DICTIONARIES] as Record<string, string> | undefined;
       const body = dict['unpaired.body'];
+      expect(dict['pair.deviceCap'], code).toContain(desk?.['settings.tab.remote']);
       for (const key of ['settings.title', 'settings.tab.remote', 'settings.remote.pair']) {
         const label = desk?.[key];
         if (!label || !body.includes(label)) wrong.push(`${code}: ${key} = ${label}`);
