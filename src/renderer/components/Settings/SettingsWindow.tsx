@@ -14,17 +14,17 @@ import RemoteConsoleSettings from './RemoteConsoleSettings';
 import RemoteHostsSettings from './RemoteHostsSettings';
 import { useT, type TranslationKey } from '../../i18n';
 import '../../styles/settings.css';
+import AgentIntegrationSettings from './AgentIntegrationSettings';
+import SettingsScope from './SettingsScope';
+import { SETTINGS_GROUPS, searchSettings } from './settings-navigation';
 
-// Changelog sits next to Help (issue #211) — both answer "tell me about wmux
-// itself" rather than "change how wmux behaves", and neither belongs among the
-// preference tabs above them. Remote (#254) closes the preference tabs: it is
-// the one that exposes wmux beyond this machine, so it is not in the way of
-// the everyday ones.
-const TABS = ['General', 'Hosts', 'Sidebar', 'Workspace', 'Terminal', 'Prompts', 'Notifications', 'Browser', 'Profiles', 'Shortcuts', 'Remote', 'Changelog', 'Help'] as const;
+// Historical section IDs remain valid for callers and deep links.
+const TABS = ['General', 'Hosts', 'Sidebar', 'Workspace', 'Terminal', 'Prompts', 'Notifications', 'Browser', 'Profiles', 'Shortcuts', 'Remote', 'Changelog', 'Help', 'Agents'] as const;
 
 // Map each tab to its i18n key (issue #56). Typed as TranslationKey, not
 // string: the lookup is what reaches t(), so the keys are checked here.
 const TAB_LABEL_KEYS: Record<typeof TABS[number], TranslationKey> = {
+  Agents: 'settings.integration.section',
   General: 'settings.tab.general',
   Hosts: 'settings.tab.hosts',
   Sidebar: 'settings.tab.sidebar',
@@ -51,6 +51,8 @@ interface SettingsWindowProps {
 export default function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? 'Terminal');
   const t = useT();
+  const [query, setQuery] = useState('');
+  const matches = searchSettings(query, (key, fallback) => t(key as TranslationKey, fallback));
 
   return (
     <div
@@ -68,17 +70,49 @@ export default function SettingsWindow({ onClose, initialTab }: SettingsWindowPr
         </div>
         <div className="settings-body">
           <div className="settings-tabs">
-            {TABS.map((tab) => (
-              <button
-                key={tab}
-                className={`settings-tab ${activeTab === tab ? 'settings-tab--active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {t(TAB_LABEL_KEYS[tab])}
-              </button>
-            ))}
+            <input
+              className="settings-input settings-global-search"
+              aria-label={t('settings.alignment.searchLabel')}
+              placeholder={t('settings.alignment.searchPlaceholder')}
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+            />
+            {SETTINGS_GROUPS.map(group => {
+              const sections = group.sections.filter(section => matches.includes(section));
+              if (sections.length === 0) return null;
+              const labelKey = `settings.alignment.group.${group.sections[0]}` as TranslationKey;
+              return (
+                <div key={group.label} className="settings-nav-group">
+                  <h3>{t(labelKey, group.label)}</h3>
+                  {sections.map(tab => (
+                    <button
+                      key={tab}
+                      className={`settings-tab ${activeTab === tab ? 'settings-tab--active' : ''}`}
+                      onClick={() => setActiveTab(tab)}
+                    >
+                      {t(TAB_LABEL_KEYS[tab])}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+            {matches.length === 0 && (
+              <p className="settings-hint" role="status">
+                {t('settings.alignment.noMatch')}
+              </p>
+            )}
           </div>
           <div className="settings-content">
+            <SettingsScope section={activeTab} />
+            {activeTab === 'Agents' && (
+              <div className="settings-section">
+                <h3>{t('settings.alignment.agentsTitle')}</h3>
+                <p className="settings-hint">{t('settings.alignment.integrationScope')}</p>
+                <p className="settings-hint">{t('settings.alignment.eridaniAuthority')}</p>
+                <p className="settings-hint">{t('settings.alignment.activityHints')}</p>
+                <AgentIntegrationSettings />
+              </div>
+            )}
             {activeTab === 'General' && <GeneralSettings />}
             {activeTab === 'Hosts' && <RemoteHostsSettings />}
             {activeTab === 'Sidebar' && <SidebarSettings />}
