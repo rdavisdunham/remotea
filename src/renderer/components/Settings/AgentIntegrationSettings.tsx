@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { isIntegrationStatus, type IntegrationStatus } from '../../../shared/integration-status';
+import { useState, useEffect, useRef } from 'react';
 import { useT } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 
@@ -11,10 +12,8 @@ import type { TranslationKey } from '../../i18n';
  * straight back. This panel is the "you can change your mind" half of the fix:
  * the first-launch dialog asks, and this is where the answer lives afterwards.
  *
- * State is read back from the main process rather than mirrored locally, for the
- * same reason the Explorer context-menu toggle above it does: the user can edit
- * or delete those files by hand at any moment, and a checkbox that confidently
- * reflects a cached preference rather than the disk is worse than no checkbox.
+ * Consent is read from main's settings store. A separate read-only file check
+ * observes managed content; neither fact proves a running agent has loaded it.
  */
 
 type Feature = 'instructions' | 'hooks' | 'orchestrator' | 'browserMcp';
@@ -66,27 +65,64 @@ export default function AgentIntegrationSettings() {
   const t = useT();
   const [consent, setConsent] = useState<Consent | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [status, setStatus] = useState<IntegrationStatus | null>(null);
+  const [error, setError] = useState<'read' | 'write' | null>(null);
+  const request = useRef(0);
+
+  const refresh = async () => {
+    const current = ++request.current;
+    setReading(true);
+    setError(null);
+    try {
+      const api = window.wmux?.integration;
+      if (!api?.get || !api?.status) throw new Error('Unavailable');
+      const [configured, observed] = await Promise.all([api.get(), api.status()]);
+      if (!configured || !isIntegrationStatus(observed)) {
+        throw new Error('Invalid integration response');
+      }
+      if (request.current !== current) return;
+      setConsent(configured as Consent);
+      setStatus(observed);
+    } catch {
+      if (request.current === current) setError('read');
+    } finally {
+      if (request.current === current) setReading(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
-    window.wmux?.integration?.get?.()
-      .then((c: unknown) => { if (!cancelled) setConsent(c as Consent); })
-      .catch(() => { /* main unreachable — leave the panel in its loading state */ });
-    return () => { cancelled = true; };
+    void refresh();
+    return () => { request.current++; };
   }, []);
 
-  // Trust what main reports back over what was requested: applying a change also
-  // adds or removes files, and a partial failure must leave the checkboxes
-  // showing what actually happened.
+  // Consent and observed files are separate facts: a saved choice does not prove
+  // every provider write succeeded, nor that a running agent consumed a file.
   const push = async (partial: ConsentPatch) => {
+    const current = ++request.current;
     setBusy(true);
+    setError(null);
     try {
-      const next = await window.wmux?.integration?.set?.(partial);
-      if (next) setConsent(next as Consent);
+      const api = window.wmux?.integration;
+      if (!api?.set) throw new Error('Unavailable');
+      const next = await api.set(partial);
+      if (!next) throw new Error('Missing consent response');
+      if (request.current !== current) return;
+      setConsent(next as Consent);
+      try {
+        if (!api.status) throw new Error('Unavailable');
+        const observed = await api.status();
+        if (!isIntegrationStatus(observed)) {
+          throw new Error('Invalid integration response');
+        }
+        if (request.current === current) setStatus(observed);
+      } catch {
+        if (request.current === current) setError('read');
+      }
     } catch {
-      /* leave the previous state visible rather than inventing one */
+      if (request.current === current) setError('write');
     } finally {
-      setBusy(false);
+      if (request.current === current) setBusy(false);
     }
   };
 
@@ -107,7 +143,7 @@ export default function AgentIntegrationSettings() {
           type="checkbox"
           className="settings-toggle"
           checked={enabled}
-          disabled={busy || consent === null}
+          disabled={busy || reading || consent === null}
           onChange={(e) => push({ decision: e.target.checked ? 'granted' : 'declined' })}
         />
       </div>
@@ -118,6 +154,72 @@ export default function AgentIntegrationSettings() {
           'remotea edits files in your home directory so coding agents can drive its browser panel, markdown views and sidebar status. Turning something off here also removes what it wrote.',
         )}
       </p>
+
+      <p className="settings-hint">{t('settings.integration.configuredHint')}</p>
+      {consent && (
+        <p className="settings-hint">
+          {t('settings.integration.savedChoice')}: {t(`settings.integration.choice.${consent.decision}`)}
+        </p>
+      )}
+      {error && (
+        <p className="settings-hint" role="alert">
+          {t(error === 'read' ? 'settings.integration.readFailed' : 'settings.integration.writeFailed')}
+        </p>
+      )}
+      <div className="settings-row">
+        <button className="settings-btn" disabled={busy || reading} onClick={() => void refresh()}>
+          {t(reading ? 'settings.integration.checking' : 'settings.integration.refresh')}
+        </button>
+        <button
+          className="settings-btn"
+          disabled={busy || reading || !consent || consent.decision === 'unset'}
+          onClick={() => void push({})}
+        >
+          {t('settings.integration.retryApply')}
+        </button>
+      </div>
+      {status && (
+        <div className="settings-integration-status">
+          <h4>{t('settings.integration.observedTitle')}</h4>
+          <p className="settings-hint">{t('settings.integration.runtimeNotProbed')}</p>
+          <p className="settings-hint">
+            {t('settings.integration.checkedAt').replace('{time}', new Date(status.checkedAt).toLocaleString())}
+          </p>
+          <p className="settings-hint">{t('settings.integration.stateMeaning')}</p>
+          {status.failures.map((failure, index) => (
+            <p key={index} role="alert" className="settings-hint">
+              {failure.provider} · {t(failure.operation === 'write'
+                ? 'settings.integration.writeOperation' : 'settings.integration.removeOperation')} · {failure.code}
+            </p>
+          ))}
+          {status.files.some(file => file.state === 'error') && (
+            <p className="settings-hint" role="alert">{t('settings.integration.fileReadErrors')}</p>
+          )}
+          {[...new Set(status.files.map(file => file.provider))].map(provider => {
+            const files = status.files.filter(file => file.provider === provider);
+            const counts = t('settings.integration.fileCounts')
+              .replace('{present}', String(files.filter(file => file.state === 'present').length))
+              .replace('{missing}', String(files.filter(file => file.state === 'missing').length))
+              .replace('{modified}', String(files.filter(file => file.state === 'modified').length))
+              .replace('{errors}', String(files.filter(file => file.state === 'error').length));
+            return (
+              <details key={provider}>
+                <summary>{provider} · {t('settings.integration.desktopEnvironment')} · {counts}</summary>
+                <ul>
+                  {files.map(file => (
+                    <li key={`${file.feature}:${file.path}`}>
+                      <strong>{t(FEATURES.find(feature => feature.key === file.feature)!.labelKey)}</strong>
+                      {' · '}{t(`settings.integration.file.${file.state}`)}
+                      {file.code && ` · ${file.code}`}
+                      <div className="settings-hint" style={{ overflowWrap: 'anywhere' }}>{file.path}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            );
+          })}
+        </div>
+      )}
 
       {FEATURES.map((f) => (
         <div className="settings-row" key={f.key}>
@@ -132,7 +234,7 @@ export default function AgentIntegrationSettings() {
             // Sub-features of an integration that is off are not merely
             // unchecked, they are meaningless — disable them rather than let
             // one be ticked while nothing it controls can run.
-            disabled={busy || !enabled}
+            disabled={busy || reading || !enabled}
             onChange={(e) => push({ features: { [f.key]: e.target.checked } })}
           />
         </div>

@@ -1,3 +1,4 @@
+import { reportIntegrationFailure } from './integration-failures';
 /**
  * Qwen Code (Alibaba's `qwen` CLI) integration — the Claude Code integration,
  * pointed at ~/.qwen.
@@ -89,6 +90,7 @@ export function ensureQwenContext(): void {
     fs.writeFileSync(contextPath, next, 'utf-8');
     console.log('[remotea] Updated remotea context in', contextPath);
   } catch (err) {
+    reportIntegrationFailure('Qwen Code', 'write', err);
     console.warn('[remotea] Failed to update Qwen context:', err);
   }
 }
@@ -106,6 +108,7 @@ export function removeQwenContext(): void {
       else fs.writeFileSync(contextPath, next, 'utf-8');
       console.log('[remotea] Removed remotea context from', contextPath);
     } catch (err) {
+      reportIntegrationFailure('Qwen Code', 'remove', err);
       console.warn('[remotea] Failed to remove Qwen context:', err);
     }
   }
@@ -310,6 +313,7 @@ export function ensureQwenHooks(): void {
       console.log(`[remotea] Configured ${QWEN_HOOK_EVENTS.join('/')} hooks in`, getQwenSettingsPath());
     }
   } catch (err) {
+    reportIntegrationFailure('Qwen Code', 'write', err);
     console.warn('[remotea] Failed to update Qwen hooks:', err);
   }
 }
@@ -322,6 +326,7 @@ export function removeQwenHooks(): void {
       }
       removeQwenHookStub(home);
     } catch (err) {
+      reportIntegrationFailure('Qwen Code', 'remove', err);
       console.warn('[remotea] Failed to remove Qwen hooks:', err);
     }
   }
@@ -339,6 +344,7 @@ export function ensureQwenMcp(): void {
     const changed = updateQwenSettings(getQwenSettingsPath(), s => applyChromeDevtoolsMcp(s).next, true);
     if (changed) console.log('[remotea] Configured chrome-devtools-mcp in', getQwenSettingsPath(), '→ localhost:9222');
   } catch (err) {
+    reportIntegrationFailure('Qwen Code', 'write', err);
     console.warn('[remotea] Failed to update chrome-devtools-mcp for Qwen:', err);
   }
 }
@@ -350,6 +356,7 @@ export function removeQwenMcp(): void {
         console.log('[remotea] Removed chrome-devtools-mcp from', settingsPathIn(home));
       }
     } catch (err) {
+      reportIntegrationFailure('Qwen Code', 'remove', err);
       console.warn('[remotea] Failed to remove chrome-devtools-mcp for Qwen:', err);
     }
   }

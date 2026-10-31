@@ -1,3 +1,4 @@
+import { readIntegrationStatus } from './integration-status';
 import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents, safeStorage } from 'electron';
 import { isSafeExternalUrl } from './security-policy';
 import * as path from 'path';
@@ -1380,6 +1381,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   // in the user's home right away — switching a feature off has to remove what it
   // wrote, or the toggle would only stop future writes and leave the current ones
   // in place, which is the original complaint one level down.
+  ipcMain.handle(IPC_CHANNELS.INTEGRATION_STATUS, () => readIntegrationStatus());
   ipcMain.handle('integration:get', () => readConsent());
   ipcMain.handle('integration:set', (_event, partial: Parameters<typeof updateConsent>[0]) =>
     updateConsent(partial ?? {}),

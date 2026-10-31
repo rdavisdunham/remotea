@@ -1,3 +1,4 @@
+import { reportIntegrationFailure } from './integration-failures';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -182,6 +183,7 @@ export function ensureClaudeContext(): void {
     fs.writeFileSync(claudeMdPath, before + wmuxBlock + after, 'utf-8');
     console.log('[remotea] Updated remotea context in ~/.claude/CLAUDE.md');
   } catch (err) {
+    reportIntegrationFailure('Claude Code', 'write', err);
     console.warn('[remotea] Failed to update Claude context:', err);
   }
 }
@@ -226,6 +228,7 @@ export function removeClaudeContext(): void {
     else fs.writeFileSync(claudeMdPath, stripped, 'utf-8');
     console.log('[remotea] Removed remotea context from ~/.claude/CLAUDE.md');
   } catch (err) {
+    reportIntegrationFailure('Claude Code', 'remove', err);
     console.warn('[remotea] Failed to remove Claude context:', err);
   }
 }
@@ -298,6 +301,7 @@ export function ensureClaudeHooks(): void {
     fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf-8');
     console.log(`[remotea] Configured ${WMUX_HOOK_EVENTS.join('/')} hooks in ~/.claude/settings.json`);
   } catch (err) {
+    reportIntegrationFailure('Claude Code', 'write', err);
     console.warn('[remotea] Failed to update Claude hooks:', err);
   }
 }
@@ -320,6 +324,7 @@ export function removeClaudeHooks(): void {
     fs.writeFileSync(settingsPath, next, 'utf-8');
     console.log('[remotea] Removed wmux hooks from ~/.claude/settings.json');
   } catch (err) {
+    reportIntegrationFailure('Claude Code', 'remove', err);
     console.warn('[remotea] Failed to remove Claude hooks:', err);
   }
 }
@@ -502,6 +507,7 @@ function syncClaudeConfigMcp(wanted: boolean): void {
         : '[remotea] Removed chrome-devtools-mcp from ~/.claude.json'
     );
   } catch (err) {
+    reportIntegrationFailure('Claude Code', wanted ? 'write' : 'remove', err);
     console.warn('[remotea] Failed to update chrome-devtools-mcp in ~/.claude.json:', err);
   }
 }
@@ -540,6 +546,7 @@ function syncSettingsPluginFlag(wanted: boolean): void {
 
     if (changed) fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
   } catch (err) {
+    reportIntegrationFailure('Claude Code', wanted ? 'write' : 'remove', err);
     console.warn('[remotea] Failed to update the chrome-devtools plugin flag:', err);
   }
 }
@@ -682,6 +689,7 @@ export function removeOrchestratorPlugin(): void {
       console.log('[remotea] Removed the deprecated wmux-orchestrator plugin from the Claude Code cache');
     }
   } catch (err) {
+    reportIntegrationFailure('Claude Code', 'remove', err);
     console.warn('[remotea] Failed to remove orchestrator plugin cache:', err);
   }
 
@@ -701,6 +709,7 @@ export function removeOrchestratorPlugin(): void {
       }
     }
   } catch (err) {
+    reportIntegrationFailure('Claude Code', 'remove', err);
     console.warn('[remotea] Failed to deregister orchestrator plugin:', err);
   }
 
@@ -714,6 +723,7 @@ export function removeOrchestratorPlugin(): void {
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
     console.log('[remotea] Cleared the stale wmux-orchestrator flag in ~/.claude/settings.json');
   } catch (err) {
+    reportIntegrationFailure('Claude Code', 'remove', err);
     console.warn('[remotea] Failed to clear the orchestrator plugin flag:', err);
   }
 }

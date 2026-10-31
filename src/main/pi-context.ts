@@ -1,3 +1,4 @@
+import { reportIntegrationFailure } from './integration-failures';
 /**
  * pi (@earendil-works/pi-coding-agent) integration — issue #231.
  *
@@ -126,6 +127,7 @@ export function ensurePiContext(): void {
     fs.writeFileSync(contextPath, next, 'utf-8');
     console.log('[remotea] Updated remotea context in', contextPath);
   } catch (err) {
+    reportIntegrationFailure('pi', 'write', err);
     console.warn('[remotea] Failed to update pi context:', err);
   }
 }
@@ -154,6 +156,7 @@ export function removePiContext(): void {
       else fs.writeFileSync(contextPath, next, 'utf-8');
       console.log('[remotea] Removed remotea context from', contextPath);
     } catch (err) {
+      reportIntegrationFailure('pi', 'remove', err);
       console.warn('[remotea] Failed to remove pi context:', err);
     }
   }
@@ -173,7 +176,7 @@ export function getPiExtensionPath(agentDir = getPiAgentDir()): string {
  * check exists because this failure has shipped twice already (#81, #149) — the
  * dev fallback below works perfectly while the installed build has no file.
  */
-function getPiExtensionSrcPath(): string {
+export function getPiExtensionSrcPath(): string {
   try {
     const { app } = require('electron') as typeof import('electron');
     if (app.isPackaged) {
@@ -199,6 +202,7 @@ export function ensurePiExtension(): void {
     fs.writeFileSync(dest, src, 'utf-8');
     console.log('[remotea] Installed the remotea pi extension to', dest);
   } catch (err) {
+    reportIntegrationFailure('pi', 'write', err);
     console.warn('[remotea] Failed to install the pi extension:', err);
   }
 }
@@ -219,6 +223,7 @@ export function removePiExtension(): void {
     fs.unlinkSync(dest);
     console.log('[remotea] Removed the remotea pi extension from', dest);
   } catch (err) {
+    reportIntegrationFailure('pi', 'remove', err);
     console.warn('[remotea] Failed to remove the pi extension:', err);
   }
 }

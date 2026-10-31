@@ -1,3 +1,4 @@
+import { reportIntegrationFailure } from './integration-failures';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -47,11 +48,12 @@ export function ensureOpencodeContext(): void {
       console.log('[remotea] Updated remotea context in ~/.config/opencode/AGENTS.md');
     }
   } catch (err) {
+    reportIntegrationFailure('OpenCode', 'write', err);
     console.warn('[remotea] Failed to update OpenCode context:', err);
   }
 }
 
-function getPluginSrcPath(): string {
+export function getPluginSrcPath(): string {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { app } = require('electron') as typeof import('electron');
@@ -79,6 +81,7 @@ export function ensureOpencodePlugin(): void {
     fs.writeFileSync(dest, src, 'utf-8');
     console.log('[remotea] Installed remotea OpenCode plugin to', dest);
   } catch (err) {
+    reportIntegrationFailure('OpenCode', 'write', err);
     console.warn('[remotea] Failed to install OpenCode plugin:', err);
   }
 }
@@ -101,6 +104,7 @@ export function removeOpencodeContext(): void {
     else fs.writeFileSync(agentsPath, stripped, 'utf-8');
     console.log('[remotea] Removed remotea context from ~/.config/opencode/AGENTS.md');
   } catch (err) {
+    reportIntegrationFailure('OpenCode', 'remove', err);
     console.warn('[remotea] Failed to remove OpenCode context:', err);
   }
 }
@@ -120,6 +124,7 @@ export function removeOpencodePlugin(): void {
     fs.unlinkSync(dest);
     console.log('[remotea] Removed the remotea OpenCode plugin from', dest);
   } catch (err) {
+    reportIntegrationFailure('OpenCode', 'remove', err);
     console.warn('[remotea] Failed to remove OpenCode plugin:', err);
   }
 }

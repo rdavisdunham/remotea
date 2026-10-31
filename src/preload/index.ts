@@ -1,3 +1,4 @@
+import type { IntegrationStatus } from '../shared/integration-status';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { decodeHostInfoArg } from '../shared/host-info';
 import { IPC_CHANNELS, type InsertionResult, type NotificationSoundPickResult, type UpdateTriggerResult,
@@ -279,6 +280,7 @@ contextBridge.exposeInMainWorld('wmux', {
   // What wmux may write into ~/.claude and ~/.config/opencode (issue #132).
   // Separate from `settings` because setting it has side effects on disk.
   integration: {
+    status: (): Promise<IntegrationStatus> => ipcRenderer.invoke(IPC_CHANNELS.INTEGRATION_STATUS),
     get: (): Promise<unknown> => ipcRenderer.invoke('integration:get'),
     set: (partial: unknown): Promise<unknown> => ipcRenderer.invoke('integration:set', partial),
   },

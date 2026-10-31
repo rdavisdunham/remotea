@@ -1,3 +1,4 @@
+import { reportIntegrationFailure } from './integration-failures';
 /**
  * omp (Oh My Pi) integration (issue #165).
  *
@@ -100,6 +101,7 @@ export function ensureOmpContext(): void {
     fs.writeFileSync(agentsPath, next, 'utf-8');
     console.log('[remotea] Updated remotea context in', agentsPath);
   } catch (err) {
+    reportIntegrationFailure('omp', 'write', err);
     console.warn('[remotea] Failed to update omp context:', err);
   }
 }
@@ -126,23 +128,29 @@ export function removeOmpContext(): void {
     else fs.writeFileSync(agentsPath, next, 'utf-8');
     console.log('[remotea] Removed remotea context from', agentsPath);
   } catch (err) {
+    reportIntegrationFailure('omp', 'remove', err);
     console.warn('[remotea] Failed to remove omp context:', err);
   }
 }
 
 /** Where the extension lands: `<agentDir>/extensions/wmux.js`. */
-function getOmpExtensionPath(): string {
+export function getOmpExtensionPath(): string {
   return path.join(getOmpAgentDir(), 'extensions', 'wmux.js');
+}
+
+export function getOmpExtensionSrcPath(): string {
+  let source = path.join(__dirname, '../../resources/omp-extension/wmux.js');
+  try {
+    const { app } = require('electron') as typeof Electron;
+    if (app.isPackaged) source = path.join(process.resourcesPath, 'omp-extension', 'wmux.js');
+  } catch { /* Node unit tests use the development resource. */ }
+  return source;
 }
 
 /** Installs the status bridge without modifying a user's own wmux.js. */
 export function ensureOmpExtension(): void {
   try {
-    let source = path.join(__dirname, '../../resources/omp-extension/wmux.js');
-    try {
-      const { app } = require('electron') as typeof Electron;
-      if (app.isPackaged) source = path.join(process.resourcesPath, 'omp-extension', 'wmux.js');
-    } catch { /* Node unit tests use the development resource. */ }
+    const source = getOmpExtensionSrcPath();
     const src = fs.readFileSync(source, 'utf-8');
     const dest = getOmpExtensionPath();
     const target = fs.existsSync(dest) ? fs.readFileSync(dest, 'utf-8') : null;
@@ -154,6 +162,7 @@ export function ensureOmpExtension(): void {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, src, 'utf-8');
   } catch (err) {
+    reportIntegrationFailure('omp', 'write', err);
     console.warn('[remotea] Failed to install the omp extension:', err);
   }
 }
@@ -165,6 +174,7 @@ export function removeOmpExtension(): void {
     if (!fs.existsSync(dest) || !isWmuxPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
     fs.unlinkSync(dest);
   } catch (err) {
+    reportIntegrationFailure('omp', 'remove', err);
     console.warn('[remotea] Failed to remove the omp extension:', err);
   }
 }

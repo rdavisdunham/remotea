@@ -1,3 +1,4 @@
+import { reportIntegrationFailure } from './integration-failures';
 /**
  * Kiro CLI integration (issue #148).
  *
@@ -83,6 +84,7 @@ export function ensureKiroContext(): void {
     fs.writeFileSync(steeringPath, block, 'utf-8');
     console.log('[remotea] Updated remotea steering in ~/.kiro/steering/wmux.md');
   } catch (err) {
+    reportIntegrationFailure('Kiro', 'write', err);
     console.warn('[remotea] Failed to update Kiro context:', err);
   }
 }
@@ -102,6 +104,7 @@ export function removeKiroContext(): void {
     fs.unlinkSync(steeringPath);
     console.log('[remotea] Removed remotea steering from ~/.kiro/steering/wmux.md');
   } catch (err) {
+    reportIntegrationFailure('Kiro', 'remove', err);
     console.warn('[remotea] Failed to remove Kiro context:', err);
   }
 }

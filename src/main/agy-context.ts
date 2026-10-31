@@ -1,3 +1,4 @@
+import { reportIntegrationFailure } from './integration-failures';
 /**
  * Antigravity CLI (`agy`) integration: a plugin of wmux's own that reports each
  * pane's conversation, so a restored tab can reopen it with
@@ -52,7 +53,7 @@ export function buildAgyHooks(): string {
   return JSON.stringify({ 'wmux-session': handlers }, null, 2) + '\n';
 }
 
-function getHookScriptSrcPath(): string {
+export function getHookScriptSrcPath(): string {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { app } = require('electron') as typeof import('electron');
@@ -111,6 +112,7 @@ export function ensureAgyPlugin(home = os.homedir(), scriptSrc = getHookScriptSr
     }
     if (changed) console.log('[remotea] Installed the remotea agy plugin to', dir);
   } catch (err) {
+    reportIntegrationFailure('Antigravity', 'write', err);
     console.warn('[remotea] Failed to install agy plugin:', err);
   }
 }
@@ -130,6 +132,7 @@ export function removeAgyPlugin(home = os.homedir()): void {
     if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
     console.log('[remotea] Removed the remotea agy plugin from', dir);
   } catch (err) {
+    reportIntegrationFailure('Antigravity', 'remove', err);
     console.warn('[remotea] Failed to remove agy plugin:', err);
   }
 }
