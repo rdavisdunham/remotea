@@ -101,6 +101,10 @@ describe('D6: SessionStart context for unbound sessions', () => {
     const long = 'candidate '.repeat(1000);
     const out = await svc({ text: long, scope: 'candidates' }, true).sessionStart('surf-f', { sessionId: 's' });
     expect(out.length).toBeLessThanOrEqual(UNBOUND_CHARS + 1);
+    expect(out).toContain('candidate');
+    expect(out).not.toContain('Execution location:');
+    const short = await svc({ text: 'CANDIDATE TASK', scope: 'candidates' }, true).sessionStart('surf-f', { sessionId: 's' });
+    expect(short).toBe('CANDIDATE TASK\n');
     expect(await svc({ text: 'FULL RUN CONTEXT', scope: 'run', run_token: 't' }, true).sessionStart('surf-f', { sessionId: 's' })).not.toContain('FULL RUN CONTEXT');
     expect(await svc({ text: 'FULL RUN CONTEXT', scope: 'run', run_token: 'tok' }, true).sessionStart('surf-f', { sessionId: 's' })).not.toContain('tok');
     // A scoping Eridani that sent no scope: dropped.
@@ -109,7 +113,10 @@ describe('D6: SessionStart context for unbound sessions', () => {
 
   it('an older Eridani (no context.scope) is printed as before; a bound surface gets the full text', async () => {
     expect(await svc({ text: 'OLD STYLE' }, false).sessionStart('surf-f', { sessionId: 's' })).toBe('OLD STYLE\n');
-    expect(await svc({ text: 'FULL RUN CONTEXT', scope: 'run' }, true).sessionStart('surf-b', { sessionId: 's' })).toContain('FULL RUN CONTEXT');
+    const bound = await svc({ text: 'FULL RUN CONTEXT', scope: 'run' }, true).sessionStart('surf-b', { sessionId: 's' });
+    expect(bound).toContain('FULL RUN CONTEXT');
+    expect(bound).toContain('status-only bridge does not expose desktop browser or workspace control');
+    expect(bound).toContain('do not establish Eridani verification or task acceptance');
   });
 });
 

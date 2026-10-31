@@ -108,7 +108,9 @@ export class ContextService {
     } else if (b?.mcp) {
       lines.push(`Eridani's MCP tools (${ERIDANI_MCP_TOOLS.join(', ')}) are not available in this session: ${b.mcp.reason ?? 'not configured on this host'}.`);
     }
-    lines.push('Execution location: this terminal runs on a Remotea host, not in the desktop local backend. Inspect wmux identify and wmux capabilities in this shell; a status-only bridge does not expose desktop browser or workspace control. The host administration command is remotea. Agent activity and process exit do not establish Eridani verification or task acceptance.');
+    // Run guidance belongs only to bound sessions. Unbound candidate lists keep
+    // their complete UNBOUND_CHARS budget; legacy unscoped output stays unchanged.
+    if (b) lines.push('Execution location: this terminal runs on a Remotea host, not in the desktop local backend. Inspect wmux identify and wmux capabilities in this shell; a status-only bridge does not expose desktop browser or workspace control. The host administration command is remotea. Agent activity and process exit do not establish Eridani verification or task acceptance.');
     return lines.join('\n\n') + '\n';
   }
 }
