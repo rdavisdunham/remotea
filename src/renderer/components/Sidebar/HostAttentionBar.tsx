@@ -73,7 +73,6 @@ export function HostAttentionRow({ row, onFocus, onOpenHosts }: {
 
 export default function HostAttentionBar({ onOpenHosts }: { onOpenHosts?: () => void }) {
   const t = useT();
-  const t = useT();
   useEffect(() => startRemoteHostStatus(), []);
   const hosts = useRemoteHosts((s) => s.hosts);
   const status = useRemoteHosts((s) => s.status);
