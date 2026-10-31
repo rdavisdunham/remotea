@@ -29,13 +29,14 @@ export default function HostActivityDialog({ onClose, onSettings }: {
   const t = useT();
   const hosts = useRemoteHosts((s) => s.hosts);
   const loaded = useRemoteHosts((s) => s.loaded);
+  const loadError = useRemoteHosts((s) => s.loadError);
   const status = useRemoteHosts((s) => s.status);
   const views = useRemoteRegistry((s) => s.views);
   const [now, setNow] = useState(Date.now);
   const [phone, setPhone] = useState<RemoteConsoleStatus | null>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const changes = pendingChanges(hosts, status, views);
+  const changes = pendingChanges(hosts, status, views, t);
 
   useEffect(() => {
     startRemoteHostStatus();
@@ -109,8 +110,8 @@ export default function HostActivityDialog({ onClose, onSettings }: {
             {Object.keys(hosts).length > 0 && <button onClick={reconnectRemoteHosts}>{t('activity.retry')}</button>}
           </div>
           <p>{t('activity.lifetime')}</p>
-          {!loaded && <p role="status">{t('activity.loadingHosts')}</p>}
-          {loaded && Object.keys(hosts).length === 0 && <p>{t('activity.noHosts')}</p>}
+          {(!loaded || loadError) && <p role="status">{t('activity.loadingHosts')}</p>}
+          {loaded && !loadError && Object.keys(hosts).length === 0 && <p>{t('activity.noHosts')}</p>}
           {Object.values(hosts).map((host) => {
             const view = views?.find((v) => v.hostId === host.id);
             const records = activitySessions(view);

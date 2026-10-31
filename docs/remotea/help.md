@@ -1,5 +1,8 @@
 # Remotea task guide
 
+[Complete settings reference](settings-reference.md) · [Alignment and morning acceptance checklist](alignment.md)
+
+
 Remotea organizes terminals, coding agents and project tools on this computer and connected hosts.
 
 ## Start on this computer

@@ -1402,7 +1402,7 @@ export const en = {
   "activity.theme.system": "Follow system",
   "activity.theme.dark": "Dark",
   "activity.theme.light": "Light",
-  "activity.loadingHosts": "Loading host definitions; connection availability is not yet known.",
+  "activity.loadingHosts": "Host definitions are unavailable or still loading; connection availability is not yet known.",
   "health.justNow": "just now",
   "health.secondsAgo": "{n} s ago",
   "health.minutesAgo": "{n} min ago",
@@ -1483,6 +1483,9 @@ export const en = {
   "settings.alignment.scope.Help": "Help and support links do not change preferences. External links open only when selected.",
   "settings.alignment.scope.Changelog": "Release history loads when this section is selected. Reading it does not change preferences or install an update.",
   'settings.alignment.noRendererSnapshot': 'This section has no renderer preference snapshot to inspect. Its controls and status read their owning service; no per-field file provenance is available here.',
+  'health.connection.unknown': 'Unknown',
+  'health.awaitingStatus': 'No connection status received yet',
+
 } as const;
 
 /** Every key the UI may ask for — derived from English, the source of truth. */

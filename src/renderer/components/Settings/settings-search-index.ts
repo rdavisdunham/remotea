@@ -158,7 +158,172 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Watch your agents as pixel characters in a tiny office. Adds a titlebar button and enables {binding}."
     }
   ],
-  "Hosts": [],
+  "Hosts": [
+    {
+      "key": "remote.host.urlExpected",
+      "label": "remote.host.urlExpected"
+    },
+    {
+      "key": "remote.host.urlLoopback",
+      "label": "remote.host.urlLoopback"
+    },
+    {
+      "key": "remote.host.urlTailscale",
+      "label": "remote.host.urlTailscale"
+    },
+    {
+      "key": "remote.host.urlTls",
+      "label": "remote.host.urlTls"
+    },
+    {
+      "key": "remote.host.urlPlain",
+      "label": "remote.host.urlPlain"
+    },
+    {
+      "key": "remote.host.urlAck",
+      "label": "remote.host.urlAck"
+    },
+    {
+      "key": "remote.host.testSuccess",
+      "label": "remote.host.testSuccess"
+    },
+    {
+      "key": "remote.host.testFailed",
+      "label": "remote.host.testFailed"
+    },
+    {
+      "key": "remote.host.saveFailed",
+      "label": "remote.host.saveFailed"
+    },
+    {
+      "key": "remote.host.name",
+      "label": "remote.host.name"
+    },
+    {
+      "key": "remote.host.namePlaceholder",
+      "label": "remote.host.namePlaceholder"
+    },
+    {
+      "key": "remote.host.url",
+      "label": "remote.host.url"
+    },
+    {
+      "key": "remote.host.token",
+      "label": "remote.host.token"
+    },
+    {
+      "key": "remote.host.storedToken",
+      "label": "remote.host.storedToken"
+    },
+    {
+      "key": "remote.host.pasteToken",
+      "label": "remote.host.pasteToken"
+    },
+    {
+      "key": "remote.host.enabled",
+      "label": "remote.host.enabled"
+    },
+    {
+      "key": "remote.host.test",
+      "label": "remote.host.test"
+    },
+    {
+      "key": "remote.host.save",
+      "label": "remote.host.save"
+    },
+    {
+      "key": "remote.host.cancel",
+      "label": "remote.host.cancel"
+    },
+    {
+      "key": "remote.host.hidden",
+      "label": "remote.host.hidden"
+    },
+    {
+      "key": "remote.host.hiddenHint",
+      "label": "remote.host.hiddenHint"
+    },
+    {
+      "key": "remote.host.inbox",
+      "label": "remote.host.inbox"
+    },
+    {
+      "key": "remote.host.show",
+      "label": "remote.host.show"
+    },
+    {
+      "key": "remote.host.endConfirm",
+      "label": "remote.host.endConfirm"
+    },
+    {
+      "key": "remote.host.end",
+      "label": "remote.host.end"
+    },
+    {
+      "key": "remote.host.removeConfirm",
+      "label": "remote.host.removeConfirm"
+    },
+    {
+      "key": "settings.tab.hosts",
+      "label": "settings.tab.hosts"
+    },
+    {
+      "key": "remote.host.lifetime",
+      "label": "remote.host.lifetime"
+    },
+    {
+      "key": "remote.host.setup",
+      "label": "remote.host.setup"
+    },
+    {
+      "key": "remote.host.notApplied",
+      "label": "remote.host.notApplied"
+    },
+    {
+      "key": "remote.host.dismiss",
+      "label": "remote.host.dismiss"
+    },
+    {
+      "key": "remote.host.default",
+      "label": "remote.host.default"
+    },
+    {
+      "key": "remote.host.edit",
+      "label": "remote.host.edit"
+    },
+    {
+      "key": "remote.host.remove",
+      "label": "remote.host.remove"
+    },
+    {
+      "key": "remote.host.shellSpec",
+      "label": "remote.host.shellSpec"
+    },
+    {
+      "key": "remote.host.add",
+      "label": "remote.host.add"
+    },
+    {
+      "key": "remote.host.eridani",
+      "label": "remote.host.eridani"
+    },
+    {
+      "key": "remote.host.group",
+      "label": "remote.host.group"
+    },
+    {
+      "key": "remote.host.groupHint",
+      "label": "remote.host.groupHint"
+    },
+    {
+      "key": "remote.host.skipRecovery",
+      "label": "remote.host.skipRecovery"
+    },
+    {
+      "key": "remote.host.skipRecoveryHint",
+      "label": "remote.host.skipRecoveryHint"
+    }
+  ],
   "Sidebar": [
     {
       "key": "settings.sidebarPanel.detailsSection",
@@ -451,20 +616,16 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Shell"
     },
     {
-      "key": "settings.workspacePanel.defaultShell",
-      "label": "Default shell"
-    },
-    {
-      "key": "settings.workspacePanel.shell.systemDefault",
-      "label": "System default"
-    },
-    {
       "key": "settings.workspacePanel.defaultCwd",
       "label": "Starting directory"
     },
     {
       "key": "settings.workspacePanel.defaultCwdPlaceholder",
       "label": "Current directory (e.g. ~\\\\projects)"
+    },
+    {
+      "key": "execution.browseLocal",
+      "label": "execution.browseLocal"
     },
     {
       "key": "settings.workspacePanel.browse",
@@ -545,6 +706,18 @@ export const SETTINGS_SEARCH_TERMS = {
     {
       "key": "settings.quickLaunch.remove",
       "label": "Remove"
+    },
+    {
+      "key": "execution.browser",
+      "label": "execution.browser"
+    },
+    {
+      "key": "execution.inherit",
+      "label": "execution.inherit"
+    },
+    {
+      "key": "execution.defaultDirectory",
+      "label": "execution.defaultDirectory"
     },
     {
       "key": "settings.workspacePanel.startupCommandsToggle",
@@ -1141,10 +1314,6 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Remove"
     },
     {
-      "key": "settings.quickLaunch.shellPlaceholder",
-      "label": "Shell (optional, e.g. pwsh.exe)"
-    },
-    {
       "key": "settings.quickLaunch.cwdPlaceholder",
       "label": "Working directory (optional)"
     },
@@ -1155,6 +1324,10 @@ export const SETTINGS_SEARCH_TERMS = {
     {
       "key": "\\n",
       "label": "\\n"
+    },
+    {
+      "key": "execution.browser",
+      "label": "execution.browser"
     },
     {
       "key": "settings.quickLaunch.urlPlaceholder",
@@ -1595,6 +1768,30 @@ export const SETTINGS_SEARCH_TERMS = {
     {
       "key": "settings.help.hint",
       "label": "settings.help.hint"
+    },
+    {
+      "key": "settings.help.credits",
+      "label": "settings.help.credits"
+    },
+    {
+      "key": "settings.help.tasks",
+      "label": "settings.help.tasks"
+    },
+    {
+      "key": "settings.help.search",
+      "label": "settings.help.search"
+    },
+    {
+      "key": "settings.help.search",
+      "label": "settings.help.search"
+    },
+    {
+      "key": "settings.help.noResults",
+      "label": "settings.help.noResults"
+    },
+    {
+      "key": "settings.help.readMore",
+      "label": "settings.help.readMore"
     }
   ],
   "Agents": [
@@ -1604,7 +1801,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.integration.enable",
-      "label": "Let remotea configure Claude Code, OpenCode, Kiro, omp, pi and Grok"
+      "label": "Configure coding-agent integrations on this computer"
     },
     {
       "key": "settings.integration.hint",

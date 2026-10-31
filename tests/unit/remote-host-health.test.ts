@@ -37,6 +37,10 @@ function view(sessions: SessionRecord[], patch: Partial<RemoteRegistryView> = {}
 const READY: HostStatus = { hostId: 'desk', state: 'ready', attempt: 0, connectedAt: NOW - 3_600_000, lastSeenAt: NOW - 1000 };
 
 describe('host connection', () => {
+  it('does not treat an unreported connection as disabled or connected', () => {
+    expect(connectionHealth(undefined, NOW)).toMatchObject({ state: 'unknown', label: 'Unknown', tone: 'neutral' });
+  });
+
   it('connected: says since when, nothing about terminals', () => {
     const c = connectionHealth(READY, NOW);
     expect(c).toMatchObject({ state: 'ready', label: 'Connected', tone: 'ok' });

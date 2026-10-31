@@ -1,8 +1,8 @@
 # Remotea settings reference
 
-Updated 2026-10-31 for the app alignment release. This catalogue covers all 86 fields in the eight renderer preference objects, all 61 rebindable actions, and separate host, phone, integration and file-owned configuration. Preferences, compatibility keys and factory defaults are preserved. This is a source reference, not an inspection of your installed settings or live hosts.
+Updated 2026-10-31 for the app alignment release. This catalogue covers all 86 existing fields in the eight renderer preference objects, all 61 rebindable actions, and separate host, phone, integration and file-owned configuration. Preferences, compatibility keys and factory defaults are preserved. This is a source reference, not an inspection of your installed settings or live hosts.
 
-The detailed field inventory was reconciled against `b31f92c4a78b064b64f467200da3be2ac8f48b9c`. Source line citations below are pinned to that baseline; alignment changes and new controls are described here and in the relevant sections. Historical control-node counts are not preference counts.
+The detailed field inventory was reconciled against `b31f92c4a78b064b64f467200da3be2ac8f48b9c`. Source line citations below are pinned to that baseline and identify each field’s implementation origin, not its current line number or a guarantee that historical labels are unchanged. The behavior and labels in this document describe the alignment release unless explicitly marked as baseline observations. New controls and changed behavior are described here and in the relevant sections. Historical control-node counts are not preference counts.
 
 [Task help](help.md) · [Alignment and preservation contract](alignment.md)
 
@@ -32,6 +32,27 @@ New/changed controls:
 - Shortcut Reset All also resets the two number-row shortcut families; the recorder shares the same formatter as live hints.
 - Connections and activity is available from the sidebar and command palette. It shows independent host connection, terminal process, agent activity, verification, hidden sessions and pending changes, with links to configuration and Eridani.
 - Agent integration is its own page. Configuration consent and observed integration files are separate from runtime readiness; the page does not enable native desktop Eridani execution.
+
+
+### New controls and operational entry points
+
+These are actions, readouts or alternate editors for existing fields, not new renderer preference fields.
+
+| Control | Location and behavior |
+|---|---|
+| Search settings / result navigation | Settings header; translated labels, field names, aliases and shortcut names lead to retained section IDs |
+| Scope, apply time & effective preferences | Each section; expands persistence/precedence help. Renderer-backed sections also offer **Inspect effective preferences in this window**, a read-only JSON snapshot with explicit provenance limits |
+| Execution location / Shell or Command | Workspace defaults and terminal launch profiles; separate editors for the existing shell representation. Profiles additionally offer inheritance. Local suggestions are fixed Windows choices; missing hosts and invalid host directories have compatibility warnings |
+| Layout compatibility readouts | Saved layout entries identify each tab’s location/directory and missing-host/path warnings; commands are preserved |
+| Search help / expandable task topics / Read task guide | Help; filters task descriptions and opens the matching published guide. Separate Remotea issue/documentation/credits links; installed version and updater remain available |
+| Connections and activity | Sidebar action and command palette; separate desktop-local and Phone access summaries, host connection/process/activity/verification readouts, and configuration links |
+| Manage hosts / Retry connections / Phone access settings / Launch settings | Connections and activity; configuration deep links and connection retry, not execution/readiness tests |
+| Hidden sessions / Show here | Connections and activity and Remote hosts; source-bound host view recovery without starting a new task/run. Offline state remains last known |
+| Pending changes / Forget | Both connection surfaces; per-intent consequences and acknowledged, failed or unconfirmed local removal. Already applied host effects are never undone by Forget |
+| Failed change count | Connections and activity; refers users to the host settings detail. **Dismiss** in host settings clears the failure report rather than retrying execution |
+| Open this run in Eridani | Connections and activity; only usable bound links are offered; verification, approval and task decisions remain in Eridani |
+| Sidebar activity override | Workspace context menu; auto/running/idle affects presentation only, not process state or Eridani acceptance |
+| App theme / Terminal scheme palette entries | Command palette; update the same appearance/terminal preferences as Settings. Rebound shortcut actions use semantic app-action handlers, not synthesized default keypresses |
 
 
 ## Scope, storage, and precedence
@@ -93,13 +114,28 @@ Main-owned `agentIntegration={decision,features,decidedAt?}`. New installs defau
 
 | Label / compatibility name | Key / default after grant | Disclosure / behavior | Source |
 |---|---|---|---|
-| Let remotea configure Claude Code, OpenCode, Kiro, omp, pi and Grok | `decision`, effective off until granted | Loading/busy disables; label omits Qwen and Antigravity even though installer covers them | UI/AgentIntegration:104 |
+| Configure coding-agent integrations on this computer | `decision`, effective off until granted | Loading/busy disables; details disclose Claude Code, OpenCode, Kiro, omp, pi, Grok, Qwen and Antigravity as supported per feature | UI/AgentIntegration:104 |
 | Agent instructions | `features.instructions=true` | Marked instruction sections in Claude/OpenCode/omp/pi/Qwen docs; Kiro steering and Grok rules | UI/AgentIntegration:35–38 |
-| Status hooks | `features.hooks=true` | Claude, pi, Grok, Antigravity, Qwen listed; actual implementation also omp extension, missing from this row's path hint | UI/AgentIntegration:41–44; `agent-integration.ts:126–129,187` |
-| Orchestrator plugin | `features.orchestrator=true` | OpenCode plugin only, `~/.config/opencode/plugin/`; legacy Claude orchestrator removed regardless | UI/AgentIntegration:47–55 |
-| Browser panel for MCP | `features.browserMcp=true` | `~/.claude.json`, `~/.qwen/settings.json`; configures browser panel access | UI/AgentIntegration:58–61 |
+| Status hooks | `features.hooks=true` | Claude, omp, pi, Grok, Antigravity and Qwen; path hints include the omp extension | UI/AgentIntegration:41–44; `agent-integration.ts:126–129,187` |
+| OpenCode status and task plugin | `features.orchestrator=true` | OpenCode plugin only, `~/.config/opencode/plugin/`; legacy Claude orchestrator removed regardless | UI/AgentIntegration:47–55 |
+| Connect agent MCP tools to the desktop browser | `features.browserMcp=true` | `~/.claude.json`, `~/.qwen/settings.json`; configures browser panel access | UI/AgentIntegration:58–61 |
 
 All four children remain visible but disabled/unchecked if master not granted; busy disables all. The corresponding component contains the full affected-file path hints. These are filesystem-changing operations presented as preferences and deserve clear ownership scope, not removal for a server-first workflow.
+
+### Integration diagnostics
+
+Implementation integration note: the diagnostics change must be merged before this subsection is treated as shipped UI. Reconcile the final control labels with that component before removing this note.
+
+The diagnostics readout separates saved consent/configuration from observed managed files for each provider. File observations distinguish present, missing, modified and inspection errors; runtime readiness remains **unprobed**. File presence does not establish an installed/authenticated agent or active process, and a host connection does not establish Eridani execution readiness.
+
+| Control / readout | Effect and boundary |
+|---|---|
+| Provider configuration / consent | Reports existing integration selection; does not infer runtime availability |
+| Managed-file observations | Read-only current file inspection; missing/modified/error is distinct from configured consent |
+| Refresh diagnostics | Re-inspects files without applying configuration or launching agents |
+| Retry apply | Reapplies the currently authorized integration selection through the existing consent boundary; changes Remotea-managed configuration entries and is separate from read-only refresh |
+| Runtime readiness: unprobed | No executable, authentication or running-process probe is implied |
+
 
 ## Sidebar
 
@@ -128,27 +164,27 @@ Persisted `sidebarPrefs`, except Sidebar mode in `appearancePrefs`. All apply li
 |---|---|---|---|
 | New workspace placement | `newWorkspacePlacement='afterCurrent'` | After Current / Top / End | Workspace:187 |
 | Auto-reorder on notification | `autoReorderOnNotification=false` | on/off; workspace list behavior | Workspace:204 |
-| Show welcome screen on startup | `showWelcomeScreen=true` | on/off; next startup | Workspace:214 |
-| Confirm before closing a session | `confirmWorkspaceClose=false` | on/off; UI/shortcut close, not CLI. Remote workspaces/tabs always ask hide/end regardless | Workspace:224–243 |
-| Confirm before closing remotea | `confirmAppClose=false` | on/off; window X / Alt+F4. Updates/restarts/OS shutdown bypass. Help says all terminals end, but remote sessions detach | Workspace:246–258 |
-| Snapshot sessions every | `sessionSnapshotMinutes=5` | Never/5/10/15/30/60 minutes in UI; TOML accepts 0–240. Retains last 3 distinct layouts, not terminal process checkpoint | Workspace:263–282 |
+| Show the first-use tour | `showWelcomeScreen=true` | on/off; first-use eligibility also depends on the tutorial-seen marker; this does not replay the tour on every launch | Workspace:214 |
+| Confirm before closing a local workspace | `confirmWorkspaceClose=false` | on/off; local-workspace UI/shortcut closes, not CLI. Host workspaces/tabs have a separate mandatory Hide/End decision | Workspace:224–243 |
+| Confirm before closing remotea | `confirmAppClose=false` | on/off; window X / Alt+F4. Updates/restarts/OS shutdown bypass. Local processes end; host views detach without requesting termination. Offline host liveness remains unknown | Workspace:246–258 |
+| Save layout snapshots every | `sessionSnapshotMinutes=5` | Never/5/10/15/30/60 minutes in UI; TOML accepts 0–240. Retains last 3 distinct layouts, not terminal process checkpoint | Workspace:263–282 |
 | Resume Claude Code sessions on restore | `restoreClaudeSessions=false` | Relaunch exact known conversation with claude --resume on local restored panes, skips clean exits/missing conversations | Workspace:287–298 |
-| Resume Codex sessions on restore | `restoreCodexSessions=false` | Native Windows Codex, Node.js, PowerShell/Command Prompt; new terminal captures conversation | Workspace:303–312 |
-| Resume OpenCode sessions on restore | `restoreOpencodeSessions=false` | Requires integration plugin; OpenCode 2 capture requires --standalone; deleted session may become new | Workspace:316–325 |
-| Resume Antigravity CLI conversations on restore | `restoreAgySessions=false` | agy --conversation; Status hooks + Node.js | Workspace:329–338 |
-| Resume Qwen Code sessions on restore | `restoreQwenSessions=false` | qwen --resume; Status hooks + Qwen 0.14+, skips clean/missing | Workspace:342–351 |
+| Resume local Codex conversations when restoring | `restoreCodexSessions=false` | Native Windows Codex, Node.js, PowerShell/Command Prompt; new terminal captures conversation | Workspace:303–312 |
+| Resume local OpenCode conversations when restoring | `restoreOpencodeSessions=false` | Requires integration plugin; OpenCode 2 capture requires --standalone; deleted session may become new | Workspace:316–325 |
+| Resume local Antigravity conversations when restoring | `restoreAgySessions=false` | agy --conversation; Status hooks + Node.js | Workspace:329–338 |
+| Resume local Qwen Code conversations when restoring | `restoreQwenSessions=false` | qwen --resume; Status hooks + Qwen 0.14+, skips clean/missing | Workspace:342–351 |
 | Resume omp sessions on restore | `restoreOmpSessions=false` | omp --resume path; Status hooks, missing file skips safely | Workspace:355–364 |
 | Read agent screens to infer state | `detectAgentScreens=true` | Local screen matching; rules configurable in app-data/agent-detection. Declared state takes precedence | Workspace:368–379 |
 | Show the file explorer by default | `explorerOpenByDefault=true` | Opens when cwd known, per-workspace closure retained; global off hides all | Workspace:384–395 |
 | Auto-open diff tab on agent edits | `autoOpenDiffTab=true` | Opens diff for edit events | Workspace:400–411 |
 | Keep computer awake | main `wmux-keep-awake.mode='smart'` | Smart (when agents are working) / Always (keep awake while remotea is open) / Off (system defaults). Affects desktop machine; smart working-claim expiry 15min | Workspace:416–430; `awake-manager.ts:29–31` |
 | Keep display awake | main `wmux-keep-awake.preventDisplaySleep=false` | on/off; always editable even mode off, takes effect when keep-awake engages | Workspace:435–446 |
-| Default shell | `defaultShell=''` | System default / PowerShell=powershell.exe / PowerShell Core=pwsh.exe / Command Prompt=cmd.exe / Git Bash=bash.exe / WSL=wsl.exe / Remote: each configured host encoded via remoteShellSpec | Workspace:454–468 |
-| Starting directory | `defaultCwd=''` | Text, ~ and %VARIABLES% expansion; Browse… local folder picker. Splits/explicit cwd/restores keep own cwd; no remote directory picker here | Workspace:473–489 |
+| Execution location and Shell / Command | `defaultShell=''` | Separate location picker (This computer or a configured host) and free-text local shell / host command. Local suggestions: powershell.exe, pwsh.exe, cmd.exe, bash.exe, wsl.exe. Explicit local system shell uses `local:`; host selection retains `remote:<host> [command]` | Workspace:454–468 |
+| Starting directory | `defaultCwd=''` | Text on selected location; local ~ and %VARIABLES% expansion. Browse… is a local folder picker disabled for host launches. Host paths must begin / or ~/ (or be ~); incompatible saved paths warn and are rejected on launch. Splits/explicit cwd/restores keep own cwd | Workspace:473–489 |
 | Terminal panes | `newWorkspacePanes=3` | 1–8 rounded/clamped on input; affects new default workspace | Workspace:503–518 |
 | Arrangement | `newWorkspaceLayout='grid'` | Grid (balanced rows) / Columns (side by side) / Rows (stacked) / Main pane left, rest stacked right / Main pane top, rest across the bottom; disabled for <=1 pane | Workspace:524–538 |
 
-Current shell choices are **hard-coded, not detected**. Windows options are not platform-filtered in this component. Preserve local Windows routing while adding explicitly platform-aware localMac shells later; a remote host belongs to a backend/location chooser, with shell selected within that location.
+Local shell suggestions remain a fixed Windows list rather than runtime discovery, and the text field permits custom commands. Location is now chosen separately. Missing/malformed host specifications fail rather than launching locally; a failed host-list read shows uncertain configuration rather than claiming the host was removed. Native Mac shell discovery remains future work.
 
 ### Saved layouts (Workspace → Saved Layouts)
 
@@ -177,7 +213,7 @@ All in terminalPrefs. Typography, cursor, scrollback, input handling and title p
 |---|---|---|---|
 | Font | `fontFamily='Consolas, Menlo, Monaco, monospace'` | Installed font names from main; choosing writes selected family + Consolas, monospace. Picker hidden if font enumeration empty | Terminal:36–50,218–235 |
 | Font stack (advanced) | Same `fontFamily` | Free CSS font stack; live preview | Terminal:240 |
-| Font size | `fontSize=13` | Number input min8/max72; handler stores raw Number, not clamp | Terminal:270–277 |
+| Font size | `fontSize=13` | Integer input normalized to 8–72 by its change handler | Terminal:270–277 |
 | Default scheme | `theme='Monokai'` | Bundled names from resources + user schemes, unique sorted | Terminal:38–53,285 |
 | From Windows Terminal | Import action | Colors/font/opacity; stores custom scheme and selects it | [Terminal:136–210,309](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/TerminalSettings.tsx#L136) |
 | From Ghostty | Import action | Same; opacity import may enable clear transparency/restart requirement | [Terminal:312](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/TerminalSettings.tsx#L312) |
@@ -193,18 +229,18 @@ All in terminalPrefs. Typography, cursor, scrollback, input handling and title p
 | Use the window title as the workspace name | `oscTitleWorkspaces=true` | First title-producing terminal unless explicit workspace name | Terminal:427–439 |
 | Terminal bell | `bellStyle='visual'` | Flash the pane / Soft beep / Silent; visible pane behavior; background uses Notifications | Terminal:447–461 |
 | Right-click | `rightClick='copyPaste'` | Copy selection, otherwise paste / Always paste / Do nothing; mouse applications own click, Shift invokes clipboard override | Terminal:469–483 |
-| Scrollback lines | `scrollbackLines=5000` | UI min100/max100000/step100; handler stores raw Number, not clamp | Terminal:491–499 |
+| Scrollback lines | `scrollbackLines=5000` | Integer input normalized to 100–100000 by its change handler; displayed step 100 | Terminal:491–499 |
 | Touch pan gain | `touchPanGain=1` | 0.05–4, step0.05; normalized/clamped; full-screen mouse app drag, not wheel/flick/normal scrollback | Terminal:507–519; `utils/wheel-forward.ts:69–80` |
 
 Custom scheme persistent fields beyond the three UI colors: `cursorText`, `selectionBackground`, `selectionForeground`, `palette` (up to 16 from TOML), all optional. Imports and TOML can populate them; no UI editors for them (`S:668–681`; `src/main/user-config.ts:70–77,296–312`). There is no UI rename for an existing scheme.
 
-## Prompts
+## Prompt history (Prompts)
 
-`promptPrefs`; defaults enabled=true, highlight=true, color=#6ea8ff, ruler=true, pin=false, pinLines=2, anchor=true, anchorScope=agent, outline=true, outlineSide=right, outlineMode=overlay. All child controls dim/disable when Track prompts is off. This is local prompt tracking/presentation, not a system prompt or Eridani prompt template editor.
+`promptPrefs`; defaults enabled=true, highlight=true, color=#6ea8ff, ruler=true, pin=false, pinLines=2, anchor=true, anchorScope=agent, outline=true, outlineSide=right, outlineMode=overlay. All child controls dim/disable when recording prompt history is off. This is local prompt tracking/presentation, not a system prompt or Eridani prompt template editor.
 
 | Exact label | Field | Choices / additional dependency | UI source |
 |---|---|---|---|
-| Track prompts | enabled | on/off; stops recording and consumers when off | [Prompt:64](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/PromptSettings.tsx#L64) |
+| Record prompt history in terminal views | enabled | on/off; stops recording and consumers when off | [Prompt:64](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/PromptSettings.tsx#L64) |
 | Highlight prompt lines | highlight | on/off | [Prompt:78](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/PromptSettings.tsx#L78) |
 | Highlight color | highlightColor | Color input; remains editable if highlight off but master on | [Prompt:89](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/PromptSettings.tsx#L89) |
 | Mark prompts on the scrollbar | ruler | on/off | [Prompt:105](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/PromptSettings.tsx#L105) |
@@ -245,7 +281,7 @@ Audio accepts aac/flac/m4a/mp3/oga/ogg/opus/wav/webm, max10MiB (`main/ipc-handle
 |---|---|---|---|
 | Default search engine | `searchEngine='google'` | Google / DuckDuckGo / Bing / Brave Search | Browser:13–26 |
 | Open browser panel on startup | `openOnStartup=true` | on/off; startup | Browser:34 |
-| Start page | `defaultUrl=''` | Free text; empty uses Remotea page, hint requires http(s) scheme; new workspace browser before navigation | Browser:45–60 |
+| Start page | `defaultUrl=''` | Draft text with inline validation; only valid trimmed values persist. Empty uses Remotea page; Explicit scheme:// or about: URLs accepted; http(s) additionally requires a hostname. Custom protocols remain supported. New workspace browser before navigation | Browser:45–60 |
 | Auto-open dev servers in the browser panel | `autoOpenDevServer=true` | on/off; detection still shows ports while off | Browser:66–78 |
 | Open links in the system browser | `openLinksExternally=false` | on/off; terminal/markdown clicked links, Ctrl+click inverse; in mouse-owning apps Ctrl+click uses configured preference | Browser:87–106 |
 | DevTools icon | `devToolsIcon='default'` | Default / Compact / Hidden | Browser:114–126 |
@@ -254,7 +290,7 @@ File-only `browser.dev-ports` adds detection ports (below). No default browser e
 
 ## Profiles
 
-Profiles tab title is “Quick-launch profiles”. Store defaults to empty array. New profile defaults generated UUID, name “New profile”, type terminal; optional values absent. Global profiles are local saved tab presets; project profiles are read separately from .wmux.json and not edited here.
+The navigation label is “Launch profiles” (internal `Profiles`); the panel heading remains “Quick-launch profiles”. Store defaults to empty array. New profile defaults generated UUID, name “New profile”, type terminal; optional values absent. Global profiles are local saved tab presets; project profiles are read separately from .wmux.json and not edited here.
 
 | Exact label / placeholder | Stored field / allowed value | Condition / effect | UI source |
 |---|---|---|---|
@@ -263,7 +299,7 @@ Profiles tab title is “Quick-launch profiles”. Store defaults to empty array
 | icon; title Optional emoji/glyph | icon, optional string, maxlength2 UTF-16 units | Every profile | [QuickLaunch:73–79](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/QuickLaunchSettings.tsx#L73) |
 | terminal / browser / markdown | type select | Raw lowercase type names, not translated | [QuickLaunch:7,81–86](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/QuickLaunchSettings.tsx#L7) |
 | Remove | Delete profile action | Every profile | [QuickLaunch:88](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/QuickLaunchSettings.tsx#L88) |
-| Shell (optional, e.g. pwsh.exe) | shell optional free text | Terminal only | [QuickLaunch:93–97](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/QuickLaunchSettings.tsx#L93) |
+| Execution location and Shell / Command | shell optional compatible string | Terminal only: inherit workspace/default, This computer, or a configured host; local shell and host command are edited separately. Explicit local system shell uses `local:` | [QuickLaunch:93–97](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/QuickLaunchSettings.tsx#L93) |
 | Working directory (optional) | cwd optional free text | Terminal only in UI; schema also permits browser cwd | QuickLaunch:99–103; `shared/types.ts:426` |
 | Startup commands (one per line) | startupCommands string array | Terminal only; handler splits, trims every line, drops empty lines on every keystroke | [QuickLaunch:105–116](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/QuickLaunchSettings.tsx#L105) |
 | URL (e.g. https://localhost:3000) | url optional free text | Browser only | [QuickLaunch:124–128](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/QuickLaunchSettings.tsx#L124) |
@@ -291,13 +327,13 @@ These tabs have actions and information, **no user preference fields**.
 
 Changelog: Refresh (disabled while loading), select release, Open on GitHub; selected version/loading are component state. Main owns cache; fetching starts on tab mount, chooses newest initially, refresh preserves selection. `UI/Changelog:55–70,87,107,131`. Help now uses `src/shared/product.ts`: Remotea issues and documentation are primary, with a separate upstream credits link. It also includes searchable task topics and lifecycle guidance.
 
-Help: Version read from installed Electron app; update action states Check for updates / Checking… / Downloading N% / Update to vN / Restart / Click to try again / up-to-date text. Disabled during checking/downloading; button can restart app after update, so it is an operation rather than preference (`UI/Help:36–62,69–79`). English strings use the `settings.help.*` translation keys in the bundled English locale. The current updater and changelog already target rdavisdunham/remotea; preserve those correct sources while fixing the Help links.
+Help: Version read from installed Electron app; update action states Check for updates / Checking… / Downloading N% / Update to vN / Restart / Click to try again / up-to-date text. Disabled during checking/downloading; button can restart app after update, so it is an operation rather than preference (`UI/Help:36–62,69–79`). English strings use the `settings.help.*` translation keys in the bundled English locale. Updater, changelog and Help support destinations consistently target rdavisdunham/remotea; upstream attribution remains separate.
 
 ## Supported advanced configuration outside Settings
 
 ### ~/.wmux/config.toml
 
-No file creation/edit occurred. Values omitted from TOML retain corresponding current/default preference. Supported fields below are exhaustive for `UserConfig` and mapping functions at this revision; arbitrary settings.json keys are not implicitly TOML options. Kebab-case keys listed here accept the shown camelCase aliases only where indicated. UI writes do not synchronize back to this file.
+This reference does not inspect or edit your configuration. Values omitted from TOML retain corresponding current/default preference. Supported fields below are exhaustive for `UserConfig` and mapping functions at this revision; arbitrary settings.json keys are not implicitly TOML options. Kebab-case keys listed here accept the shown camelCase aliases only where indicated. UI writes do not synchronize back to this file.
 
 | Section/key (aliases) | Default / accepted values | UI counterpart / effect | `main/user-config.ts` |
 |---|---|---|---|
@@ -327,7 +363,7 @@ No file creation/edit occurred. Values omitted from TOML retain corresponding cu
 | workspace.keep-awake.prevent-display-sleep (preventDisplaySleep) | false; bool | Keep display awake | 522–526 |
 | browser.dev-ports (devPorts) | Empty extra list; bundled ports 3000,3001,4000,4200,5000,5173,5174,8000,8080,8888 (`renderer/dev-ports.ts:11`); array integers1–65535, bad numeric entries dropped/warned | No UI; merged with bundled defaults, reset extras on reload | 540–552 |
 | browser.auto-open (autoOpen) | true; bool | Auto-open dev servers | 555–556 |
-| browser.default-url (defaultUrl) | ''; string with scheme:// or about:, empty allowed | Start page; stricter parser than raw UI field | 564–589 |
+| browser.default-url (defaultUrl) | ''; string with scheme:// or about:, empty allowed | Start page; Start-page text validates an explicit scheme:// or about: form before saving; http(s) additionally requires a hostname | 564–589 |
 | remote.upload-on-paste (uploadOnPaste) | true; bool | No UI; legacy SSH image/file transfer preference, not remote-host transport or console enablement | 593–610 |
 | remote.upload-on-drop (uploadOnDrop) | true; bool | No UI; legacy SSH dropped-file upload; Shift inverts per-drop | 593–610 |
 | keys."CHORD" | No remaps; text sequence or empty string to swallow | No Settings editor; bytes to terminal, not app action binding | 617–627 |
@@ -356,20 +392,20 @@ Supported exposed settings are all accounted for above. The following are not ad
 - Saved workspace/session data (selected tab, split tree, explicit titles/colors, pinned state, cwd, shell, browser surface engine, explorer state, remote placements/hidden sessions) is user state and per-workspace overrides, not a global setting. The main analysis and connection sections distinguish remote placement and server scope. Do not conflate “restore settings”, “restore layout”, “resume local agent conversation”, “reattach remote session”, and “restart exited remote process”.
 - Agent-browser API accepts an optional configured binary path, but no current parsed config setting or Browser Settings field supplies one; do not document a nonexistent path preference merely from comments in `agent-browser-cli.ts`.
 
-## Alignment recommendations (no implementation)
+## Alignment delivered and remaining follow-ups
 
-1. Preserve two first-class execution locations: **This computer** (local Windows now, native Mac later) and **Remote host**. Eridani controls/creates server-owned sessions; it is not a replacement for local desktop PTYs. Separate location/backend, shell, and starting directory. Label local-path Browse accurately and provide remote path validation only for host-backed choices.
-2. Use the main report’s proposed nine groups: General & appearance, Workspaces & launches, Terminal & input, Agents & Eridani, Connections, Browser & files, Notifications & attention, Keyboard shortcuts, and Help & about. These are proposed navigation groups, not removal of current controls. Keep current prompt display features identifiable as **Prompt history**, distinct from agent instructions and Eridani task prompts.
-3. Add visible scope/effect metadata: “This device”, “Local terminals”, “Remote host”, “New tabs”, “On next restore”, “Restart required”. Primary current copy problem is Workspace confirm-app-close help saying every session ends despite remote detach behavior immediately above. Keep local process termination disclosure, and explain remote detach separately.
-4. Keep Windows Explorer/refresh icons/WT import/local Codex restore available on Windows; expose native Mac equivalents only when implemented. Platform-filter or annotate unavailable capabilities. Current UI unconditionally renders Windows shell choices and Explorer actions. Do not solve this by deleting local backend features.
-5. Agent integration master label and path hints need factual synchronization: Qwen/Antigravity absent from master label, omp missing from Status hooks paths, Orchestrator plugin actually means OpenCode integration plugin. Make clear it changes **local user files**, not host agent setup, and may require restarting agent sessions.
-6. Distinguish global theme, terminal default scheme, per-pane scheme, custom background, window transparency, terminal opacity and sidebar opacity; defaults/import side effects currently cross sections. An import preview should show changed keys/scope and restart requirement. Keep Undo session-only documented.
-7. Reconcile validation and displays: font/scrollback numeric inputs only declare min/max yet store unbounded typed values; snapshot TOML accepts values absent from UI select; scheme add can overwrite existing name; start-page UI stores strings parser would reject; profile command editor trims/drops blank lines as typed. These are source-observed behaviors to validate in a future implementation task, not silently promise away in help.
-8. Reconcile shortcut languages: use shared formatAccelerator in recorder, define Mac Command support before claiming native Mac parity, distinguish app shortcuts from terminal byte remaps, rename Reset All to “Reset app shortcuts” or extend it explicitly to number-row families; include conflict resolution rather than transient warning-only. Preserve terminal Ctrl sequences.
-9. Introduce a read-only effective-settings view with source (default / settings.json / TOML / per-workspace override), path, scope and reload behavior. Link supported TOML/locale/detection docs. This solves hidden precedence more effectively than extra toggles.
-10. Update Help/support/release-note/update destinations deliberately to Remotea-owned sources; report installed/source/backend compatibility separately. A rename-only sweep risks routing Remotea users into upstream wmux support or release channels.
+The original review proposed location separation, grouped search, scope explanations, accurate lifecycle/support copy, integration disclosures, validation fixes and shortcut consistency. Those changes are implemented in this release: font/scrollback enforce bounds, duplicate scheme names are refused, start-page drafts validate before saving, the shortcut recorder uses the shared formatter, and Reset All includes both number-row families. The current settings inspector displays effective renderer values and explicitly discloses that per-field provenance is unavailable.
 
-No host or phone settings were modified or exercised. Their complete control inventories are included below; source inspection is not runtime certification.
+The following remain separate follow-ups rather than claims of implemented features:
+
+- Native Windows Eridani execution, native Mac shells/app support and remote Mac execution require dedicated implementations. Existing local Windows tools remain available.
+- A theme/settings import preview could disclose all changed preferences and restart requirements before applying them. Existing theme-import Undo remains session-only; named workspace snapshots also restore terminal preferences.
+- The snapshot TOML interval accepts intermediate values absent from the UI select. The profile command editor still trims lines and drops empty lines as typed. Full editing/import/export of those formats is not added here.
+- Shortcut conflict warnings remain advisory; no conflict-resolution workflow or new Mac Command support is introduced. Terminal byte remaps remain separate from app actions.
+- Per-field default/settings.json/TOML/snapshot provenance requires additional load metadata. The current inspector does not infer a source chain it cannot prove.
+- Full host Git/worktree parity and remote OS-open adapters remain unavailable; source-bound remote file editing and change statistics are preserved.
+
+No installed user settings, live host sessions or paired devices were changed to produce this reference. Source inspection and automated tests do not certify a user's live runtime readiness.
 
 ## Remote hosts: configuration, recovery, and adjacent controls
 
@@ -397,13 +433,13 @@ Sources: [form/defaults/actions](https://github.com/rdavisdunham/remotea/blob/b3
 | Add remote host / Edit | Opens a draft form | Preserve separate draft versus stored connection |
 | Test | Uses draft address/token or existing stored token; reports server name/session count or failure; does not Save the host record | **Test connection**; distinguish transport success from Eridani execution readiness |
 | Save / Cancel | Saves draft or abandons it; disabled while busy | **Save connection** |
-| Remove | Confirmation states server sessions keep running; tabs here stop updating. Clears matching default shell | **Remove connection**; not **Delete host** |
+| Remove | Confirmation states removal does not request termination, tabs stop updating and offline liveness is unknown. Clears matching default shell | **Remove connection**; not **Delete host** |
 | Shell spec examples | Shows `remote:<id>` and `remote:<id> claude` | Retain in advanced help for existing profiles/automation; avoid teaching it as the only future location model |
 | Host health and session rows | Separate connection/process/Eridani run information; last-seen data | Preserve separate status meanings; label stale/unknown observations |
-| Changes made here not yet confirmed / Forget | Pending or sent-but-unanswered operations; Forget explains its effect for each state | Forget is not proof a remote effect was undone; uncertainty must remain explicit |
+| Changes made here not yet confirmed / Forget | Pending or sent-but-unanswered operations; per-item consequence tooltip and acknowledged / failed / unconfirmed removal result | Forget removes a local pending request only when acknowledged; it never rolls back a host effect. Failed requests stay available for review/retry |
 | Not applied on this host / Dismiss | Failed/expired operations with error information | Dismiss is clearing a report, not retrying or undoing execution |
 | Hidden on this device / Show here | Unhides a session view for this device | **Show on this device**; not a new task/run |
-| Close everywhere | Confirms ending that session's process for every device | **End session on {host}**; preserve global scope |
+| End session on this host | Confirms requesting process termination for every attached device | Does not verify or accept the associated Eridani task |
 | Retry now (terminal overlay) | Wakes/retries host connections from outside Settings | Connection recovery, not rerunning the terminal command |
 | Agent status on {host}: Install | After host reports missing hooks, asks server to install status hooks there | **Install status hooks on {host}**; distinct from local agent integration consent |
 | Agent status prompt: Not now | Suppresses this run's prompt | Transient choice; does not set permanent refusal |
@@ -413,11 +449,11 @@ Stable generated host ID, pinned server ID, encrypted token, remembered acknowle
 
 Sources: [hidden sessions](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/RemoteHostsSettings.tsx#L168), [host health](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/RemoteHostHealth.tsx#L25), [pending changes](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/RemotePendingChanges.tsx#L9), [remote hook prompt](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/RemoteHooksPrompt.tsx#L6), [host status/schema](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/shared/remote-hosts-types.ts#L7).
 
-**Required help correction:** the current intro promises remote work continues while “this computer sleeps,” even though the server may be WSL on this very computer. Say: “Closing or disconnecting this desktop leaves host-owned sessions on their execution host. That computer must remain awake and running. If the host is WSL on this PC, sleeping or shutting down this PC also stops execution.” Likewise, hidden-session copy saying “Still running” should reflect the actual process/connection state, rather than infer liveness merely from being hidden.
+The host introduction and hidden-session help now distinguish ownership from liveness: desktop exit does not request host-process termination, host/service availability is required, same-PC WSL depends on that PC, and offline process status is unknown. Hiding alone is not evidence that a process is running.
 
-## Remote tab: phone access, pairing, and device administration
+## Phone access (Remote): pairing and device administration
 
-This is the desktop-hosted **Remote Console**, not the remote execution server and not the Eridani connection. Proposed navigation: **Connections → Phone access**. Every setting below belongs to the desktop instance on this computer. Closing that desktop ends phone access, even when its remote terminal sessions continue on a host.
+This is the desktop-hosted **Remote Console**, not the remote execution server and not the Eridani connection. Navigation is **Connections → Phone access** (internal ID `Remote`). Every setting below belongs to the desktop instance on this computer. Closing that desktop ends phone access, even when its remote terminal sessions continue on a host.
 
 Configuration is stored separately from ordinary preferences: `%APPDATA%/remotea[-instance]/remote-console.json`; paired device records in `remote-devices.json`. The six configuration fields below are the complete `RemoteConsoleConfig` schema. The device list and pairing controls are separate records/actions, not additional global preference fields. Defaults describe a new installation; this review did not inspect private user settings or tokens.
 

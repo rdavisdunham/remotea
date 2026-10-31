@@ -23,7 +23,7 @@ import type { HostConnState, HostStatus, RemoteRegistryView } from '../../shared
 export type HealthTone = 'ok' | 'pending' | 'error' | 'off' | 'neutral';
 
 export interface ConnectionHealth {
-  state: HostConnState;
+  state: HostConnState | 'unknown';
   label: string;
   tone: HealthTone;
   /** "since 10:42", "last seen 5 min ago", "never connected". */
@@ -90,7 +90,8 @@ function clock(at: number): string {
 
 /** The transport to the host, and when it was last heard from. Says nothing about terminals. */
 export function connectionHealth(status: HostStatus | undefined, now: number, t: Translator = makeT('en')): ConnectionHealth {
-  const state = status?.state ?? 'disabled';
+  if (!status) return { state: 'unknown', label: t('health.connection.unknown'), tone: 'neutral', detail: t('health.awaitingStatus') };
+  const state = status.state;
   const { key, tone } = CONN[state];
   const label = t(key);
   let detail: string;
