@@ -222,6 +222,8 @@ contextBridge.exposeInMainWorld('wmux', {
     /** The webview's back/forward stack, to persist it (#315). Null for a guest this window does not host. */
     getHistory: (webContentsId: number): Promise<BrowserHistory | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GET_HISTORY, webContentsId),
+    focusDevTools: (webContentsId: number): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FOCUS_DEVTOOLS, webContentsId),
     /** Shortcut-shaped keys pressed inside a browser pane's page. See webview-guest-keys.ts. */
     onGuestKey: (cb: (webContentsId: number, key: GuestKey) => void) => {
       const handler = (_event: unknown, webContentsId: number, key: GuestKey) => cb(webContentsId, key);
