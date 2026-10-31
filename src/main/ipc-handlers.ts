@@ -714,7 +714,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
         }
         remoteTaps.noteResize(id);
       });
-      const unsubExit = ptyManager.onExit(id, (code, info) => {
+      onPtyExitOnce(id, (code, info) => {
         // Trailing output must land before the exit notification, or the
         // renderer paints the exit over bytes still sitting in the window.
         batcher.flush();
@@ -741,7 +741,6 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
         forgetSurface(id);
         // Clean up listeners when PTY exits
         unsubData();
-        unsubExit();
       });
       return created;
     } catch (err: unknown) {
@@ -2036,6 +2035,26 @@ export function registerRemoteConsoleHandlers(): void {
   });
 }
 
+/** Host subscriptions may replay a pending exit before returning their disposer.
+ * Run forwarding/teardown once, then remove that subscription as soon as its
+ * disposer is available. Keep the synchronous replay and data-before-exit order.
+ */
+function onPtyExitOnce(surfaceId: SurfaceId, callback: Parameters<TerminalRouter['onExit']>[1]): void {
+  let exited = false;
+  let unsubscribe: (() => void) | undefined;
+  const dispose = ptyManager.onExit(surfaceId, (code, info) => {
+    if (exited) return;
+    exited = true;
+    try {
+      callback(code, info);
+    } finally {
+      unsubscribe?.();
+    }
+  });
+  unsubscribe = dispose;
+  if (exited) dispose();
+}
+
 export function setupAgentPtyForwarding(surfaceId: string, window: BrowserWindow): void {
   ownSurface(surfaceId as SurfaceId, window.webContents);
   // Same batching as the PTY_CREATE forwarder — agent panes are the panes most
@@ -2050,7 +2069,7 @@ export function setupAgentPtyForwarding(surfaceId: string, window: BrowserWindow
   });
   bindRemoteSurface(surfaceId, window.webContents);
   const unsubData = ptyManager.onData(surfaceId as SurfaceId, (data) => batcher.push(data));
-  const unsubExit = ptyManager.onExit(surfaceId as SurfaceId, (code) => {
+  onPtyExitOnce(surfaceId as SurfaceId, (code) => {
     batcher.flush();
     batcher.dispose();
     remoteTaps.exit(surfaceId, code);
@@ -2060,7 +2079,6 @@ export function setupAgentPtyForwarding(surfaceId: string, window: BrowserWindow
     }
     // Clean up listeners when PTY exits
     unsubData();
-    unsubExit();
   });
 }
 
