@@ -77,5 +77,5 @@ export function taskRunHealth(workspace: { splitTree: SplitNode; eridaniTask?: E
   for (const s of view.sessions) {
     if (ids.has(s.id) && s.eridani && (!best || newer(s, best) > 0)) best = s;
   }
-  return best ? runHealth(best) : null;
+  return best ? runHealth(best, view.connected) : null;
 }

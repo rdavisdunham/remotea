@@ -152,3 +152,49 @@ describe('RemoteHostHealth (render)', () => {
     expect(chips(el, 'connection')).toHaveLength(1);
   });
 });
+
+describe('run observation and verification authority', () => {
+  function verifiedSession(): SessionRecord {
+    return session('surf-verified', {
+      title: 'Verified worker', eridani: binding(), agentState: { state: 'idle', since: 1 },
+      verify: { attemptId: 'attempt-1', state: 'passed', startedAt: 1, runId: 'run-0123456789', generation: 3, turnSeq: 1, planRevision: 1, verifyId: 'verify-1', initiator: 'eridani' },
+    });
+  }
+
+  it('marks disconnected run activity and verification last known with neutral tone', () => {
+    const observed = runHealth(verifiedSession(), false);
+    expect(observed).toMatchObject({ state: 'idle', label: 'Idle (last known)', tone: 'neutral', stale: true, verify: 'verify passed (last known)' });
+    const tabs = tabsHealth(view([verifiedSession()], { connected: false }));
+    expect(tabs[0].run).toEqual(observed);
+    const html = renderToStaticMarkup(createElement(RemoteHostHealth, { status: { hostId: 'desk', state: 'reconnecting', attempt: 1 }, view: view([verifiedSession()], { connected: false }), now: NOW }));
+    const element = document.createElement('div');
+    element.innerHTML = html;
+    expect(element.querySelector('[data-kind="run"]')?.textContent).toBe('Idle (last known)');
+    expect(element.querySelector('[data-kind="run"]')?.className).toContain('--neutral');
+    expect(element.textContent).toContain('verify passed (last known)');
+  });
+
+  it('ignores verification from another run or generation', () => {
+    const current = verifiedSession();
+    expect(runHealth(current)?.verify).toBe('verify passed');
+    expect(runHealth({ ...current, verify: { ...current.verify!, generation: 2 } })?.verify).toBeUndefined();
+    expect(runHealth({ ...current, verify: { ...current.verify!, runId: 'run-other' } })?.verify).toBeUndefined();
+    const html = renderToStaticMarkup(createElement(RemoteHostHealth, { status: READY, view: view([{ ...current, verify: { ...current.verify!, generation: 2 } }]), now: NOW }));
+    expect(html).not.toContain('verify passed');
+    expect(html).toContain('Not reported');
+  });
+
+  it('does not infer task acceptance from idle, process exit, or passed verification', () => {
+    const current = verifiedSession();
+    expect(runHealth(current)).toMatchObject({ state: 'idle', label: 'Idle', verify: 'verify passed' });
+    expect(runHealth({ ...current, state: 'exited', exitCode: 0 })).toMatchObject({ state: 'ended', label: 'Agent ended', verify: 'verify passed' });
+    const html = renderToStaticMarkup(createElement(RemoteHostHealth, { status: READY, view: view([{ ...current, state: 'exited', exitCode: 0 }]), now: NOW }));
+    const element = document.createElement('div');
+    element.innerHTML = html;
+    expect(element.textContent).toContain('Verification does not imply task acceptance');
+    expect(element.textContent).toContain('review the run in Eridani');
+    expect(element.querySelector('[data-kind="run"]')?.textContent).toBe('Agent ended');
+    expect(element.querySelector('[data-kind="run"]')?.textContent).not.toMatch(/accepted|success|complete/i);
+    expect(element.textContent).toContain('Host verification report');
+  });
+});

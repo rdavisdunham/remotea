@@ -16,6 +16,7 @@
  * Pure, so it can be tested without a window. Uses only fields the server
  * already sends.
  */
+import { makeT, type Translator, type TranslationKey } from '../i18n/core';
 import type { SessionRecord } from '../../shared/remote-host-protocol';
 import type { HostConnState, HostStatus, RemoteRegistryView } from '../../shared/remote-hosts-types';
 
@@ -49,6 +50,7 @@ export interface RunHealth {
   tone: HealthTone;
   /** The latest verification attempt, when the registry has one. */
   verify?: string;
+  stale?: boolean;
 }
 
 export interface TabHealth {
@@ -58,26 +60,26 @@ export interface TabHealth {
   run: RunHealth | null;
 }
 
-const CONN: Record<HostConnState, { label: string; tone: HealthTone }> = {
-  disabled: { label: 'Off', tone: 'off' },
-  connecting: { label: 'Connecting…', tone: 'pending' },
-  ready: { label: 'Connected', tone: 'ok' },
-  reconnecting: { label: 'Reconnecting…', tone: 'pending' },
-  'auth-failed': { label: 'Token rejected', tone: 'error' },
-  'wrong-server': { label: 'Different server', tone: 'error' },
-  incompatible: { label: 'Incompatible', tone: 'error' },
-  suspended: { label: 'Paused (sleep)', tone: 'pending' },
+const CONN: Record<HostConnState, { key: TranslationKey; tone: HealthTone }> = {
+  disabled: { key: 'health.connection.disabled', tone: 'off' },
+  connecting: { key: 'health.connection.connecting', tone: 'pending' },
+  ready: { key: 'health.connection.ready', tone: 'ok' },
+  reconnecting: { key: 'health.connection.reconnecting', tone: 'pending' },
+  'auth-failed': { key: 'health.connection.auth-failed', tone: 'error' },
+  'wrong-server': { key: 'health.connection.wrong-server', tone: 'error' },
+  incompatible: { key: 'health.connection.incompatible', tone: 'error' },
+  suspended: { key: 'health.connection.suspended', tone: 'pending' },
 };
 
 /** "just now", "42 s ago", "5 min ago", "3 h ago", or a date. */
-export function ago(at: number, now: number): string {
+export function ago(at: number, now: number, t: Translator = makeT('en')): string {
   const s = Math.max(0, Math.round((now - at) / 1000));
-  if (s < 5) return 'just now';
-  if (s < 60) return `${s} s ago`;
+  if (s < 5) return t('health.justNow');
+  if (s < 60) return t('health.secondsAgo').replace('{n}', String(s));
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m} min ago`;
+  if (m < 60) return t('health.minutesAgo').replace('{n}', String(m));
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} h ago`;
+  if (h < 24) return t('health.hoursAgo').replace('{n}', String(h));
   return new Date(at).toLocaleDateString();
 }
 
@@ -87,18 +89,19 @@ function clock(at: number): string {
 }
 
 /** The transport to the host, and when it was last heard from. Says nothing about terminals. */
-export function connectionHealth(status: HostStatus | undefined, now: number): ConnectionHealth {
+export function connectionHealth(status: HostStatus | undefined, now: number, t: Translator = makeT('en')): ConnectionHealth {
   const state = status?.state ?? 'disabled';
-  const { label, tone } = CONN[state];
+  const { key, tone } = CONN[state];
+  const label = t(key);
   let detail: string;
-  if (state === 'ready') detail = status?.connectedAt ? `since ${clock(status.connectedAt)}` : 'just connected';
-  else if (status?.lastSeenAt) detail = `last seen ${ago(status.lastSeenAt, now)}`;
-  else detail = 'never connected';
+  if (state === 'ready') detail = status?.connectedAt ? t('health.since').replace('{time}', clock(status.connectedAt)) : t('health.justConnected');
+  else if (status?.lastSeenAt) detail = t('health.lastSeen').replace('{time}', ago(status.lastSeenAt, now, t));
+  else detail = t('health.neverConnected');
   return { state, label, tone, detail };
 }
 
 /** A tab's terminal process, as the registry and this app's open confirmations report it. */
-export function processHealth(s: SessionRecord, view: Pick<RemoteRegistryView, 'connected' | 'restoring'>): ProcessHealth {
+export function processHealth(s: SessionRecord, view: Pick<RemoteRegistryView, 'connected' | 'restoring'>, t: Translator = makeT('en')): ProcessHealth {
   const stale = !view.connected;
   let state: ProcessState;
   if (s.state === 'exited') state = 'exited';
@@ -106,18 +109,20 @@ export function processHealth(s: SessionRecord, view: Pick<RemoteRegistryView, '
   else if (s.state === 'lost') state = 'restoring';
   else if (!stale && view.restoring?.includes(s.id)) state = 'restoring';
   else state = 'live';
-  const base = state === 'live' ? 'Live' : state === 'exited' ? `Exited${s.exitCode !== undefined ? ` (${s.exitCode})` : ''}` : 'Restoring…';
+  const base = state === 'exited' && s.exitCode !== undefined
+    ? `${t('health.process.exited')} (${s.exitCode})`
+    : t(`health.process.${state}`);
   const tone: HealthTone = stale ? 'neutral' : state === 'live' ? 'ok' : state === 'exited' ? 'off' : 'pending';
-  return { state, label: stale ? `${base} (last known)` : base, tone, stale };
+  return { state, label: stale ? t('health.lastKnown').replace('{state}', base) : base, tone, stale };
 }
 
-const RUN_LABEL: Record<RunState, string> = {
-  working: 'Working',
-  needs_you: 'Needs you',
-  idle: 'Idle',
-  stopping: 'Stopping',
-  ended: 'Agent ended',
-  unknown: 'No report yet',
+const RUN_LABEL: Record<RunState, TranslationKey> = {
+  working: 'health.run.working',
+  needs_you: 'health.run.needs_you',
+  idle: 'health.run.idle',
+  stopping: 'health.run.stopping',
+  ended: 'health.run.ended',
+  unknown: 'health.run.unknown',
 };
 
 const RUN_TONE: Record<RunState, HealthTone> = {
@@ -130,7 +135,7 @@ const RUN_TONE: Record<RunState, HealthTone> = {
 };
 
 /** The Eridani run in this session, as the server registry reports it; null when there is none. */
-export function runHealth(s: SessionRecord): RunHealth | null {
+export function runHealth(s: SessionRecord, connected = true, t: Translator = makeT('en')): RunHealth | null {
   const b = s.eridani;
   if (!b) return null;
   let state: RunState;
@@ -138,12 +143,25 @@ export function runHealth(s: SessionRecord): RunHealth | null {
   else if (b.stopRequested) state = 'stopping';
   else if (s.agentState?.state === 'working' || s.agentState?.state === 'needs_you' || s.agentState?.state === 'idle') state = s.agentState.state;
   else state = 'unknown';
-  const verify = s.verify && s.verify.runId === b.runId ? `verify ${s.verify.state.replace('_', ' ')}` : undefined;
-  return { runId: b.runId, generation: b.generation, state, label: RUN_LABEL[state], tone: RUN_TONE[state], verify };
+  const reportedVerify = s.verify && s.verify.runId === b.runId && s.verify.generation === b.generation
+    ? t('health.verify').replace('{state}', t(`health.verification.${s.verify.state}`))
+    : undefined;
+  const label = t(RUN_LABEL[state]);
+  return {
+    runId: b.runId,
+    generation: b.generation,
+    state,
+    label: connected ? label : t('health.lastKnown').replace('{state}', label),
+    tone: connected ? RUN_TONE[state] : 'neutral',
+    verify: !connected && reportedVerify
+      ? t('health.lastKnown').replace('{state}', reportedVerify)
+      : reportedVerify,
+    stale: !connected,
+  };
 }
 
 /** Every tab this device shows from `view`: not hidden here, not closed. */
-export function tabsHealth(view: RemoteRegistryView | undefined): TabHealth[] {
+export function tabsHealth(view: RemoteRegistryView | undefined, t: Translator = makeT('en')): TabHealth[] {
   if (!view) return [];
   const closed = new Set(view.closedIds);
   return view.sessions
@@ -151,8 +169,8 @@ export function tabsHealth(view: RemoteRegistryView | undefined): TabHealth[] {
     .map((s) => ({
       id: s.id,
       title: s.title || s.agent?.provider || s.cmd || 'shell',
-      process: processHealth(s, view),
-      run: runHealth(s),
+      process: processHealth(s, view, t),
+      run: runHealth(s, view.connected, t),
     }))
     .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
 }

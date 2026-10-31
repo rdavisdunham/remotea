@@ -360,6 +360,7 @@ export default function Sidebar({
         <AgentRosterBanner onFocusAgent={onFocusAgent} onOpenNavigator={onOpenAgentNavigator} />
       </ErrorBoundary>
 
+      <button className="sidebar__connections" onClick={onOpenHostSettings}>{t('activity.title')}</button>
       <ErrorBoundary label="host-attention" silent>
         <HostAttentionBar onOpenHosts={onOpenHostSettings} />
       </ErrorBoundary>

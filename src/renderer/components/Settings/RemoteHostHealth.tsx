@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useT } from '../../i18n';
 import type { HostStatus, RemoteRegistryView } from '../../../shared/remote-hosts-types';
 import { connectionHealth, tabsHealth, type HealthTone } from '../../remote-sessions/host-health';
 
@@ -18,13 +19,14 @@ function Chip({ tone, children, kind }: { tone: HealthTone; children: ReactNode;
 }
 
 export default function RemoteHostHealth({ status, view, now }: { status: HostStatus | undefined; view: RemoteRegistryView | undefined; now: number }) {
-  const conn = connectionHealth(status, now);
-  const tabs = tabsHealth(view);
-  const anyRun = tabs.some((t) => t.run);
+  const t = useT();
+  const conn = connectionHealth(status, now, t);
+  const tabs = tabsHealth(view, t);
+  const anyRun = tabs.some((tab) => tab.run);
   return (
     <div className="remote-host-health">
       <div className="remote-host-health__row">
-        <span className="remote-host-health__kind">Host connection</span>
+        <span className="remote-host-health__kind">{t('health.hostConnection')}</span>
         <Chip tone={conn.tone} kind="connection">{conn.label}</Chip>
         <span className="remote-host-health__detail">{conn.detail}</span>
       </div>
@@ -32,35 +34,37 @@ export default function RemoteHostHealth({ status, view, now }: { status: HostSt
         <table className="remote-host-health__tabs">
           <thead>
             <tr>
-              <th>Tab</th>
-              <th>Terminal process</th>
-              {anyRun && <th>Eridani run</th>}
+              <th>{t('health.tab')}</th>
+              <th>{t('health.terminalProcess')}</th>
+              {anyRun && <><th>{t('activity.runActivity')}</th><th>{t('activity.verification')}</th></>}
             </tr>
           </thead>
           <tbody>
-            {tabs.map((t) => (
-              <tr key={t.id} data-surface={t.id}>
-                <td className="remote-host-health__title">{t.title}</td>
-                <td><Chip tone={t.process.tone} kind="process">{t.process.label}</Chip></td>
+            {tabs.map((tab) => (
+              <tr key={tab.id} data-surface={tab.id}>
+                <td className="remote-host-health__title">{tab.title}</td>
+                <td><Chip tone={tab.process.tone} kind="process">{tab.process.label}</Chip></td>
                 {anyRun && (
                   <td>
-                    {t.run ? (
+                    {tab.run ? (
                       <>
-                        <Chip tone={t.run.tone} kind="run">{t.run.label}</Chip>
+                        <Chip tone={tab.run.tone} kind="run">{tab.run.label}</Chip>
                         <span className="remote-host-health__detail">
-                          {' '}run {t.run.runId.slice(0, 8)} · gen {t.run.generation}{t.run.verify ? ` · ${t.run.verify}` : ''}
+                          {' '}run {tab.run.runId.slice(0, 8)} · gen {tab.run.generation}
                         </span>
                       </>
                     ) : (
-                      <span className="remote-host-health__detail">none</span>
+                      <span className="remote-host-health__detail">{t('health.none')}</span>
                     )}
                   </td>
                 )}
+                {anyRun && <td>{tab.run?.verify || t('activity.notReported')}</td>}
               </tr>
             ))}
           </tbody>
         </table>
       )}
+      {anyRun && <p className="remote-host-health__detail">{t('activity.stateHint')}</p>}
     </div>
   );
 }

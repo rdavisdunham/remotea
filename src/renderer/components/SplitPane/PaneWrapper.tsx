@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { PaneId, SplitNode, SurfaceId, WorkspaceId, QuickLaunchProfile, ShellInfo, engineOf } from '../../../shared/types';
 import { workspaceFallbackCwd } from '../../../shared/paths';
+import { listenAppActions } from '../../utils/app-action';
 import { findLeaf, splitNode } from '../../store/split-utils';
 import KeptAliveTerminal from '../Terminal/KeptAliveTerminal';
 import BrowserPane from '../Browser/BrowserPane';
@@ -207,8 +208,12 @@ export default function PaneWrapper({
       }
     }
 
+    const stopActions = listenAppActions({
+      find: () => setFindBarVisible((v) => !v),
+      copyMode: () => setCopyModeActive((v) => !v),
+    });
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => { stopActions(); document.removeEventListener('keydown', handleKeyDown); };
   }, [isFocused, shortcuts, copyModeActive]);
 
   // ─── Global drag tracking ─────────────────────────────────────────────────
