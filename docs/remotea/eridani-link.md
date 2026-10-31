@@ -533,7 +533,8 @@ A target may also name its own `mcpKeyFile` (see below).
 ### Eridani MCP for spawned agents
 
 A run's agent reports through Eridani's MCP tools: `submit_plan`,
-`task_step`, `task_interview` and `session_link`. A fresh worktree has no
+`submit_plan_review` (hyperplan reviewers), `task_step`, `task_interview`
+and `session_link`. A fresh worktree has no
 `.mcp.json`, and the host may have no user-scope server, so every spawn (and
 every resume) brings its own. Nothing is written to the worktree or to the
 user's Claude or Codex settings.
@@ -579,8 +580,8 @@ is told:
 
 Both fields are optional; an older host omits them. The SessionStart context
 of a run's surface ends with one line: either `Eridani tools: submit_plan,
-task_step, task_interview, session_link are available via the eridani MCP
-server.`, or that they are not available and why. `remotea eridani targets
+submit_plan_review, task_step, task_interview, session_link are available via
+the eridani MCP server.`, or that they are not available and why. `remotea eridani targets
 list` prints each target's MCP state.
 
 **Trust boundary.** Nothing Eridani sends becomes a program, a path or a shell

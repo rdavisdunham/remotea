@@ -43,7 +43,7 @@ export const MCP_SERVER_NAME = 'eridani';
 /** Codex reads the bearer token from this variable (outside the ERIDANI_* names Eridani may set). */
 export const MCP_TOKEN_ENV = 'REMOTEA_ERIDANI_MCP_TOKEN';
 /** The Eridani tools a configured session can call (named in the SessionStart context). */
-export const ERIDANI_MCP_TOOLS = ['submit_plan', 'task_step', 'task_interview', 'session_link'] as const;
+export const ERIDANI_MCP_TOOLS = ['submit_plan', 'submit_plan_review', 'task_step', 'task_interview', 'session_link'] as const;
 const MCP_PATH = '/api/v1/external/mcp/';
 
 /** Readiness as reported upstream (spawn outcome, hello target). */
