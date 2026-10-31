@@ -49,6 +49,14 @@ describe('titlebar Git toggle', () => {
     expect(git.cwd).toBe('X:\\Dev\\Repo\\Tickr');
   });
 
+  it('keeps a remote origin on review tabs so host paths cannot become desktop Git paths', () => {
+    const leaf = terminalLeaf('/repo');
+    if (leaf.type === 'leaf') leaf.surfaces[0].shell = 'remote:desk';
+    const ops = makeOps(leaf);
+    toggleGitView(ops, WS, PANE, NEW_PANE);
+    expect(findLeaf(ops.tree(), NEW_PANE)!.surfaces[0]).toMatchObject({ cwd: '/repo', shell: 'remote:desk' });
+  });
+
   it('closes it on the second click and gives the layout back', () => {
     const ops = makeOps(terminalLeaf('X:\\repo'));
     toggleGitView(ops, WS, PANE, NEW_PANE);

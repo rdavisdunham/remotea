@@ -22,6 +22,10 @@ import Titlebar from './components/Titlebar/Titlebar';
 import { useKeyboardShortcuts, matchesBinding } from './hooks/useKeyboardShortcuts';
 import SettingsWindow, { type SettingsTab } from './components/Settings/SettingsWindow';
 import CommandPalette from './components/CommandPalette/CommandPalette';
+import HostActivityDialog from './components/Connections/HostActivityDialog';
+import { dispatchAppAction } from './utils/app-action';
+import { SHORTCUT_TABLE } from './shortcuts';
+import type { ShortcutAction } from './store/settings-slice';
 import AgentNavigator from './components/AgentNavigator/AgentNavigator';
 import HubView from './components/Hub/hub-view';
 import { focusAgentTarget } from './store/focus-agent';
@@ -612,6 +616,8 @@ export default function App() {
     if (open) openSettings();
     else setSettingsOpen(false);
   }, [openSettings]);
+  const [hostActivityOpen, setHostActivityOpen] = useState(false);
+  const closeHostActivity = useCallback(() => setHostActivityOpen(false), []);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [agentNavigatorOpen, setAgentNavigatorOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
@@ -1458,17 +1464,7 @@ export default function App() {
     setCommandPaletteOpen(false);
   }, []);
 
-  // The palette's Actions category has always been a stub that logs and closes
-  // — every entry is listed, none of them run. Fixing that wholesale means
-  // hoisting useKeyboardShortcuts' handler table out of its effect, which is a
-  // bigger change than #175 justifies and would put 40 untested paths into a
-  // patch release.
-  //
-  // resetTerminal is wired anyway, because it is a *recovery* command: the
-  // pane it exists for is one where the mouse is dead and the keyboard may be
-  // going somewhere unexpected, and "open the palette and pick it" is the one
-  // route that still works when the shortcut itself is what the user cannot
-  // remember. Listing it and not running it would be worse than not listing it.
+  // Palette commands reuse shortcut handlers by action ID, independent of bindings.
   const handlePaletteAction = useCallback((action: string) => {
     const ws = workspaces.find((w) => w.id === activeWorkspaceId);
     const leaf = ws && focusedPaneId ? findLeaf(ws.splitTree, focusedPaneId) : undefined;
@@ -1496,7 +1492,8 @@ export default function App() {
     } else if (action === 'openGitPanel') {
       if (activeWorkspaceId) openGitView(useStore.getState(), activeWorkspaceId, focusedPaneId);
     } else {
-      console.log(`[remotea] Command palette action: ${action}`);
+      if (action === 'openHostActivity') setHostActivityOpen(true);
+      else if (Object.hasOwn(SHORTCUT_TABLE, action)) dispatchAppAction(action as ShortcutAction);
     }
     setCommandPaletteOpen(false);
   }, [workspaces, activeWorkspaceId, focusedPaneId, handleToggleExplorer]);
@@ -1712,6 +1709,7 @@ export default function App() {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {tutorialOpen && <Tutorial onClose={handleTutorialClose} />}
+      {hostActivityOpen && <HostActivityDialog onClose={closeHostActivity} onSettings={openSettings} />}
       {settingsOpen && <SettingsWindow initialTab={settingsTab} onClose={() => setSettingsOpen(false)} />}
       <Titlebar
         title={titlebarText}
@@ -1763,7 +1761,7 @@ export default function App() {
             }}
             onFocusAgent={focusAgent}
             onOpenAgentNavigator={() => setAgentNavigatorOpen(true)}
-            onOpenHostSettings={() => openSettings('Hosts')}
+            onOpenHostSettings={() => setHostActivityOpen(true)}
           />
         ) : (
           <div

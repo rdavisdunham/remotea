@@ -1,3 +1,4 @@
+import { clearIntegrationFailures } from './integration-failures';
 /**
  * Consent gate for everything wmux writes outside its own directory (issue #132).
  *
@@ -166,8 +167,8 @@ export function readConsent(): IntegrationConsent {
   return parseConsent(loadSettings()[SETTINGS_KEY]);
 }
 
-export function writeConsent(consent: IntegrationConsent): void {
-  saveSetting(SETTINGS_KEY, consent);
+export function writeConsent(consent: IntegrationConsent): boolean {
+  return saveSetting(SETTINGS_KEY, consent);
 }
 
 /** Apply one feature, or take it back. Split out so `applyConsent` reads as a table. */
@@ -230,6 +231,7 @@ function applyFeature(feature: IntegrationFeature, enabled: boolean): void {
  */
 export function applyConsent(consent: IntegrationConsent): void {
   if (consent.decision === 'unset') return;
+  clearIntegrationFailures();
   const granted = consent.decision === 'granted';
   for (const feature of INTEGRATION_FEATURES) {
     applyFeature(feature, granted && consent.features[feature]);
@@ -294,14 +296,14 @@ export async function initAgentIntegration(parent?: Electron.BrowserWindow): Pro
     const decision = await promptForConsent(parent);
     if (decision === null) return consent; // ask again next launch
     consent = { decision, features: { ...consent.features }, decidedAt: Date.now() };
-    writeConsent(consent);
+    if (!writeConsent(consent)) return readConsent();
   }
   applyConsent(consent);
   return consent;
 }
 
 /**
- * Settings → General wrote a new decision: persist it and reconcile the files now.
+ * Settings → Agents wrote a new decision: persist it and reconcile the files now.
  *
  * `features` is a *sparse* patch, not a whole record — the panel sends one
  * checkbox at a time. Typing it as `Partial<IntegrationConsent>` would say a
@@ -317,7 +319,7 @@ export function updateConsent(partial: {
     features: { ...current.features, ...(partial.features ?? {}) },
     decidedAt: Date.now(),
   };
-  writeConsent(next);
+  if (!writeConsent(next)) throw new Error('Integration consent could not be saved.');
   applyConsent(next);
   return next;
 }

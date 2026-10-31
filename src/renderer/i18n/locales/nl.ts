@@ -394,7 +394,6 @@ export const nl: Translation = {
   'settings.terminalPanel.fontSize': 'Lettergrootte',
   'settings.terminalPanel.colorSchemeSection': 'Kleurenschema',
   'settings.terminalPanel.defaultScheme': 'Standaardschema',
-  'settings.terminalPanel.schemeHintPart1': 'Wordt toegepast op nieuwe panelen. Per paneel te overschrijven via ',
   'settings.terminalPanel.schemeHintPart2': ' of ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Aangepaste schema\'s',

@@ -101,16 +101,25 @@ describe('titlebar sidebar toggle', () => {
     expect(app).toContain('onCollapse={toggleSidebar}');
   });
 
-  it('removes the old sidebar header, collapse button, and their unused styles', () => {
+  it('keeps Connections actionable without restoring the old header or collapse button', () => {
+    const onOpenHostSettings = vi.fn();
     act(() => root.render(React.createElement(Sidebar, {
       workspaces: [], activeWorkspaceId: null, sidebarWidth: 240,
       onWidthChange: vi.fn(), onSelect: vi.fn(), onClose: vi.fn(),
       onCreate: vi.fn(), onCreateFromLayout: vi.fn(), onManageLayouts: vi.fn(),
       onRename: vi.fn(), onReorder: vi.fn(), onUpdateMetadata: vi.fn(),
+      onOpenHostSettings,
     })));
     expect(container.querySelector('.sidebar__header')).toBeNull();
     expect(container.querySelector('.sidebar__collapse-btn')).toBeNull();
-    expect(container.querySelector('.sidebar')?.firstElementChild?.className).toBe('sidebar__list');
+    const sidebar = container.querySelector('.sidebar');
+    expect(sidebar?.querySelector('.sidebar__list')?.parentElement).toBe(sidebar);
+    const connections = sidebar?.querySelector<HTMLButtonElement>('button.sidebar__connections');
+    expect(connections).not.toBeNull();
+    expect(connections?.textContent).toBeTruthy();
+    act(() => connections!.click());
+    expect(onOpenHostSettings).toHaveBeenCalledOnce();
+    expect(toggleSidebar).not.toHaveBeenCalled();
     const css = readFileSync(join(__dirname, '../../src/renderer/styles/sidebar.css'), 'utf8');
     expect(css).not.toContain('.sidebar__header');
     expect(css).not.toContain('.sidebar__collapse-btn');

@@ -391,7 +391,6 @@ export const zh: Translation = {
   'settings.terminalPanel.fontSize': '字号',
   'settings.terminalPanel.colorSchemeSection': '配色方案',
   'settings.terminalPanel.defaultScheme': '默认方案',
-  'settings.terminalPanel.schemeHintPart1': '应用于新窗格。可通过 ',
   'settings.terminalPanel.schemeHintPart2': ' 或 ',
   'settings.terminalPanel.schemeHintPart3': ' 按窗格覆盖。',
   'settings.terminalPanel.customSchemesSection': '自定义方案',

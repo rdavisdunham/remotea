@@ -525,7 +525,6 @@ export const zhTW: Translation = {
   'settings.terminalPanel.importUndo': '復原',
   'settings.terminalPanel.importReverted': '已復原匯入。',
   'settings.terminalPanel.defaultScheme': '預設配色方案',
-  'settings.terminalPanel.schemeHintPart1': '套用於新開的窗格。要單獨覆蓋某個窗格，可透過 ',
   'settings.terminalPanel.schemeHintPart2': ' 或 ',
   'settings.terminalPanel.schemeHintPart3': '。',
   'settings.terminalPanel.customSchemesSection': '自訂配色方案',

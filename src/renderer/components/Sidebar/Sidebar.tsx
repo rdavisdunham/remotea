@@ -360,6 +360,7 @@ export default function Sidebar({
         <AgentRosterBanner onFocusAgent={onFocusAgent} onOpenNavigator={onOpenAgentNavigator} />
       </ErrorBoundary>
 
+      <button className="sidebar__connections" onClick={onOpenHostSettings}>{t('activity.title')}</button>
       <ErrorBoundary label="host-attention" silent>
         <HostAttentionBar onOpenHosts={onOpenHostSettings} />
       </ErrorBoundary>
@@ -386,7 +387,7 @@ export default function Sidebar({
                 <span className="sidebar__task-group-label">{item.label}</span>
                 <span className="sidebar__task-group-count">{item.workspaces.length}</span>
               </div>
-              {item.workspaces.map((ws) => renderRow(ws, <TaskRunChip run={taskRunHealth(ws, registryViews)} />))}
+              {item.workspaces.map((ws) => renderRow(ws, <TaskRunChip run={taskRunHealth(ws, registryViews, t)} />))}
             </div>
           )))}
       </div>

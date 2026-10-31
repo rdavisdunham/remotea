@@ -394,7 +394,6 @@ export const de: Translation = {
   'settings.terminalPanel.fontSize': 'Schriftgröße',
   'settings.terminalPanel.colorSchemeSection': 'Farbschema',
   'settings.terminalPanel.defaultScheme': 'Standardschema',
-  'settings.terminalPanel.schemeHintPart1': 'Wird auf neue Bereiche angewendet. Pro Bereich überschreibbar via ',
   'settings.terminalPanel.schemeHintPart2': ' oder ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Benutzerdefinierte Schemata',

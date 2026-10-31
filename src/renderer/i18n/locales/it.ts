@@ -394,7 +394,6 @@ export const it: Translation = {
   'settings.terminalPanel.fontSize': 'Dimensione carattere',
   'settings.terminalPanel.colorSchemeSection': 'Schema colori',
   'settings.terminalPanel.defaultScheme': 'Schema predefinito',
-  'settings.terminalPanel.schemeHintPart1': 'Applicato ai nuovi riquadri. Sovrascrivi per riquadro con ',
   'settings.terminalPanel.schemeHintPart2': ' oppure ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Schemi personalizzati',

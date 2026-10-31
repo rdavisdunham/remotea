@@ -394,7 +394,6 @@ export const sv: Translation = {
   'settings.terminalPanel.fontSize': 'Teckenstorlek',
   'settings.terminalPanel.colorSchemeSection': 'Färgschema',
   'settings.terminalPanel.defaultScheme': 'Standardschema',
-  'settings.terminalPanel.schemeHintPart1': 'Tillämpas på nya rutor. Åsidosätt per ruta via ',
   'settings.terminalPanel.schemeHintPart2': ' eller ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Egna scheman',

@@ -19,14 +19,67 @@ const sections = {
   Help: 'HelpSettings',
   Agents: 'AgentIntegrationSettings',
 };
+// Related components own controls that remain reachable from these sections.
+const relatedSources = {
+  Workspace: ['LaunchLocationEditor.tsx', '../../utils/execution-location-text.ts'],
+  Profiles: ['LaunchLocationEditor.tsx', '../../utils/execution-location-text.ts'],
+  Remote: ['PairDeviceDialog.tsx'],
+  Help: ['help-topics.ts'],
+};
+
+function parseSource(file) {
+  return ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+}
+
+// Read the canonical English dictionary without evaluating application modules.
+// AST string values decode apostrophes, escapes and Unicode exactly as TypeScript does.
+const englishSource = parseSource('src/renderer/i18n/locales/en.ts');
+const english = new Map();
+function readEnglish(node) {
+  if (ts.isVariableDeclaration(node) && node.name.getText(englishSource) === 'en') {
+    let initializer = node.initializer;
+    while (initializer && (ts.isAsExpression(initializer) || ts.isSatisfiesExpression(initializer))) {
+      initializer = initializer.expression;
+    }
+    if (!initializer || !ts.isObjectLiteralExpression(initializer)) {
+      throw new Error('Expected the English dictionary to be an object literal.');
+    }
+    for (const property of initializer.properties) {
+      if (!ts.isPropertyAssignment(property) || !ts.isStringLiteralLike(property.initializer)) continue;
+      const key = ts.isStringLiteralLike(property.name)
+        ? property.name.text
+        : property.name.getText(englishSource);
+      english.set(key, property.initializer.text);
+    }
+  }
+  ts.forEachChild(node, readEnglish);
+}
+readEnglish(englishSource);
+if (!english.size) throw new Error('No English translation entries found.');
+
+const escapePattern = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const terms = {};
 for (const [section, file] of Object.entries(sections)) {
-  const source = fs.readFileSync(`${directory}${file}.tsx`, 'utf8');
-  const translations = source.matchAll(/t\(\s*'([^']+)'(?:,\s*'((?:\\.|[^'])*)')?/g);
-  terms[section] = [...translations].map(match => ({
-    key: match[1],
-    label: match[2] || match[1],
-  }));
+  const keys = new Set();
+  const files = [`${file}.tsx`, ...(relatedSources[section] ?? [])];
+  for (const relativeFile of files) {
+    const source = parseSource(`${directory}${relativeFile}`);
+    function collect(node) {
+      // Include metadata such as FEATURES.labelKey, conditional labels and help-topic
+      // title/body keys, in addition to literal t() calls.
+      if (ts.isStringLiteralLike(node) && english.has(node.text)) keys.add(node.text);
+      if (ts.isTemplateExpression(node) && node.head.text.includes('.')) {
+        const literals = [node.head.text, ...node.templateSpans.map(span => span.literal.text)];
+        const pattern = new RegExp(`^${literals.map(escapePattern).join('.*')}$`);
+        for (const key of english.keys()) {
+          if (pattern.test(key)) keys.add(key);
+        }
+      }
+      ts.forEachChild(node, collect);
+    }
+    collect(source);
+  }
+  terms[section] = [...keys].map(key => ({ key, label: english.get(key) }));
 }
 
 const source = ts.createSourceFile(

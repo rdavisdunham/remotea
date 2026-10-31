@@ -412,9 +412,12 @@ export const createSurfaceSlice: StateCreator<SliceState, [], [], SurfaceSlice> 
     // dismissal exists to break.
     if (type === 'diff' && !options?.auto) diffTabDismissed.delete(workspaceId);
 
+    const activeSource = leaf.surfaces[leaf.activeSurfaceIndex];
+    const launchSource = activeSource?.type === 'terminal' ? activeSource : leaf.surfaces.find((surface) => surface.type === 'terminal');
     const newSurface: SurfaceRef = {
       id: surfaceId,
       type,
+      ...((type === 'git' || type === 'diff') && !options?.shell ? { shell: launchSource?.shell || launchSource?.resolvedShell || ws.shell } : {}),
       ...(options?.colorScheme ? { colorScheme: options.colorScheme } : {}),
       ...(options?.customTitle ? { customTitle: options.customTitle } : {}),
       ...(options?.defaultTitle ? { defaultTitle: options.defaultTitle } : {}),

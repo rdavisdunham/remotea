@@ -405,7 +405,6 @@ export const uk: Translation = {
   'settings.terminalPanel.fontSize': 'Розмір шрифту',
   'settings.terminalPanel.colorSchemeSection': 'Колірна схема',
   'settings.terminalPanel.defaultScheme': 'Схема за замовчуванням',
-  'settings.terminalPanel.schemeHintPart1': 'Застосовується до нових панелей. Перевизначте для панелі через ',
   'settings.terminalPanel.schemeHintPart2': ' або ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Власні схеми',

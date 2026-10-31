@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { listenAppActions } from '../utils/app-action';
 import { useStore } from '../store';
 import { ShortcutBinding, ShortcutAction } from '../store/settings-slice';
 import { splitNode, removeLeaf, getAllPaneIds, findLeaf, adjustPaneRatio } from '../store/split-utils';
@@ -484,8 +485,10 @@ export function useKeyboardShortcuts(
       }
     }
 
+    const stopActions = listenAppActions(handlers);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
+      stopActions();
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [

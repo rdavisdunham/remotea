@@ -55,6 +55,15 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
   const t = useT();
   const workspaceLabels = useWorkspaceLabels(workspaces);
 
+  const [themes, setThemes] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    void window.wmux?.config?.getThemeList?.().then((names: unknown) => {
+      if (live && Array.isArray(names)) setThemes(names.filter((name): name is string => typeof name === 'string'));
+    }, () => {});
+    return () => { live = false; };
+  }, []);
+  const userSchemes = useStore((state) => state.terminalPrefs.userColorSchemes);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,7 +83,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     const hubEnabled = useStore.getState().appearancePrefs.hubEnabled;
     for (const [action, binding] of actionEntries) {
       // The agent-office easter egg stays out of the palette until enabled.
-      if (action === 'openHub' && !hubEnabled) continue;
+      if (action === 'commandPalette' || (action === 'openHub' && !hubEnabled)) continue;
       items.push({
         id: `action:${action}`,
         label: actionLabel(action, t),
@@ -84,9 +93,9 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
       });
     }
 
-    // Sidebar mode toggle. Deliberately a self-executing Commands-style item
-    // rather than a ShortcutAction: the Actions path in App.tsx is a stub that
-    // only console.logs, so anything routed through it silently does nothing.
+    items.push({ id: 'command:host-activity', label: t('activity.title'), category: t('palette.category.commands'), action: () => onAction('openHostActivity') });
+
+    // Sidebar mode has no shortcut; update the same preference as Settings.
     {
       const nextMode = useStore.getState().appearancePrefs.uiMode === 'trace' ? 'classic' : 'trace';
       items.push({
@@ -205,24 +214,20 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
       });
     }
 
-    // Category: Themes — placeholder entries for future theme switching
-    const themes = ['Dark (Default)', 'Light', 'Monokai', 'Solarized Dark', 'Nord'];
-    for (const theme of themes) {
-      items.push({
-        id: `theme:${theme}`,
-        label: theme,
-        category: t('palette.category.themes'),
-        action: () => {
-          console.log(`[remotea] Switch theme: ${theme}`);
-          onClose();
-        },
-      });
+    // These entries update the same preferences as Settings; no placeholder commands.
+    for (const mode of ['system', 'dark', 'light'] as const) {
+      items.push({ id: `appearance:${mode}`, label: `${t('activity.appTheme')}: ${t(`activity.theme.${mode}`)}`,
+        category: t('palette.category.themes'), action: () => { useStore.getState().setAppearancePrefs({ uiTheme: mode }); onClose(); } });
+    }
+    for (const theme of [...new Set([...themes, ...Object.keys(userSchemes)])].sort()) {
+      items.push({ id: `theme:${theme}`, label: `${t('activity.terminalTheme')}: ${theme}`,
+        category: t('palette.category.themes'), action: () => { useStore.getState().setTerminalPrefs({ theme }); onClose(); } });
     }
 
     return items;
   }, [
     shortcuts, workspaces, workspaceLabels, activeWorkspaceId, selectWorkspace, onAction, onClose, t,
-    savedLayouts, createWorkspaceFromLayout, requestLayoutSave,
+    savedLayouts, createWorkspaceFromLayout, requestLayoutSave, themes, userSchemes,
   ]);
 
   // Filter based on query
@@ -251,7 +256,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((i) => Math.min(i + 1, filteredItems.length - 1));
+      setSelectedIndex((i) => Math.min(i + 1, Math.max(0, Math.min(filteredItems.length, 10) - 1)));
       return;
     }
     if (e.key === 'ArrowUp') {
@@ -261,7 +266,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      const item = filteredItems[selectedIndex];
+      const item = visibleItems[selectedIndex];
       if (item) item.action();
     }
   };

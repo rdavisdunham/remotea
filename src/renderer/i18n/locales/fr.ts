@@ -435,7 +435,6 @@ export const fr: Translation = {
   'settings.terminalPanel.fontSize': 'Taille de police',
   'settings.terminalPanel.colorSchemeSection': 'Palette de couleurs',
   'settings.terminalPanel.defaultScheme': 'Palette par défaut',
-  'settings.terminalPanel.schemeHintPart1': 'Appliqué aux nouveaux panneaux. À redéfinir par panneau via ',
   'settings.terminalPanel.schemeHintPart2': ' ou ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Palettes personnalisées',

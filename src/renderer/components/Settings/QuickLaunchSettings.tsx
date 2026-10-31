@@ -1,3 +1,4 @@
+import LaunchLocationEditor from './LaunchLocationEditor';
 import { useState } from 'react';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
@@ -90,12 +91,7 @@ export default function QuickLaunchSettings() {
 
           {p.type === 'terminal' && (
             <div className="ql-profile__fields">
-              <input
-                className="settings-input"
-                value={p.shell ?? ''}
-                placeholder={t('settings.quickLaunch.shellPlaceholder', 'Shell (optional, e.g. pwsh.exe)')}
-                onChange={(e) => update(p.id, { shell: e.target.value || undefined })}
-              />
+              <LaunchLocationEditor inherit shell={p.shell} cwd={p.cwd} onChange={(shell) => update(p.id, { shell: shell || undefined })} />
               <input
                 className="settings-input"
                 value={p.cwd ?? ''}
@@ -121,6 +117,7 @@ export default function QuickLaunchSettings() {
 
           {p.type === 'browser' && (
             <div className="ql-profile__fields">
+              <p className="settings-hint">{t('execution.browser')}</p>
               <input
                 className="settings-input"
                 value={p.url ?? ''}

@@ -30,7 +30,10 @@ const store = create(() => ({
   workspaces: [] as WorkspaceInfo[],
 }));
 vi.mock('../../src/renderer/store', () => ({ get useStore() { return store; } }));
-vi.mock('../../src/renderer/i18n', () => ({ useT: () => (_key: string, fallback: string) => fallback }));
+vi.mock('../../src/renderer/i18n', async () => {
+  const { makeT } = await import('../../src/renderer/i18n/core');
+  return { useT: () => makeT('en') };
+});
 vi.mock('../../src/renderer/components/Sidebar/OrchestrationPanel', () => ({ default: () => null }));
 vi.mock('../../src/renderer/components/Sidebar/AgentRosterBanner', () => ({ default: () => null }));
 
@@ -88,6 +91,27 @@ describe('Sidebar with Eridani task workspaces', () => {
     const rows = [...container.querySelectorAll<HTMLElement>('[data-workspace-id]')].map((r) => r.dataset.workspaceId);
     expect(rows).toEqual(['ws-plain', 'ws-task']);
     expect(container.querySelectorAll('[data-kind="run"]')).toHaveLength(1);
+  });
+
+  it('marks disconnected activity and verification as last known without implying acceptance', () => {
+    setLatestRemoteViews([{
+      hostId: 'desk', deviceId: 'dev-me000000', connected: false, bootId: 'b',
+      groups: [], closedIds: [], lost: {},
+      sessions: [{
+        ...record,
+        verify: {
+          attemptId: 'verify-1', state: 'passed', startedAt: 1, finishedAt: 2,
+          runId: 'run-a', generation: 1, turnSeq: 1, planRevision: 1,
+          verifyId: 'checks', initiator: 'eridani',
+        },
+      }],
+    }]);
+    render();
+    const chip = container.querySelector<HTMLElement>('[data-kind="run"]');
+    expect(chip?.textContent).toBe('Working (last known)');
+    expect(chip?.classList.contains('remote-host-chip--neutral')).toBe(true);
+    expect(chip?.title).toContain('verify passed (last known)');
+    expect(chip?.title).toContain('Verification does not imply task acceptance');
   });
 
   it('grouping off: no heading, a flat list', () => {

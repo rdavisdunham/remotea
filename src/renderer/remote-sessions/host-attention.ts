@@ -1,3 +1,4 @@
+import type { Translator } from '../i18n/core';
 /**
  * remotea: the host attention overview (Astra review A-Q2). One compact row
  * per remote host: its connection, how many Eridani runs on it are waiting
@@ -65,12 +66,13 @@ export function hostAttention(
   views: RemoteRegistryView[] | null | undefined,
   shownHere: ReadonlySet<string>,
   now: number,
+  t?: Translator,
 ): HostAttention[] {
   const out: HostAttention[] = [];
   for (const host of Object.values(hosts)) {
     if (host.enabled === false) continue; // switched off in Settings: nothing to attend to
     const st = status[host.id];
-    const connection = connectionHealth(st, now);
+    const connection = connectionHealth(st, now, t);
     const view = views?.find((v) => v.hostId === host.id);
     const closed = new Set(view?.closedIds ?? []);
     const visible = (view?.sessions ?? []).filter((s) => !closed.has(s.id) && !(s.hiddenBy as string[]).includes(view!.deviceId));

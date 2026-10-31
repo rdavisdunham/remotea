@@ -395,7 +395,6 @@ export const es: Translation = {
   'settings.terminalPanel.fontSize': 'Tamaño de fuente',
   'settings.terminalPanel.colorSchemeSection': 'Esquema de color',
   'settings.terminalPanel.defaultScheme': 'Esquema predeterminado',
-  'settings.terminalPanel.schemeHintPart1': 'Se aplica a los paneles nuevos. Sobrescribe por panel con ',
   'settings.terminalPanel.schemeHintPart2': ' o ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Esquemas personalizados',

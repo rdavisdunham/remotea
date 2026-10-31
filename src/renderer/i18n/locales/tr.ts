@@ -405,7 +405,6 @@ export const tr: Translation = {
   'settings.terminalPanel.fontSize': 'Yazı boyutu',
   'settings.terminalPanel.colorSchemeSection': 'Renk düzeni',
   'settings.terminalPanel.defaultScheme': 'Varsayılan düzen',
-  'settings.terminalPanel.schemeHintPart1': 'Yeni panellere uygulanır. Panel başına ',
   'settings.terminalPanel.schemeHintPart2': ' veya ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Özel düzenler',

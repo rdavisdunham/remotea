@@ -3,6 +3,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { IPC_CHANNELS } from '../../src/shared/types';
 
+// These handler tests never spawn a PTY and must not load platform bindings.
+vi.mock('node-pty', () => ({ spawn: vi.fn() }));
+
 const registeredHandlers = new Map<string, Function>();
 
 vi.mock('electron', () => ({
@@ -35,6 +38,11 @@ const mockCreateWorktree = vi.fn();
 const mockRemoveWorktree = vi.fn();
 const mockInspectWorktree = vi.fn();
 const mockProbeRepo = vi.fn();
+const mockProjectProfiles = vi.fn();
+vi.mock('../../src/main/config-loader', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  loadProjectProfiles: (...args: unknown[]) => mockProjectProfiles(...args),
+}));
 
 vi.mock('../../src/main/git-worktree', () => ({
   createWorktree: (...args: any[]) => mockCreateWorktree(...args),
@@ -43,7 +51,7 @@ vi.mock('../../src/main/git-worktree', () => ({
   probeRepo: (...args: any[]) => mockProbeRepo(...args),
 }));
 
-import { registerIpcHandlers } from '../../src/main/ipc-handlers';
+import { registerIpcHandlers, ptyManager } from '../../src/main/ipc-handlers';
 
 const WT = 'C:\\Users\\user\\AppData\\Local\\wmux\\wt\\repo\\feat-12345678';
 
@@ -63,6 +71,38 @@ describe('worktree IPC handlers (#366)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('refuses remote and unknown terminal owners before desktop Git/worktree calls', async () => {
+    const remote = vi.spyOn(ptyManager, 'isRemote').mockImplementation((id) => id === 'surf-remote');
+    const known = vi.spyOn(ptyManager, 'has').mockReturnValue(false);
+    try {
+      for (const id of ['surf-remote', 'surf-missing']) {
+        expect(await createHandler({}, '/host/repo', 'branch', undefined, id)).toMatchObject({ ok: false, code: 'unsupported_location' });
+        expect(await probeHandler({}, '/host/repo', id)).toBeNull();
+        await expect(registeredHandlers.get(IPC_CHANNELS.DIFF_GET_FILES)!({}, '/host/repo', undefined, id)).rejects.toThrow(/not routed/);
+        await expect(registeredHandlers.get(IPC_CHANNELS.DIFF_GET_DIFF)!({}, '/host/repo', 'file', undefined, id)).rejects.toThrow(/not routed/);
+        expect(await registeredHandlers.get(IPC_CHANNELS.GIT_VIEW)!({}, { op: 'repo', cwd: '/host/repo' }, id)).toMatchObject({ ok: false });
+      }
+      expect(mockCreateWorktree).not.toHaveBeenCalled();
+      expect(mockProbeRepo).not.toHaveBeenCalled();
+    } finally { remote.mockRestore(); known.mockRestore(); }
+  });
+
+  it('does not interpret remote or unknown project-profile ownership as desktop paths', async () => {
+    const handler = registeredHandlers.get('config:getProjectProfiles')!;
+    const remote = vi.spyOn(ptyManager, 'isRemote').mockImplementation((id) => id === 'surf-remote');
+    mockProjectProfiles.mockResolvedValue([{ id: 'local-profile' }]);
+    try {
+      expect(await handler({}, '/host/repo', { shell: 'remote:desk' })).toEqual([]);
+      expect(await handler({}, '/host/repo', { shell: '' })).toEqual([]);
+      expect(await handler({}, '/host/repo', { shell: 'pwsh.exe', surfaceId: 'surf-remote' })).toEqual([]);
+      expect(mockProjectProfiles).not.toHaveBeenCalled();
+      expect(await handler({}, 'C:\\repo', { shell: 'local:', surfaceId: 'surf-local' })).toEqual([{ id: 'local-profile' }]);
+      expect(mockProjectProfiles).toHaveBeenLastCalledWith('C:\\repo');
+      await handler({}, 'C:\\legacy');
+      expect(mockProjectProfiles).toHaveBeenLastCalledWith('C:\\legacy');
+    } finally { remote.mockRestore(); }
   });
 
   it('registers the worktree handlers', () => {
