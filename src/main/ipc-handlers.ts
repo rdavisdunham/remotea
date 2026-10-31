@@ -899,7 +899,13 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   });
 
   // Quick-launch profiles (issue #32): read project `.wmux.json` and import WT profiles.
-  ipcMain.handle('config:getProjectProfiles', async (_event, cwd: string) => {
+  ipcMain.handle('config:getProjectProfiles', async (_event, cwd: string, source?: { surfaceId?: string; shell?: string }) => {
+    // Old cwd-only callers are explicitly desktop-local. Source-aware callers
+    // must name a local launch; host paths are never a desktop profile backend.
+    if (source !== undefined) {
+      if (!source || typeof source !== 'object' || typeof source.shell !== 'string' || !source.shell || source.shell.startsWith('remote:')) return [];
+      if (source.surfaceId !== undefined && (typeof source.surfaceId !== 'string' || ptyManager.isRemote(source.surfaceId))) return [];
+    }
     return loadProjectProfiles(cwd);
   });
   ipcMain.handle('config:importWindowsTerminalProfiles', async () => {
