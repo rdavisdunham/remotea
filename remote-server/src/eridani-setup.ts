@@ -1043,8 +1043,9 @@ export async function runSetup(o: SetupOptions, d: SetupDeps): Promise<SetupRepo
       base = await p.text('   base branch', base);
       root = path.resolve(await p.text('   worktree root', root));
       harnesses = (await p.text('   harnesses (claude, codex)', harnesses.join(','))).split(/[\s,]+/).filter((h): h is SpawnHarness => h === 'claude' || h === 'codex');
-      const v = await p.text('   verify command (Enter for none)', verify[0]?.argv.join(' ') ?? '');
-      verify = v ? [{ id: verify[0]?.id ?? 'test', argv: v.split(/\s+/).filter(Boolean), timeout: o.verifyTimeout }] : [];
+      // Enter keeps the bracketed default (the detected command, if any); "-" means no verify entry.
+      const v = (await p.text(verify.length ? '   verify command (Enter keeps it, - for none)' : '   verify command (Enter for none)', verify[0]?.argv.join(' ') ?? '')).trim();
+      verify = v && v !== '-' ? [{ id: verify[0]?.id ?? 'test', argv: v.split(/\s+/).filter(Boolean), timeout: o.verifyTimeout }] : [];
     }
     if (!TARGET_ID_RE.test(tid) || taken.has(tid)) throw new Error(`target id ${tid}: taken or not letters, digits, . _ -`);
     const launch: ExecutionTarget['launch'] = {};
