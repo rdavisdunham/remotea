@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const zh: Translation = {
+  "settings.tab.remote": "手机访问",
   'settings.title': '设置',
   'settings.tab.general': '常规',
   'settings.tab.sidebar': '侧边栏',
@@ -12,7 +13,6 @@ export const zh: Translation = {
   'settings.tab.terminal': '终端',
   'settings.tab.notifications': '通知',
   'settings.tab.browser': '浏览器',
-  'settings.tab.profiles': '配置文件',
   'settings.tab.shortcuts': '快捷键',
   'settings.general.languageSection': '语言',
   'settings.general.language': '界面语言',
@@ -67,8 +67,6 @@ export const zh: Translation = {
   'settings.help.updateTo': '更新到',
   'settings.help.upToDate': '已是最新',
   'settings.help.downloading': '下载中',
-  'settings.help.reportIssue': '报告问题',
-  'settings.help.website': '网站',
   'settings.help.hint': '发现错误或有建议？请在 GitHub 上提交问题。',
   'ctx.pin': '固定工作区',
   'ctx.unpin': '取消固定工作区',
@@ -160,25 +158,13 @@ export const zh: Translation = {
   'tutorial.next': '下一步',
   'tutorial.getStarted': '开始使用',
   'tutorial.step.welcome.title': '欢迎使用 remotea',
-  'tutorial.step.welcome.body': 'remotea 是一款用于并行运行 AI 编程代理的终端复用器。这段快速导览将展示核心功能。',
   'tutorial.step.workspaces.title': '工作区',
-  'tutorial.step.workspaces.body':
-    '左侧边栏显示你的工作区。每个工作区都是拥有独立终端布局的独立会话。按 Ctrl+N 新建工作区，双击标题可重命名。',
   'tutorial.step.splitPanes.title': '拆分窗格',
-  'tutorial.step.splitPanes.body':
-    '可以水平或垂直拆分终端，每个窗格运行独立的 shell。拖动分隔线可调整大小，按 Ctrl+Shift+Enter 可将窗格放大至全屏。',
-  'tutorial.step.surfaceTabs.title': '标签页',
   'tutorial.step.surfaceTabs.body':
     '每个窗格可包含多个标签页——终端、浏览器面板或 Markdown 视图。可在窗格间拖动标签页重新排列，按 Ctrl+T 新建标签页。',
   'tutorial.step.browserPanel.title': '浏览器面板',
-  'tutorial.step.browserPanel.body':
-    '右侧的浏览器面板可预览代理构建的内容。按 Ctrl+Shift+I 切换显示，可导航至 localhost 或任意网址，浏览器还可通过 socket API 编程控制。',
   'tutorial.step.notifications.title': '通知',
-  'tutorial.step.notifications.body':
-    '当代理需要你处理时，其窗格会出现蓝色光环，工作区角标也会增加，同时会触发 Windows 系统通知。按 Ctrl+Shift+U 跳转到最新未读项。',
   'tutorial.step.allSet.title': '一切就绪',
-  'tutorial.step.allSet.body':
-    '你随时可以通过标题栏中的帮助按钮（?）重新打开本指南。要查看完整快捷键列表，请按 Ctrl+, 打开设置，或按 Ctrl+Shift+P 打开命令面板。',
   // 侧边栏 — 工作区行：按工具区分的活动标签
   'workspaceRow.tool.bash': '正在运行命令...',
   'workspaceRow.tool.read': '正在读取文件...',
@@ -210,20 +196,13 @@ export const zh: Translation = {
   'workspaceRow.working': '进行中…',
   // 侧边栏 — 外框
   'sidebar.collapse': '收起侧边栏 (Ctrl+B)',
-  'sidebar.saveSession': '保存会话',
-  'sidebar.loadSession': '加载会话',
   'sidebar.newWorkspace': '新建工作区',
   // 侧边栏 — 会话菜单（保存/加载）
   'sessionMenu.justNow': '刚刚',
   'sessionMenu.minutesAgo': '{count} 分钟前',
   'sessionMenu.hoursAgo': '{count} 小时前',
   'sessionMenu.daysAgo': '{count} 天前',
-  'sessionMenu.newSessionName': '新会话名称...',
-  'sessionMenu.noSavedSessions': '没有已保存的会话',
-  'sessionMenu.overwriteExisting': '或覆盖现有会话：',
   'sessionMenu.overwrite': '覆盖“{name}”',
-  'sessionMenu.load': '加载“{name}”',
-  'sessionMenu.deleteSession': '删除会话',
   // 设置 — 浏览器面板
   'settings.browser.searchSection': '搜索',
   'settings.browser.defaultSearchEngine': '默认搜索引擎',
@@ -439,10 +418,6 @@ export const zh: Translation = {
   'settings.workspacePanel.placement.top': '顶部',
   'settings.workspacePanel.placement.end': '末尾',
   'settings.workspacePanel.autoReorder': '收到通知时自动重新排序',
-  'settings.workspacePanel.showWelcomeScreen': '启动时显示欢迎界面',
-  'settings.workspacePanel.confirmClose': '关闭会话前确认',
-  'settings.workspacePanel.confirmCloseHint':
-    '在点击 × 按钮、使用右键菜单或按 Ctrl+Shift+W 关闭会话前先询问 —— 这样误点击就不会终止尚未保存状态的代理。通过 CLI 或代理发起的关闭操作永远不会弹出询问。',
   'settings.workspacePanel.restoreClaudeSessions': '恢复时继续 Claude Code 会话',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'remotea 恢复会话时，会在原目录下用 `claude --resume` 重新启动每个曾运行 Claude Code 的终端。默认关闭：这些窗格会同时各启动一个代理。Claude 已没有对应对话的窗格会被跳过，你正常退出的 Claude 也不会被恢复。',
   'settings.workspacePanel.restoreOmpSessions': '恢复时继续 omp 会话',
@@ -460,7 +435,6 @@ export const zh: Translation = {
   // 侧边栏 — 编排面板
   'orchestrationPanel.expand': '展开编排',
   'orchestrationPanel.collapse': '收起编排',
-  'orchestrationPanel.title': '编排',
   'orchestrationPanel.reviewer': '审阅者',
   'orchestrationPanel.dismiss': '关闭',
   'orchestrationPanel.waiting': '等待中',
@@ -574,18 +548,12 @@ export const zh: Translation = {
   'surfaceTab.profileBadge': '项目',
   // 设置 — 代理集成授权 (issue #132)
   'settings.integration.section': '代理集成',
-  'settings.integration.enable': '允许 remotea 配置 Claude Code、OpenCode、Kiro、omp、pi 与 Grok',
-  'settings.integration.hint':
-    'remotea 会修改主目录中的文件，使编码代理能够驱动其浏览器面板、Markdown 视图和侧边栏状态。在此关闭某项时，也会一并移除它写入的内容。',
   'settings.integration.instructions': '代理指令',
   'settings.integration.hooks': '状态钩子',
-  'settings.integration.orchestrator': '编排器插件',
-  'settings.integration.browserMcp': '用于 MCP 的浏览器面板',
   // 侧边栏 — 在面板之外回复被阻塞的代理 (issue #128)
   'workspaceRow.answerSent': '已发送 — 等待中…',
   'workspaceRow.answerTitle': '无需切换到该面板即可回复',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': '远程',
   'settings.remote.title': '远程控制台',
   'settings.remote.hint': '在手机浏览器中查看你的智能体并回复它们。默认关闭：在此处开启之前，不会监听任何端口。',
   'settings.remote.loading': '正在加载…',

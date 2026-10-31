@@ -5,15 +5,14 @@
 import type { Translation } from './en';
 
 export const fr: Translation = {
+  "settings.tab.remote": "Accès téléphone",
   'settings.title': 'Paramètres',
   'settings.tab.general': 'Général',
   'settings.tab.sidebar': 'Barre latérale',
   'settings.tab.workspace': 'Espace de travail',
   'settings.tab.terminal': 'Terminal',
-  'settings.tab.prompts': 'Invites',
   'settings.tab.notifications': 'Notifications',
   'settings.tab.browser': 'Navigateur',
-  'settings.tab.profiles': 'Profils',
   'settings.tab.shortcuts': 'Raccourcis',
   'settings.general.languageSection': 'Langue',
   'settings.general.language': "Langue de l'interface",
@@ -79,8 +78,6 @@ export const fr: Translation = {
   'settings.help.updateTo': 'Mettre à jour vers',
   'settings.help.upToDate': 'À jour',
   'settings.help.downloading': 'Téléchargement',
-  'settings.help.reportIssue': 'Signaler un problème',
-  'settings.help.website': 'Site web',
   'settings.help.hint': 'Un bug ou une suggestion ? Ouvrez un ticket sur GitHub.',
   'ctx.pin': "Épingler l'espace",
   'ctx.unpin': "Désépingler l'espace",
@@ -182,26 +179,13 @@ export const fr: Translation = {
   'tutorial.next': 'Suivant',
   'tutorial.getStarted': 'Commencer',
   'tutorial.step.welcome.title': 'Bienvenue dans remotea',
-  'tutorial.step.welcome.body':
-    "remotea est un multiplexeur de terminal pour exécuter des agents IA en parallèle. Cette visite rapide vous montre l'essentiel.",
   'tutorial.step.workspaces.title': 'Espaces de travail',
-  'tutorial.step.workspaces.body':
-    "La barre latérale à gauche affiche vos espaces de travail. Chaque espace est une session indépendante avec sa propre disposition de terminaux. Créez-en un nouveau avec Ctrl+N. Double-cliquez sur un titre pour le renommer.",
   'tutorial.step.splitPanes.title': 'Panneaux divisés',
-  'tutorial.step.splitPanes.body':
-    'Divisez vos terminaux horizontalement ou verticalement. Chaque panneau exécute son propre shell. Faites glisser les séparateurs pour redimensionner. Agrandissez un panneau en plein écran avec Ctrl+Maj+Entrée.',
-  'tutorial.step.surfaceTabs.title': 'Onglets',
   'tutorial.step.surfaceTabs.body':
     'Chaque panneau peut avoir plusieurs onglets — terminaux, panneaux navigateur ou vues markdown. Faites glisser les onglets entre panneaux pour les réorganiser. Créez de nouveaux onglets avec Ctrl+T.',
   'tutorial.step.browserPanel.title': 'Panneau navigateur',
-  'tutorial.step.browserPanel.body':
-    "Le panneau navigateur à droite permet de prévisualiser ce que construisent vos agents. Activez-le avec Ctrl+Maj+I. Accédez à localhost ou à n'importe quelle URL. Le navigateur est scriptable via l'API socket.",
   'tutorial.step.notifications.title': 'Notifications',
-  'tutorial.step.notifications.body':
-    "Quand un agent a besoin de votre attention, son panneau s'entoure d'un anneau bleu et le badge de l'espace de travail s'incrémente. Une notification toast Windows se déclenche aussi. Accédez au dernier non lu avec Ctrl+Maj+U.",
   'tutorial.step.allSet.title': 'Vous êtes prêt',
-  'tutorial.step.allSet.body':
-    "Vous pouvez toujours rouvrir ce guide depuis le bouton d'aide (?) dans la barre de titre. Pour tous les raccourcis clavier, ouvrez les Paramètres avec Ctrl+, ou la palette de commandes avec Ctrl+Maj+P.",
   // Sidebar — ligne d'espace de travail : libellés d'activité par outil
   'workspaceRow.tool.bash': 'Exécution de la commande...',
   'workspaceRow.tool.read': 'Lecture du fichier...',
@@ -234,20 +218,13 @@ export const fr: Translation = {
   'workspaceRow.working': 'En cours…',
   // Barre latérale — chrome
   'sidebar.collapse': 'Réduire la barre latérale (Ctrl+B)',
-  'sidebar.saveSession': 'Enregistrer la session',
-  'sidebar.loadSession': 'Charger la session',
   'sidebar.newWorkspace': 'Nouvel espace de travail',
   // Barre latérale — menu des sessions (enregistrer/charger)
   'sessionMenu.justNow': "à l'instant",
   'sessionMenu.minutesAgo': 'il y a {count} min',
   'sessionMenu.hoursAgo': 'il y a {count} h',
   'sessionMenu.daysAgo': 'il y a {count} j',
-  'sessionMenu.newSessionName': 'Nom de la nouvelle session...',
-  'sessionMenu.noSavedSessions': 'Aucune session enregistrée',
-  'sessionMenu.overwriteExisting': 'Ou écraser une session existante :',
   'sessionMenu.overwrite': 'Écraser « {name} »',
-  'sessionMenu.load': 'Charger « {name} »',
-  'sessionMenu.deleteSession': 'Supprimer la session',
   // Paramètres — Panneau Navigateur
   'settings.browser.searchSection': 'Recherche',
   'settings.browser.defaultSearchEngine': 'Moteur de recherche par défaut',
@@ -492,14 +469,7 @@ export const fr: Translation = {
   'settings.workspacePanel.placement.top': 'En haut',
   'settings.workspacePanel.placement.end': 'À la fin',
   'settings.workspacePanel.autoReorder': 'Réorganisation automatique à la notification',
-  'settings.workspacePanel.showWelcomeScreen': "Afficher l'écran d'accueil au démarrage",
-  'settings.workspacePanel.confirmClose': 'Confirmer avant de fermer une session',
-  'settings.workspacePanel.confirmCloseHint':
-    "Demande confirmation avant que le bouton ×, le menu contextuel ou Ctrl+Maj+W ne ferme une session — un clic accidentel ne peut pas interrompre des agents qui n'ont pas encore enregistré leur état. Les fermetures via la CLI ou les agents ne demandent jamais de confirmation.",
-  'settings.workspacePanel.restoreCodexSessions': "Reprendre les sessions Codex à la restauration",
-  'settings.workspacePanel.restoreOpencodeSessions': "Reprendre les sessions OpenCode à la restauration",
   'settings.workspacePanel.restoreOpencodeSessionsHint': "Rouvre la session OpenCode de chaque onglet restauré avec `opencode -s`, dans le dossier où il se trouvait. Nécessite le plugin OpenCode de remotea (intégration des agents activée). Un OpenCode quitté normalement n’est pas relancé. Si la session a été supprimée entre-temps, OpenCode en démarre une nouvelle. OpenCode 2 n’est capturé que lancé avec --standalone : son serveur d’arrière-plan partagé ne distingue pas les onglets.",
-  'settings.workspacePanel.restoreAgySessions': "Reprendre les conversations Antigravity CLI à la restauration",
   'settings.workspacePanel.restoreAgySessionsHint': "Rouvre la conversation agy de chaque onglet restauré avec `agy --conversation`, dans le dossier où il se trouvait. Nécessite le plugin agy de remotea (hooks de statut activés) et Node.js. Une conversation est capturée à son démarrage, ou à son premier message après une reprise. Un agy quitté jusqu’à l’invite du shell n’est pas relancé.",
   'settings.workspacePanel.restoreCodexSessionsHint': "Rouvre la conversation Codex exacte dans chaque onglet restauré. Active cette option, puis lance codex dans un nouveau terminal remotea. Nécessite Node.js et le CLI Codex Windows natif dans PowerShell ou l’invite de commandes. Une session quittée normalement ne sera pas relancée.",
   'settings.workspacePanel.restoreClaudeSessions': 'Reprendre les sessions Claude Code à la restauration',
@@ -547,7 +517,6 @@ export const fr: Translation = {
   // Barre latérale — panneau d'orchestration
   'orchestrationPanel.expand': "Développer l'orchestration",
   'orchestrationPanel.collapse': "Réduire l'orchestration",
-  'orchestrationPanel.title': 'orchestration',
   'orchestrationPanel.reviewer': 'relecteur',
   'orchestrationPanel.dismiss': 'ignorer',
   'orchestrationPanel.waiting': 'en attente',
@@ -746,13 +715,8 @@ export const fr: Translation = {
   'surfaceTab.profileBadge': 'projet',
   // Paramètres — consentement à l'intégration des agents (issue #132)
   'settings.integration.section': 'Intégration des agents',
-  'settings.integration.enable': 'Autoriser remotea à configurer Claude Code, OpenCode, Kiro, omp, pi et Grok',
-  'settings.integration.hint':
-    "remotea modifie des fichiers dans votre dossier personnel afin que les agents de codage puissent piloter son panneau navigateur, ses vues markdown et l'état de la barre latérale. Désactiver une option ici supprime aussi ce qu'elle avait écrit.",
   'settings.integration.instructions': 'Instructions pour les agents',
   'settings.integration.hooks': 'Hooks de statut',
-  'settings.integration.orchestrator': 'Extension orchestrateur',
-  'settings.integration.browserMcp': 'Panneau navigateur pour MCP',
   // Barre latérale — répondre à un agent bloqué depuis l'extérieur de son panneau (issue #128)
   'workspaceRow.answerSent': 'Envoyé — en attente…',
   'workspaceRow.answerTitle': 'Répondre sans basculer vers ce panneau',
@@ -788,8 +752,6 @@ export const fr: Translation = {
   // ─── Paramètres — Panneau des invites (issue #207) ───
   // {binding} est remplacé par le raccourci RÉEL de l'utilisateur : garder le
   // marqueur tel quel et ne jamais écrire une combinaison de touches en dur.
-  'settings.prompt.title': 'Invites',
-  'settings.prompt.enabled': 'Suivre les invites',
   'settings.prompt.enabledHint':
     'Retient ce que vous avez tapé dans chaque panneau, pour donner aux options ci-dessous quelque chose à désigner. Désactivé, aucune d’elles ne tourne et rien n’est enregistré.',
   'settings.prompt.highlightSection': 'Surlignage',
@@ -856,9 +818,7 @@ export const fr: Translation = {
   'prompt.paneLock': 'Suit le panneau actif — cliquez pour figer la liste sur celui-ci',
   'prompt.paneUnlock': 'Figé sur un panneau — cliquez pour suivre à nouveau le panneau actif',
   'prompt.paneNoSource': 'Activez un panneau terminal et ce volet listera ses invites.',
-  'prompt.paneDisabled': 'Le suivi des invites est désactivé. Activez-le dans Réglages → Invites.',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'Distant',
   'settings.remote.title': 'Console distante',
   'settings.remote.hint': 'Suivez vos agents et répondez-leur depuis le navigateur d’un téléphone. Désactivée par défaut : rien n’écoute tant que vous ne l’activez pas ici.',
   'settings.remote.loading': 'Chargement…',

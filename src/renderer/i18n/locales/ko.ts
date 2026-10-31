@@ -9,6 +9,7 @@
 import type { Translation } from './en';
 
 export const ko: Translation = {
+  "settings.tab.remote": "휴대폰 접근",
   // 설정 — 창 구성
   'settings.title': '설정',
   'settings.tab.general': '일반',
@@ -17,7 +18,6 @@ export const ko: Translation = {
   'settings.tab.terminal': '터미널',
   'settings.tab.notifications': '알림',
   'settings.tab.browser': '브라우저',
-  'settings.tab.profiles': '프로필',
   'settings.tab.shortcuts': '단축키',
   // 설정 — 일반 패널
   'settings.general.languageSection': '언어',
@@ -84,8 +84,6 @@ export const ko: Translation = {
   'settings.help.updateTo': '업데이트:',
   'settings.help.upToDate': '최신 버전',
   'settings.help.downloading': '다운로드 중',
-  'settings.help.reportIssue': '문제 신고',
-  'settings.help.website': '웹사이트',
   'settings.help.hint': '버그를 발견했거나 요청할 기능이 있나요? GitHub에 이슈를 남겨 주세요.',
   // 작업 공간 오른쪽 클릭 메뉴
   'ctx.pin': '작업 공간 고정',
@@ -179,26 +177,13 @@ export const ko: Translation = {
   'tutorial.next': '다음',
   'tutorial.getStarted': '시작하기',
   'tutorial.step.welcome.title': 'wmux에 오신 것을 환영합니다',
-  'tutorial.step.welcome.body':
-    'wmux는 AI 코딩 에이전트를 병렬로 실행하기 위한 터미널 멀티플렉서입니다. 이 짧은 둘러보기에서 핵심 기능을 소개합니다.',
   'tutorial.step.workspaces.title': '작업 공간',
-  'tutorial.step.workspaces.body':
-    '왼쪽 사이드바에 작업 공간이 표시됩니다. 각 작업 공간은 고유한 터미널 레이아웃을 가진 독립된 세션입니다. Ctrl+N으로 새로 만들 수 있고, 작업 공간 제목을 두 번 클릭하면 이름을 변경할 수 있습니다.',
   'tutorial.step.splitPanes.title': '창 분할',
-  'tutorial.step.splitPanes.body':
-    '터미널을 가로 또는 세로로 분할할 수 있습니다. 각 창은 자체 셸을 실행합니다. 구분선을 끌어 크기를 조절하고, Ctrl+Shift+Enter로 원하는 창을 전체 크기로 확대하세요.',
-  'tutorial.step.surfaceTabs.title': '서피스 탭',
   'tutorial.step.surfaceTabs.body':
     '각 창은 터미널, 브라우저 패널, 마크다운 보기 등 여러 탭을 가질 수 있습니다. 탭을 창 사이로 끌어 옮겨 재배치하고, Ctrl+T로 새 탭을 만드세요.',
   'tutorial.step.browserPanel.title': '브라우저 패널',
-  'tutorial.step.browserPanel.body':
-    '오른쪽 브라우저 패널에서 에이전트가 만든 결과를 바로 확인할 수 있습니다. Ctrl+Shift+I로 열고 닫으며, localhost나 원하는 URL로 이동할 수 있습니다. 브라우저는 소켓 API로 제어할 수도 있습니다.',
   'tutorial.step.notifications.title': '알림',
-  'tutorial.step.notifications.body':
-    '에이전트가 사용자의 확인을 기다리면 해당 창에 파란 테두리가 생기고 작업 공간 배지 숫자가 올라갑니다. Windows 토스트 알림도 함께 표시됩니다. Ctrl+Shift+U로 가장 최근의 읽지 않은 알림으로 이동하세요.',
   'tutorial.step.allSet.title': '준비가 끝났습니다',
-  'tutorial.step.allSet.body':
-    '이 안내는 제목 표시줄의 도움말 버튼(?)에서 언제든 다시 열 수 있습니다. 전체 단축키는 Ctrl+,로 설정을 열거나 Ctrl+Shift+P로 명령 팔레트를 열어 확인하세요.',
   // 사이드바 — 작업 공간 행: 도구별 활동 표시
   'workspaceRow.tool.bash': '명령 실행 중...',
   'workspaceRow.tool.read': '파일 읽는 중...',
@@ -231,20 +216,13 @@ export const ko: Translation = {
   'workspaceRow.working': '작업 중…',
   // 사이드바 구성
   'sidebar.collapse': '사이드바 접기 (Ctrl+B)',
-  'sidebar.saveSession': '세션 저장',
-  'sidebar.loadSession': '세션 불러오기',
   'sidebar.newWorkspace': '새 작업 공간',
   // 사이드바 — 세션 메뉴 (저장/불러오기)
   'sessionMenu.justNow': '방금 전',
   'sessionMenu.minutesAgo': '{count}분 전',
   'sessionMenu.hoursAgo': '{count}시간 전',
   'sessionMenu.daysAgo': '{count}일 전',
-  'sessionMenu.newSessionName': '새 세션 이름...',
-  'sessionMenu.noSavedSessions': '저장된 세션이 없습니다',
-  'sessionMenu.overwriteExisting': '또는 기존 세션에 덮어쓰기:',
   'sessionMenu.overwrite': '"{name}"에 덮어쓰기',
-  'sessionMenu.load': '"{name}" 불러오기',
-  'sessionMenu.deleteSession': '세션 삭제',
   // 설정 — 브라우저 패널
   'settings.browser.searchSection': '검색',
   'settings.browser.defaultSearchEngine': '기본 검색 엔진',
@@ -462,10 +440,6 @@ export const ko: Translation = {
   'settings.workspacePanel.placement.top': '맨 위',
   'settings.workspacePanel.placement.end': '맨 끝',
   'settings.workspacePanel.autoReorder': '알림이 오면 자동으로 정렬',
-  'settings.workspacePanel.showWelcomeScreen': '시작할 때 환영 화면 표시',
-  'settings.workspacePanel.confirmClose': '세션을 닫기 전에 확인',
-  'settings.workspacePanel.confirmCloseHint':
-    '× 버튼, 오른쪽 클릭 메뉴, Ctrl+Shift+W로 세션을 닫기 전에 확인합니다. 실수로 클릭해도 아직 상태를 저장하지 않은 에이전트가 종료되지 않습니다. CLI와 에이전트가 닫을 때는 확인하지 않습니다.',
   'settings.workspacePanel.restoreClaudeSessions': '복원 시 Claude Code 세션 재개',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'wmux가 세션을 복원할 때 Claude Code가 실행 중이던 각 터미널을 원래 디렉터리에서 `claude --resume`으로 다시 실행합니다. 기본값은 꺼짐입니다. 해당 창들이 한꺼번에 에이전트를 시작하기 때문입니다. Claude에 대화가 남아 있지 않은 창은 건너뛰며, 정상적으로 종료한 Claude는 재개되지 않습니다.',
   'settings.workspacePanel.autoOpenDiff': '에이전트가 파일을 편집하면 변경 사항 탭 자동 열기',
@@ -481,7 +455,6 @@ export const ko: Translation = {
   // 사이드바 — 오케스트레이션 패널
   'orchestrationPanel.expand': '오케스트레이션 펼치기',
   'orchestrationPanel.collapse': '오케스트레이션 접기',
-  'orchestrationPanel.title': '오케스트레이션',
   'orchestrationPanel.reviewer': '검토자',
   'orchestrationPanel.dismiss': '닫기',
   'orchestrationPanel.waiting': '대기 중',
@@ -598,18 +571,12 @@ export const ko: Translation = {
   'surfaceTab.profileBadge': '프로젝트',
   // 설정 — 에이전트 연동 동의 (issue #132)
   'settings.integration.section': '에이전트 연동',
-  'settings.integration.enable': 'wmux가 Claude Code, OpenCode, Kiro, omp, pi, Grok을 설정하도록 허용',
-  'settings.integration.hint':
-    '코딩 에이전트가 wmux의 브라우저 패널, 마크다운 보기, 사이드바 상태를 제어할 수 있도록 wmux가 홈 디렉터리의 파일을 수정합니다. 여기서 항목을 끄면 wmux가 기록한 내용도 함께 제거됩니다.',
   'settings.integration.instructions': '에이전트 지침',
   'settings.integration.hooks': '상태 훅',
-  'settings.integration.orchestrator': '오케스트레이터 플러그인',
-  'settings.integration.browserMcp': 'MCP용 브라우저 패널',
   // 사이드바 — 창 밖에서 대기 중인 에이전트에 응답 (issue #128)
   'workspaceRow.answerSent': '전송됨 — 대기 중…',
   'workspaceRow.answerTitle': '이 창으로 전환하지 않고 답변하기',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': '원격',
   'settings.remote.title': '원격 콘솔',
   'settings.remote.hint': '휴대폰 브라우저에서 에이전트를 지켜보고 응답하세요. 기본값은 꺼짐이며, 여기서 켜기 전까지는 아무것도 수신 대기하지 않습니다.',
   'settings.remote.loading': '불러오는 중…',

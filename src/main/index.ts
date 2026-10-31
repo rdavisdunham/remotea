@@ -2015,7 +2015,7 @@ app.whenReady().then(() => {
         respond({ name: 'wmux', version: app.getVersion(), platform: 'win32' });
         break;
       case 'system.capabilities':
-        respond({ protocols: ['v1', 'v2'], features: ['workspaces', 'splits', 'notifications'] });
+        respond({ protocols: ['v1', 'v2'], features: ['workspaces', 'splits', 'notifications', 'windows', 'browser', 'markdown', 'agents', 'status'] });
         break;
       // workspace.* and pane.split/close handled by handleBridgeV2 (./v2-bridge).
       // window.* handled by handleWindowV2 above.

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
+import { PRODUCT } from '../../../shared/product';
+import { HELP_TOPICS } from './help-topics';
 import { useUpdate } from '../../hooks/useUpdate';
 
 // Help / About panel — shows the running app version and quick links to the
@@ -8,12 +10,10 @@ import { useUpdate } from '../../hooks/useUpdate';
 // rather than a hardcoded literal. The update button next to it drives the
 // same in-app updater as the titlebar badge, so a zip extract can update in
 // place without leaving the app for GitHub.
-const REPO_URL = 'https://github.com/amirlehmam/wmux';
-const ISSUES_URL = `${REPO_URL}/issues`;
-const WEBSITE_URL = 'https://wmux.org';
-
 export default function HelpSettings() {
   const t = useT();
+  const [query, setQuery] = useState('');
+  const topics = HELP_TOPICS.filter((topic) => `${t(topic.title)} ${t(topic.body)}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const [version, setVersion] = useState('');
   const { update, state, upToDate, trigger } = useUpdate();
 
@@ -68,7 +68,7 @@ export default function HelpSettings() {
       <div className="settings-row">
         <label className="settings-label">{t('settings.help.version')}</label>
         <div className="settings-help-version">
-          <span>remotea{version ? ` v${version}` : ''}</span>
+          <span>{PRODUCT.name}{version ? ` v${version}` : ''}</span>
           <button
             className={`settings-btn ${updateKind === 'accent' ? 'settings-btn--accent' : 'settings-btn--secondary'}`}
             onClick={() => { void trigger(); }}
@@ -83,19 +83,35 @@ export default function HelpSettings() {
       <div className="settings-row">
         <button
           className="settings-btn settings-btn--secondary"
-          onClick={() => openExternal(ISSUES_URL)}
+          onClick={() => openExternal(PRODUCT.issuesUrl)}
         >
           {t('settings.help.reportIssue')}
         </button>
         <button
           className="settings-btn settings-btn--secondary"
-          onClick={() => openExternal(WEBSITE_URL)}
+          onClick={() => openExternal(PRODUCT.documentationUrl)}
         >
           {t('settings.help.website')}
         </button>
       </div>
 
       <p className="settings-hint">{t('settings.help.hint')}</p>
+      <button className="settings-btn settings-btn--secondary" onClick={() => openExternal(PRODUCT.creditsUrl)}>
+        {t('settings.help.credits')}
+      </button>
+      <h3 className="settings-section-title">{t('settings.help.tasks')}</h3>
+      <input className="settings-input" type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+        aria-label={t('settings.help.search')} placeholder={t('settings.help.search')} />
+      {topics.length === 0 && <p className="settings-hint">{t('settings.help.noResults')}</p>}
+      {topics.map((topic) => (
+        <details key={topic.title} className="settings-row" style={{ display: 'block' }}>
+          <summary>{t(topic.title)}</summary>
+          <p className="settings-hint">{t(topic.body)}</p>
+          <button className="settings-btn settings-btn--secondary" onClick={() => openExternal(`${PRODUCT.repositoryUrl}/blob/main/docs/remotea/help.md#${topic.anchor}`)}>
+            {t('settings.help.readMore')}
+          </button>
+        </details>
+      ))}
     </div>
   );
 }

@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const it: Translation = {
+  "settings.tab.remote": "Accesso dal telefono",
   'settings.title': 'Impostazioni',
   'settings.tab.general': 'Generale',
   'settings.tab.sidebar': 'Barra laterale',
@@ -12,7 +13,6 @@ export const it: Translation = {
   'settings.tab.terminal': 'Terminale',
   'settings.tab.notifications': 'Notifiche',
   'settings.tab.browser': 'Browser',
-  'settings.tab.profiles': 'Profili',
   'settings.tab.shortcuts': 'Scorciatoie',
   'settings.general.languageSection': 'Lingua',
   'settings.general.language': "Lingua dell'interfaccia",
@@ -70,8 +70,6 @@ export const it: Translation = {
   'settings.help.updateTo': 'Aggiorna a',
   'settings.help.upToDate': 'Aggiornato',
   'settings.help.downloading': 'Download',
-  'settings.help.reportIssue': 'Segnala un problema',
-  'settings.help.website': 'Sito web',
   'settings.help.hint': 'Hai trovato un bug o hai una richiesta? Apri una issue su GitHub.',
   'ctx.pin': "Fissa l'area di lavoro",
   'ctx.unpin': 'Rimuovi il fissaggio',
@@ -163,26 +161,13 @@ export const it: Translation = {
   'tutorial.next': 'Avanti',
   'tutorial.getStarted': 'Inizia',
   'tutorial.step.welcome.title': 'Benvenuto in remotea',
-  'tutorial.step.welcome.body':
-    'remotea è un terminal multiplexer per eseguire agenti AI in parallelo. Questo breve tour ti mostrerà l’essenziale.',
   'tutorial.step.workspaces.title': 'Aree di lavoro',
-  'tutorial.step.workspaces.body':
-    'La barra laterale a sinistra mostra le tue aree di lavoro. Ogni area di lavoro è una sessione indipendente con il proprio layout di terminali. Creane di nuove con Ctrl+N. Doppio clic sul titolo per rinominarla.',
   'tutorial.step.splitPanes.title': 'Riquadri divisi',
-  'tutorial.step.splitPanes.body':
-    'Dividi i terminali orizzontalmente o verticalmente. Ogni riquadro esegue la propria shell. Trascina i divisori per ridimensionare. Ingrandisci un riquadro a schermo intero con Ctrl+Shift+Invio.',
-  'tutorial.step.surfaceTabs.title': 'Schede',
   'tutorial.step.surfaceTabs.body':
     'Ogni riquadro può avere più schede — terminali, pannelli browser o viste markdown. Trascina le schede tra i riquadri per riorganizzarle. Crea nuove schede con Ctrl+T.',
   'tutorial.step.browserPanel.title': 'Pannello browser',
-  'tutorial.step.browserPanel.body':
-    'Il pannello browser a destra ti permette di vedere in anteprima cosa costruiscono i tuoi agenti. Attivalo con Ctrl+Shift+I. Naviga verso localhost o qualsiasi URL. Il browser è scriptabile tramite l’API socket.',
   'tutorial.step.notifications.title': 'Notifiche',
-  'tutorial.step.notifications.body':
-    'Quando un agente richiede la tua attenzione, il suo riquadro si illumina di un anello blu e il badge dell’area di lavoro si incrementa. Parte anche una notifica toast di Windows. Vai all’ultimo non letto con Ctrl+Shift+U.',
   'tutorial.step.allSet.title': 'Tutto pronto',
-  'tutorial.step.allSet.body':
-    'Puoi sempre riaprire questa guida dal pulsante di aiuto (?) nella barra del titolo. Per tutte le scorciatoie da tastiera, apri Impostazioni con Ctrl+, oppure il Command Palette con Ctrl+Shift+P.',
   // Sidebar — riga workspace: etichette di attività per strumento
   'workspaceRow.tool.bash': 'Esecuzione comando...',
   'workspaceRow.tool.read': 'Lettura file...',
@@ -214,20 +199,13 @@ export const it: Translation = {
   'workspaceRow.working': 'In corso…',
   // Barra laterale — chrome
   'sidebar.collapse': 'Comprimi la barra laterale (Ctrl+B)',
-  'sidebar.saveSession': 'Salva sessione',
-  'sidebar.loadSession': 'Carica sessione',
   'sidebar.newWorkspace': 'Nuova area di lavoro',
   // Barra laterale — menu sessioni (salva/carica)
   'sessionMenu.justNow': 'adesso',
   'sessionMenu.minutesAgo': '{count}m fa',
   'sessionMenu.hoursAgo': '{count}h fa',
   'sessionMenu.daysAgo': '{count}g fa',
-  'sessionMenu.newSessionName': 'Nome nuova sessione...',
-  'sessionMenu.noSavedSessions': 'Nessuna sessione salvata',
-  'sessionMenu.overwriteExisting': 'Oppure sovrascrivi una sessione esistente:',
   'sessionMenu.overwrite': 'Sovrascrivi "{name}"',
-  'sessionMenu.load': 'Carica "{name}"',
-  'sessionMenu.deleteSession': 'Elimina sessione',
   // Impostazioni — Pannello Browser
   'settings.browser.searchSection': 'Ricerca',
   'settings.browser.defaultSearchEngine': 'Motore di ricerca predefinito',
@@ -443,10 +421,6 @@ export const it: Translation = {
   'settings.workspacePanel.placement.top': 'In cima',
   'settings.workspacePanel.placement.end': 'In fondo',
   'settings.workspacePanel.autoReorder': 'Riordino automatico alla notifica',
-  'settings.workspacePanel.showWelcomeScreen': "Mostra schermata di benvenuto all'avvio",
-  'settings.workspacePanel.confirmClose': 'Conferma prima di chiudere una sessione',
-  'settings.workspacePanel.confirmCloseHint':
-    "Chiede conferma prima che il pulsante ×, il menu contestuale o Ctrl+Shift+W chiudano una sessione — un clic accidentale non può eliminare agenti che non hanno ancora salvato il loro stato. Le chiusure da CLI e dagli agenti non chiedono mai conferma.",
   'settings.workspacePanel.restoreClaudeSessions': 'Riprendi le sessioni di Claude Code al ripristino',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'Quando remotea ripristina una sessione, rilancia ogni terminale che stava eseguendo Claude Code con `claude --resume`, nella directory in cui si trovava. Disattivato di default: ognuno di questi pannelli avvia un agente tutto insieme. I pannelli la cui conversazione Claude non ha più vengono saltati, e un Claude chiuso correttamente non viene ripreso.',
   'settings.workspacePanel.autoOpenDiff': 'Apri automaticamente la scheda diff alle modifiche agente',
@@ -462,7 +436,6 @@ export const it: Translation = {
   // Barra laterale — pannello di orchestrazione
   'orchestrationPanel.expand': 'Espandi orchestrazione',
   'orchestrationPanel.collapse': 'Comprimi orchestrazione',
-  'orchestrationPanel.title': 'orchestrazione',
   'orchestrationPanel.reviewer': 'revisore',
   'orchestrationPanel.dismiss': 'ignora',
   'orchestrationPanel.waiting': 'in attesa',
@@ -578,18 +551,12 @@ export const it: Translation = {
   'surfaceTab.profileBadge': 'progetto',
   // Impostazioni — consenso all'integrazione degli agenti (issue #132)
   'settings.integration.section': 'Integrazione degli agenti',
-  'settings.integration.enable': 'Consenti a remotea di configurare Claude Code, OpenCode, Kiro, omp, pi e Grok',
-  'settings.integration.hint':
-    "remotea modifica file nella tua cartella personale affinché gli agenti di programmazione possano pilotare il pannello browser, le viste markdown e lo stato della barra laterale. Disattivare una voce qui rimuove anche ciò che aveva scritto.",
   'settings.integration.instructions': 'Istruzioni per gli agenti',
   'settings.integration.hooks': 'Hook di stato',
-  'settings.integration.orchestrator': 'Plugin orchestratore',
-  'settings.integration.browserMcp': 'Pannello browser per MCP',
   // Barra laterale — rispondere a un agente bloccato da fuori del suo pannello (issue #128)
   'workspaceRow.answerSent': 'Inviato — in attesa…',
   'workspaceRow.answerTitle': 'Rispondi senza passare a questo pannello',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'Remoto',
   'settings.remote.title': 'Console remota',
   'settings.remote.hint': 'Segui i tuoi agenti e rispondi loro dal browser di un telefono. Disattivata per impostazione predefinita: nulla è in ascolto finché non la attivi qui.',
   'settings.remote.loading': 'Caricamento…',

@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const hi: Translation = {
+  "settings.tab.remote": "फ़ोन से पहुँच",
   // सेटिंग्स — विंडो की चौखट
   'settings.title': 'सेटिंग्स',
   'settings.tab.general': 'सामान्य',
@@ -13,7 +14,6 @@ export const hi: Translation = {
   'settings.tab.terminal': 'टर्मिनल',
   'settings.tab.notifications': 'सूचनाएँ',
   'settings.tab.browser': 'ब्राउज़र',
-  'settings.tab.profiles': 'प्रोफ़ाइल',
   'settings.tab.shortcuts': 'शॉर्टकट',
   // सेटिंग्स — सामान्य पैनल
   'settings.general.languageSection': 'भाषा',
@@ -80,8 +80,6 @@ export const hi: Translation = {
   'settings.help.updateTo': 'अपडेट करें',
   'settings.help.upToDate': 'अद्यतित',
   'settings.help.downloading': 'डाउनलोड हो रहा है',
-  'settings.help.reportIssue': 'समस्या रिपोर्ट करें',
-  'settings.help.website': 'वेबसाइट',
   'settings.help.hint': 'कोई बग मिला या कोई अनुरोध है? GitHub पर issue खोलें।',
   // वर्कस्पेस का कॉन्टेक्स्ट मेन्यू
   'ctx.pin': 'वर्कस्पेस पिन करें',
@@ -174,26 +172,13 @@ export const hi: Translation = {
   'tutorial.next': 'अगला',
   'tutorial.getStarted': 'आरंभ करें',
   'tutorial.step.welcome.title': 'remotea में आपका स्वागत है',
-  'tutorial.step.welcome.body':
-    'remotea एक टर्मिनल मल्टीप्लेक्सर है जो AI कोडिंग एजेंटों को समानांतर चलाता है। यह त्वरित टूर मूल बातें दिखाएगा।',
   'tutorial.step.workspaces.title': 'वर्कस्पेस',
-  'tutorial.step.workspaces.body':
-    'बाईं ओर का साइडबार आपके वर्कस्पेस दिखाता है। हर वर्कस्पेस अपने स्वयं के टर्मिनल लेआउट वाला एक स्वतंत्र सत्र है। Ctrl+N से नए बनाएँ। किसी वर्कस्पेस के शीर्षक पर डबल-क्लिक करके उसका नाम बदलें।',
   'tutorial.step.splitPanes.title': 'पैन विभाजित करें',
-  'tutorial.step.splitPanes.body':
-    'अपने टर्मिनल क्षैतिज या लंबवत विभाजित करें। हर पैन अपना शेल चलाता है। आकार बदलने के लिए विभाजक खींचें। Ctrl+Shift+Enter से किसी भी पैन को पूर्ण आकार में ज़ूम करें।',
-  'tutorial.step.surfaceTabs.title': 'सरफ़ेस टैब',
   'tutorial.step.surfaceTabs.body':
     'हर पैन में कई टैब हो सकते हैं — टर्मिनल, ब्राउज़र पैनल या markdown दृश्य। पुनः व्यवस्थित करने के लिए टैब को पैनों के बीच खींचें। Ctrl+T से नए टैब बनाएँ।',
   'tutorial.step.browserPanel.title': 'ब्राउज़र पैनल',
-  'tutorial.step.browserPanel.body':
-    'दाईं ओर का ब्राउज़र पैनल आपको दिखाता है कि आपके एजेंट क्या बना रहे हैं। Ctrl+Shift+I से इसे टॉगल करें। localhost या किसी भी URL पर जाएँ। ब्राउज़र को सॉकेट API के ज़रिए स्क्रिप्ट किया जा सकता है।',
   'tutorial.step.notifications.title': 'सूचनाएँ',
-  'tutorial.step.notifications.body':
-    'जब किसी एजेंट को आपके ध्यान की ज़रूरत होती है, तो उसके पैन पर नीली रिंग दिखती है और वर्कस्पेस का बैज बढ़ जाता है। Windows की टोस्ट सूचना भी आती है। Ctrl+Shift+U से नवीनतम अपठित पर जाएँ।',
   'tutorial.step.allSet.title': 'सब तैयार है',
-  'tutorial.step.allSet.body':
-    'आप इस गाइड को टाइटल बार के सहायता बटन (?) से कभी भी फिर खोल सकते हैं। सभी कीबोर्ड शॉर्टकट के लिए, Ctrl+, से सेटिंग्स या Ctrl+Shift+P से कमांड पैलेट खोलें।',
   // साइडबार — वर्कस्पेस पंक्ति: प्रति-टूल गतिविधि लेबल
   'workspaceRow.tool.bash': 'कमांड चल रहा है...',
   'workspaceRow.tool.read': 'फ़ाइल पढ़ी जा रही है...',
@@ -225,20 +210,13 @@ export const hi: Translation = {
   'workspaceRow.working': 'काम हो रहा है…',
   // साइडबार की चौखट
   'sidebar.collapse': 'साइडबार छोटा करें (Ctrl+B)',
-  'sidebar.saveSession': 'सत्र सहेजें',
-  'sidebar.loadSession': 'सत्र लोड करें',
   'sidebar.newWorkspace': 'नया वर्कस्पेस',
   // साइडबार — सत्र मेन्यू (सहेजें/लोड करें)
   'sessionMenu.justNow': 'अभी-अभी',
   'sessionMenu.minutesAgo': '{count} मिनट पहले',
   'sessionMenu.hoursAgo': '{count} घंटे पहले',
   'sessionMenu.daysAgo': '{count} दिन पहले',
-  'sessionMenu.newSessionName': 'नया सत्र नाम...',
-  'sessionMenu.noSavedSessions': 'कोई सहेजा हुआ सत्र नहीं',
-  'sessionMenu.overwriteExisting': 'या कोई मौजूदा सत्र अधिलेखित करें:',
   'sessionMenu.overwrite': '"{name}" अधिलेखित करें',
-  'sessionMenu.load': '"{name}" लोड करें',
-  'sessionMenu.deleteSession': 'सत्र हटाएँ',
   // सेटिंग्स — ब्राउज़र पैनल
   'settings.browser.searchSection': 'खोज',
   'settings.browser.defaultSearchEngine': 'डिफ़ॉल्ट खोज इंजन',
@@ -454,10 +432,6 @@ export const hi: Translation = {
   'settings.workspacePanel.placement.top': 'शीर्ष',
   'settings.workspacePanel.placement.end': 'अंत',
   'settings.workspacePanel.autoReorder': 'सूचना पर स्वतः पुनः क्रमित करें',
-  'settings.workspacePanel.showWelcomeScreen': 'आरंभ पर स्वागत स्क्रीन दिखाएँ',
-  'settings.workspacePanel.confirmClose': 'सत्र बंद करने से पहले पुष्टि करें',
-  'settings.workspacePanel.confirmCloseHint':
-    '× बटन, कॉन्टेक्स्ट मेन्यू या Ctrl+Shift+W से सत्र बंद होने से पहले पूछें — एक गलत क्लिक उन एजेंटों को नहीं गिरा सकता जिन्होंने अभी अपनी स्थिति सहेजी नहीं है। CLI और एजेंटों से बंद करने पर कभी नहीं पूछा जाता।',
   'settings.workspacePanel.restoreClaudeSessions': 'पुनर्स्थापना पर Claude Code सत्र फिर से शुरू करें',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'जब remotea कोई सत्र पुनर्स्थापित करता है, तो Claude Code चला रहे हर टर्मिनल को उसी डायरेक्टरी में `claude --resume` के साथ फिर से चलाता है। डिफ़ॉल्ट रूप से बंद: ऐसा हर पेन एक साथ एजेंट शुरू कर देता है। जिन पेन की बातचीत Claude के पास नहीं है उन्हें छोड़ दिया जाता है, और जिस Claude को आपने ठीक से बंद किया था वह फिर से शुरू नहीं होता।',
   'settings.workspacePanel.autoOpenDiff': 'एजेंट संपादनों पर diff टैब स्वतः खोलें',
@@ -473,7 +447,6 @@ export const hi: Translation = {
   // साइडबार — ऑर्केस्ट्रेशन पैनल
   'orchestrationPanel.expand': 'ऑर्केस्ट्रेशन विस्तृत करें',
   'orchestrationPanel.collapse': 'ऑर्केस्ट्रेशन छोटा करें',
-  'orchestrationPanel.title': 'ऑर्केस्ट्रेशन',
   'orchestrationPanel.reviewer': 'समीक्षक',
   'orchestrationPanel.dismiss': 'खारिज करें',
   'orchestrationPanel.waiting': 'प्रतीक्षा',
@@ -589,18 +562,12 @@ export const hi: Translation = {
   'surfaceTab.profileBadge': 'प्रोजेक्ट',
   // सेटिंग्स — एजेंट एकीकरण की सहमति (issue #132)
   'settings.integration.section': 'एजेंट एकीकरण',
-  'settings.integration.enable': 'remotea को Claude Code, OpenCode, Kiro, omp, pi और Grok कॉन्फ़िगर करने दें',
-  'settings.integration.hint':
-    'remotea आपकी होम डायरेक्टरी में फ़ाइलें संपादित करता है ताकि कोडिंग एजेंट उसके ब्राउज़र पैनल, markdown दृश्य और साइडबार स्थिति चला सकें। यहाँ कुछ बंद करने पर वह जो लिखा गया था उसे भी हटा देता है।',
   'settings.integration.instructions': 'एजेंट निर्देश',
   'settings.integration.hooks': 'स्थिति हुक',
-  'settings.integration.orchestrator': 'ऑर्केस्ट्रेटर प्लगइन',
-  'settings.integration.browserMcp': 'MCP के लिए ब्राउज़र पैनल',
   // साइडबार — किसी ब्लॉक किए गए एजेंट को उसके पैन से बाहर उत्तर देना (issue #128)
   'workspaceRow.answerSent': 'भेजा गया — प्रतीक्षा…',
   'workspaceRow.answerTitle': 'इस पैन पर स्विच किए बिना उत्तर दें',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'रिमोट',
   'settings.remote.title': 'रिमोट कंसोल',
   'settings.remote.hint': 'फ़ोन के ब्राउज़र से अपने एजेंट देखें और उन्हें जवाब दें। डिफ़ॉल्ट रूप से बंद: जब तक आप इसे यहाँ चालू नहीं करते, कुछ भी सुनता नहीं है।',
   'settings.remote.loading': 'लोड हो रहा है…',

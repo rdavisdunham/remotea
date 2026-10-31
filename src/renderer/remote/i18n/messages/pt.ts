@@ -17,12 +17,12 @@ export const pt: Readonly<Record<string, string>> = {
   'pair.pairing': 'Pareando…',
   'pair.failed': 'O pareamento falhou. Gere um novo código no computador e tente de novo.',
   'pair.rate': 'Tentativas demais. Aguarde um instante e toque em Parear de novo.',
-  'pair.deviceCap': 'Há dispositivos pareados demais. No computador, revogue um em Configurações → Remoto e gere um novo código.',
+  "pair.deviceCap": "Há dispositivos pareados demais. No computador, revogue um em Configurações → Acesso pelo telefone e gere um novo código.",
 
   'expired.title': 'Código expirado',
   'expired.body': 'Este código expirou — gere um novo no seu computador.',
   'unpaired.title': 'Não pareado',
-  'unpaired.body': 'Este navegador não está pareado com o wmux. No computador, abra Configurações → Remoto → Parear um dispositivo e escaneie o código.',
+  "unpaired.body": "Este navegador não está pareado com o remotea. No computador, abra Configurações → Acesso pelo telefone → Parear um dispositivo e escaneie o código.",
   'revoked.title': 'Acesso removido',
   'revoked.body': 'Este dispositivo foi removido do remotea no seu computador. Pareie de novo para reconectar.',
   'replaced.title': 'Pareado de novo em outra aba',
@@ -49,7 +49,7 @@ export const pt: Readonly<Record<string, string>> = {
   'console.waiting': 'Aguardando o computador…',
   'console.viewerNotice': 'Somente leitura — esta conexão não pode digitar nem responder.',
   'console.controlLimited': 'Somente leitura aqui — este dispositivo foi pareado com controle, mas o computador desativa o controle em conexões HTTP sem criptografia.',
-  'console.repairForControl': 'Somente leitura aqui — este dispositivo foi pareado com controle, mas o pareamento já foi usado por HTTP sem criptografia, então o controle está desativado. Para usar o controle, crie um novo código no computador (Configurações → Remoto → Parear um dispositivo) e escaneie-o com este telefone.',
+  "console.repairForControl": "Somente leitura aqui — este dispositivo foi pareado com controle, mas o pareamento já foi usado por HTTP sem criptografia, então o controle está desativado. Para usar o controle, crie um novo código no computador (Configurações → Acesso pelo telefone → Parear um dispositivo) e escaneie-o com este telefone.",
   'console.needsYouCount_one': '{n} agente precisa de você',
   'console.needsYouCount_other': '{n} agentes precisam de você',
 

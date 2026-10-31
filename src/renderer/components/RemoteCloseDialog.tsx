@@ -1,3 +1,4 @@
+import { useT } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { getStoredWorkspaceLabel } from './SplitPane/use-osc-title';
@@ -16,9 +17,10 @@ import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
  *  - End sessions on this host: closes them (a workspace: its whole server
  *    group) on every device, hidden ones and Eridani runs included.
  * The body lists, per host, what ending would stop. CLI/agent closes never
- * come here. Quitting the app only detaches and never asks.
+ * come here. Quitting detaches host views without asking; local processes end with their window.
  */
 export default function RemoteCloseDialog() {
+  const t = useT();
   const head = useStore((s) => s.pendingRemoteClose[0]);
   const queued = useStore((s) => s.pendingRemoteClose.length);
   const workspace = useStore((s) => (head ? s.workspaces.find((w) => w.id === head.workspaceId) : undefined));
@@ -66,13 +68,13 @@ export default function RemoteCloseDialog() {
   const hostNames: Record<string, string> = {};
   for (const [id, h] of Object.entries(hosts)) hostNames[id] = h.name;
   const summary = summarizeRemoteClose({ request: head, workspace, defaultShell, views, hostNames });
-  const name = getStoredWorkspaceLabel(workspace) || 'this workspace';
+  const name = getStoredWorkspaceLabel(workspace) || t('remote.close.workspace');
   const isWorkspace = head.scope === 'workspace';
   const single = !isWorkspace && head.surfaceIds.length === 1;
   const title = isWorkspace
-    ? `Close "${name}"?`
-    : single ? 'Close this remote tab?' : `Close ${head.surfaceIds.length} tabs?`;
-  const endLabel = isWorkspace ? 'End sessions on this host' : single ? 'End session on this host' : 'End sessions on this host';
+    ? t('remote.close.titleWorkspace').replace('{name}', name)
+    : single ? t('remote.close.titleTab') : t('remote.close.titleTabs').replace('{count}', String(head.surfaceIds.length));
+  const endLabel = single ? t('remote.close.endOne') : summary.length === 1 ? t('remote.close.endHost') : t('remote.close.endMany');
 
   return (
     <div className="confirm-dialog__overlay" onClick={() => resolve('cancel')}>
@@ -86,31 +88,24 @@ export default function RemoteCloseDialog() {
       >
         <div className="confirm-dialog__title">{title}</div>
         <div className="confirm-dialog__message">
-          <p>{summaryHeadline(summary, head.scope)}</p>
+          <p>{summaryHeadline(summary, head.scope, t)}</p>
           {summary.map((h) => (
             <div key={h.hostId} className="remote-close__host" style={{ margin: '8px 0', whiteSpace: 'pre-wrap' }}>
-              {describeHostSummary(h).map((line, i) => (
+              {describeHostSummary(h, t).map((line, i) => (
                 <div key={i} style={i === 0 ? { fontWeight: 600 } : undefined}>{line}</div>
               ))}
             </div>
           ))}
-          <p>
-            <strong>Hide on this device</strong> removes {isWorkspace ? 'it' : single ? 'the tab' : 'the tabs'} from this
-            device only: the sessions keep running and stay on your other devices (Settings → Remote hosts lists
-            hidden sessions to bring back).
-          </p>
-          <p>
-            <strong>{endLabel}</strong> stops {isWorkspace ? 'every session in this workspace' : single ? 'the session' : 'the sessions'} on
-            every device{isWorkspace ? ', including the ones hidden here and agent runs' : ''}.
-          </p>
-          {queued > 1 && <p>{queued - 1} more to decide after this one.</p>}
+          <p><strong>{t('remote.close.hide')}</strong> {t('remote.close.hideHint')}</p>
+          <p><strong>{endLabel}</strong> {t('remote.close.endHint')}</p>
+          {queued > 1 && <p>{t('remote.close.queued').replace('{count}', String(queued - 1))}</p>}
         </div>
         <div className="confirm-dialog__actions">
           <button ref={cancelRef} className="confirm-dialog__btn" onClick={() => resolve('cancel')}>
-            Cancel
+            {t('remote.cancel')}
           </button>
           <button className="confirm-dialog__btn" onClick={() => resolve('hide')}>
-            Hide on this device
+            {t('remote.close.hide')}
           </button>
           <button className="confirm-dialog__btn confirm-dialog__btn--danger" onClick={() => resolve('end')}>
             {endLabel}

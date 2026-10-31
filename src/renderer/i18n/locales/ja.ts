@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const ja: Translation = {
+  "settings.tab.remote": "スマートフォンからのアクセス",
   // 設定 — ウィンドウの枠
   'settings.title': '設定',
   'settings.tab.general': '一般',
@@ -13,7 +14,6 @@ export const ja: Translation = {
   'settings.tab.terminal': 'ターミナル',
   'settings.tab.notifications': '通知',
   'settings.tab.browser': 'ブラウザー',
-  'settings.tab.profiles': 'プロファイル',
   'settings.tab.shortcuts': 'ショートカット',
   // 設定 — 一般パネル
   'settings.general.languageSection': '言語',
@@ -80,8 +80,6 @@ export const ja: Translation = {
   'settings.help.updateTo': '更新:',
   'settings.help.upToDate': '最新です',
   'settings.help.downloading': 'ダウンロード中',
-  'settings.help.reportIssue': '問題を報告',
-  'settings.help.website': 'ウェブサイト',
   'settings.help.hint': 'バグを見つけましたか、またはリクエストがありますか?GitHub で issue を開いてください。',
   // ワークスペースのコンテキストメニュー
   'ctx.pin': 'ワークスペースをピン留め',
@@ -174,26 +172,13 @@ export const ja: Translation = {
   'tutorial.next': '次へ',
   'tutorial.getStarted': 'はじめる',
   'tutorial.step.welcome.title': 'remotea へようこそ',
-  'tutorial.step.welcome.body':
-    'remotea は、AI コーディングエージェントを並列実行するためのターミナルマルチプレクサーです。この短いツアーで基本を説明します。',
   'tutorial.step.workspaces.title': 'ワークスペース',
-  'tutorial.step.workspaces.body':
-    '左側のサイドバーにワークスペースが表示されます。各ワークスペースは、独自のターミナルレイアウトを持つ独立したセッションです。Ctrl+N で新しく作成できます。ワークスペースのタイトルをダブルクリックすると名前を変更できます。',
   'tutorial.step.splitPanes.title': 'ペインの分割',
-  'tutorial.step.splitPanes.body':
-    'ターミナルを水平または垂直に分割できます。各ペインは独自のシェルを実行します。仕切りをドラッグしてサイズを変更します。Ctrl+Shift+Enter で任意のペインを全画面にズームできます。',
-  'tutorial.step.surfaceTabs.title': 'タブ',
   'tutorial.step.surfaceTabs.body':
     '各ペインには複数のタブを置けます — ターミナル、ブラウザーパネル、markdown ビューなど。タブをペイン間でドラッグして整理できます。Ctrl+T で新しいタブを作成できます。',
   'tutorial.step.browserPanel.title': 'ブラウザーパネル',
-  'tutorial.step.browserPanel.body':
-    '右側のブラウザーパネルで、エージェントが構築したものをプレビューできます。Ctrl+Shift+I で切り替えます。localhost や任意の URL に移動できます。ブラウザーはソケット API でスクリプト操作できます。',
   'tutorial.step.notifications.title': '通知',
-  'tutorial.step.notifications.body':
-    'エージェントがあなたの対応を必要とすると、そのペインに青いリングが表示され、ワークスペースのバッジが増えます。Windows のトースト通知も発行されます。Ctrl+Shift+U で最新の未読に移動します。',
   'tutorial.step.allSet.title': '設定完了です',
-  'tutorial.step.allSet.body':
-    'このガイドは、タイトルバーのヘルプボタン (?) からいつでも開き直せます。すべてのキーボードショートカットを見るには、Ctrl+, で設定を開くか、Ctrl+Shift+P でコマンドパレットを開きます。',
   // サイドバー — ワークスペース行: ツール別のアクティビティラベル
   'workspaceRow.tool.bash': 'コマンドを実行中...',
   'workspaceRow.tool.read': 'ファイルを読み取り中...',
@@ -225,20 +210,13 @@ export const ja: Translation = {
   'workspaceRow.working': '作業中…',
   // サイドバーの枠
   'sidebar.collapse': 'サイドバーを折りたたむ (Ctrl+B)',
-  'sidebar.saveSession': 'セッションを保存',
-  'sidebar.loadSession': 'セッションを読み込み',
   'sidebar.newWorkspace': '新しいワークスペース',
   // サイドバー — セッションメニュー (保存 / 読み込み)
   'sessionMenu.justNow': 'たった今',
   'sessionMenu.minutesAgo': '{count} 分前',
   'sessionMenu.hoursAgo': '{count} 時間前',
   'sessionMenu.daysAgo': '{count} 日前',
-  'sessionMenu.newSessionName': '新しいセッション名...',
-  'sessionMenu.noSavedSessions': '保存されたセッションはありません',
-  'sessionMenu.overwriteExisting': 'または既存のセッションを上書き:',
   'sessionMenu.overwrite': '「{name}」を上書き',
-  'sessionMenu.load': '「{name}」を読み込み',
-  'sessionMenu.deleteSession': 'セッションを削除',
   // 設定 — ブラウザーパネル
   'settings.browser.searchSection': '検索',
   'settings.browser.defaultSearchEngine': '既定の検索エンジン',
@@ -454,10 +432,6 @@ export const ja: Translation = {
   'settings.workspacePanel.placement.top': '先頭',
   'settings.workspacePanel.placement.end': '末尾',
   'settings.workspacePanel.autoReorder': '通知時に自動で並べ替え',
-  'settings.workspacePanel.showWelcomeScreen': '起動時にウェルカム画面を表示',
-  'settings.workspacePanel.confirmClose': 'セッションを閉じる前に確認',
-  'settings.workspacePanel.confirmCloseHint':
-    '× ボタン、コンテキストメニュー、または Ctrl+Shift+W がセッションを閉じる前に確認します — 誤クリックで、まだ状態を保存していないエージェントを落としてしまうことはありません。CLI やエージェントからのクローズでは確認しません。',
   'settings.workspacePanel.restoreClaudeSessions': '復元時に Claude Code のセッションを再開',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'remotea がセッションを復元するとき、Claude Code が動いていた各ターミナルを元のディレクトリで `claude --resume` により起動し直します。既定はオフです。対象のペインが一斉にエージェントを起動するためです。Claude に会話が残っていないペインはスキップされ、正常に終了した Claude は再開されません。',
   'settings.workspacePanel.autoOpenDiff': 'エージェントの編集時に diff タブを自動で開く',
@@ -473,7 +447,6 @@ export const ja: Translation = {
   // サイドバー — オーケストレーションパネル
   'orchestrationPanel.expand': 'オーケストレーションを展開',
   'orchestrationPanel.collapse': 'オーケストレーションを折りたたみ',
-  'orchestrationPanel.title': 'オーケストレーション',
   'orchestrationPanel.reviewer': 'レビュアー',
   'orchestrationPanel.dismiss': '閉じる',
   'orchestrationPanel.waiting': '待機中',
@@ -589,18 +562,12 @@ export const ja: Translation = {
   'surfaceTab.profileBadge': 'プロジェクト',
   // 設定 — エージェント統合の同意 (issue #132)
   'settings.integration.section': 'エージェント統合',
-  'settings.integration.enable': 'remotea が Claude Code、OpenCode、Kiro、omp、pi、Grok を設定できるようにする',
-  'settings.integration.hint':
-    'remotea はホームディレクトリのファイルを編集して、コーディングエージェントがブラウザーパネル、markdown ビュー、サイドバーのステータスを操作できるようにします。ここで何かをオフにすると、それが書き込んだものも削除されます。',
   'settings.integration.instructions': 'エージェントの指示',
   'settings.integration.hooks': 'ステータスフック',
-  'settings.integration.orchestrator': 'オーケストレータープラグイン',
-  'settings.integration.browserMcp': 'MCP 用ブラウザーパネル',
   // サイドバー — ブロックされたエージェントにペイン外から回答する (issue #128)
   'workspaceRow.answerSent': '送信済み — 待機中…',
   'workspaceRow.answerTitle': 'このペインに切り替えずに回答',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'リモート',
   'settings.remote.title': 'リモートコンソール',
   'settings.remote.hint': 'スマートフォンのブラウザからエージェントを見守り、応答できます。既定ではオフで、ここでオンにするまで何も待ち受けません。',
   'settings.remote.loading': '読み込み中…',

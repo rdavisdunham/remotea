@@ -32,15 +32,15 @@ describe('agent instruction block (issue #158)', () => {
 
   it('gives the reader a second probe that does not depend on PATH', () => {
     expect(raw).toContain(CLI_BIN_PLACEHOLDER);
-    // The fallback probe must be the placeholder plus the same verb, so a
+    // The fallback probe must be the placeholder plus the discovery verbs, so a
     // session off PATH has something concrete to run rather than advice.
-    expect(raw).toMatch(new RegExp(`${CLI_BIN_PLACEHOLDER.replace(/[{}]/g, '\\$&')}/wmux" ping`));
+    expect(raw).toMatch(new RegExp(`${CLI_BIN_PLACEHOLDER.replace(/[{}]/g, '\\$&')}/wmux" capabilities`));
   });
 
   it('substitutes the install path, leaving no placeholder behind', () => {
     const out = renderInstructions(raw, 'C:\\Program Files\\wmux\\resources\\cli-bin');
     expect(out).not.toContain(CLI_BIN_PLACEHOLDER);
-    expect(out).toContain('C:\\Program Files\\wmux\\resources\\cli-bin/wmux" ping');
+    expect(out).toContain('C:\\Program Files\\wmux\\resources\\cli-bin/wmux" capabilities');
   });
 
   it('substitutes every occurrence, not just the first', () => {
@@ -56,10 +56,24 @@ describe('agent instruction block (issue #158)', () => {
     expect(renderInstructions(CLI_BIN_PLACEHOLDER, weird)).toBe(weird);
   });
 
-  it('still tells a session with no wmux at all to stand down', () => {
-    // The block must not become a machine for insisting wmux is present. If the
-    // absolute probe also fails, the reader is told plainly to use normal tools.
-    expect(raw).toMatch(/If it too does not answer `pong`, remotea is not\s+running for this\s+session/);
+  it('uses capabilities rather than ping to select command families', () => {
+    expect(raw).toContain('A successful `wmux ping`');
+    expect(raw).toContain('does **not** establish any');
+    expect(raw).toContain('Host status bridge (`features: ["status"]`)');
+    expect(raw).toContain('Missing browser');
+    expect(raw).toContain('support does not disable status reporting');
+    expect(raw).toContain('`wmux agent-state` is a desktop query');
+    expect(raw).toMatch(/Use your\s+normal tools/);
     expect(raw).toMatch(/Nothing here is a\s+restriction on what you may otherwise do/);
+  });
+
+  it('preserves packaged source mapping and managed markers', () => {
+    const builder = JSON.parse(fs.readFileSync('electron-builder.json', 'utf8'));
+    expect(builder.extraResources).toContainEqual(expect.objectContaining({
+      from: 'resources/claude-instructions.md', to: 'claude-instructions/claude-instructions.md',
+    }));
+    expect(fs.readFileSync('resources/claude-instructions/claude-instructions.md', 'utf8')).toBe(raw);
+    expect(raw).toContain('<!-- wmux:start');
+    expect(raw).toContain('<!-- wmux:end -->');
   });
 });

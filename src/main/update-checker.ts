@@ -1,3 +1,4 @@
+import { PRODUCT } from '../shared/product';
 import { app, BrowserWindow, net } from 'electron';
 import { IPC_CHANNELS } from '../shared/types';
 
@@ -10,8 +11,8 @@ import { IPC_CHANNELS } from '../shared/types';
 // lightweight, zero-trust-install notification and a source of release metadata
 // (published_at) that updater.ts reuses to compute release age.
 
-const REPO_OWNER = 'rdavisdunham';
-const REPO_NAME = 'remotea';
+const REPO_OWNER = PRODUCT.repositoryOwner;
+const REPO_NAME = PRODUCT.repositoryName;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const FIRST_CHECK_DELAY_MS = 5_000;
 

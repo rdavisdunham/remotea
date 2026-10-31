@@ -1,3 +1,4 @@
+import { PRODUCT } from '../shared/product';
 /**
  * Release notes, in the app (issue #211).
  *
@@ -36,8 +37,8 @@ import * as path from 'path';
 import { getAppDataDir } from '../shared/instance';
 import { compareVersions, type GithubRelease } from './update-checker';
 
-const REPO_OWNER = 'rdavisdunham';
-const REPO_NAME = 'remotea';
+const REPO_OWNER = PRODUCT.repositoryOwner;
+const REPO_NAME = PRODUCT.repositoryName;
 
 /**
  * How many releases to show. wmux ships often; a changelog is for "what changed

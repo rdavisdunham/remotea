@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const uk: Translation = {
+  "settings.tab.remote": "Доступ із телефона",
   // Налаштування — вікно застосунку
   'settings.title': 'Параметри',
   'settings.tab.general': 'Загальні',
@@ -13,7 +14,6 @@ export const uk: Translation = {
   'settings.tab.terminal': 'Термінал',
   'settings.tab.notifications': 'Сповіщення',
   'settings.tab.browser': 'Браузер',
-  'settings.tab.profiles': 'Профілі',
   'settings.tab.shortcuts': 'Сполучення клавіш',
   // Налаштування — панель «Загальні»
   'settings.general.languageSection': 'Мова',
@@ -80,8 +80,6 @@ export const uk: Translation = {
   'settings.help.updateTo': 'Оновити до',
   'settings.help.upToDate': 'Актуальна версія',
   'settings.help.downloading': 'Завантаження',
-  'settings.help.reportIssue': 'Повідомити про помилку',
-  'settings.help.website': 'Веб-сайт',
   'settings.help.hint': 'Знайшли помилку або маєте запит? Відкрийте питання на GitHub.',
   // Контекстне меню робочого простору
   'ctx.pin': 'Закріпити робочий простір',
@@ -174,26 +172,13 @@ export const uk: Translation = {
   'tutorial.next': 'Далі',
   'tutorial.getStarted': 'Почати',
   'tutorial.step.welcome.title': 'Ласкаво просимо до remotea',
-  'tutorial.step.welcome.body':
-    'remotea — це мультиплексор терміналів для паралельного запуску ІІ-агентів, що пишуть код. Цей короткий тур покаже вам найголовніше.',
   'tutorial.step.workspaces.title': 'Робочі простори',
-  'tutorial.step.workspaces.body':
-    'Бічна панель ліворуч показує ваші робочі простори. Кожен із них — незалежний сеанс зі своїм макетом терміналів. Нові створюються по Ctrl+N. Двічі клацніть назву робочого простору, щоб перейменувати його.',
   'tutorial.step.splitPanes.title': 'Розділення панелей',
-  'tutorial.step.splitPanes.body':
-    'Розділяйте термінали горизонтально або вертикально. У кожній панелі працює власний shell. Перетягуйте роздільники, щоб змінити розмір. Розгорніть будь-яку панель на весь екран по Ctrl+Shift+Enter.',
-  'tutorial.step.surfaceTabs.title': 'Вкладки поверхонь',
   'tutorial.step.surfaceTabs.body':
     'У кожній панелі може бути кілька вкладок — термінали, панелі браузера або представлення Markdown. Перетягуйте вкладки між панелями, щоб змінити порядок. Нові вкладки створюються по Ctrl+T.',
   'tutorial.step.browserPanel.title': 'Панель браузера',
-  'tutorial.step.browserPanel.body':
-    'Панель браузера праворуч дає змогу переглядати те, що створюють ваші агенти. Вмикається по Ctrl+Shift+I. Переходьте на localhost або будь-який URL. Браузером можна керувати через socket API.',
   'tutorial.step.notifications.title': 'Сповіщення',
-  'tutorial.step.notifications.body':
-    'Коли агенту потрібна ваша увага, його панель отримує синє кільце, а лічильник робочого простору збільшується. Також спрацьовує сповіщення Windows. Перехід до останнього непрочитаного — по Ctrl+Shift+U.',
   'tutorial.step.allSet.title': 'Ви готові',
-  'tutorial.step.allSet.body':
-    'Цей путівник завжди можна відкрити знову через кнопку довідки (?) у заголовку вікна. Повний список сполучень клавіш — у параметрах (Ctrl+,) або в палітрі команд (Ctrl+Shift+P).',
   // Бічна панель — рядок робочого простору: підписи дій за інструментами
   'workspaceRow.tool.bash': 'Виконання команди...',
   'workspaceRow.tool.read': 'Читання файлу...',
@@ -225,20 +210,13 @@ export const uk: Translation = {
   'workspaceRow.working': 'Робота…',
   // Елементи бічної панелі
   'sidebar.collapse': 'Згорнути бічну панель (Ctrl+B)',
-  'sidebar.saveSession': 'Зберегти сеанс',
-  'sidebar.loadSession': 'Завантажити сеанс',
   'sidebar.newWorkspace': 'Новий робочий простір',
   // Бічна панель — меню сеансів (збереження/завантаження)
   'sessionMenu.justNow': 'щойно',
   'sessionMenu.minutesAgo': '{count} хв тому',
   'sessionMenu.hoursAgo': '{count} год тому',
   'sessionMenu.daysAgo': '{count} дн тому',
-  'sessionMenu.newSessionName': 'Нова назва сеансу...',
-  'sessionMenu.noSavedSessions': 'Немає збережених сеансів',
-  'sessionMenu.overwriteExisting': 'Або перезапишіть наявний сеанс:',
   'sessionMenu.overwrite': 'Перезаписати "{name}"',
-  'sessionMenu.load': 'Завантажити "{name}"',
-  'sessionMenu.deleteSession': 'Видалити сеанс',
   // Налаштування — панель браузера
   'settings.browser.searchSection': 'Пошук',
   'settings.browser.defaultSearchEngine': 'Пошукова система за замовчуванням',
@@ -454,10 +432,6 @@ export const uk: Translation = {
   'settings.workspacePanel.placement.top': 'Угорі',
   'settings.workspacePanel.placement.end': 'Наприкінці',
   'settings.workspacePanel.autoReorder': 'Автоперевпорядкування під час сповіщення',
-  'settings.workspacePanel.showWelcomeScreen': 'Показувати екран привітання під час запуску',
-  'settings.workspacePanel.confirmClose': 'Підтверджувати закриття сеансу',
-  'settings.workspacePanel.confirmCloseHint':
-    'Запитувати перед тим, як кнопка ×, контекстне меню або Ctrl+Shift+W закриють сеанс — випадковий клік не зможе зупинити агентів, які ще не зберегли свій стан. Закриття з CLI та від агентів запит не викликають.',
   'settings.workspacePanel.restoreClaudeSessions': 'Відновлювати сесії Claude Code під час відновлення',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'Коли remotea відновлює сесію, кожен термінал, у якому працював Claude Code, перезапускається командою `claude --resume` у початковому каталозі. Типово вимкнено: усі такі панелі одразу запускають агента. Панелі, розмови яких Claude уже не має, пропускаються, а коректно завершений Claude не відновлюється.',
   'settings.workspacePanel.autoOpenDiff': 'Автовідкриття вкладки Diff під час правок агента',
@@ -473,7 +447,6 @@ export const uk: Translation = {
   // Бічна панель — панель оркестрації
   'orchestrationPanel.expand': 'Розгорнути оркестрацію',
   'orchestrationPanel.collapse': 'Згорнути оркестрацію',
-  'orchestrationPanel.title': 'оркестрація',
   'orchestrationPanel.reviewer': 'рев\'юер',
   'orchestrationPanel.dismiss': 'сховати',
   'orchestrationPanel.waiting': 'очікування',
@@ -589,18 +562,12 @@ export const uk: Translation = {
   'surfaceTab.profileBadge': 'проєкт',
   // Налаштування — згода на інтеграцію агентів (issue #132)
   'settings.integration.section': 'Інтеграція агентів',
-  'settings.integration.enable': 'Дозволити remotea налаштовувати Claude Code, OpenCode, Kiro, omp, pi і Grok',
-  'settings.integration.hint':
-    'remotea редагує файли у вашому домашньому каталозі, щоб агенти коду могли керувати його панеллю браузера, представленнями Markdown і станом бічної панелі. Вимкнення чогось тут також видаляє те, що він записав.',
   'settings.integration.instructions': 'Інструкції для агентів',
   'settings.integration.hooks': 'Хуки стану',
-  'settings.integration.orchestrator': 'Плагін оркестратора',
-  'settings.integration.browserMcp': 'Панель браузера для MCP',
   // Бічна панель — відповідь заблокованому агенту поза його панеллю (issue #128)
   'workspaceRow.answerSent': 'Надіслано — очікування…',
   'workspaceRow.answerTitle': 'Відповісти, не перемикаючись на цю панель',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'Віддалено',
   'settings.remote.title': 'Віддалена консоль',
   'settings.remote.hint': 'Стежте за агентами й відповідайте їм із браузера телефона. Типово вимкнено: ніщо не слухає, доки ви не ввімкнете це тут.',
   'settings.remote.loading': 'Завантаження…',

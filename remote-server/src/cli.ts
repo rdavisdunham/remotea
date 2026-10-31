@@ -547,7 +547,14 @@ export function parseUpgradeArgs(argv: string[]): { yes: boolean; json: boolean;
   return out;
 }
 
-const USAGE = `usage:
+const USAGE = `Remotea host CLI — run beside the Linux/WSL session server.
+This administers host terminals, not the desktop UI or its phone console.
+wmux in a host pane may expose a status-only hook bridge: inspect wmux identify
+and wmux capabilities. ping does not establish desktop browser/workspace control.
+Host tokens, desktop bridge tokens, phone pairing and Eridani keys are separate.
+Task/run outcomes belong to Eridani; agent idle or terminal exit is not acceptance.
+
+usage:
   remotea status [--json]
   remotea doctor [--json] [--probe]                             readiness report (ok/warn/fail per check; exit 1 on a fail)
   remotea upgrade [--yes] [--timeout <s>] [--unit <name>] [--json]

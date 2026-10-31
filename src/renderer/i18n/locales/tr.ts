@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const tr: Translation = {
+  "settings.tab.remote": "Telefon erişimi",
   // Ayarlar — pencere çerçevesi
   'settings.title': 'Ayarlar',
   'settings.tab.general': 'Genel',
@@ -13,7 +14,6 @@ export const tr: Translation = {
   'settings.tab.terminal': 'Terminal',
   'settings.tab.notifications': 'Bildirimler',
   'settings.tab.browser': 'Tarayıcı',
-  'settings.tab.profiles': 'Profiller',
   'settings.tab.shortcuts': 'Kısayollar',
   // Ayarlar — Genel panel
   'settings.general.languageSection': 'Dil',
@@ -80,8 +80,6 @@ export const tr: Translation = {
   'settings.help.updateTo': 'Şuna güncelle:',
   'settings.help.upToDate': 'Güncel',
   'settings.help.downloading': 'İndiriliyor',
-  'settings.help.reportIssue': 'Bir Sorun Bildir',
-  'settings.help.website': 'Web Sitesi',
   'settings.help.hint': 'Bir hata buldunuz veya bir isteğiniz mi var? GitHub\'da bir sorun açın.',
   // Çalışma alanı bağlam menüsü
   'ctx.pin': 'Çalışma Alanını Sabitle',
@@ -174,26 +172,13 @@ export const tr: Translation = {
   'tutorial.next': 'Sonraki',
   'tutorial.getStarted': 'Başlayın',
   'tutorial.step.welcome.title': 'remotea\'a hoş geldiniz',
-  'tutorial.step.welcome.body':
-    'remotea, kod yazan yapay zekâ aracılarını paralel çalıştırmak için bir terminal çoklayıcıdır. Bu kısa tur size temel bilgileri gösterecek.',
   'tutorial.step.workspaces.title': 'Çalışma Alanları',
-  'tutorial.step.workspaces.body':
-    'Soldaki kenar çubuğu çalışma alanlarınızı gösterir. Her çalışma alanı kendi terminal düzenine sahip bağımsız bir oturumdur. Yenilerini Ctrl+N ile oluşturun. Bir çalışma alanı başlığını yeniden adlandırmak için çift tıklayın.',
   'tutorial.step.splitPanes.title': 'Panelleri Bölme',
-  'tutorial.step.splitPanes.body':
-    'Terminallerinizi yatay veya dikey olarak bölün. Her panel kendi kabuğunu çalıştırır. Boyutlandırmak için ayırıcıları sürükleyin. Herhangi bir paneli Ctrl+Shift+Enter ile tam ekrana büyütün.',
-  'tutorial.step.surfaceTabs.title': 'Yüzey Sekmeleri',
   'tutorial.step.surfaceTabs.body':
     'Her panelin birden çok sekmesi olabilir — terminaller, tarayıcı panelleri veya markdown görünümleri. Yeniden düzenlemek için sekmeleri paneller arasında sürükleyin. Yeni sekmeleri Ctrl+T ile oluşturun.',
   'tutorial.step.browserPanel.title': 'Tarayıcı Paneli',
-  'tutorial.step.browserPanel.body':
-    'Sağdaki tarayıcı paneli, aracılarınızın ne ürettiğini önizlemenizi sağlar. Ctrl+Shift+I ile açıp kapatın. localhost\'a veya herhangi bir URL\'ye gidin. Tarayıcı, soket API\'si ile betiksel olarak denetlenebilir.',
   'tutorial.step.notifications.title': 'Bildirimler',
-  'tutorial.step.notifications.body':
-    'Bir aracının ilginize ihtiyacı olduğunda paneli mavi bir halka alır ve çalışma alanı rozeti artar. Bir Windows bildirimi de açılır. Son okunmamışa Ctrl+Shift+U ile atlayın.',
   'tutorial.step.allSet.title': 'Hazırsınız',
-  'tutorial.step.allSet.body':
-    'Bu kılavuzu pencere başlığındaki yardım düğmesinden (?) her zaman yeniden açabilirsiniz. Tüm klavye kısayolları için Ayarlar\'ı (Ctrl+,) veya Komut Paleti\'ni (Ctrl+Shift+P) açın.',
   // Kenar çubuğu — çalışma alanı satırı: araç başına etkinlik etiketleri
   'workspaceRow.tool.bash': 'Komut çalıştırılıyor...',
   'workspaceRow.tool.read': 'Dosya okunuyor...',
@@ -225,20 +210,13 @@ export const tr: Translation = {
   'workspaceRow.working': 'Çalışılıyor…',
   // Kenar çubuğu öğeleri
   'sidebar.collapse': 'Kenar çubuğunu daralt (Ctrl+B)',
-  'sidebar.saveSession': 'Oturumu kaydet',
-  'sidebar.loadSession': 'Oturumu yükle',
   'sidebar.newWorkspace': 'Yeni çalışma alanı',
   // Kenar çubuğu — oturum menüsü (kaydet/yükle)
   'sessionMenu.justNow': 'az önce',
   'sessionMenu.minutesAgo': '{count} dk önce',
   'sessionMenu.hoursAgo': '{count} sa önce',
   'sessionMenu.daysAgo': '{count} gün önce',
-  'sessionMenu.newSessionName': 'Yeni oturum adı...',
-  'sessionMenu.noSavedSessions': 'Kayıtlı oturum yok',
-  'sessionMenu.overwriteExisting': 'Veya mevcut bir oturumun üzerine yazın:',
   'sessionMenu.overwrite': '"{name}" üzerine yaz',
-  'sessionMenu.load': '"{name}" yükle',
-  'sessionMenu.deleteSession': 'Oturumu sil',
   // Ayarlar — Tarayıcı paneli
   'settings.browser.searchSection': 'Arama',
   'settings.browser.defaultSearchEngine': 'Varsayılan arama motoru',
@@ -454,10 +432,6 @@ export const tr: Translation = {
   'settings.workspacePanel.placement.top': 'Üst',
   'settings.workspacePanel.placement.end': 'Son',
   'settings.workspacePanel.autoReorder': 'Bildirimde otomatik yeniden sırala',
-  'settings.workspacePanel.showWelcomeScreen': 'Başlangıçta karşılama ekranını göster',
-  'settings.workspacePanel.confirmClose': 'Bir oturumu kapatmadan önce onayla',
-  'settings.workspacePanel.confirmCloseHint':
-    'Bir oturumu kapatmadan önce × düğmesi, bağlam menüsü veya Ctrl+Shift+W için sor — yanlışlıkla bir tıklama, durumunu henüz kaydetmemiş araçları durduramaz. CLI ve araç kapatmaları hiç sormaz.',
   'settings.workspacePanel.restoreClaudeSessions': 'Geri yüklerken Claude Code oturumlarını sürdür',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'remotea bir oturumu geri yüklediğinde, Claude Code çalıştıran her terminali bulunduğu dizinde `claude --resume` ile yeniden başlatır. Varsayılan olarak kapalıdır: bu bölmelerin hepsi aynı anda bir ajan başlatır. Claude’un konuşması artık elinde olmayan bölmeler atlanır ve düzgün kapattığınız bir Claude sürdürülmez.',
   'settings.workspacePanel.autoOpenDiff': 'Aracı düzenlemelerinde diff sekmelerini otomatik aç',
@@ -473,7 +447,6 @@ export const tr: Translation = {
   // Kenar çubuğu — orkestrasyon paneli
   'orchestrationPanel.expand': 'Orkestrasyonu genişlet',
   'orchestrationPanel.collapse': 'Orkestrasyonu daralt',
-  'orchestrationPanel.title': 'orkestrasyon',
   'orchestrationPanel.reviewer': 'inceleyen',
   'orchestrationPanel.dismiss': 'kapat',
   'orchestrationPanel.waiting': 'bekleniyor',
@@ -589,18 +562,12 @@ export const tr: Translation = {
   'surfaceTab.profileBadge': 'proje',
   // Ayarlar — aracı entegrasyonu onayı (issue #132)
   'settings.integration.section': 'Aracı entegrasyonu',
-  'settings.integration.enable': 'remotea\'un Claude Code, OpenCode, Kiro, omp, pi ve Grok\'u yapılandırmasına izin ver',
-  'settings.integration.hint':
-    'remotea, kod üretim aracılarının tarayıcı panelini, markdown görünümlerini ve kenar çubuğu durumunu yönlendirebilmesi için ev dizininizdeki dosyaları düzenler. Burada bir şeyi kapatmak, onun yazdıklarını da kaldırır.',
   'settings.integration.instructions': 'Aracı talimatları',
   'settings.integration.hooks': 'Durum kancaları',
-  'settings.integration.orchestrator': 'Orkestratör eklentisi',
-  'settings.integration.browserMcp': 'MCP için tarayıcı paneli',
   // Kenar çubuğu — kilitli bir aracıya panel dışından yanıt verme (issue #128)
   'workspaceRow.answerSent': 'Gönderildi — bekleniyor…',
   'workspaceRow.answerTitle': 'Bu panele geçmeden yanıtla',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'Uzaktan',
   'settings.remote.title': 'Uzak konsol',
   'settings.remote.hint': 'Ajanlarınızı bir telefon tarayıcısından izleyin ve yanıtlayın. Varsayılan olarak kapalı: burada açana kadar hiçbir şey dinlemez.',
   'settings.remote.loading': 'Yükleniyor…',
