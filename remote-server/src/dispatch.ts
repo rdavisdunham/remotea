@@ -16,6 +16,12 @@
  *           One writer per worktree (S-S4): a spawn onto a branch another
  *           live session (or a spawn in flight) already writes is `rejected`
  *           `worktree_busy` with `{branch, writer}`, unless it says `share`.
+ *           Hyperplan: a spawn with `mode` (plan | review) launches the
+ *           harness read-only (readOnlyFlags) and carries `role`; such a
+ *           session is never a worktree's writer (it starts beside one, and
+ *           does not block a later writable spawn) but counts toward
+ *           `limits.maxRuns`. A harness without a read-only launch is
+ *           `rejected` `mode_unsupported`, never started writable.
  *           S-Q3: a target whose template fails (target-template.ts) is
  *           `rejected` `target_not_ready: <reasons>`; one at its
  *           `limits.maxRuns` is `rejected` `target_busy` with `{limit,
@@ -85,7 +91,8 @@ import type {
   WorktreeWriter,
   HelloTemplate,
 } from '../../src/shared/eridani-link-protocol';
-import { TARGET_BUSY, TARGET_NOT_READY, WORKTREE_BUSY } from '../../src/shared/eridani-link-protocol';
+import { MODE_UNSUPPORTED, TARGET_BUSY, TARGET_NOT_READY, WORKTREE_BUSY } from '../../src/shared/eridani-link-protocol';
+import type { SpawnMode } from '../../src/shared/eridani-link-protocol';
 import type { CreateSpec, EridaniBinding, PrepareFacts, RemoteSurfaceId, ServerMsg, SessionRecord } from '../../src/shared/remote-host-protocol';
 import type { Hub, HubConn, HubEridaniHooks } from './hub';
 import type { Registry } from './registry';
@@ -98,7 +105,7 @@ import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOpti
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
 import type { TurnFields } from './turn-capture';
 import { notReadyReason, runPrepare } from './target-template';
-import { claudeMcpConfig, codexMcpArgs, ERIDANI_MCP_DIR, MCP_TOKEN_ENV, mcpStatus, writePrivate, type McpResolution, type McpStatus } from './eridani-mcp';
+import { claudeMcpConfig, codexMcpArgs, ERIDANI_MCP_DIR, MCP_SERVER_NAME, MCP_TOKEN_ENV, mcpStatus, writePrivate, type McpResolution, type McpStatus } from './eridani-mcp';
 
 export const RUNS_FILE = 'eridani-runs.json';
 /** S-Q5: the M7 launch record per surface, so a process the PTY keeper kept is still vouched for after a restart. */
@@ -150,28 +157,70 @@ export function freshnessNote(wt: Pick<EnsuredWorktree, 'branch' | 'base' | 'bas
 }
 
 /**
+ * Hyperplan: what Claude may do in a read-only session (`mode` plan | review).
+ * `dontAsk` denies everything else without a terminal prompt (nothing waits
+ * on one remotea does not relay), so the roles' prompts ask through Eridani's
+ * `task_interview` instead of AskUserQuestion. Bash rules are matched on the
+ * command text and are not a security boundary; the worktree is shared with
+ * the writer, so what a reviewer can read is what the writer can.
+ */
+export const CLAUDE_READ_ONLY_TOOLS: readonly string[] = Object.freeze([
+  'Read', 'Grep', 'Glob',
+  'Bash(git status *)', 'Bash(git log *)', 'Bash(git diff *)', 'Bash(git show *)', 'Bash(ls *)', 'Bash(cat *)', 'Bash(rg *)',
+  `mcp__${MCP_SERVER_NAME}__*`,
+]);
+export const CLAUDE_READ_ONLY_DENIED: readonly string[] = Object.freeze(['Edit', 'Write', 'NotebookEdit']);
+
+/**
+ * The launch flags that make a harness read-only, or null when it has none
+ * (such a spawn is refused, never started writable). Claude (2.1.x):
+ * `--permission-mode dontAsk` with an allow list and a deny list; Codex
+ * (0.166): `--sandbox read-only --ask-for-approval never` (also accepted by
+ * `codex resume`). Claude's two lists take several values each, so the
+ * caller must put an option after them, never the prompt.
+ */
+export function readOnlyFlags(harness: string): { lists: string[]; tail: string[] } | null {
+  switch (harness) {
+    case 'claude':
+      return { lists: ['--allowedTools', ...CLAUDE_READ_ONLY_TOOLS.map(q), '--disallowedTools', ...CLAUDE_READ_ONLY_DENIED.map(q)], tail: ['--permission-mode', 'dontAsk'] };
+    case 'codex':
+      return { lists: [], tail: ['--sandbox', 'read-only', '--ask-for-approval', 'never'] };
+    default:
+      return null;
+  }
+}
+
+/**
  * The command line a spawn runs (through the login shell; the prompt stays in $ERIDANI_PROMPT).
  * `mcpArgs` (eridani-mcp.ts) come right after the program: Claude's
  * `--mcp-config` takes several values, so an option must follow it, never the prompt.
+ * With `mode` (hyperplan) the harness is launched read-only: Claude's
+ * `--permission-mode auto` becomes `dontAsk` with the tool lists (placed before
+ * `--model`, which ends them), Codex gets its sandbox flags. Without `mode` the
+ * line is exactly what it was before modes existed.
  */
-export function launchCommand(harness: 'claude' | 'codex', model: string, spec: LaunchSpec, withPrompt: boolean, mcpArgs: string[] = []): string {
+export function launchCommand(harness: 'claude' | 'codex', model: string, spec: LaunchSpec, withPrompt: boolean, mcpArgs: string[] = [], mode?: SpawnMode | null): string {
   const bin = q(spec.bin ?? harness);
   const extra = (spec.args ?? []).map(q);
   const mcp = mcpArgs.map(q);
+  const ro = mode ? readOnlyFlags(harness) : null;
+  if (mode && !ro) throw new Error(`${harness} has no read-only launch`);
   const words = harness === 'claude'
-    ? [bin, ...mcp, '--model', q(model), '--permission-mode', 'auto', ...extra]
-    : [bin, ...mcp, '--disable', 'daemon_auto_start', '-m', q(model), ...extra];
+    ? [bin, ...mcp, ...(ro?.lists ?? []), '--model', q(model), ...(ro?.tail ?? ['--permission-mode', 'auto']), ...extra]
+    : [bin, ...mcp, '--disable', 'daemon_auto_start', '-m', q(model), ...(ro?.tail ?? []), ...extra];
   if (withPrompt) words.push('"$ERIDANI_PROMPT"');
   return words.join(' ');
 }
 
-/** The command that reopens a run's conversation with the same model and permission mode. */
+/** The command that reopens a run's conversation with the same model and permission mode (read-only again when the binding has a `mode`). */
 export function resumeLine(b: EridaniBinding, spec: LaunchSpec | undefined, sessionId: string, mcpArgs: string[] = []): string | null {
   if (!/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId)) return null;
   const bin = q(spec?.bin ?? b.harness);
   const mcp = mcpArgs.map(q);
-  if (b.harness === 'claude') return [bin, '--resume', q(sessionId), ...mcp, '--model', q(b.model), '--permission-mode', 'auto', ...(spec?.args ?? []).map(q)].join(' ');
-  return [bin, 'resume', ...mcp, '--disable', 'daemon_auto_start', '-m', q(b.model), q(sessionId)].join(' ');
+  const ro = b.mode ? readOnlyFlags(b.harness) : null;
+  if (b.mode && !ro) return null;
+  if (b.harness === 'claude') return [bin, '--resume', q(sessionId), ...mcp, ...(ro?.lists ?? []), '--model', q(b.model), ...(ro?.tail ?? ['--permission-mode', 'auto']), ...(spec?.args ?? []).map(q)].join(' ');
+  return [bin, 'resume', ...mcp, '--disable', 'daemon_auto_start', '-m', q(b.model), ...(ro?.tail ?? []), q(sessionId)].join(' ');
 }
 
 /** A client of the hub that is Eridani: it opens sessions and reads nothing back. */
@@ -572,10 +621,14 @@ export class Dispatch {
     return [...this.writes.keys()];
   }
 
-  /** The newest session bound to a run. */
+  /**
+   * The newest session bound to a run that is not a reviewer (hyperplan: the
+   * planner, then the worker), so `verify` never lands on a review session.
+   * A run with only reviewer sessions has no bound session.
+   */
   private boundSession(runId: string): SessionRecord | undefined {
     return this.deps.registry.sessions()
-      .filter((r) => r.eridani?.runId === runId)
+      .filter((r) => r.eridani?.runId === runId && r.eridani.role !== 'reviewer')
       .sort((a, b) => (b.eridani!.generation - a.eridani!.generation) || (b.createdAt - a.createdAt))[0];
   }
 
@@ -613,6 +666,8 @@ export class Dispatch {
       ...(b.baseRef !== undefined ? { base_ref: b.baseRef, fetch: b.fetch ?? null, behind: b.behind ?? null, ahead: b.ahead ?? null } : {}),
       ...(b.mcp ? { mcp: { ...b.mcp } } : {}),
       ...(b.prepare ? { prepare: { ...b.prepare } } : {}),
+      ...(b.role ? { role: b.role } : {}),
+      ...(b.mode ? { mode: b.mode } : {}),
     };
   }
 
@@ -677,6 +732,9 @@ export class Dispatch {
     if (!target) return { state: 'rejected', detail: `unknown execution target ${cmd.target.id}` };
     const launch = target.launch[cmd.harness];
     if (!launch) return { state: 'rejected', detail: `${cmd.harness} is not enabled on target ${target.id}` };
+    // Hyperplan: a read-only mode the harness cannot honour is refused; it is never launched writable instead.
+    const readOnly = !!cmd.mode;
+    if (readOnly && !readOnlyFlags(cmd.harness)) return { state: 'rejected', detail: MODE_UNSUPPORTED, result: { harness: cmd.harness, mode: cmd.mode } };
     // S-Q3: what hello would not advertise is not started either (the template may have broken since).
     const template = this.deps.checkTarget?.(target);
     if (template && !template.ready) return { state: 'rejected', detail: `${TARGET_NOT_READY}: ${notReadyReason(template)}`, result: { template } };
@@ -687,13 +745,14 @@ export class Dispatch {
       return { state: 'rejected', detail: TARGET_BUSY, result: { limit, running } };
     }
     // S-S4: one writer per worktree. Checked and claimed with no await in between, so two spawns cannot both pass.
+    // A read-only spawn (hyperplan) neither needs the branch free nor claims it: it writes nothing.
     const claim = `${target.id}\0${cmd.target.branch}`;
-    const writer = this.writerFor(target.id, cmd.target.branch);
+    const writer = readOnly ? null : this.writerFor(target.id, cmd.target.branch);
     if (writer && cmd.share !== true) {
       this.log(`eridani: refused spawn for run ${cmd.run_id} on ${cmd.target.branch}: ${writer.surf} (run ${writer.run_id}) writes it`);
       return { state: 'rejected', detail: WORKTREE_BUSY, result: { branch: cmd.target.branch, writer } };
     }
-    const claimed = !writer;
+    const claimed = !writer && !readOnly;
     if (claimed) this.claims.set(claim, { surf, run_id: cmd.run_id });
     this.spawning.add(surf);
     this.spawningOn.set(surf, target.id);
@@ -724,6 +783,8 @@ export class Dispatch {
         ERIDANI_BRANCH: wt.branch,
         ERIDANI_WORKTREE: wt.path,
         ERIDANI_HARNESS: cmd.harness,
+        ...(cmd.role ? { ERIDANI_ROLE: cmd.role } : {}),
+        ...(cmd.mode ? { ERIDANI_MODE: cmd.mode } : {}),
         ...(cmd.task_id ? { ERIDANI_TASK_ID: cmd.task_id } : {}),
         ...(prompt ? { ERIDANI_PROMPT: prompt } : {}),
         ...(cmd.run_token ? { ERIDANI_RUN_TOKEN: cmd.run_token } : {}),
@@ -753,6 +814,9 @@ export class Dispatch {
         // What the desktop needs to link back to the run (no secrets): only what this spawn and config carry.
         ...(cmd.title ? { taskTitle: cmd.title } : {}),
         ...(prepare ? { prepare } : {}),
+        // Hyperplan: the role and read-only mode stay on the record (resume reuses the mode; verify skips reviewers).
+        ...(cmd.role ? { role: cmd.role } : {}),
+        ...(cmd.mode ? { mode: cmd.mode } : {}),
       };
       const webUrl = this.webUrl();
       if (webUrl) binding.webUrl = webUrl;
@@ -760,7 +824,7 @@ export class Dispatch {
       if (mcp) binding.mcp = mcp.status;
       const { groupId, group } = this.groupFor(cmd.group ?? 'Eridani');
       const res = this.conn.open(surf, {
-        cmd: launchCommand(cmd.harness, cmd.model, launch, !!prompt, mcp?.args),
+        cmd: launchCommand(cmd.harness, cmd.model, launch, !!prompt, mcp?.args, cmd.mode),
         cwd: wt.path,
         groupId: groupId as CreateSpec['groupId'],
         group,
@@ -777,7 +841,7 @@ export class Dispatch {
       this.noteLaunched(surf, rec?.incarnation ?? 1);
       this.deps.registry.saveNow();
       this.deps.changed?.();
-      this.log(`eridani: spawned ${cmd.harness} for run ${cmd.run_id} g${cmd.generation} in ${wt.path} (${surf})${mcp ? `; Eridani MCP ${mcp.status.configured ? 'configured' : `not configured: ${mcp.status.reason}`}` : ''}`);
+      this.log(`eridani: spawned ${cmd.harness}${cmd.role ? ` ${cmd.role}` : ''}${cmd.mode ? ` (read-only: ${cmd.mode})` : ''} for run ${cmd.run_id} g${cmd.generation} in ${wt.path} (${surf})${mcp ? `; Eridani MCP ${mcp.status.configured ? 'configured' : `not configured: ${mcp.status.reason}`}` : ''}`);
       return { state: 'executed', result: this.spawnFacts(rec!) };
     } finally {
       this.spawning.delete(surf);
@@ -810,9 +874,10 @@ export class Dispatch {
   /**
    * S-S4: the live session writing `branch` on `target` (the oldest, when a
    * spawn shared it), or the spawn in flight claiming it; null when free.
+   * A read-only session (hyperplan `mode`) is not a writer.
    */
   writerFor(targetId: string, branch: string): WorktreeWriter | null {
-    const live = liveWriters(this.deps.registry.sessions()).find((w) => w.target === targetId && w.branch === branch);
+    const live = liveWriters(this.deps.registry.sessions()).find((w) => w.target === targetId && w.branch === branch && !w.readOnly);
     return live?.writer ?? this.claims.get(`${targetId}\0${branch}`) ?? null;
   }
 
@@ -1222,11 +1287,15 @@ export class Dispatch {
   /**
    * Eridani's desired state after a reconnect (C08). A newer generation is
    * adopted (queued input of an older one is then refused, never typed); a
-   * `stop` is carried out like a stop command.
+   * `stop` is carried out like a stop command. Hyperplan: an entry that names
+   * a `surf` (or an `attempt`) applies to that one session of the run; one
+   * that names neither applies to every session of the run, as before.
    */
   applyRunsSnapshot(runs: RunsSnapshotEntry[]): void {
     for (const r of runs) {
-      for (const rec of this.deps.registry.sessions().filter((s) => s.eridani?.runId === r.run_id)) {
+      const targets = this.deps.registry.sessions().filter((s) => s.eridani?.runId === r.run_id
+        && (r.surf !== undefined ? s.id === r.surf : r.attempt === undefined || s.eridani!.attempt === r.attempt));
+      for (const rec of targets) {
         let b = rec.eridani!;
         if (r.generation > b.generation && rec.state !== 'exited') {
           b = { ...b, generation: r.generation };

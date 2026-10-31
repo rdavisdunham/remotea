@@ -99,6 +99,8 @@ export interface LiveWriter {
   branch: string;
   worktree: string;
   writer: WorktreeWriter;
+  /** Hyperplan: the session was launched read-only (`mode` set); it uses the worktree but never writes it. */
+  readOnly?: boolean;
 }
 
 /**
@@ -110,7 +112,7 @@ export function liveWriters(sessions: Iterable<SessionRecord>): LiveWriter[] {
   return [...sessions]
     .filter((r) => r.eridani && r.state !== 'exited')
     .sort((a, b) => a.createdAt - b.createdAt)
-    .map((r) => ({ target: r.eridani!.target, branch: r.eridani!.branch, worktree: r.eridani!.worktree, writer: { surf: r.id, run_id: r.eridani!.runId } }));
+    .map((r) => ({ target: r.eridani!.target, branch: r.eridani!.branch, worktree: r.eridani!.worktree, writer: { surf: r.id, run_id: r.eridani!.runId }, ...(r.eridani!.mode ? { readOnly: true } : {}) }));
 }
 
 /** The writer of each worktree path (the oldest live session there). */

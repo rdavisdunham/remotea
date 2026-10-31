@@ -539,7 +539,9 @@ every resume) brings its own. Nothing is written to the worktree or to the
 user's Claude or Codex settings.
 
 - **Claude Code**: `claude --mcp-config <config dir>/eridani-mcp/<surf>.json
-  --model … --permission-mode auto "$ERIDANI_PROMPT"`. The file (mode 0600,
+  --model … --permission-mode auto "$ERIDANI_PROMPT"` (a read-only spawn
+  puts its tool lists between the two and ends with `--permission-mode
+  dontAsk`). The file (mode 0600,
   folder 0700, removed with the session) is
   `{"mcpServers": {"eridani": {"type": "http", "url": "<mcp url>", "headers":
   {"Authorization": "Bearer <key>"}}}}`. There is no `--strict-mcp-config`,
@@ -588,7 +590,9 @@ prompt. The prompt is passed in `$ERIDANI_PROMPT` and expanded by the login
 shell as **one argv word**; it is never parsed as shell text, and a prompt
 starting with `-` is refused. `env` accepts only `ERIDANI_*` keys with
 one-line values. This is policy against Eridani's text becoming commands. It
-is not a sandbox: the agent itself runs with `--permission-mode auto` as you.
+is not a sandbox: the agent itself runs with `--permission-mode auto` as you
+(a spawn with `mode` runs read-only instead; see [Roles and read-only
+modes](#roles-and-read-only-modes-hyperplan)).
 Stage F tightened `input`, the lost-run respawn and verify. See
 [Stage F: security model](#stage-f-security-model).
 
@@ -610,7 +614,12 @@ too: stop the old surface first. A spawn that says `share: true` starts
 anyway, in the same worktree, and both sessions edit it (the oldest stays the
 reported writer). A child task's spawn names its own branch with the parent's
 branch as `base`, so it gets its own worktree as before, while the parent
-keeps writing.
+keeps writing. A read-only spawn (hyperplan `mode`, see [Roles and read-only
+modes](#roles-and-read-only-modes-hyperplan)) is not a writer: it starts
+beside the writer without `share`, claims nothing, and does not make a later
+writable spawn `worktree_busy`; it still counts toward `limits.maxRuns`. The
+worktrees report's `writer` is unchanged: the oldest live session there,
+read-only or not.
 
 **Freshness.** Before basing on (or reusing a worktree of) the target's own
 `base`, the host runs `git fetch origin <base>` (30 s, non-interactive). New
@@ -665,7 +674,7 @@ changes.
 
 | `t` | Fields | Effect |
 |---|---|---|
-| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, share?, expires_at` | `share` (boolean, optional, S-S4): start even when another live session writes the branch's worktree; without it such a spawn is `rejected` `worktree_busy` with `result {branch, writer {surf, run_id}}` (see [Worktrees](#worktrees)). Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. S-Q3 ([Target templates](#target-templates-s-q3)): a target whose template fails is `rejected` `target_not_ready: <reasons>` with `result {template}`; one at `limits.maxRuns` is `rejected` `target_busy` with `result {limit, running}`; with `prepare` steps the worktree is prepared first and `result.prepare` is `{ran, ok, steps: [{id, exit_code, duration_ms, timed_out?, error?}], reason?, log?, tail?}` (`ran: false`: an earlier preparation of the same steps still holds); a failed preparation is `failed` `prepare: <reason>` with `result {worktree, branch, target, prepare}` (with `tail`, the last 2,000 characters of output) and no agent starts. |
+| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, share?, role?, mode?, expires_at` | `share` (boolean, optional, S-S4): start even when another live session writes the branch's worktree; without it such a spawn is `rejected` `worktree_busy` with `result {branch, writer {surf, run_id}}` (see [Worktrees](#worktrees)). `role` (`planner` \| `reviewer` \| `worker`, optional; absent = planner) and `mode` (`plan` \| `review`, optional; absent = writable): hyperplan, see [Roles and read-only modes](#roles-and-read-only-modes-hyperplan); with `mode` the launch below is the read-only one, the outcome's `result` carries `role` and `mode` back, and a harness without a read-only launch is `rejected` `mode_unsupported`. Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. S-Q3 ([Target templates](#target-templates-s-q3)): a target whose template fails is `rejected` `target_not_ready: <reasons>` with `result {template}`; one at `limits.maxRuns` is `rejected` `target_busy` with `result {limit, running}`; with `prepare` steps the worktree is prepared first and `result.prepare` is `{ran, ok, steps: [{id, exit_code, duration_ms, timed_out?, error?}], reason?, log?, tail?}` (`ran: false`: an earlier preparation of the same steps still holds); a failed preparation is `failed` `prepare: <reason>` with `result {worktree, branch, target, prepare}` (with `tail`, the last 2,000 characters of output) and no agent starts. |
 | `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then (800 ms later) the text. Typed as a bracketed paste and Enter (150 ms later). Never counts as a person answering. The outcome is `executed` only once Enter was sent; see [Input and steer outcomes](#input-and-steer-outcomes). |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
@@ -749,7 +758,8 @@ journal says being on disk, so:
 
 **Recovery on boot.** Eridani sessions the restart lost are respawned with
 their conversation (`claude --resume <id> --model <m> --permission-mode auto`,
-`codex resume --disable daemon_auto_start -m <m> <id>`), with the run's env
+`codex resume --disable daemon_auto_start -m <m> <id>`; a session spawned with
+a read-only `mode` resumes with that mode's flags), with the run's env
 from `eridani-runs.json` (0600; the run token and env never go into the
 registry). A lost session whose stop was requested is marked exited instead.
 So is one that cannot be resumed: no conversation was ever reported, or
@@ -792,9 +802,14 @@ server stops draining and runs what it held.
 
 **runs.snapshot** (Eridani → remotea, after welcome, chunked like the
 snapshot): `runs [{run_id, generation, desired: continue|stop|none,
-stop_mode?, verify? {verify_id, plan_revision} | null}]`. A newer generation is adopted (an older queued input is then
+stop_mode?, verify? {verify_id, plan_revision} | null, surf?, attempt?}]`. A newer generation is adopted (an older queued input is then
 refused, and a steer or input still waiting to type is canceled);
-`desired: stop` is carried out like a stop command.
+`desired: stop` is carried out like a stop command. An entry is applied per
+surface (hyperplan): with `surf` to that surface only, with `attempt` (and no
+`surf`) to the run's session of that attempt, and with neither to every
+session of the run, as before. A run with more than one live session (a
+reviewer beside its planner) gets one entry per surface, so stopping the
+reviewer leaves the planner alone.
 
 #### Input and steer outcomes
 
@@ -852,6 +867,62 @@ sequence.
 
 A restart while an `input` is `executing` still settles it as `uncertain`
 (see **Journal** above): the bytes may or may not have arrived.
+
+### Roles and read-only modes (hyperplan)
+
+Hyperplan runs more than one session per run: a **planner** drafts the plan,
+a fresh **reviewer** reads it (and the repo) each round, and a **worker**
+executes the approved plan (or the planner's session continues into
+execution, which is today's run). The host's part is small and additive;
+the loop itself lives in Eridani (`docs/AGENT_CONTROL.md`, "Hyperplan and
+roles"). hello `caps` advertises `spawn.roles` for all of this (with the
+stage F caps, in both collector modes); Eridani refuses hyperplan or a split
+worker on a host without it.
+
+**`spawn.role`** (`planner` | `reviewer` | `worker`; absent = `planner`) is
+recorded on the session's binding (`eridani.role`, so it survives a restart)
+and echoed in the spawn outcome's `result.role`, the spawn `facts` and the
+agent's `ERIDANI_ROLE`. Its one effect on the host: `verify` (command and
+auto) binds to the run's newest session that is **not** a reviewer (the
+planner, then the worker), so a review session never gets verified or
+chosen as "the run's session". A run whose only sessions are reviewers has
+no bound session (`verify` is `rejected` `unknown run`).
+
+**`spawn.mode`** (`plan` | `review`; absent = writable, today's launch) starts
+the harness read-only, recorded as `eridani.mode` and `ERIDANI_MODE`, and
+kept by a resume after a restart:
+
+| Harness | Writable (no `mode`) | Read-only (`mode` set) |
+|---|---|---|
+| Claude (2.1.x) | `claude [--mcp-config <file>] --model <m> --permission-mode auto [args] "$ERIDANI_PROMPT"` | `claude [--mcp-config <file>] --allowedTools 'Read' 'Grep' 'Glob' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' 'mcp__eridani__*' --disallowedTools 'Edit' 'Write' 'NotebookEdit' --model <m> --permission-mode dontAsk [args] "$ERIDANI_PROMPT"` |
+| Codex (0.166) | `codex [-c …] --disable daemon_auto_start -m <m> [args] "$ERIDANI_PROMPT"` | `codex [-c …] --disable daemon_auto_start -m <m> --sandbox read-only --ask-for-approval never [args] "$ERIDANI_PROMPT"` |
+
+`dontAsk` denies every tool outside the allow list without a prompt, so
+nothing waits on a terminal dialog that remotea does not relay (that is why
+Claude's own plan mode is not used: leaving it asks in the terminal). The
+MCP entry names the server remotea registers (`eridani`, eridani-mcp.ts), so
+`submit_plan`, `submit_plan_review` and `task_interview` work; the roles'
+prompts ask through `task_interview`, never AskUserQuestion (denied). Both
+Claude lists take several values, so they go before `--model`, which ends
+them: the prompt is never read as a tool name. `codex resume` accepts the
+same two flags. A `mode` on a harness with no read-only launch is `rejected`
+`mode_unsupported` with `result {harness, mode}`; it is never started
+writable. The lines without `mode` are byte-for-byte what they were.
+
+A read-only spawn is **not a writer** ([Worktrees](#worktrees)): it starts in
+the live writer's worktree without `share` (Eridani sends `share: true`
+anyway), claims nothing, and does not block the writable spawn that follows
+it (the worker at handoff), while still counting toward `limits.maxRuns`.
+`runs.snapshot` entries name the surface they are for (`surf`, or
+`attempt`), so a `desired: stop` for the reviewer leaves the planner alone
+([Draining for a restart](#draining-for-a-restart) has the entry shape).
+
+What this is not: Bash allow rules match the command text and are not a
+security boundary, Codex's sandbox is the harness's own, and the worktree is
+shared with the writer, so what a reviewer can read is bounded by the same
+git-ignore hygiene as the planner's. `status` frames already carry
+`effective_permission_mode`. Live use of a new build needs the service
+rebuilt and restarted (`remotea upgrade`).
 
 ### Open in Eridani, and the terminal from Eridani
 
@@ -1481,9 +1552,11 @@ Eridani may require it), `context.scope`, `prompt` (live `prompt` frames,
 sent only when Eridani advertises `prompt` back), `worktrees.scan` (the
 host takes the [`worktrees.scan`](#commands) command; an Eridani that never
 sends it loses nothing), `terminal.focus` (the host takes the
-[`terminal.focus`](#commands) command; likewise optional) and `doctor` (live
+[`terminal.focus`](#commands) command; likewise optional), `doctor` (live
 [`doctor`](#doctor) frames, sent only when Eridani advertises `doctor` back;
-hello carries the summary regardless). The lag rules:
+hello carries the summary regardless) and `spawn.roles` ([Roles and read-only
+modes](#roles-and-read-only-modes-hyperplan); an Eridani that never sends
+`role` or `mode` gets the same host as before). The lag rules:
 
 - Eridani refuses an `op_id` frame without a digest only from a host that
   advertises `digest`.

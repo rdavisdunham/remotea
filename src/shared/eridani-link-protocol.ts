@@ -114,7 +114,11 @@ export type LinkCap =
   | 'terminal.focus'
   // The host reports `remotea doctor`'s summary: in hello (`doctor`), and as a `doctor` frame when it changes.
   // The frame goes only to an Eridani whose welcome advertised `doctor`.
-  | 'doctor';
+  | 'doctor'
+  // Hyperplan: `spawn` takes `role` and `mode` (read-only sessions beside the run's
+  // writer), `runs.snapshot` entries may name one surface, and `verify` never
+  // lands on a reviewer. Eridani refuses hyperplan / split-worker starts without it.
+  | 'spawn.roles';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -132,7 +136,7 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
 /** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus` and the `doctor` summary. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor']);
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -788,8 +792,33 @@ export interface SpawnCommand extends OpFields {
    * with detail `worktree_busy` and result `{branch, writer}`.
    */
   share?: boolean;
+  /**
+   * Hyperplan (additive, cap `spawn.roles`): which of the run's roles this
+   * session plays. Absent: `planner`, today's behaviour. A `reviewer` session
+   * is never the run's bound session (`verify` skips it).
+   */
+  role?: RunRole;
+  /**
+   * Hyperplan: start the harness read-only (`plan` for a planner whose worker
+   * is another session, `review` for a reviewer). Absent: today's writable
+   * launch. Read-only sessions are never a worktree's writer, so they start
+   * beside a live session on the same branch without `share`, but they count
+   * toward `limits.maxRuns`. A harness that cannot run read-only is
+   * `rejected` `mode_unsupported`.
+   */
+  mode?: SpawnMode;
   expires_at: number | string;
 }
+
+/** Hyperplan: the roles a session may play in a run. */
+export type RunRole = 'planner' | 'reviewer' | 'worker';
+export const RUN_ROLES: readonly RunRole[] = Object.freeze(['planner', 'reviewer', 'worker']);
+/** Hyperplan: the read-only launch modes. */
+export type SpawnMode = 'plan' | 'review';
+export const SPAWN_MODES: readonly SpawnMode[] = Object.freeze(['plan', 'review']);
+
+/** The `command.outcome` detail of a spawn with a `mode` the harness cannot run read-only (never launched writable instead). */
+export const MODE_UNSUPPORTED = 'mode_unsupported';
 
 /** The live session writing a worktree (S-S4): its surface and the run bound to it. */
 export interface WorktreeWriter {
@@ -904,6 +933,15 @@ export interface RunsSnapshotEntry {
   stop_mode?: 'interrupt' | 'kill';
   /** Stage D: the run's current verify config (null: none; absent: unchanged). */
   verify?: RunVerifyConfig | null;
+  /**
+   * Hyperplan (cap `spawn.roles`): the one surface this entry is for. With
+   * `surf` the entry applies to that surface only; with `attempt` (and no
+   * `surf`) to the run's session of that attempt. With neither it applies to
+   * every session of the run, as before. A run with more than one live
+   * session (a reviewer beside its planner) gets one entry per surface.
+   */
+  surf?: string;
+  attempt?: number;
 }
 /** One managed worktree, as `remotea eridani worktrees` reports it (nominate-only, never removed). */
 export interface WorktreeReport {
@@ -1093,7 +1131,9 @@ function isQuestionItem(v: unknown): boolean {
 function isRunsEntry(v: unknown): boolean {
   return isObj(v) && isStr(v.run_id, 200) && isNum(v.generation) && ['continue', 'stop', 'none'].includes(v.desired as string)
     && (v.stop_mode === undefined || v.stop_mode === 'interrupt' || v.stop_mode === 'kill')
-    && (v.verify === undefined || v.verify === null || isVerifyConfig(v.verify));
+    && (v.verify === undefined || v.verify === null || isVerifyConfig(v.verify))
+    && (v.surf === undefined || isStr(v.surf, 120))
+    && (v.attempt === undefined || isInt(v.attempt, 1));
 }
 
 const VERIFY_ID_RE = /^[A-Za-z0-9._-]{1,64}$/;
@@ -1150,6 +1190,8 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
         if (!isObj(mg) || !isInt(mg.number, 1) || !isStr(mg.dir, 200) || !noControl(mg.dir) || /[\r\n]/.test(mg.dir)) return 'bad migration';
       }
       if (m.share !== undefined && typeof m.share !== 'boolean') return 'bad share';
+      if (m.role !== undefined && !RUN_ROLES.includes(m.role as RunRole)) return 'bad role';
+      if (m.mode !== undefined && !SPAWN_MODES.includes(m.mode as SpawnMode)) return 'bad mode';
       if (m.run_token !== undefined && !(isStr(m.run_token, 512) && /^[\x21-\x7e]+$/.test(m.run_token))) return 'bad run_token';
       if (m.env !== undefined) {
         if (!isObj(m.env) || Object.keys(m.env).length > 32) return 'bad env';
