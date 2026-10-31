@@ -354,7 +354,6 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
     // first pane when the id does not resolve, and dropping the click here
     // meant that recovery path could never run.
     if (!activeWorkspaceId || !absRoot) return;
-    if (location.kind === 'remote') { setOpenError('remote'); return; }
     const absolute = absolutePathOf(row.relPath);
     setOpenError(null);
     // No `void`: the two-argument `.then` below already handles rejection, so
