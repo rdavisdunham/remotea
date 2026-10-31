@@ -1,9 +1,14 @@
+import { useState } from 'react';
+import { isValidStartUrl } from './settings-validation';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 
 export default function BrowserSettings() {
   const t = useT();
   const { browserPrefs, setBrowserPrefs } = useStore();
+
+  const [urlDraft, setUrlDraft] = useState(browserPrefs.defaultUrl);
+  const validUrl = isValidStartUrl(urlDraft);
 
   return (
     <div className="settings-section">
@@ -48,12 +53,22 @@ export default function BrowserSettings() {
           id="browser-default-url"
           type="text"
           className="settings-input"
-          value={browserPrefs.defaultUrl}
-          onChange={(e) => setBrowserPrefs({ defaultUrl: e.target.value })}
+          value={urlDraft}
+          aria-invalid={!validUrl}
+          onChange={(event) => {
+            const next = event.target.value;
+            setUrlDraft(next);
+            if (isValidStartUrl(next)) setBrowserPrefs({ defaultUrl: next.trim() });
+          }}
           placeholder="http://localhost:3000"
           spellCheck={false}
         />
       </div>
+      {!validUrl && (
+        <p className="settings-hint" role="alert">
+          {t('settings.alignment.invalidStartUrl')}
+        </p>
+      )}
       <p className="settings-hint">
         {t(
           'settings.browser.defaultUrlHint',
