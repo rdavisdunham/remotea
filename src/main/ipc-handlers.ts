@@ -2,6 +2,7 @@ import { isChatAttentionAction } from '../shared/remote-host-protocol';
 import { readIntegrationStatus } from './integration-status';
 import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents, safeStorage } from 'electron';
 import { isSafeExternalUrl } from './security-policy';
+import { nextZoomFactor } from './zoom-factor';
 import * as path from 'path';
 import { promises as fsp } from 'fs';
 import { IPC_CHANNELS, SurfaceId, WindowId, WorkspaceId, AgentId, type InsertionResult, type ExplorerListError } from '../shared/types';
@@ -614,6 +615,14 @@ const agentBrowserDeps: AgentBrowserDeps = {
 };
 
 export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstance?: CDPProxy): void {
+  // Ctrl+wheel captured by the desktop before terminal scrolling consumes it.
+  ipcMain.on(IPC_CHANNELS.WINDOW_ZOOM, (event, deltaY: unknown) => {
+    if (typeof deltaY !== 'number' || !Number.isFinite(deltaY)) return;
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed() || win.webContents !== event.sender) return;
+    event.sender.setZoomFactor(nextZoomFactor(event.sender.getZoomFactor(), deltaY));
+  });
+
   // Toggle DevTools for the renderer window
   ipcMain.on('toggle-devtools', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);

@@ -712,6 +712,7 @@ export interface InsertionResult {
 
 // IPC channel names
 export const IPC_CHANNELS = {
+  WINDOW_ZOOM: 'window:zoom',
   INTEGRATION_STATUS: 'integration:status',
   // PTY
   PTY_CREATE: 'pty:create',
