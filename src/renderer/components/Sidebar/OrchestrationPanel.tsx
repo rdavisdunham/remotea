@@ -58,14 +58,14 @@ export default function OrchestrationPanel() {
           : t('orchestrationPanel.collapse', 'Collapse orchestration')}
       >
         <span className="orch-panel__header-dot" />
-        <span className="orch-panel__header-title">{t('orchestrationPanel.title', 'orchestration')}</span>
+        <span className="orch-panel__header-title">{t('orchestrationPanel.title', 'Legacy local orchestration')}</span>
         <span className="orch-panel__header-status">{statusLabel[orch.status] || orch.status}</span>
         <span className="orch-panel__header-id">{orch.id.replace(/^orch-/, '')}</span>
       </button>
 
       {!collapsed && (
         <>
-          <div className="orch-panel__task" title={orch.task}>
+          <div className="orch-panel__task" title={`wmux-orchestrator compatibility: ${orch.task}`}>
             {orch.task}
           </div>
 

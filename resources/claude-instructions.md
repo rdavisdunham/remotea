@@ -2,45 +2,64 @@
 
 # remotea
 
-remotea is a terminal multiplexer with a browser panel on the right that the user
-watches in real time. It writes this section into a **global** agent-context
-file, so every session on this machine loads it — including sessions that are
-not running inside remotea at all (a desktop app, a plain terminal, CI, an SSH
-session, a scheduled run). Whether it applies to you is a fact about *your*
-session, so check it rather than assume it:
+Remotea integration is optional context, written into a global agent file. You may
+be in a desktop pane, a host terminal, an ordinary shell or CI. Identify the
+endpoint available **in this shell** before choosing commands:
 
 ```bash
-wmux ping     # "pong" → remotea is here
+wmux identify
+wmux capabilities
 ```
 
-**If `wmux ping` answers `pong`**, everything below is available and preferred.
+Read the returned `features` array. A desktop endpoint advertises `workspaces`,
+`splits`, `notifications`, `windows`, `browser`, `markdown`, `agents` and `status`.
+A host hook bridge advertises only `status`: it is not a desktop control endpoint.
+A successful `wmux ping` (a legacy reachability probe) does **not** establish any
+command capability; the host bridge need not implement ping at all.
 
-**If it answers anything else — command not found, an error, no output — do not
-conclude yet.** remotea puts `wmux` on PATH only for terminals it starts itself, so
-any session it did not spawn — a desktop app, a plain terminal, an SSH session, a
-scheduled run, anything already open before remotea started — will not find it there
-even while remotea is running normally. And a different program also called `wmux`
-may be on PATH (another app by that name puts its own `wmux` command there), so a
-bare `wmux` can be the wrong one. Ask this install directly:
+If the commands answer anything else — command not found, an error, no output —
+do not conclude yet. Outside panes, PATH may omit this install or name a different
+program. In an ordinary desktop shell, try this install directly:
 
 ```bash
-"{{WMUX_CLI_BIN}}/wmux" ping
+"{{WMUX_CLI_BIN}}/wmux" identify
+"{{WMUX_CLI_BIN}}/wmux" capabilities
 ```
 
-If that answers `pong`, remotea is running: use that absolute path in place of bare
-`wmux` for every command below. If it too does not answer `pong`, remotea is not
-running for this session. Ignore the whole section and use your normal tools.
-Nothing here is a restriction on what you may otherwise do.
+If these answer, use that absolute path instead of bare `wmux`. Do not redirect a
+host session to an unrelated desktop or clear its `WMUX_REMOTE` / token context.
+If discovery also fails, the endpoint is unavailable to this session. Use your
+normal tools; failure does not prove the app or host is stopped. Nothing here is a
+restriction on what you may otherwise do. Never print authentication tokens.
 
-One check per session is enough; `wmux ping` needs no arguments and no auth, and
-fails immediately when nothing is listening.
+## Command scope
+
+- Desktop endpoint: use only command families advertised by capabilities. Browser
+  and markdown below require `browser` and `markdown` respectively; workspace,
+  window and agent control require their corresponding features.
+- Host status bridge (`features: ["status"]`): `wmux report-agent`,
+  `wmux release-agent` and `wmux report-subagent` report in their session scope.
+  `wmux agent-state` is a desktop query and is not relayed by the host bridge.
+  Do not use browser, markdown, window or workspace control there. Missing browser
+  support does not disable status reporting. Follow reported errors for unavailable
+  status options; normal hooks may already report activity.
+- Host administration: `remotea status`, `remotea doctor`, `remotea hooks status`
+  and `remotea eridani status` are the **host CLI**, distinct from desktop `wmux`
+  shims (the desktop package also has a `remotea` entrypoint). Inspect `--help` in
+  that environment. Desktop `--remote` selects a desktop CLI TCP bridge, not a
+  host session server WebSocket.
+- Eridani-bound host session: use the supplied run/target context and configured
+  Eridani MCP tools for task/run decisions, questions and verification. MCP
+  availability is stated in the run context; do not infer it from agent status.
+  Agent activity, process exit and task acceptance are different facts.
 
 ## Browser
 
-For web browsing, prefer the `wmux browser` commands over Playwright, Firecrawl
-or WebSearch: those open windows the user cannot see, while the browser panel
-lets them watch what you are doing. Use whichever tool the user explicitly asks
-for, and use your own web tools when `wmux ping` says remotea is absent.
+When the endpoint advertises `browser`, the desktop browser commands provide a
+shared view the user can watch. Prefer that view when it helps the task; respect
+the user's explicit tool preference. When this capability is absent, use normal
+browser tools. The browser runs on the desktop computer; `localhost` refers there,
+not to a host terminal's machine. Use a reachable host URL or configured tunnel.
 
 ```bash
 wmux browser open <url>          # navigate
@@ -61,7 +80,7 @@ Workflow: `browser open <url>` → `browser snapshot` → read tree → `browser
 
 Refs (`e1`, `e2`...) expire after page changes — always re-snapshot.
 
-## Markdown
+## Markdown (desktop `markdown` capability)
 
 To let the user review a markdown document — your plan-mode plan, a spec, a design doc, a README — open it in a read-only markdown view (like the diff view) instead of dumping it into the terminal:
 
@@ -75,7 +94,7 @@ wmux markdown get <id>                           # read a surface's buffer back 
 
 Relative paths resolve against your current working directory. Only text/markdown files up to 5 MB are accepted. Prefer this over pasting long markdown into the terminal so the user can read it comfortably in a pane.
 
-## Asking the user something
+## Asking the user something (`status` capability)
 
 When you stop to ask the user a question — a permission prompt, a choice, a
 confirmation — tell remotea, and tell it what the answers are. The sidebar then
@@ -103,7 +122,7 @@ have acted on the answer, exactly as you would if the user had typed it:
 wmux report-agent --unblocked
 ```
 
-## Subagents and background tasks
+## Subagents and background tasks (`status` reporting)
 
 Claude Code's own subagents appear under your pane in the sidebar on their
 own. If you run work of your own in the background — a worker, a planner, a

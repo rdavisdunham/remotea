@@ -1,3 +1,4 @@
+import { makeT, LANGUAGES } from '../../src/renderer/i18n/core';
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -253,16 +254,16 @@ describe('safe agent integration defaults', () => {
     }
   });
 
-  it('names every configured agent in the integration toggle, in every locale (#259)', () => {
-    const dir = path.resolve(__dirname, '../../src/renderer/i18n/locales');
-    const locales = fs.readdirSync(dir).filter((f) => f.endsWith('.ts'));
-    expect(locales.length).toBeGreaterThanOrEqual(18);
-    for (const file of locales) {
-      const label = fs.readFileSync(path.join(dir, file), 'utf-8')
-        .split('\n').find((l) => l.includes("'settings.integration.enable'")) ?? '';
-      for (const agent of ['Claude Code', 'OpenCode', 'Kiro', 'omp', 'pi', 'Grok']) {
-        expect(label, `${file} should name ${agent}`).toContain(agent);
+  it('discloses all providers and computer scope in every effective locale', () => {
+    for (const { code } of LANGUAGES) {
+      const t = makeT(code);
+      expect(t('settings.integration.enable')).toContain('this computer');
+      const detail = t('settings.integration.hint');
+      for (const agent of ['Claude Code', 'OpenCode', 'Kiro', 'omp', 'pi', 'Grok', 'Qwen', 'Antigravity']) {
+        expect(detail, `${code} should disclose ${agent}`).toContain(agent);
       }
+      expect(detail).toContain('Eridani MCP');
+      expect(detail).toContain('not a live readiness test');
     }
   });
 });

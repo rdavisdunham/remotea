@@ -241,8 +241,9 @@ export default function WorkspaceContextMenu({
         onMouseLeave={() => setShowStatusSubmenu(false)}
         role="menuitem"
         aria-haspopup="true"
+        title={t('workspace.manualStatusHint')}
       >
-        {t('ctx.status')} ▶
+        {t('workspace.manualStatus')} ▶
         {showStatusSubmenu && (
           <div className="ctx-menu__submenu">
             {statusChoice(t('ctx.statusAuto'), null)}
@@ -262,8 +263,8 @@ export default function WorkspaceContextMenu({
       <div className="ctx-menu__separator" />
 
       {/* Close */}
-      {remote && item('Hide on this device', () => useStore.getState().hideWorkspaceOnDevice(workspaceId))}
-      {item(remote ? 'End sessions on this host…' : t('ctx.close'), () => onCloseWorkspace(workspaceId), true)}
+      {remote && item(t('remote.close.hide'), () => useStore.getState().hideWorkspaceOnDevice(workspaceId))}
+      {item(remote ? t('workspace.endHost') : t('ctx.close'), () => onCloseWorkspace(workspaceId), true)}
       {item(t('ctx.closeOthers'), () => onCloseOthers(workspaceId), true)}
 
       <div className="ctx-menu__separator" />

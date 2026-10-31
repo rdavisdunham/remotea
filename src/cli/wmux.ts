@@ -2606,9 +2606,15 @@ async function main() {
 }
 
 function printUsage() {
-  console.log(`wmux CLI — Windows terminal multiplexer
+  console.log(`remotea desktop CLI — terminals, agents and workspace tools (wmux compatibility command)
 
-Usage: wmux <command> [options]
+Usage: wmux <command> [options]  (desktop package entrypoint: remotea)
+
+Endpoint:   identify, capabilities — inspect before using a command family.
+            Host WMUX_REMOTE may expose only status; ping does not prove desktop control.
+            On a host, remotea is the server administration CLI (remotea --help).
+            Desktop --remote connects a desktop TCP CLI bridge, not a host session server.
+            Local processes end with their window; host sessions detach on desktop close.
 
 System:     ping, identify, capabilities, list-windows, focus-window <id>, new-window
 Links:      open <url>   (open it in the wmux browser panel, per Settings → Browser → Links)
@@ -2617,8 +2623,8 @@ Workspace:  new-workspace, close-workspace, select-workspace, rename-workspace, 
 Remote:     ssh [ssh options] <user@host> [--title T]   (remote terminal in a new workspace)
             bridge [--port P] [--host H] [--wsl]   (expose this remotea's pipe over TCP, default 127.0.0.1:9787)
             token                          (print this instance's auth token, for --token)
-            remote status [--json]         (the phone Remote Console: on/off, where, devices)
-Global:     --remote host[:port] --token <T>   (drive a REMOTE remotea through an SSH tunnel;
+            remote status [--json]         (Phone access / desktop phone console: on/off, where, devices)
+Global:     --remote host[:port] --token <T>   (drive a desktop CLI endpoint through an SSH tunnel;
             env equivalents: WMUX_REMOTE, WMUX_REMOTE_TOKEN)
 Surface:    new-surface [--type T] [--color-scheme NAME], close-surface, focus-surface, list-surfaces
             rename-surface [surfaceId] <title>   (renames the current surface when run inside a pane)

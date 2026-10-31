@@ -1,6 +1,6 @@
 # remotea: read this first
 
-This repository is **remotea**, a fork of [wmux](https://github.com/amirlehmam/wmux) (MIT, by Amir Lehmam). It adds a WSL session server (`remote-server/`, design modeled on [herdr](https://github.com/herdrdev/herdr)) that owns terminals, plus a remote-host backend in the app. Everything below the line is wmux's original development guide, and it still applies to the app.
+This repository is **remotea**, a fork of [wmux](https://github.com/amirlehmam/wmux) (MIT, by Amir Lehmam). It adds a WSL session server (`remote-server/`, design modeled on [herdr](https://github.com/herdrdev/herdr)) that owns terminals, plus a remote-host backend in the app. The guide below preserves wmux's development history and useful implementation conventions. Remotea's preamble and current source take precedence; upstream ownership, release destinations and historical feature claims are not Remotea operating instructions.
 
 remotea-specific pieces:
 
@@ -26,7 +26,17 @@ Identity: the app's pipe, APPDATA dir and AppUserModelId use the base name `remo
 
 ---
 
-# wmux — Development Guide
+# Preserved wmux development guide
+
+Historical upstream material follows. Do not follow its deployment/release instructions
+for Remotea. Current product support, local/host lifecycle and CLI endpoint boundaries
+are documented in [the task guide](docs/remotea/help.md); Remotea releases and support
+belong to `rdavisdunham/remotea`. Internal `WMUX_*`, `window.wmux`, aliases and managed
+block markers remain compatibility contracts. Desktop integration and host setup are
+separate; inspect capabilities before using browser/workspace commands. Eridani MCP
+exists for supported host runs; inherited “No MCP” claims are historical.
+
+## wmux — Development Guide
 
 Electron-based Windows terminal multiplexer for AI agents. TypeScript, React 19, Zustand, xterm.js, node-pty.
 

@@ -48,6 +48,13 @@ describe('hook bridge requests', () => {
     expect((await handleBridgeRequest(deps, { method: 'surface.send_text', params: { surfaceId: SURF, text: 'rm -rf ~' }, token })).error?.code).toBe(-32601);
     expect((await handleBridgeRequest(deps, { method: 'workspace.create', params: { surfaceId: SURF }, token })).error?.code).toBe(-32601);
     expect((await handleBridgeRequest(deps, { method: 'system.identify', id: 3 })).result).toMatchObject({ name: 'remotea' });
+    expect((await handleBridgeRequest(deps, { method: 'system.capabilities' })).result).toEqual({ protocols: ['v2'], features: ['status'] });
+    // Discovery must not imply desktop controls or status-query support.
+    for (const method of ['browser.open', 'markdown.create', 'window.create', 'pane.agent_state']) {
+      expect((await handleBridgeRequest(deps, { method, params: { surfaceId: SURF }, token })).error?.code).toBe(-32601);
+    }
+    expect((await handleBridgeRequest(deps, { method: 'pane.report_agent', params: { surfaceId: SURF, state: 'blocked' }, token })).result).toEqual({ ok: true });
+    expect((await handleBridgeRequest(deps, { method: 'agent.subagent', params: { surfaceId: SURF, id: 'child', done: false }, token })).result).toEqual({ ok: true });
     expect((await handleBridgeRequest(deps, 'nonsense')).error?.code).toBe(-32700);
   });
 

@@ -1,3 +1,4 @@
+import { useT } from '../../i18n';
 import { useState } from 'react';
 import type { HostPendingChanges } from '../../remote-sessions/pending-changes';
 
@@ -10,13 +11,15 @@ export default function RemotePendingChanges({ host, onForget }: {
   host: HostPendingChanges;
   onForget: (hostId: string, iid: string) => Promise<unknown> | void;
 }) {
+  const t = useT();
+  const [result, setResult] = useState<'acknowledged' | 'failed' | 'unconfirmed' | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const total = host.items.length + host.unlisted;
   return (
     <div className="remote-pending" data-host={host.hostId}>
       <div className="remote-pending__title">
-        {total} change{total === 1 ? '' : 's'} made here not yet confirmed by {host.hostName}
-        {host.uncertain ? ` (${host.uncertain} unanswered)` : ''}
+        {t('pending.title').replace('{count}', String(total)).replace('{host}', host.hostName)}
+        {host.uncertain > 0 && ` (${t('pending.unanswered').replace('{count}', String(host.uncertain))})`}
       </div>
       {host.items.map((item) => (
         <div key={item.iid} className="remote-pending__item" data-state={item.state} data-iid={item.iid}>
@@ -26,25 +29,30 @@ export default function RemotePendingChanges({ host, onForget }: {
           </div>
           <button
             className="settings-button"
-            disabled={busy === item.iid}
+            disabled={busy !== null}
             title={item.forgetEffect}
             onClick={async () => {
               setBusy(item.iid);
+              setResult(null);
               try {
-                await onForget(item.hostId, item.iid);
+                const response = await onForget(item.hostId, item.iid);
+                setResult(response === true ? 'acknowledged' : response === false ? 'failed' : 'unconfirmed');
+              } catch {
+                setResult('failed');
               } finally {
                 setBusy(null);
               }
             }}
           >
-            Forget
+            {t('pending.forget.action')}
           </button>
         </div>
       ))}
+      {result && <p role="status" aria-live="polite">{result === 'acknowledged' ? t('pending.result.acknowledged') : result === 'failed' ? t('pending.result.failed') : t('pending.result.unconfirmed')}</p>}
       {host.unlisted > 0 && (
         <div className="remote-pending__item">
           <div className="remote-pending__text remote-pending__status">
-            {host.unlisted} more not itemised by this build; they are sent when the host is reachable.
+            {t('pending.unlisted').replace('{count}', String(host.unlisted))}
           </div>
         </div>
       )}

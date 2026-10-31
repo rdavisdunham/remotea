@@ -1,6 +1,8 @@
+import { useT } from '../i18n';
+import type { TranslationKey } from '../i18n';
 import { useEffect, useRef, useState } from 'react';
 import { useRemoteHosts } from '../remote-sessions/status';
-import { CHOICE_LABEL, type RecoveryChoice, type RecoveryItem } from '../remote-sessions/recovery';
+import { RECOVERY_CHOICE_KEY, recoveryDetail, type RecoveryChoice, type RecoveryItem } from '../remote-sessions/recovery';
 import { applyRecoveryChoice, dismissRecovery, settleRecoveryItem, useRecovery } from '../remote-sessions/recovery-runtime';
 import '../styles/remote-hosts.css';
 
@@ -15,11 +17,11 @@ import '../styles/remote-hosts.css';
  * restores cleanly.
  */
 
-const KIND_LABEL: Record<RecoveryItem['kind'], string> = {
-  exited: 'Exited while away',
-  closed: 'Closed elsewhere',
-  restored: 'Restoring',
-  worktree: 'Unmerged work',
+const KIND_LABEL: Record<RecoveryItem['kind'], TranslationKey> = {
+  exited: 'remote.recovery.kind.exited',
+  closed: 'remote.recovery.kind.closed',
+  restored: 'remote.recovery.kind.restored',
+  worktree: 'remote.recovery.kind.worktree',
 };
 
 export function RecoveryItemRow({ item, hostName, onChoose, busy }: {
@@ -28,14 +30,15 @@ export function RecoveryItemRow({ item, hostName, onChoose, busy }: {
   onChoose: (item: RecoveryItem, choice: RecoveryChoice) => void;
   busy?: boolean;
 }) {
+  const t = useT();
   return (
     <div className="recovery__item" data-kind={item.kind} data-key={item.key}>
       <div className="recovery__head">
-        <span className="recovery__kind">{KIND_LABEL[item.kind]}</span>
+        <span className="recovery__kind">{t(KIND_LABEL[item.kind])}</span>
         <span className="recovery__title">{item.title}</span>
         <span className="recovery__host">{hostName}</span>
       </div>
-      <div className="recovery__detail">{item.detail}</div>
+      <div className="recovery__detail">{recoveryDetail(item, t)}</div>
       {item.branch && <div className="recovery__branch remote-host-code">{item.branch}</div>}
       <div className="recovery__choices">
         {item.choices.map((c, i) => (
@@ -46,7 +49,7 @@ export function RecoveryItemRow({ item, hostName, onChoose, busy }: {
             disabled={busy}
             onClick={() => onChoose(item, c)}
           >
-            {CHOICE_LABEL[c]}
+            {t(RECOVERY_CHOICE_KEY[c])}
           </button>
         ))}
       </div>
@@ -55,6 +58,7 @@ export function RecoveryItemRow({ item, hostName, onChoose, busy }: {
 }
 
 export default function RecoveryDialog() {
+  const t = useT();
   const items = useRecovery((s) => s.items);
   const hosts = useRemoteHosts((s) => s.hosts);
   const [busy, setBusy] = useState<string | null>(null);
@@ -97,24 +101,23 @@ export default function RecoveryDialog() {
         className="confirm-dialog recovery"
         role="dialog"
         aria-modal="true"
-        aria-label="While this device was away"
+        aria-label={t('remote.recovery.title')}
         data-testid="recovery-dialog"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="confirm-dialog__title">While this device was away</div>
+        <div className="confirm-dialog__title">{t('remote.recovery.title')}</div>
         <div className="confirm-dialog__message">
           <p>
-            {items.length} thing{items.length === 1 ? '' : 's'} changed on your remote host{Object.keys(hosts).length === 1 ? '' : 's'}.
-            Nothing below has been reopened or removed: choose for each, or Done to leave them as they are.
+            {t('remote.recovery.hint').replace('{count}', String(items.length))}
           </p>
           {items.map((item) => (
             <RecoveryItemRow key={item.key} item={item} hostName={hosts[item.hostId]?.name ?? item.hostId} onChoose={choose} busy={busy === item.key} />
           ))}
-          {copied && <p className="recovery__copied">Copied {copied}</p>}
+          {copied && <p className="recovery__copied">{t('remote.recovery.copied').replace('{branch}', copied)}</p>}
         </div>
         <div className="confirm-dialog__actions">
           <button ref={doneRef} className="confirm-dialog__btn" onClick={() => dismissRecovery()}>
-            Done
+            {t('remote.done')}
           </button>
         </div>
       </div>

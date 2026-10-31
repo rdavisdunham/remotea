@@ -3,7 +3,7 @@ import { useT } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 
 /**
- * Settings → General → Agent integration (issue #132).
+ * Settings → Agents → Agent integration (issue #132).
  *
  * wmux writes into ~/.claude, ~/.config/opencode and ~/.kiro so coding agents drive
  * its browser panel, markdown views and sidebar. It used to do that silently on
@@ -41,12 +41,12 @@ const FEATURES: Array<{ key: Feature; labelKey: TranslationKey; labelFallback: s
     key: 'hooks',
     labelKey: 'settings.integration.hooks',
     labelFallback: 'Status hooks',
-    pathHint: '~/.claude/settings.json · ~/.pi/agent/extensions/wmux.js · ~/.grok/hooks/wmux.json · ~/.gemini/config/plugins/wmux/ · ~/.qwen/settings.json',
+    pathHint: '~/.claude/settings.json · ~/.omp/agent/extensions/wmux.js · ~/.pi/agent/extensions/wmux.js · ~/.grok/hooks/wmux.json · ~/.gemini/config/plugins/wmux/ · ~/.qwen/settings.json',
   },
   {
     key: 'orchestrator',
     labelKey: 'settings.integration.orchestrator',
-    labelFallback: 'Orchestrator plugin',
+    labelFallback: 'OpenCode status and task plugin',
     // OpenCode only since 2.12.0. The Claude Code plugin this also used to
     // install is deprecated (issue #239) and is uninstalled whichever way this
     // toggle is set, so naming ~/.claude/plugins/ here would promise a write
@@ -57,7 +57,7 @@ const FEATURES: Array<{ key: Feature; labelKey: TranslationKey; labelFallback: s
   {
     key: 'browserMcp',
     labelKey: 'settings.integration.browserMcp',
-    labelFallback: 'Browser panel for MCP',
+    labelFallback: 'Connect agent MCP tools to the desktop browser',
     pathHint: '~/.claude.json · ~/.qwen/settings.json',
   },
 ];
@@ -101,7 +101,7 @@ export default function AgentIntegrationSettings() {
 
       <div className="settings-row">
         <label className="settings-label">
-          {t('settings.integration.enable', 'Let remotea configure Claude Code, OpenCode, Kiro, omp, pi and Grok')}
+          {t('settings.integration.enable', 'Configure coding-agent integrations on this computer')}
         </label>
         <input
           type="checkbox"
