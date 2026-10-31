@@ -3,19 +3,12 @@ import { ShortcutBinding, ShortcutAction } from '../../store/settings-slice';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import { actionLabel } from './KeyboardSettings';
+import { formatAccelerator } from '../../shortcuts';
 import { bindingsEqual } from '../../utils/shortcut-binding';
 import { useKeyCapture } from '../../hooks/useKeyCapture';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function bindingToString(b: ShortcutBinding): string {
-  const parts: string[] = [];
-  if (b.ctrl) parts.push('Ctrl');
-  if (b.alt) parts.push('Alt');
-  if (b.shift) parts.push('Shift');
-  parts.push(b.key);
-  return parts.join('+');
-}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -64,7 +57,7 @@ export default function ShortcutRecorder({ action, binding }: ShortcutRecorderPr
           ? t('settings.shortcutRecorder.pressCombo', 'Press a key combo (Escape to cancel)')
           : t('settings.shortcutRecorder.clickToRecord', 'Click to record a new shortcut')}
       >
-        {recording ? t('settings.shortcutRecorder.pressKeys', 'Press keys...') : bindingToString(binding)}
+        {recording ? t('settings.shortcutRecorder.pressKeys', 'Press keys...') : formatAccelerator(binding)}
       </button>
       {conflict && (
         <span className="shortcut-recorder__conflict">
