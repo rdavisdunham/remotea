@@ -1,3 +1,4 @@
+import { boundedInteger, canAddScheme } from './settings-validation';
 import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
@@ -54,7 +55,7 @@ export default function TerminalSettings() {
 
   const addUserScheme = () => {
     const name = newSchemeName.trim();
-    if (!name) return;
+    if (!canAddScheme(name, allSchemes)) return;
     setTerminalPrefs({
       userColorSchemes: {
         ...terminalPrefs.userColorSchemes,
@@ -274,7 +275,7 @@ export default function TerminalSettings() {
           value={terminalPrefs.fontSize}
           min={8}
           max={72}
-          onChange={(e) => setTerminalPrefs({ fontSize: Number(e.target.value) })}
+          onChange={(e) => setTerminalPrefs({ fontSize: boundedInteger(e.target.value, 8, 72) })}
         />
       </div>
 
@@ -370,7 +371,7 @@ export default function TerminalSettings() {
           onChange={(e) => setNewSchemeName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') addUserScheme(); }}
         />
-        <button className="settings-btn settings-btn--secondary" onClick={addUserScheme}>{t('settings.terminalPanel.addScheme', 'Add scheme')}</button>
+        <button className="settings-btn settings-btn--secondary" disabled={!canAddScheme(newSchemeName, allSchemes)} onClick={addUserScheme}>{t('settings.terminalPanel.addScheme', 'Add scheme')}</button>
       </div>
 
       <div className="settings-divider" />
@@ -496,7 +497,7 @@ export default function TerminalSettings() {
           min={100}
           max={100000}
           step={100}
-          onChange={(e) => setTerminalPrefs({ scrollbackLines: Number(e.target.value) })}
+          onChange={(e) => setTerminalPrefs({ scrollbackLines: boundedInteger(e.target.value, 100, 100000) })}
         />
       </div>
 

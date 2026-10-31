@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
-import { ShortcutAction, ShortcutBinding } from '../../store/settings-slice';
+import { DEFAULT_KEYBOARD_PREFS, ShortcutAction, ShortcutBinding } from '../../store/settings-slice';
 import ShortcutRecorder from './ShortcutRecorder';
 import { actionLabel, CATEGORY_LABEL_KEY, CATEGORY_ORDER, formatAccelerator, SHORTCUT_TABLE, type ShortcutCategory } from '../../shortcuts';
 import ShortcutFilterCapture from './ShortcutFilterCapture';
@@ -195,7 +195,13 @@ export default function KeyboardSettings() {
       </p>
 
       <div className="shortcut-footer">
-        <button className="settings-btn settings-btn--danger" onClick={resetShortcuts}>
+        <button
+          className="settings-btn settings-btn--danger"
+          onClick={() => {
+            resetShortcuts();
+            setKeyboardPrefs(DEFAULT_KEYBOARD_PREFS);
+          }}
+        >
           {t('settings.keyboard.resetAll', 'Reset All')}
         </button>
       </div>
