@@ -334,7 +334,7 @@ describe('remotea eridani setup', () => {
     const w = world(['codex']);
     const code = encodeSetupCode({ url: 'https://eridani.example', link_key: LINK_KEY, mcp_key: MCP_KEY });
     const asked: string[] = [];
-    const answers: Record<string, string> = { id: 'myproj', 'verify command (Enter for none)': 'npm run check' };
+    const answers: Record<string, string> = { id: 'myproj', 'verify command (Enter for none)': 'npm run check', 'verify command (Enter keeps it, - for none)': 'npm run check' };
     const prompt = {
       interactive: true,
       text: async (q: string, d?: string) => {
@@ -358,6 +358,30 @@ describe('remotea eridani setup', () => {
     expect(fs.readFileSync(path.join(w.home, '.codex', 'config.toml'), 'utf8')).toContain('[mcp_servers.eridani]');
     expect(r.changed.length).toBeGreaterThan(3);
     if (process.env.SHOW_SETUP_OUTPUT) fs.writeFileSync(process.env.SHOW_SETUP_OUTPUT, w.out.text());
+  });
+
+  it('interactive: Enter keeps a detected verify command, "-" leaves the target without one', async () => {
+    for (const [answer, expected] of [['', 'kept'], ['-', 'none']] as const) {
+      const w = world(['codex']);
+      fs.writeFileSync(path.join(w.repo, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }));
+      const code = encodeSetupCode({ url: 'https://eridani.example', link_key: LINK_KEY, mcp_key: MCP_KEY });
+      const labels: string[] = [];
+      const prompt = {
+        interactive: true,
+        text: async (q: string, d?: string) => {
+          if (/verify command/.test(q)) { labels.push(q.trim()); return answer || (d ?? ''); }
+          return d ?? '';
+        },
+        secret: async (q: string) => (/Setup code/.test(q) ? code : ''),
+        confirm: async () => true,
+      };
+      await runSetup(parseSetupArgs(['--scan', path.join(w.root, 'work')]), w.deps({ prompt }));
+      const [t] = loadTargets(w.dir);
+      if (expected === 'kept') {
+        expect(labels).toEqual(['verify command (Enter keeps it, - for none)']);
+        expect(t.verify.length).toBe(1);
+      } else expect(t.verify).toEqual([]);
+    }
   });
 
   it('dry run: shows what would change and writes nothing', async () => {
