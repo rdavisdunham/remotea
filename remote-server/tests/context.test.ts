@@ -22,7 +22,7 @@ describe('context', () => {
     const { s, sent } = svc(async () => ({ text: 'You are working on task 9.\n', run_token: 'fresh-token' }));
     const out = await s.sessionStart('surf-1', { sessionId: 'sess-1', source: 'startup' });
     expect(sent[0]).toMatchObject({ t: 'context.request', surf: 'surf-1', incarnation: 2, provider: 'claude', provider_session_id: 'sess-1', source: 'startup', cwd: '/w/sub', run_id: 'run-1', generation: 3, task_id: 'task-9' });
-    expect(out).toBe('You are working on task 9.\n\nEridani run token: fresh-token (pass it as run_token to Eridani\'s task tools)\n');
+    expect(out).toContain('You are working on task 9.\n\nEridani run token: fresh-token (pass it as run_token to Eridani\'s task tools)\n');
   });
 
   it('no answer in time: one identifying line, with the spawn\'s token', async () => {
@@ -30,6 +30,8 @@ describe('context', () => {
     const out = await s.sessionStart('surf-1', { sessionId: 'sess-1', provider: 'codex' });
     expect(out).toContain('remotea: this is codex_cli session sess-1 on surf-1, Eridani run run-1 (generation 3).');
     expect(out).toContain('Eridani run token: spawn-token');
+    expect(out).toContain('status-only bridge does not expose desktop browser or workspace control');
+    expect(out).toContain('do not establish Eridani verification or task acceptance');
   });
 
   it('prints nothing when the link is off, for a subagent, or for an unknown surface', async () => {

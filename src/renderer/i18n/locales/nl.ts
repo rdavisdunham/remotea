@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const nl: Translation = {
+  "settings.tab.remote": "Telefoontoegang",
   'settings.title': 'Instellingen',
   'settings.tab.general': 'Algemeen',
   'settings.tab.sidebar': 'Zijbalk',
@@ -12,7 +13,6 @@ export const nl: Translation = {
   'settings.tab.terminal': 'Terminal',
   'settings.tab.notifications': 'Meldingen',
   'settings.tab.browser': 'Browser',
-  'settings.tab.profiles': 'Profielen',
   'settings.tab.shortcuts': 'Sneltoetsen',
   'settings.general.languageSection': 'Taal',
   'settings.general.language': 'Interfacetaal',
@@ -70,8 +70,6 @@ export const nl: Translation = {
   'settings.help.updateTo': 'Bijwerken naar',
   'settings.help.upToDate': 'Up-to-date',
   'settings.help.downloading': 'Downloaden',
-  'settings.help.reportIssue': 'Een probleem melden',
-  'settings.help.website': 'Website',
   'settings.help.hint': 'Een bug gevonden of een verzoek? Open een issue op GitHub.',
   'ctx.pin': 'Werkruimte vastzetten',
   'ctx.unpin': 'Werkruimte losmaken',
@@ -163,26 +161,13 @@ export const nl: Translation = {
   'tutorial.next': 'Volgende',
   'tutorial.getStarted': 'Aan de slag',
   'tutorial.step.welcome.title': 'Welkom bij remotea',
-  'tutorial.step.welcome.body':
-    'remotea is een terminal-multiplexer voor het parallel uitvoeren van AI-codeeragenten. Deze korte rondleiding laat de basis zien.',
   'tutorial.step.workspaces.title': 'Werkruimtes',
-  'tutorial.step.workspaces.body':
-    'De zijbalk links toont je werkruimtes. Elke werkruimte is een onafhankelijke sessie met een eigen terminalindeling. Maak nieuwe aan met Ctrl+N. Dubbelklik op een werkruimtetitel om deze te hernoemen.',
   'tutorial.step.splitPanes.title': 'Gesplitste panelen',
-  'tutorial.step.splitPanes.body':
-    'Splits je terminals horizontaal of verticaal. Elk paneel voert een eigen shell uit. Sleep scheidingslijnen om de grootte aan te passen. Vergroot elk paneel naar volledig scherm met Ctrl+Shift+Enter.',
-  'tutorial.step.surfaceTabs.title': 'Tabbladen',
   'tutorial.step.surfaceTabs.body':
     'Elk paneel kan meerdere tabbladen hebben — terminals, browserpanelen of markdown-weergaven. Sleep tabbladen tussen panelen om ze te reorganiseren. Maak nieuwe tabbladen met Ctrl+T.',
   'tutorial.step.browserPanel.title': 'Browserpaneel',
-  'tutorial.step.browserPanel.body':
-    'Het browserpaneel rechts laat je zien wat je agenten bouwen. Schakel het in of uit met Ctrl+Shift+I. Navigeer naar localhost of elke andere URL. De browser is scriptbaar via de socket-API.',
   'tutorial.step.notifications.title': 'Meldingen',
-  'tutorial.step.notifications.body':
-    'Wanneer een agent je aandacht nodig heeft, krijgt zijn paneel een blauwe ring en loopt de badge van de werkruimte op. Er verschijnt ook een Windows-toastmelding. Spring naar de nieuwste ongelezen melding met Ctrl+Shift+U.',
   'tutorial.step.allSet.title': 'Helemaal klaar',
-  'tutorial.step.allSet.body':
-    'Je kunt deze gids altijd opnieuw openen via de helpknop (?) in de titelbalk. Voor alle sneltoetsen: open Instellingen met Ctrl+, of het Opdrachtenpalet met Ctrl+Shift+P.',
   // Zijbalk — werkruimterij: activiteitslabels per tool
   'workspaceRow.tool.bash': 'Opdracht wordt uitgevoerd...',
   'workspaceRow.tool.read': 'Bestand wordt gelezen...',
@@ -214,20 +199,13 @@ export const nl: Translation = {
   'workspaceRow.working': 'Bezig…',
   // Zijbalk — chrome
   'sidebar.collapse': 'Zijbalk inklappen (Ctrl+B)',
-  'sidebar.saveSession': 'Sessie opslaan',
-  'sidebar.loadSession': 'Sessie laden',
   'sidebar.newWorkspace': 'Nieuwe werkruimte',
   // Zijbalk — sessiemenu (opslaan/laden)
   'sessionMenu.justNow': 'zojuist',
   'sessionMenu.minutesAgo': '{count}m geleden',
   'sessionMenu.hoursAgo': '{count}u geleden',
   'sessionMenu.daysAgo': '{count}d geleden',
-  'sessionMenu.newSessionName': 'Naam van nieuwe sessie...',
-  'sessionMenu.noSavedSessions': 'Geen opgeslagen sessies',
-  'sessionMenu.overwriteExisting': 'Of overschrijf een bestaande sessie:',
   'sessionMenu.overwrite': 'Overschrijf "{name}"',
-  'sessionMenu.load': 'Laad "{name}"',
-  'sessionMenu.deleteSession': 'Sessie verwijderen',
   // Instellingen — browserpaneel
   'settings.browser.searchSection': 'Zoeken',
   'settings.browser.defaultSearchEngine': 'Standaardzoekmachine',
@@ -443,10 +421,6 @@ export const nl: Translation = {
   'settings.workspacePanel.placement.top': 'Boven',
   'settings.workspacePanel.placement.end': 'Einde',
   'settings.workspacePanel.autoReorder': 'Automatisch herordenen bij melding',
-  'settings.workspacePanel.showWelcomeScreen': 'Welkomstscherm tonen bij opstarten',
-  'settings.workspacePanel.confirmClose': 'Bevestigen voordat een sessie wordt gesloten',
-  'settings.workspacePanel.confirmCloseHint':
-    'Vraagt om bevestiging voordat de ×-knop, het contextmenu of Ctrl+Shift+W een sessie sluit — een verdwaalde klik kan geen agenten platleggen die hun status nog niet hebben opgeslagen. Sluiten vanuit de CLI en door agenten vraagt nooit om bevestiging.',
   'settings.workspacePanel.restoreClaudeSessions': 'Claude Code-sessies hervatten bij herstel',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'Wanneer remotea een sessie herstelt, wordt elke terminal waarin Claude Code draaide opnieuw gestart met `claude --resume`, in de map waar hij stond. Standaard uit: al die vensters starten in één keer een agent. Vensters waarvan Claude het gesprek niet meer heeft worden overgeslagen, en een Claude die je netjes hebt afgesloten wordt niet hervat.',
   'settings.workspacePanel.autoOpenDiff': 'Diff-tabblad automatisch openen bij bewerkingen door agent',
@@ -462,7 +436,6 @@ export const nl: Translation = {
   // Zijbalk — orkestratiepaneel
   'orchestrationPanel.expand': 'Orkestratie uitklappen',
   'orchestrationPanel.collapse': 'Orkestratie inklappen',
-  'orchestrationPanel.title': 'orkestratie',
   'orchestrationPanel.reviewer': 'reviewer',
   'orchestrationPanel.dismiss': 'sluiten',
   'orchestrationPanel.waiting': 'wachten',
@@ -578,18 +551,12 @@ export const nl: Translation = {
   'surfaceTab.profileBadge': 'project',
   // Instellingen — toestemming voor agentintegratie (issue #132)
   'settings.integration.section': 'Agentintegratie',
-  'settings.integration.enable': 'remotea toestaan om Claude Code, OpenCode, Kiro, omp, pi en Grok te configureren',
-  'settings.integration.hint':
-    'remotea bewerkt bestanden in je thuismap zodat codeeragenten het browserpaneel, de markdown-weergaven en de zijbalkstatus kunnen aansturen. Iets hier uitschakelen verwijdert ook wat het heeft geschreven.',
   'settings.integration.instructions': 'Instructies voor agenten',
   'settings.integration.hooks': 'Statushooks',
-  'settings.integration.orchestrator': 'Orchestrator-plugin',
-  'settings.integration.browserMcp': 'Browserpaneel voor MCP',
   // Zijbalk — een geblokkeerde agent beantwoorden zonder naar diens paneel te schakelen (issue #128)
   'workspaceRow.answerSent': 'Verzonden — wachten…',
   'workspaceRow.answerTitle': 'Antwoorden zonder naar dit paneel te schakelen',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'Op afstand',
   'settings.remote.title': 'Externe console',
   'settings.remote.hint': 'Volg je agents en beantwoord ze vanuit de browser van een telefoon. Standaard uit: er luistert niets totdat je het hier inschakelt.',
   'settings.remote.loading': 'Laden…',

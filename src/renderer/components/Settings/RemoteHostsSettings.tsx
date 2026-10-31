@@ -1,9 +1,10 @@
+import { useT } from '../../i18n';
 import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { refreshRemoteHosts, startRemoteHostStatus, useRemoteHosts } from '../../remote-sessions/status';
 import { parseRemoteShellSpec, remoteShellSpec } from '../../../shared/remote-shell-spec';
 import type { HostDTO, HostSaveRequest, HostStatus, HostTestRequest, HostTestResult, RemoteRegistryView } from '../../../shared/remote-hosts-types';
-import { classifyHostUrl, hostUrlHint, UNENCRYPTED_ACK_LABEL } from '../../../shared/host-url';
+import { classifyHostUrl } from '../../../shared/host-url';
 import { closeRemoteSession, unhideRemoteSession } from '../../remote-sessions/sync';
 import RemoteHostHealth from './RemoteHostHealth';
 import RemotePendingChanges from './RemotePendingChanges';
@@ -80,21 +81,24 @@ const EMPTY: Draft = { name: '', url: 'ws://', token: '', enabled: true, ackUnen
  * disabled until it is ticked (main enforces the same).
  */
 export function HostUrlGuidance({ url, acknowledged, onAcknowledge }: { url: string; acknowledged: boolean; onAcknowledge: (v: boolean) => void }) {
+  const t = useT();
   const c = classifyHostUrl(url);
-  if (!c) return <p className="remote-host-url-hint">Expected wss://host:7717, or ws:// to a Tailscale name (*.ts.net) or 100.x address.</p>;
-  if (!c.needsAck) return <p className="remote-host-url-hint">{hostUrlHint(c)}</p>;
+  if (!c) return <p className="remote-host-url-hint">{t('remote.host.urlExpected')}</p>;
+  const hint = c.kind === 'loopback' ? t('remote.host.urlLoopback') : c.kind === 'tailscale' ? t('remote.host.urlTailscale') : c.kind === 'tls' ? t('remote.host.urlTls') : t('remote.host.urlPlain').replace('{host}', c.host);
+  if (!c.needsAck) return <p className="remote-host-url-hint">{hint}</p>;
   return (
     <div className="remote-host-warning" role="alert">
-      {hostUrlHint(c)}
+      {hint}
       <label>
         <input type="checkbox" checked={acknowledged} onChange={(e) => onAcknowledge(e.target.checked)} />
-        {UNENCRYPTED_ACK_LABEL}
+        {t('remote.host.urlAck')}
       </label>
     </div>
   );
 }
 
 function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: boolean; onDone: () => void }) {
+  const t = useT();
   const [draft, setDraft] = useState<Draft>(initial);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -109,8 +113,8 @@ function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: b
     const res = await b.test({ url: draft.url, token: draft.token || undefined, id: draft.id, acknowledgeUnencrypted: draft.ackUnencrypted || undefined });
     setBusy(false);
     setMessage(res.ok
-      ? { ok: true, text: `Connected to ${res.serverHostname ?? 'the server'}: ${res.sessions ?? 0} session(s) running.` }
-      : { ok: false, text: res.error ?? 'Failed' });
+      ? { ok: true, text: t('remote.host.testSuccess').replace('{host}', res.serverHostname ?? draft.url).replace('{count}', String(res.sessions ?? 0)) }
+      : { ok: false, text: res.error ?? t('remote.host.testFailed') });
   };
 
   const save = async () => {
@@ -123,7 +127,7 @@ function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: b
     });
     setBusy(false);
     if (!res.ok) {
-      setMessage({ ok: false, text: res.error ?? 'Could not save' });
+      setMessage({ ok: false, text: res.error ?? t('remote.host.saveFailed') });
       return;
     }
     await refreshRemoteHosts();
@@ -133,40 +137,41 @@ function HostEditor({ initial, hasToken, onDone }: { initial: Draft; hasToken: b
   return (
     <div className="remote-host-card">
       <div className="settings-row">
-        <label className="settings-label">Name</label>
-        <input className="settings-input" value={draft.name} placeholder="Desktop" spellCheck={false}
+        <label className="settings-label">{t('remote.host.name')}</label>
+        <input className="settings-input" value={draft.name} placeholder={t('remote.host.namePlaceholder')} spellCheck={false}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       </div>
       <div className="settings-row">
-        <label className="settings-label">URL</label>
+        <label className="settings-label">{t('remote.host.url')}</label>
         <input className="settings-input" value={draft.url} placeholder="ws://my-desktop.tailnet-name.ts.net:7717" spellCheck={false}
           onChange={(e) => setDraft({ ...draft, url: e.target.value, ackUnencrypted: e.target.value === initial.url ? initial.ackUnencrypted : false })} />
       </div>
       <HostUrlGuidance url={draft.url} acknowledged={draft.ackUnencrypted}
         onAcknowledge={(v) => setDraft({ ...draft, ackUnencrypted: v })} />
       <div className="settings-row">
-        <label className="settings-label">Token</label>
+        <label className="settings-label">{t('remote.host.token')}</label>
         <input className="settings-input" type="password" value={draft.token} autoComplete="off" spellCheck={false}
-          placeholder={hasToken ? '•••••••• stored (leave empty to keep)' : 'paste the output of `remotea token`'}
+          placeholder={hasToken ? t('remote.host.storedToken') : t('remote.host.pasteToken')}
           onChange={(e) => setDraft({ ...draft, token: e.target.value })} />
       </div>
       <div className="settings-row">
-        <label className="settings-label">Enabled</label>
+        <label className="settings-label">{t('remote.host.enabled')}</label>
         <input type="checkbox" className="settings-toggle" checked={draft.enabled}
           onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
       </div>
       <div className="remote-host-actions">
-        <button className="settings-button" disabled={busy || !draft.url || ackMissing} onClick={test}>Test</button>
-        <button className="settings-button" disabled={busy || !draft.name.trim() || !draft.url || ackMissing} onClick={save}>Save</button>
-        <button className="settings-button" disabled={busy} onClick={onDone}>Cancel</button>
+        <button className="settings-button" disabled={busy || !draft.url || ackMissing} onClick={test}>{t('remote.host.test')}</button>
+        <button className="settings-button" disabled={busy || !draft.name.trim() || !draft.url || ackMissing} onClick={save}>{t('remote.host.save')}</button>
+        <button className="settings-button" disabled={busy} onClick={onDone}>{t('remote.host.cancel')}</button>
       </div>
       {message && <div className={`remote-host-message remote-host-message--${message.ok ? 'ok' : 'error'}`}>{message.text}</div>}
     </div>
   );
 }
 
-/** Sessions this device chose to hide: still running, still on other devices. */
+/** Host records hidden on this device; records can be exited or stale while offline. */
 function HiddenSessions() {
+  const t = useT();
   const [views, setViews] = useState<RemoteRegistryView[]>([]);
   const load = async () => {
     const api = (window as unknown as { wmux?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).wmux?.remoteSessions;
@@ -184,20 +189,20 @@ function HiddenSessions() {
   return (
     <>
       <div className="settings-divider" />
-      <h3 className="settings-section-title">Hidden on this device</h3>
-      <p className="settings-hint">Still running, and still open on your other devices.</p>
+      <h3 className="settings-section-title">{t('remote.host.hidden')}</h3>
+      <p className="settings-hint">{t('remote.host.hiddenHint')}</p>
       {rows.map(({ hostId, session, group }) => (
         <div key={session.id} className="settings-row">
           <label className="settings-label">
             {session.title || session.agent?.provider || session.cmd || 'shell'}
-            <span className="remote-host-card__url"> · {group ?? 'Inbox'} · {session.lastCwd ?? session.cwd}</span>
+            <span className="remote-host-card__url"> · {group ?? t('remote.host.inbox')} · {session.lastCwd ?? session.cwd}</span>
           </label>
-          <button className="settings-button" onClick={() => { unhideRemoteSession(hostId, session.id); setTimeout(() => void load(), 400); }}>Show here</button>
+          <button className="settings-button" onClick={() => { unhideRemoteSession(hostId, session.id); setTimeout(() => void load(), 400); }}>{t('remote.host.show')}</button>
           <button className="settings-button" onClick={() => {
-            if (!window.confirm('Close this session on every device? Its process ends.')) return;
+            if (!window.confirm(t('remote.host.endConfirm'))) return;
             closeRemoteSession(hostId, session.id);
             setTimeout(() => void load(), 400);
-          }}>Close everywhere</button>
+          }}>{t('remote.host.end')}</button>
         </div>
       ))}
     </>
@@ -205,6 +210,7 @@ function HiddenSessions() {
 }
 
 export default function RemoteHostsSettings() {
+  const t = useT();
   useEffect(() => {
     startRemoteHostStatus();
     void refreshRemoteHosts();
@@ -221,7 +227,7 @@ export default function RemoteHostsSettings() {
   const defaultHost = parseRemoteShellSpec(workspacePrefs.defaultShell)?.hostId;
 
   const remove = async (id: string) => {
-    if (!window.confirm('Remove this host? Its sessions keep running on the server; open tabs here stop updating.')) return;
+    if (!window.confirm(t('remote.host.removeConfirm'))) return;
     await bridge()?.remove(id);
     if (defaultHost === id) setWorkspacePrefs({ defaultShell: '' });
     await refreshRemoteHosts();
@@ -229,15 +235,12 @@ export default function RemoteHostsSettings() {
 
   return (
     <div className="settings-section">
-      <h3 className="settings-section-title">Remote hosts</h3>
+      <h3 className="settings-section-title">{t('settings.tab.hosts')}</h3>
       <p className="settings-hint">
-        Terminals on a remote host run on that machine&apos;s remotea server, so they keep running while this computer
-        sleeps, loses Wi-Fi or quits. Every device connected to the same server sees the same sessions;
-        each device keeps its own layout.
+        {t('remote.host.lifetime')}
       </p>
       <p className="settings-hint">
-        Server setup (in WSL on the host): <span className="remote-host-code">remote-server/scripts/install.sh</span>,
-        then copy the URL and the output of <span className="remote-host-code">remotea token</span> here.
+        {t('remote.host.setup')}
       </p>
 
       {list.map((h) => {
@@ -264,23 +267,23 @@ export default function RemoteHostsSettings() {
             )}
             {!!status[h.id]?.outbox?.failed.length && (
               <div className="remote-host-message remote-host-message--error">
-                Not applied on this host:{' '}
+                {t('remote.host.notApplied')}{' '}
                 {status[h.id]!.outbox!.failed.map((f) => `${OUTBOX_LABEL[f.t]} ${f.id} (${f.state === 'expired' ? 'gave up' : f.error ?? 'refused'})`).join('; ')}
                 {' '}
-                <button className="settings-button" onClick={() => bridge()?.dismissOutboxFailures?.(h.id)}>Dismiss</button>
+                <button className="settings-button" onClick={() => bridge()?.dismissOutboxFailures?.(h.id)}>{t('remote.host.dismiss')}</button>
               </div>
             )}
             <div className="settings-row">
-              <label className="settings-label">New terminals open here by default</label>
+              <label className="settings-label">{t('remote.host.default')}</label>
               <input type="checkbox" className="settings-toggle" checked={defaultHost === h.id}
                 onChange={(e) => setWorkspacePrefs({ defaultShell: e.target.checked ? remoteShellSpec(h.id) : '' })} />
             </div>
             <div className="remote-host-actions">
-              <button className="settings-button" onClick={() => setEditing(h.id)}>Edit</button>
-              <button className="settings-button" onClick={() => void remove(h.id)}>Remove</button>
+              <button className="settings-button" onClick={() => setEditing(h.id)}>{t('remote.host.edit')}</button>
+              <button className="settings-button" onClick={() => void remove(h.id)}>{t('remote.host.remove')}</button>
             </div>
             <p className="settings-hint">
-              Shell spec for profiles and workspaces: <span className="remote-host-code">{remoteShellSpec(h.id)}</span>
+              {t('remote.host.shellSpec')}{' '}<span className="remote-host-code">{remoteShellSpec(h.id)}</span>
               {' '}or <span className="remote-host-code">{remoteShellSpec(h.id, 'claude')}</span>
             </p>
           </div>
@@ -289,21 +292,21 @@ export default function RemoteHostsSettings() {
 
       {editing === 'new'
         ? <HostEditor initial={EMPTY} hasToken={false} onDone={() => setEditing(null)} />
-        : <button className="settings-button" onClick={() => setEditing('new')}>Add remote host</button>}
+        : <button className="settings-button" onClick={() => setEditing('new')}>{t('remote.host.add')}</button>}
       <div className="settings-divider" />
-      <h3 className="settings-section-title">Eridani runs and recovery</h3>
+      <h3 className="settings-section-title">{t('remote.host.eridani')}</h3>
       <div className="settings-row">
         <label className="settings-label" htmlFor="remote-group-eridani">
-          Group Eridani runs by repository and task
-          <span className="settings-hint"> A workspace per task, under its execution target in the sidebar, with the run&apos;s state. Off: they share the host&apos;s &quot;Eridani&quot; workspace. Manual sessions are never moved.</span>
+          {t('remote.host.group')}
+          <span className="settings-hint">{t('remote.host.groupHint')}</span>
         </label>
         <input id="remote-group-eridani" type="checkbox" className="settings-toggle" checked={workspacePrefs.groupEridaniRuns !== false}
           onChange={(e) => setWorkspacePrefs({ groupEridaniRuns: e.target.checked })} />
       </div>
       <div className="settings-row">
         <label className="settings-label" htmlFor="remote-recovery-skip-clean">
-          Skip the recovery dialog when everything restores cleanly
-          <span className="settings-hint"> After a start or a reconnect, ask only about terminals that exited or were closed while away and worktrees with unmerged work.</span>
+          {t('remote.host.skipRecovery')}
+          <span className="settings-hint">{t('remote.host.skipRecoveryHint')}</span>
         </label>
         <input id="remote-recovery-skip-clean" type="checkbox" className="settings-toggle" checked={workspacePrefs.recoverySkipClean !== false}
           onChange={(e) => setWorkspacePrefs({ recoverySkipClean: e.target.checked })} />

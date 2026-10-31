@@ -1,6 +1,21 @@
 # remotea
 
-**Persistent remote terminals for AI coding agents.** A Windows GUI for organizing agents, attached to a session server in WSL that keeps every terminal alive, even when the laptop you're working from goes to sleep.
+Remotea organizes terminals, coding agents and project tools in one Windows desktop
+app. Work locally without a host, or connect to a Linux/WSL Remotea host for
+server-owned terminals. A supported host can optionally link to Eridani for task
+and run coordination. [Task-based help](docs/remotea/help.md) explains lifecycle,
+capabilities, phone access and CLI endpoint discovery.
+
+**Process ownership matters:** local terminals end with their owning desktop
+window. Host terminals detach when the desktop closes and can continue while the
+host and service stay available. A disconnected client cannot verify their status.
+WSL on the same physical PC is still a host; PC sleep/shutdown can stop it.
+Workspace snapshots save this window's arrangements and terminal preferences,
+not process memory. Native Windows Eridani execution and macOS support are future
+work, not enabled by this UI.
+
+
+**Optional persistent host terminals.** The WSL session server owns host processes while the desktop provides their views; continuation requires the host and service to remain available.
 
 > remotea = the **wmux** desktop app + a **herdr**-style session server. See [CREDITS.md](CREDITS.md).
 
@@ -19,7 +34,7 @@ Laptop (Windows)                          Desktop
 
 SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the session dies, and you have to find it and restart it. herdr fixes the persistence but is a TUI. wmux has a rich Windows GUI but only runs local terminals. remotea combines them.
 
-- **Terminals live on the server.** Closing the lid, losing Wi-Fi, or quitting the app only *detaches*. Agents keep running in WSL.
+- **Terminals live on the server.** Closing the desktop or losing its connection *detaches host terminals*. They can continue while the host and service stay available; offline status is unknown. Local desktop terminals end with their owning window.
 - **Automatic reconnect.** On wake (`powerMonitor` resume), after a dropped connection (heartbeat), or on relaunch, every pane reattaches. Short gaps replay only the bytes you missed; long ones get a full screen and scrollback snapshot.
 - **Shared sessions, per-device layout.**
   - Sessions and workspaces (name and color) are shared by every device: a terminal opened on the desktop shows up on the laptop in the same workspace.
@@ -27,7 +42,7 @@ SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the s
   - **End sessions on this host** closes a session (or a whole workspace's sessions) everywhere. It always asks first, and lists what it would stop.
   - **Hide on this device** removes it from one machine only.
 - **Survives server restarts, partly.** If WSL restarts, the processes are gone, but sessions come back in their saved directories, and Claude Code sessions are resumed (`claude --resume <id>`). With the PTY keeper on (`"ptyKeeper": true`, below), restarting or upgrading the server itself keeps every process running.
-- **Everything wmux does** still works for remote panes: xterm scrollback and search, notifications, cwd tracking, and agent-state detection. The server streams raw PTY bytes, not repainted frames.
+- **Terminal display features** remain available for host panes: xterm scrollback and search, notifications, cwd tracking, and agent-state detection. The server streams raw PTY bytes, not repainted frames.
 
 ## Layout
 
@@ -102,7 +117,7 @@ remotea uses its own named pipe and app-data folder (`%APPDATA%\remotea`), so it
 - **Sleep, Wi-Fi loss, quitting the app.** Panes show "Reconnecting…" and catch up on their own; nothing you type while disconnected is sent later. Quitting detaches the sessions, and reopening the app reattaches them.
 - **A second device.** Every session shows up there in the same workspace (name and colour are shared). Arrange it however suits that screen; layouts are never synced.
 - **Closing.** Closing a remote tab, pane or workspace (×, Ctrl+W, Ctrl+Shift+W, the context menu) always asks, whatever the "Confirm before closing a session" setting says. The dialog offers two commands:
-  - **Hide on this device** removes it from this device only. The sessions keep running and stay on your other devices. Bring them back from Settings → Remote hosts → Hidden on this device. Also on the tab and workspace right-click menus.
+  - **Hide on this device** removes it from this device only. This does not request process termination; host sessions remain available while the host and service run. Offline process status is unknown. Bring hidden views back from Settings → Remote hosts → Hidden on this device. Also on the tab and workspace right-click menus.
   - **End sessions on this host** stops them on every device. For a workspace that means its whole shared group, including sessions hidden on this device and Eridani agent runs. The dialog lists the host, how many sessions are active, how many are hidden here, and the Eridani tasks and runs among them. When the host is offline, it says the counts may be stale.
   - Closes from the CLI or agents (`wmux close-workspace`) do not ask. Quitting the app only detaches.
 - **Pasting and dropping files.** A screenshot pasted into a remote pane, or files dropped on it, are uploaded to the host and their paths there are typed in, so the agent in that pane can open them. They land in a private `/tmp/remotea-drop-…/` folder (200 MiB per file). All of them together are held to a budget, `uploadBudgetMiB` in `config.json` (default 2048, i.e. 2 GiB), and an age, `uploadMaxAgeDays` (default 7): the server removes expired files and then the oldest until a new upload fits, but never one of a live session's most recent drops (they also keep 10 minutes of grace after the upload and after the session ends). When the budget is held by such files, the upload is refused with "upload budget full …". `remotea status` shows the usage (`uploads {bytes, files, budget, …}` in `--json`, also written to `~/.config/remotea/uploads-status.json`), with a degraded note when the temp filesystem is under 5% free. A changed setting applies on the next server start.

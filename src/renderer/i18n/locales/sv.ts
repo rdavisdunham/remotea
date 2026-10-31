@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const sv: Translation = {
+  "settings.tab.remote": "Telefonåtkomst",
   'settings.title': 'Inställningar',
   'settings.tab.general': 'Allmänt',
   'settings.tab.sidebar': 'Sidopanel',
@@ -12,7 +13,6 @@ export const sv: Translation = {
   'settings.tab.terminal': 'Terminal',
   'settings.tab.notifications': 'Aviseringar',
   'settings.tab.browser': 'Webbläsare',
-  'settings.tab.profiles': 'Profiler',
   'settings.tab.shortcuts': 'Genvägar',
   'settings.general.languageSection': 'Språk',
   'settings.general.language': 'Gränssnittsspråk',
@@ -70,8 +70,6 @@ export const sv: Translation = {
   'settings.help.updateTo': 'Uppdatera till',
   'settings.help.upToDate': 'Uppdaterad',
   'settings.help.downloading': 'Laddar ner',
-  'settings.help.reportIssue': 'Rapportera ett problem',
-  'settings.help.website': 'Webbplats',
   'settings.help.hint': 'Hittade du en bugg eller har en önskan? Öppna ett ärende på GitHub.',
   'ctx.pin': 'Fäst arbetsytan',
   'ctx.unpin': 'Lossa arbetsytan',
@@ -163,26 +161,13 @@ export const sv: Translation = {
   'tutorial.next': 'Nästa',
   'tutorial.getStarted': 'Kom igång',
   'tutorial.step.welcome.title': 'Välkommen till remotea',
-  'tutorial.step.welcome.body':
-    'remotea är en terminalmultiplexer för att köra AI-kodningsagenter parallellt. Den här korta rundturen visar det viktigaste.',
   'tutorial.step.workspaces.title': 'Arbetsytor',
-  'tutorial.step.workspaces.body':
-    'Sidopanelen till vänster visar dina arbetsytor. Varje arbetsyta är en oberoende session med sin egen terminallayout. Skapa nya med Ctrl+N. Dubbelklicka på en arbetsytas titel för att byta namn.',
   'tutorial.step.splitPanes.title': 'Delade rutor',
-  'tutorial.step.splitPanes.body':
-    'Dela dina terminaler horisontellt eller vertikalt. Varje ruta kör sitt eget skal. Dra i avdelarna för att ändra storlek. Zooma valfri ruta till fullskärm med Ctrl+Skift+Enter.',
-  'tutorial.step.surfaceTabs.title': 'Flikar',
   'tutorial.step.surfaceTabs.body':
     'Varje ruta kan ha flera flikar — terminaler, webbläsarpaneler eller markdown-vyer. Dra flikar mellan rutor för att organisera om dem. Skapa nya flikar med Ctrl+T.',
   'tutorial.step.browserPanel.title': 'Webbläsarpanel',
-  'tutorial.step.browserPanel.body':
-    'Webbläsarpanelen till höger låter dig förhandsgranska det dina agenter bygger. Växla den med Ctrl+Skift+I. Navigera till localhost eller vilken URL som helst. Webbläsaren kan styras via socket-API:et.',
   'tutorial.step.notifications.title': 'Aviseringar',
-  'tutorial.step.notifications.body':
-    'När en agent behöver din uppmärksamhet får dess ruta en blå ring och arbetsytans räknare ökar. En Windows-avisering visas också. Hoppa till senaste olästa med Ctrl+Skift+U.',
   'tutorial.step.allSet.title': 'Du är redo',
-  'tutorial.step.allSet.body':
-    'Du kan alltid öppna den här guiden igen via hjälpknappen (?) i namnlisten. För alla kortkommandon, öppna Inställningar med Ctrl+, eller kommandopaletten med Ctrl+Skift+P.',
   // Sidopanel — arbetsyterad: aktivitetsetiketter per verktyg
   'workspaceRow.tool.bash': 'Kör kommando...',
   'workspaceRow.tool.read': 'Läser fil...',
@@ -214,20 +199,13 @@ export const sv: Translation = {
   'workspaceRow.working': 'Arbetar…',
   // Sidopanelens ramverk
   'sidebar.collapse': 'Fäll ihop sidopanelen (Ctrl+B)',
-  'sidebar.saveSession': 'Spara session',
-  'sidebar.loadSession': 'Läs in session',
   'sidebar.newWorkspace': 'Ny arbetsyta',
   // Sidopanel — sessionsmeny (spara/läs in)
   'sessionMenu.justNow': 'nyss',
   'sessionMenu.minutesAgo': '{count} min sedan',
   'sessionMenu.hoursAgo': '{count} tim sedan',
   'sessionMenu.daysAgo': '{count} dagar sedan',
-  'sessionMenu.newSessionName': 'Nytt sessionsnamn...',
-  'sessionMenu.noSavedSessions': 'Inga sparade sessioner',
-  'sessionMenu.overwriteExisting': 'Eller skriv över en befintlig session:',
   'sessionMenu.overwrite': 'Skriv över "{name}"',
-  'sessionMenu.load': 'Läs in "{name}"',
-  'sessionMenu.deleteSession': 'Ta bort session',
   // Inställningar — webbläsarpanel
   'settings.browser.searchSection': 'Sök',
   'settings.browser.defaultSearchEngine': 'Standardsökmotor',
@@ -443,10 +421,6 @@ export const sv: Translation = {
   'settings.workspacePanel.placement.top': 'Överst',
   'settings.workspacePanel.placement.end': 'Sist',
   'settings.workspacePanel.autoReorder': 'Sortera om automatiskt vid avisering',
-  'settings.workspacePanel.showWelcomeScreen': 'Visa startskärm vid uppstart',
-  'settings.workspacePanel.confirmClose': 'Bekräfta innan en session stängs',
-  'settings.workspacePanel.confirmCloseHint':
-    'Fråga innan ×-knappen, snabbmenyn eller Ctrl+Skift+W stänger en session — ett felklick kan då inte slå ut agenter som inte har sparat sitt tillstånd än. Stängningar från CLI:t och från agenter frågar aldrig.',
   'settings.workspacePanel.restoreClaudeSessions': 'Återuppta Claude Code-sessioner vid återställning',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'När remotea återställer en session startas varje terminal som körde Claude Code om med `claude --resume`, i katalogen den stod i. Av som standard: alla sådana paneler startar en agent på en gång. Paneler vars konversation Claude inte längre har hoppas över, och en Claude du avslutat korrekt återupptas inte.',
   'settings.workspacePanel.autoOpenDiff': 'Öppna diff-flik automatiskt vid agentens ändringar',
@@ -462,7 +436,6 @@ export const sv: Translation = {
   // Sidopanel — orkestreringspanel
   'orchestrationPanel.expand': 'Expandera orkestrering',
   'orchestrationPanel.collapse': 'Fäll ihop orkestrering',
-  'orchestrationPanel.title': 'orkestrering',
   'orchestrationPanel.reviewer': 'granskare',
   'orchestrationPanel.dismiss': 'avfärda',
   'orchestrationPanel.waiting': 'väntar',
@@ -578,18 +551,12 @@ export const sv: Translation = {
   'surfaceTab.profileBadge': 'projekt',
   // Inställningar — samtycke till agentintegration (issue #132)
   'settings.integration.section': 'Agentintegration',
-  'settings.integration.enable': 'Låt remotea konfigurera Claude Code, OpenCode, Kiro, omp, pi och Grok',
-  'settings.integration.hint':
-    'remotea redigerar filer i din hemkatalog så att kodningsagenter kan styra dess webbläsarpanel, markdown-vyer och sidopanelsstatus. Att stänga av något här tar också bort det som skrivits dit.',
   'settings.integration.instructions': 'Instruktioner för agenter',
   'settings.integration.hooks': 'Statuskrokar',
-  'settings.integration.orchestrator': 'Orkestreringstillägg',
-  'settings.integration.browserMcp': 'Webbläsarpanel för MCP',
   // Sidopanel — svara en blockerad agent utan att lämna sin ruta (issue #128)
   'workspaceRow.answerSent': 'Skickat — väntar…',
   'workspaceRow.answerTitle': 'Svara utan att växla till den här rutan',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'Fjärr',
   'settings.remote.title': 'Fjärrkonsol',
   'settings.remote.hint': 'Följ dina agenter och svara dem från webbläsaren i en telefon. Av som standard: ingenting lyssnar förrän du slår på det här.',
   'settings.remote.loading': 'Läser in…',

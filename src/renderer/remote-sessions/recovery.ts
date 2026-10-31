@@ -1,3 +1,4 @@
+import { makeT, type Translator, type TranslationKey } from '../i18n/core';
 /**
  * remotea: the recovery inventory (task 2eeb1e23, Astra review A-Q3). When
  * this app starts, or reconnects to a host, what happened while it was away
@@ -51,6 +52,8 @@ export interface RecoveryItem {
   resume?: string;
   /** One line: what happened. */
   detail: string;
+  /** Structured copy arguments let an open dialog follow locale changes. */
+  detailInfo?: { exitCode?: number; exitedAt?: number; work?: WorktreeStateInfo; provider?: string; branch?: string };
   branch?: string;
   worktree?: string;
   /** In order; the first is the default. */
@@ -89,6 +92,14 @@ export const CHOICE_LABEL: Record<RecoveryChoice, string> = {
   reopen: 'Reopen',
   'open-worktree': 'Open worktree in a new terminal',
   'copy-branch': 'Copy branch name',
+};
+
+export const RECOVERY_CHOICE_KEY: Record<RecoveryChoice, TranslationKey> = {
+  'leave': 'remote.recovery.choice.leave',
+  'keep-closed': 'remote.recovery.choice.keep-closed',
+  'reopen': 'remote.recovery.choice.reopen',
+  'open-worktree': 'remote.recovery.choice.open-worktree',
+  'copy-branch': 'remote.recovery.choice.copy-branch',
 };
 
 function title(s: Pick<SessionRecord, 'title' | 'agent' | 'cmd'> | undefined, fallback?: string): string {
@@ -140,6 +151,7 @@ export function recoveryInventory(state: RecoveryState): RecoveryInventory {
           key: `closed:${tab.id}`, kind: 'closed', hostId: view.hostId, surfaceId: tab.id, workspaceId: tab.workspaceId,
           title: tab.title || 'shell', cwd: tab.cwd ?? rec?.lastCwd ?? rec?.cwd, ...(resume ? { resume } : {}),
           detail: `Closed on another device while this one was away.${note}`,
+          detailInfo: { provider: resume ? rec?.agent?.provider : undefined },
           choices: ['keep-closed', 'reopen'], clean: false,
         });
         listed.add(tab.id);
@@ -154,6 +166,7 @@ export function recoveryInventory(state: RecoveryState): RecoveryInventory {
           key: `exited:${tab.id}:${rec.exitedAt ?? 0}`, kind: 'exited', hostId: view.hostId, surfaceId: tab.id, workspaceId: tab.workspaceId,
           title: title(rec, tab.title), cwd: rec.lastCwd ?? rec.cwd, ...(resume ? { resume } : {}),
           detail: `Exited${code}${rec.exitedAt ? ` at ${clock(rec.exitedAt)}` : ''} while this device was away.${work ? ` Its worktree has ${work}.` : ''}${note}`,
+          detailInfo: { exitCode: rec.exitCode, exitedAt: rec.exitedAt, work: rec.worktreeState, provider: resume ? rec.agent?.provider : undefined },
           ...(rec.eridani ? { branch: rec.eridani.branch, worktree: rec.eridani.worktree } : {}),
           choices: ['leave', 'keep-closed', 'reopen', ...worktreeChoices(rec)], clean: false,
         });
@@ -162,6 +175,7 @@ export function recoveryInventory(state: RecoveryState): RecoveryInventory {
         items.push({
           key: `restored:${tab.id}:${rec.bootId}`, kind: 'restored', hostId: view.hostId, surfaceId: tab.id, workspaceId: tab.workspaceId,
           title: title(rec, tab.title), cwd: rec.lastCwd ?? rec.cwd,
+          detailInfo: { provider: rec.agent?.provider },
           detail: rec.agent || rec.eridani
             ? 'The host restarted; the session respawns and its agent resumes when the tab opens.'
             : 'The host restarted; a new shell starts in the same directory when the tab opens.',
@@ -185,12 +199,34 @@ export function recoveryInventory(state: RecoveryState): RecoveryInventory {
         key: `worktree:${view.hostId}:${b.worktree}:${work}`, kind: 'worktree', hostId: view.hostId, surfaceId: rec.id, workspaceId: tab?.workspaceId,
         title: title(rec), cwd: b.worktree, branch: b.branch, worktree: b.worktree,
         detail: `The run on ${b.branch} ended; its worktree has ${work}.`,
+        detailInfo: { branch: b.branch, work: rec.worktreeState },
         choices: ['keep-closed', 'open-worktree', 'copy-branch'], clean: false,
       });
     }
   }
   const fresh = items.filter((i) => !state.seen.has(i.key));
   return { items: fresh, onlyClean: fresh.every((i) => i.clean) };
+}
+
+/** Localized display only: inventory keys and recovery decisions never depend on locale. */
+export function recoveryDetail(item: RecoveryItem, t: Translator = makeT('en')): string {
+  const info = item.detailInfo;
+  if (!info) return item.detail;
+  const work: string[] = [];
+  if (info.work?.uncommitted) work.push(t('remote.recovery.uncommitted').replace('{count}', String(info.work.uncommitted)));
+  if (info.work?.untracked) work.push(t('remote.recovery.untracked').replace('{count}', String(info.work.untracked)));
+  if (info.work?.merged === false) work.push(t('remote.recovery.unmerged').replace('{base}', info.work.baseRef).replace('{count}', String(info.work.ahead ?? 0)));
+  if (info.work?.unpushed) work.push(t('remote.recovery.unpushed').replace('{count}', String(info.work.unpushed)));
+  const workNote = work.length ? ' ' + t('remote.recovery.workNote').replace('{work}', work.join(', ')) : '';
+  const resumeNote = info.provider ? ' ' + t('remote.recovery.resumeNote').replace('{provider}', info.provider) : '';
+  switch (item.kind) {
+    case 'closed': return t('remote.recovery.closedDetail') + resumeNote;
+    case 'exited': return t('remote.recovery.exitedDetail')
+      .replace('{code}', info.exitCode === undefined ? t('remote.recovery.unknown') : String(info.exitCode))
+      .replace('{time}', info.exitedAt ? new Date(info.exitedAt).toLocaleString() : t('remote.recovery.unknown')) + workNote + resumeNote;
+    case 'restored': return t('remote.recovery.restoredDetail');
+    case 'worktree': return t('remote.recovery.worktreeDetail').replace('{branch}', info.branch ?? '') + workNote;
+  }
 }
 
 /** Show the dialog? Not for nothing, and not for clean restores alone when the setting says so. */

@@ -5,6 +5,39 @@
 import type { Translation } from './en';
 
 export const cs: Translation = {
+  "remote.overlay.reconnecting": "Spojení s {host} je přerušeno. Obnovení spojení{retry}. Stav terminálu je do obnovení spojení neznámý.",
+  "remote.overlay.lastSeen": "Naposledy dostupný: {time}.",
+  "remote.overlay.suspended": "Spojení je pozastaveno během spánku tohoto počítače. Po obnovení spojení ověříme hostitele {host} a jeho terminály.",
+  "remote.retry": "Zkusit znovu nyní",
+  "remote.cancel": "Zrušit",
+  "remote.done": "Hotovo",
+  "remote.close.workspace": "tento pracovní prostor",
+  "remote.close.titleWorkspace": "Zavřít „{name}“?",
+  "remote.close.titleTab": "Zavřít tuto kartu hostitele?",
+  "remote.close.titleTabs": "Zavřít karty ({count})?",
+  "remote.close.endOne": "Ukončit relaci na tomto hostiteli",
+  "remote.close.endHost": "Ukončit relace na tomto hostiteli",
+  "remote.close.endMany": "Ukončit relace na těchto hostitelích",
+  "remote.close.hide": "Skrýt na tomto zařízení",
+  "remote.close.hideHint": "Odstraní tyto pohledy pouze z tohoto zařízení, bez požadavku na ukončení. Relace jsou dostupné na dalších zařízeních, dokud běží hostitel a služba. Skryté relace najdete v Nastavení → Vzdálení hostitelé. Stav odpojených procesů je neznámý.",
+  "remote.close.endHint": "Požádá o ukončení uvedených relací hostitele na všech připojených zařízeních, včetně skrytých relací a agentů v uvedené skupině. Tím se úloha Eridani neověří ani neschválí.",
+  "remote.close.summary.stale": "Odpojeno: počty pocházejí z posledního spojení a mohou být zastaralé.",
+  "remote.host.endConfirm": "Ukončit tuto terminálovou relaci hostitele na všech zařízeních? Jde o požadavek na ukončení procesu včetně případného agenta. Neověří ani neschválí úlohu Eridani.",
+  "remote.host.removeConfirm": "Odebrat hostitele z tohoto zařízení? Nežádá to ukončení jeho relací. Otevřené karty se přestanou aktualizovat; stav odpojených procesů je neznámý.",
+  "remote.host.hiddenHint": "Skrytí nežádá ukončení. Jde o poslední záznamy hostitele včetně ukončených relací; při odpojení není známo, co stále běží.",
+  "remote.recovery.title": "Co se změnilo během nepřítomnosti",
+  "remote.recovery.hint": "Záznamy hostitele ke kontrole: {count}. Znovu otevřít spustí nový terminál a může navázat podporovanou konverzaci agenta; původní proces neoživí. Hotovo ponechá nerozhodnuté záznamy beze změn.",
+  "remote.recovery.choice.leave": "Ponechat kartu",
+  "remote.recovery.choice.keep-closed": "Ponechat zavřené",
+  "remote.recovery.choice.reopen": "Otevřít v novém terminálu",
+  "remote.recovery.choice.open-worktree": "Otevřít pracovní strom v novém terminálu",
+  "remote.recovery.choice.copy-branch": "Kopírovat název větve",
+  "settings.tab.hosts": "Vzdálení hostitelé",
+  "settings.tab.remote": "Přístup z telefonu",
+  "settings.tab.prompts": "Historie zadání",
+  "settings.tab.profiles": "Spouštěcí profily",
+
+  "settings.workspacePanel.confirmAppCloseHint": "Zeptat se před zavřením tohoto okna. Místní terminály a jejich agenti se ukončí. Terminály na hostiteli se odpojí; zavření okna nežádá jejich ukončení. Při aktualizaci, restartu ani vypnutí Windows se potvrzení nezobrazuje; místní procesy se přesto ukončí.",
   // Nastavení — rám okna
   'settings.title': 'Nastavení',
   'settings.tab.general': 'Obecné',
@@ -13,7 +46,6 @@ export const cs: Translation = {
   'settings.tab.terminal': 'Terminál',
   'settings.tab.notifications': 'Oznámení',
   'settings.tab.browser': 'Prohlížeč',
-  'settings.tab.profiles': 'Profily',
   'settings.tab.shortcuts': 'Klávesové zkratky',
   // Nastavení — panel Obecné
   'settings.general.languageSection': 'Jazyk',
@@ -84,8 +116,6 @@ export const cs: Translation = {
   'settings.help.updateTo': 'Aktualizovat na',
   'settings.help.upToDate': 'Aktuální',
   'settings.help.downloading': 'Stahování',
-  'settings.help.reportIssue': 'Nahlásit problém',
-  'settings.help.website': 'Web',
   'settings.help.hint': 'Našli jste chybu nebo máte návrh? Otevřete issue na GitHubu.',
   // Kontextová nabídka pracovního prostoru
   'ctx.pin': 'Připnout pracovní prostor',
@@ -183,26 +213,13 @@ export const cs: Translation = {
   'tutorial.next': 'Další',
   'tutorial.getStarted': 'Začít',
   'tutorial.step.welcome.title': 'Vítejte ve remotea',
-  'tutorial.step.welcome.body':
-    'remotea je terminálový multiplexer pro souběžné spouštění AI agentů, kteří píší kód. Tato krátká prohlídka vám ukáže to nejdůležitější.',
   'tutorial.step.workspaces.title': 'Pracovní prostory',
-  'tutorial.step.workspaces.body':
-    'Postranní panel vlevo zobrazuje vaše pracovní prostory. Každý pracovní prostor je samostatná relace s vlastním rozvržením terminálů. Nové vytvoříte pomocí Ctrl+N. Dvojitým kliknutím na název pracovního prostoru jej přejmenujete.',
   'tutorial.step.splitPanes.title': 'Rozdělené panely',
-  'tutorial.step.splitPanes.body':
-    'Terminály můžete rozdělit vodorovně nebo svisle. Každý panel spouští vlastní shell. Přetažením oddělovačů měníte velikost. Kterýkoli panel zvětšíte na celou obrazovku pomocí Ctrl+Shift+Enter.',
-  'tutorial.step.surfaceTabs.title': 'Karty ploch',
   'tutorial.step.surfaceTabs.body':
     'Každý panel může mít více karet — terminály, panely prohlížeče nebo náhledy Markdown. Přetahováním karet mezi panely je můžete přeorganizovat. Nové karty vytvoříte pomocí Ctrl+T.',
   'tutorial.step.browserPanel.title': 'Panel prohlížeče',
-  'tutorial.step.browserPanel.body':
-    'Panel prohlížeče vpravo umožňuje sledovat, co vaši agenti vytvářejí. Přepínáte jej pomocí Ctrl+Shift+I. Přejděte na localhost nebo jakoukoli adresu URL. Prohlížeč lze ovládat přes socket API.',
   'tutorial.step.notifications.title': 'Oznámení',
-  'tutorial.step.notifications.body':
-    'Když agent potřebuje vaši pozornost, jeho panel dostane modrý prstenec a počítadlo pracovního prostoru se zvýší. Zazní také oznámení systému Windows. Na poslední nepřečtené přejdete pomocí Ctrl+Shift+U.',
   'tutorial.step.allSet.title': 'Vše je připraveno',
-  'tutorial.step.allSet.body':
-    'Tohoto průvodce můžete kdykoli znovu otevřít tlačítkem nápovědy (?) na horní liště. Úplný seznam klávesových zkratek najdete v Nastavení (Ctrl+,) nebo v paletě příkazů (Ctrl+Shift+P).',
   // Postranní panel — řádek pracovního prostoru: štítky aktivity podle nástroje
   'workspaceRow.tool.bash': 'Spouštění příkazu...',
   'workspaceRow.tool.read': 'Čtení souboru...',
@@ -234,8 +251,6 @@ export const cs: Translation = {
   'workspaceRow.working': 'Pracuje…',
   // Prvky postranního panelu
   'sidebar.collapse': 'Sbalit postranní panel (Ctrl+B)',
-  'sidebar.saveSession': 'Uložit relaci',
-  'sidebar.loadSession': 'Načíst relaci',
   'sidebar.newWorkspace': 'Nový pracovní prostor',
   'sidebar.newWorkspaceFromLayout': 'Nový pracovní prostor z rozložení…',
   'sidebar.layoutMenu.empty': 'Zatím nejsou uložena žádná rozložení',
@@ -246,12 +261,7 @@ export const cs: Translation = {
   'sessionMenu.minutesAgo': 'před {count} min',
   'sessionMenu.hoursAgo': 'před {count} h',
   'sessionMenu.daysAgo': 'před {count} dny',
-  'sessionMenu.newSessionName': 'Název nové relace...',
-  'sessionMenu.noSavedSessions': 'Žádné uložené relace',
-  'sessionMenu.overwriteExisting': 'Nebo přepsat existující relaci:',
   'sessionMenu.overwrite': 'Přepsat „{name}“',
-  'sessionMenu.load': 'Načíst „{name}“',
-  'sessionMenu.deleteSession': 'Smazat relaci',
   // Nastavení — panel Prohlížeč
   'settings.browser.searchSection': 'Vyhledávání',
   'settings.browser.defaultSearchEngine': 'Výchozí vyhledávač',
@@ -468,10 +478,6 @@ export const cs: Translation = {
   'settings.workspacePanel.placement.top': 'Nahoře',
   'settings.workspacePanel.placement.end': 'Na konec',
   'settings.workspacePanel.autoReorder': 'Automaticky přeřadit při oznámení',
-  'settings.workspacePanel.showWelcomeScreen': 'Zobrazit uvítací obrazovku při spuštění',
-  'settings.workspacePanel.confirmClose': 'Potvrdit před zavřením relace',
-  'settings.workspacePanel.confirmCloseHint':
-    'Zeptat se, než tlačítko ×, kontextová nabídka nebo Ctrl+Shift+W zavře relaci — náhodný klik tak nemůže shodit agenty, kteří ještě neuložili svůj stav. Zavření z CLI a od agentů se nikdy nepotvrzuje.',
   'settings.workspacePanel.restoreClaudeSessions': 'Obnovit relace Claude Code při obnovení',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'Když remotea obnoví relaci, spustí znovu každý terminál, ve kterém běžel Claude Code, příkazem `claude --resume` v původním adresáři. Ve výchozím stavu vypnuto: každý takový panel hned spustí agenta. Panely, jejichž konverzaci už Claude nemá, se přeskočí, a Claude, který jste řádně ukončili, se neobnoví.',
   'settings.workspacePanel.autoOpenDiff': 'Automaticky otevřít kartu Diff při úpravách agenta',
@@ -487,7 +493,6 @@ export const cs: Translation = {
   // Postranní panel — panel orchestrace
   'orchestrationPanel.expand': 'Rozbalit orchestraci',
   'orchestrationPanel.collapse': 'Sbalit orchestraci',
-  'orchestrationPanel.title': 'orchestrace',
   'orchestrationPanel.reviewer': 'recenzent',
   'orchestrationPanel.dismiss': 'zavřít',
   'orchestrationPanel.waiting': 'čeká',
@@ -659,18 +664,12 @@ export const cs: Translation = {
   'surfaceTab.profileBadge': 'projekt',
   // Nastavení — souhlas s integrací agentů (issue #132)
   'settings.integration.section': 'Integrace agentů',
-  'settings.integration.enable': 'Povolit remotea konfigurovat Claude Code, OpenCode, Kiro, omp, pi a Grok',
-  'settings.integration.hint':
-    'remotea upravuje soubory ve vašem domovském adresáři, aby kódovací agenti mohli ovládat jeho panel prohlížeče, náhledy Markdown a stav postranního panelu. Vypnutím zde se odstraní i to, co bylo zapsáno.',
   'settings.integration.instructions': 'Instrukce pro agenty',
   'settings.integration.hooks': 'Stavové hooky',
-  'settings.integration.orchestrator': 'Plugin orchestrátoru',
-  'settings.integration.browserMcp': 'Panel prohlížeče pro MCP',
   // Postranní panel — odpověď zablokovanému agentovi mimo jeho panel (issue #128)
   'workspaceRow.answerSent': 'Odesláno — čeká se…',
   'workspaceRow.answerTitle': 'Odpovědět bez přepnutí na tento panel',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'Vzdálený přístup',
   'settings.remote.title': 'Vzdálená konzole',
   'settings.remote.hint': 'Sledujte své agenty a odpovídejte jim z prohlížeče v telefonu. Ve výchozím stavu vypnuto: nic nenaslouchá, dokud to zde nezapnete.',
   'settings.remote.loading': 'Načítání…',
@@ -768,7 +767,6 @@ export const cs: Translation = {
   'settings.remote.pair.paired': 'Spárováno: {name}',
   'settings.remote.pair.close': 'Zavřít',
   // Další nastavení a oznámení aplikace
-  'settings.tab.prompts': 'Zadání',
   'settings.general.iconCache': 'Zobrazuje hlavní panel stále starou ikonu remotea?',
   'settings.general.iconCacheButton': 'Obnovit ikony hlavního panelu',
   'settings.general.iconCacheStarted': 'Průzkumník Windows se restartuje…',
@@ -868,25 +866,16 @@ export const cs: Translation = {
     'Počet kroků posunu odeslaných za každý řádek pohybu prstu při posouvání aplikace přes celou obrazovku (opencode, tmux). Hodnota 1 vyhovuje aplikaci, která se na jeden krok posune o jeden řádek. Aby obsah sledoval prst, použijte 1 ÷ rychlost posouvání dané aplikace: pro výchozí rychlost 3 v opencode zadejte 0.33. Kolečko myši, historie terminálu ani setrvačný posun po uvolnění prstu tím nejsou ovlivněny.',
   // Pracovní prostor — zavírání a obnova relací
   'settings.workspacePanel.confirmAppClose': 'Potvrdit před zavřením remotea',
-  'settings.workspacePanel.confirmAppCloseHint':
-    'Zeptat se, než tlačítko × okna nebo Alt+F4 ukončí remotea — zavření okna ukončí všechny jeho terminálové relace včetně agentů. Při aktualizaci, restartu ani vypnutí Windows se potvrzení nezobrazuje.',
-  'settings.workspacePanel.sessionSnapshot': 'Ukládat snímky relací každých',
   'settings.workspacePanel.sessionSnapshotOff': 'Nikdy',
   'settings.workspacePanel.sessionSnapshot5': '5 minut',
   'settings.workspacePanel.sessionSnapshot10': '10 minut',
   'settings.workspacePanel.sessionSnapshot15': '15 minut',
   'settings.workspacePanel.sessionSnapshot30': '30 minut',
   'settings.workspacePanel.sessionSnapshot60': '60 minut',
-  'settings.workspacePanel.sessionSnapshotHint':
-    'Uchovává poslední tři odlišná rozložení jako položky „Auto-save …“ v nabídce Načíst relaci. Lze tak vrátit panel zavřený omylem nebo agentem. Nové místo se využije pouze při skutečné změně rozložení, takže nečinný počítač o historii nepřichází.',
-  'settings.workspacePanel.restoreCodexSessions': 'Pokračovat v relacích Codex při obnovení',
-  'settings.workspacePanel.restoreOpencodeSessions': 'Pokračovat v relacích OpenCode při obnovení',
   'settings.workspacePanel.restoreOpencodeSessionsHint':
     'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje plugin remotea pro OpenCode (zapnutou integraci agentů). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. Relace OpenCode 2 lze zachytit pouze při spuštění s --standalone: jeho sdílený server na pozadí nedokáže rozlišit jednotlivé karty.',
-  'settings.workspacePanel.restoreQwenSessions': 'Pokračovat v relacích Qwen Code při obnovení',
   'settings.workspacePanel.restoreQwenSessionsHint':
     'Znovu spustí Qwen Code v každé obnovené kartě, kde běžel, pomocí „qwen --resume“ v původním adresáři. Vyžaduje hooky remotea pro Qwen (zapnuté stavové hooky) a Qwen Code 0.14 nebo novější. Karty, jejichž relace už Qwen nemá, se přeskočí. Řádně ukončené relace Qwen se neobnovují.',
-  'settings.workspacePanel.restoreAgySessions': 'Pokračovat v konverzacích Antigravity CLI při obnovení',
   'settings.workspacePanel.restoreAgySessionsHint':
     'Znovu otevře konverzaci agy každé obnovené karty pomocí „agy --conversation“ v původním adresáři. Vyžaduje plugin remotea pro agy (zapnuté stavové hooky) a Node.js. Konverzace se zaznamená při zahájení nebo při první zprávě po obnovení. Relace agy ukončené návratem do příkazového řádku se znovu neotevřou.',
   'settings.workspacePanel.restoreOmpSessions': 'Pokračovat v relacích omp při obnovení',
@@ -1004,8 +993,6 @@ export const cs: Translation = {
   'hub.workingCount': 'Pracuje: {count}',
   'hub.blockedCount': 'Čeká na vás: {count}',
   // Zadání — sledování, zvýraznění a záhlaví
-  'settings.prompt.title': 'Zadání',
-  'settings.prompt.enabled': 'Sledovat zadání',
   'settings.prompt.enabledHint':
     'Pamatuje si, co jste v jednotlivých panelech zadali, aby níže uvedené funkce měly s čím pracovat. Po vypnutí tyto funkce neběží a nic se nezaznamenává.',
   'settings.prompt.highlightSection': 'Zvýraznění',
@@ -1070,5 +1057,4 @@ export const cs: Translation = {
   'prompt.paneLock': 'Sleduje aktivní panel — kliknutím k němu tento seznam připnete',
   'prompt.paneUnlock': 'Sleduje připnutý panel — kliknutím znovu zapnete sledování aktivního panelu',
   'prompt.paneNoSource': 'Aktivujte terminálový panel a zobrazí se zde jeho zadání.',
-  'prompt.paneDisabled': 'Sledování zadání je vypnuté. Zapněte ho v Nastavení → Zadání.',
 };

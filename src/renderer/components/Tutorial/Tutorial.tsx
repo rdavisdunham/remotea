@@ -17,64 +17,17 @@ interface Step {
   shortcuts: ShortcutAction[];
 }
 
-function buildSteps(t: (key: TranslationKey, fallback?: string) => string): Step[] {
+function buildSteps(t: (key: TranslationKey) => string): Step[] {
   return [
-    {
-      title: t('tutorial.step.welcome.title', 'Welcome to remotea'),
-      body: t(
-        'tutorial.step.welcome.body',
-        'remotea is a terminal multiplexer for running AI coding agents in parallel. This quick tour will show you the essentials.',
-      ),
-      shortcuts: [],
-    },
-    {
-      title: t('tutorial.step.workspaces.title', 'Workspaces'),
-      body: t(
-        'tutorial.step.workspaces.body',
-        'The sidebar on the left shows your workspaces. Each workspace is an independent session with its own terminal layout. Create new ones with Ctrl+N. Double-click a workspace title to rename it.',
-      ),
-      shortcuts: ['newWorkspace', 'toggleSidebar'],
-    },
-    {
-      title: t('tutorial.step.splitPanes.title', 'Split Panes'),
-      body: t(
-        'tutorial.step.splitPanes.body',
-        'Split your terminals horizontally or vertically. Each pane runs its own shell. Drag dividers to resize. Zoom any pane to full size with Ctrl+Shift+Enter.',
-      ),
-      shortcuts: ['splitRight', 'splitDown'],
-    },
-    {
-      title: t('tutorial.step.surfaceTabs.title', 'Surface Tabs'),
-      body: t(
-        'tutorial.step.surfaceTabs.body',
-        'Each pane can have multiple tabs — terminals, browser panels, or markdown views. Drag tabs between panes to reorganize. Create new tabs with Ctrl+T.',
-      ),
-      shortcuts: ['newSurface', 'closeSurfaceOrPane'],
-    },
-    {
-      title: t('tutorial.step.browserPanel.title', 'Browser Panel'),
-      body: t(
-        'tutorial.step.browserPanel.body',
-        'The browser panel on the right lets you preview what your agents build. Toggle it with Ctrl+Shift+I. Navigate to localhost or any URL. The browser is scriptable via the socket API.',
-      ),
-      shortcuts: ['openBrowser'],
-    },
-    {
-      title: t('tutorial.step.notifications.title', 'Notifications'),
-      body: t(
-        'tutorial.step.notifications.body',
-        'When an agent needs your attention, its pane gets a blue ring and the workspace badge increments. A Windows toast notification fires too. Jump to the latest unread with Ctrl+Shift+U.',
-      ),
-      shortcuts: ['jumpToUnread'],
-    },
-    {
-      title: t('tutorial.step.allSet.title', "You're all set"),
-      body: t(
-        'tutorial.step.allSet.body',
-        "You can always reopen this guide from the help button (?) in the title bar. For the full keyboard shortcuts, open Settings with Ctrl+, or the Command Palette with Ctrl+Shift+P.",
-      ),
-      shortcuts: ['toggleShortcutCheatSheet', 'openSettings', 'commandPalette'],
-    },
+    { title: t('tutorial.step.welcome.title'), body: t('tutorial.step.welcome.body'), shortcuts: [] },
+    { title: t('tutorial.location.title'), body: t('tutorial.location.body'), shortcuts: [] },
+    { title: t('tutorial.step.workspaces.title'), body: t('tutorial.step.workspaces.body'), shortcuts: ["newWorkspace", "toggleSidebar"] },
+    { title: t('tutorial.step.splitPanes.title'), body: t('tutorial.step.splitPanes.body'), shortcuts: ["splitRight", "splitDown"] },
+    { title: t('tutorial.step.surfaceTabs.title'), body: t('tutorial.step.surfaceTabs.body'), shortcuts: ["newSurface", "closeSurfaceOrPane"] },
+    { title: t('tutorial.step.browserPanel.title'), body: t('tutorial.step.browserPanel.body'), shortcuts: ["openBrowser"] },
+    { title: t('tutorial.step.notifications.title'), body: t('tutorial.step.notifications.body'), shortcuts: ["jumpToUnread"] },
+    { title: t('tutorial.return.title'), body: t('tutorial.return.body'), shortcuts: [] },
+    { title: t('tutorial.step.allSet.title'), body: t('tutorial.step.allSet.body'), shortcuts: ["toggleShortcutCheatSheet", "openSettings", "commandPalette"] },
   ];
 }
 

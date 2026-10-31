@@ -5,6 +5,7 @@
 import type { Translation } from './en';
 
 export const de: Translation = {
+  "settings.tab.remote": "Telefonzugriff",
   'settings.title': 'Einstellungen',
   'settings.tab.general': 'Allgemein',
   'settings.tab.sidebar': 'Seitenleiste',
@@ -12,7 +13,6 @@ export const de: Translation = {
   'settings.tab.terminal': 'Terminal',
   'settings.tab.notifications': 'Benachrichtigungen',
   'settings.tab.browser': 'Browser',
-  'settings.tab.profiles': 'Profile',
   'settings.tab.shortcuts': 'Tastenkürzel',
   'settings.general.languageSection': 'Sprache',
   'settings.general.language': 'Oberflächensprache',
@@ -70,8 +70,6 @@ export const de: Translation = {
   'settings.help.updateTo': 'Aktualisieren auf',
   'settings.help.upToDate': 'Aktuell',
   'settings.help.downloading': 'Download',
-  'settings.help.reportIssue': 'Problem melden',
-  'settings.help.website': 'Website',
   'settings.help.hint': 'Einen Fehler gefunden oder einen Wunsch? Ein Issue auf GitHub eröffnen.',
   'ctx.pin': 'Arbeitsbereich anheften',
   'ctx.unpin': 'Arbeitsbereich lösen',
@@ -163,26 +161,13 @@ export const de: Translation = {
   'tutorial.next': 'Weiter',
   'tutorial.getStarted': 'Loslegen',
   'tutorial.step.welcome.title': 'Willkommen bei remotea',
-  'tutorial.step.welcome.body':
-    'remotea ist ein Terminal-Multiplexer zum parallelen Ausführen von KI-Coding-Agenten. Diese kurze Tour zeigt das Wichtigste.',
   'tutorial.step.workspaces.title': 'Arbeitsbereiche',
-  'tutorial.step.workspaces.body':
-    'Die Seitenleiste links zeigt Ihre Arbeitsbereiche. Jeder Arbeitsbereich ist eine unabhängige Sitzung mit eigenem Terminal-Layout. Neue mit Strg+N erstellen. Doppelklick auf einen Titel zum Umbenennen.',
   'tutorial.step.splitPanes.title': 'Geteilte Bereiche',
-  'tutorial.step.splitPanes.body':
-    'Terminals horizontal oder vertikal teilen. Jeder Bereich führt eine eigene Shell aus. Trennlinien ziehen, um die Größe zu ändern. Jeden Bereich mit Strg+Umschalt+Eingabe auf volle Größe vergrößern.',
-  'tutorial.step.surfaceTabs.title': 'Tabs',
   'tutorial.step.surfaceTabs.body':
     'Jeder Bereich kann mehrere Tabs haben — Terminals, Browser-Panels oder Markdown-Ansichten. Tabs zwischen Bereichen ziehen, um sie neu anzuordnen. Neue Tabs mit Strg+T erstellen.',
   'tutorial.step.browserPanel.title': 'Browser-Panel',
-  'tutorial.step.browserPanel.body':
-    'Das Browser-Panel rechts zeigt eine Vorschau dessen, was Ihre Agenten bauen. Mit Strg+Umschalt+I umschalten. Zu localhost oder jeder beliebigen URL navigieren. Der Browser ist über die Socket-API skriptfähig.',
   'tutorial.step.notifications.title': 'Benachrichtigungen',
-  'tutorial.step.notifications.body':
-    'Wenn ein Agent Ihre Aufmerksamkeit braucht, erhält sein Bereich einen blauen Ring und der Arbeitsbereich-Badge erhöht sich. Auch eine Windows-Toast-Benachrichtigung erscheint. Mit Strg+Umschalt+U zur neuesten ungelesenen springen.',
   'tutorial.step.allSet.title': 'Alles bereit',
-  'tutorial.step.allSet.body':
-    'Dieser Leitfaden kann jederzeit über die Hilfe-Schaltfläche (?) in der Titelleiste erneut geöffnet werden. Für alle Tastenkürzel die Einstellungen mit Strg+, oder die Befehlspalette mit Strg+Umschalt+P öffnen.',
   // Sidebar — Arbeitsbereichszeile: Aktivitätsbezeichnungen pro Werkzeug
   'workspaceRow.tool.bash': 'Befehl wird ausgeführt...',
   'workspaceRow.tool.read': 'Datei wird gelesen...',
@@ -214,20 +199,13 @@ export const de: Translation = {
   'workspaceRow.working': 'Arbeitet…',
   // Seitenleiste — Chrome
   'sidebar.collapse': 'Seitenleiste einklappen (Strg+B)',
-  'sidebar.saveSession': 'Sitzung speichern',
-  'sidebar.loadSession': 'Sitzung laden',
   'sidebar.newWorkspace': 'Neuer Arbeitsbereich',
   // Seitenleiste — Sitzungsmenü (speichern/laden)
   'sessionMenu.justNow': 'gerade eben',
   'sessionMenu.minutesAgo': 'vor {count} Min.',
   'sessionMenu.hoursAgo': 'vor {count} Std.',
   'sessionMenu.daysAgo': 'vor {count} Tg.',
-  'sessionMenu.newSessionName': 'Name der neuen Sitzung...',
-  'sessionMenu.noSavedSessions': 'Keine gespeicherten Sitzungen',
-  'sessionMenu.overwriteExisting': 'Oder eine vorhandene Sitzung überschreiben:',
   'sessionMenu.overwrite': '„{name}“ überschreiben',
-  'sessionMenu.load': '„{name}“ laden',
-  'sessionMenu.deleteSession': 'Sitzung löschen',
   // Einstellungen — Browser-Panel
   'settings.browser.searchSection': 'Suche',
   'settings.browser.defaultSearchEngine': 'Standard-Suchmaschine',
@@ -443,10 +421,6 @@ export const de: Translation = {
   'settings.workspacePanel.placement.top': 'Oben',
   'settings.workspacePanel.placement.end': 'Am Ende',
   'settings.workspacePanel.autoReorder': 'Bei Benachrichtigung automatisch neu anordnen',
-  'settings.workspacePanel.showWelcomeScreen': 'Willkommensbildschirm beim Start anzeigen',
-  'settings.workspacePanel.confirmClose': 'Vor dem Schließen einer Sitzung bestätigen',
-  'settings.workspacePanel.confirmCloseHint':
-    'Fragt nach, bevor die ×-Schaltfläche, das Kontextmenü oder Strg+Umschalt+W eine Sitzung schließt — ein versehentlicher Klick kann keine Agenten beenden, die ihren Status noch nicht gespeichert haben. Schließvorgänge über CLI und Agenten fragen nie nach.',
   'settings.workspacePanel.restoreClaudeSessions': 'Claude-Code-Sitzungen beim Wiederherstellen fortsetzen',
   'settings.workspacePanel.restoreClaudeSessionsHint': 'Wenn remotea eine Sitzung wiederherstellt, wird jedes Terminal, in dem Claude Code lief, mit `claude --resume` im ursprünglichen Verzeichnis neu gestartet. Standardmäßig aus: jedes dieser Panes startet sofort einen Agenten. Panes, deren Konversation Claude nicht mehr hat, werden übersprungen, und ein sauber beendeter Claude wird nicht fortgesetzt.',
   'settings.workspacePanel.autoOpenDiff': 'Diff-Tab bei Agentenbearbeitungen automatisch öffnen',
@@ -462,7 +436,6 @@ export const de: Translation = {
   // Seitenleiste — Orchestrierungs-Panel
   'orchestrationPanel.expand': 'Orchestrierung erweitern',
   'orchestrationPanel.collapse': 'Orchestrierung einklappen',
-  'orchestrationPanel.title': 'Orchestrierung',
   'orchestrationPanel.reviewer': 'Reviewer',
   'orchestrationPanel.dismiss': 'verwerfen',
   'orchestrationPanel.waiting': 'wartet',
@@ -578,18 +551,12 @@ export const de: Translation = {
   'surfaceTab.profileBadge': 'Projekt',
   // Einstellungen — Zustimmung zur Agentenintegration (Issue #132)
   'settings.integration.section': 'Agentenintegration',
-  'settings.integration.enable': 'remotea erlauben, Claude Code, OpenCode, Kiro, omp, pi und Grok zu konfigurieren',
-  'settings.integration.hint':
-    'remotea bearbeitet Dateien in Ihrem Home-Verzeichnis, damit Coding-Agenten das Browser-Panel, die Markdown-Ansichten und den Seitenleisten-Status steuern können. Wird etwas hier deaktiviert, wird auch entfernt, was es geschrieben hat.',
   'settings.integration.instructions': 'Anweisungen für Agenten',
   'settings.integration.hooks': 'Status-Hooks',
-  'settings.integration.orchestrator': 'Orchestrator-Plugin',
-  'settings.integration.browserMcp': 'Browser-Panel für MCP',
   // Seitenleiste — einem blockierten Agenten antworten, ohne zu dessen Bereich zu wechseln (Issue #128)
   'workspaceRow.answerSent': 'Gesendet — wartet…',
   'workspaceRow.answerTitle': 'Antworten, ohne zu diesem Bereich zu wechseln',
   // Settings → Remote: the phone remote console (#254)
-  'settings.tab.remote': 'Fernzugriff',
   'settings.remote.title': 'Remote-Konsole',
   'settings.remote.hint': 'Beobachten Sie Ihre Agenten und antworten Sie ihnen aus dem Browser eines Smartphones. Standardmäßig aus: Nichts lauscht, bis Sie es hier einschalten.',
   'settings.remote.loading': 'Wird geladen…',

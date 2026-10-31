@@ -1,5 +1,5 @@
 name: Crash report
-description: wmux disappeared, closed itself, or died without a dialog
+description: remotea disappeared, closed itself, or died without a dialog
 labels: ["crash"]
 body:
   - type: markdown
@@ -8,8 +8,8 @@ body:
         ## Before you attach anything: do not send a crash dump
 
         **A Windows minidump contains your process environment block** — every
-        user-scope environment variable, in cleartext. wmux's users keep
-        credentials there so the shells wmux spawns can see them, so a dump from
+        user-scope environment variable, in cleartext. Remotea users keep
+        credentials there so the shells Remotea spawns can see them, so a dump from
         a developer machine usually carries live keys. A full dump
         (`DumpType = 2`) adds the process heap on top of that.
 
@@ -21,15 +21,15 @@ body:
         does **not** clean a process that was already running, and why
         hand-scrubbing a dump is worse than sending nothing.
 
-        [doc]: https://github.com/amirlehmam/wmux/blob/master/docs/crash-reports.md
+        [doc]: https://github.com/rdavisdunham/remotea/blob/main/docs/crash-reports.md
 
   - type: textarea
     id: fingerprint
     attributes:
       label: Crash fingerprint
       description: |
-        Run `wmux crash-report` and paste the output. It needs no running wmux.
-        It reads the Windows Event Log and wmux's own lifecycle log — no memory,
+        Run `wmux crash-report` and paste the output. It needs no running desktop app.
+        It reads the Windows Event Log and Remotea’s own lifecycle log — no memory,
         so no environment variables, no pane contents, no command lines.
 
         No CLI? Event Viewer → Windows Logs → Application, source

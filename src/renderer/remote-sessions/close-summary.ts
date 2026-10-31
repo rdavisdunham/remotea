@@ -1,3 +1,4 @@
+import { makeT, type Translator } from '../i18n/core';
 /**
  * remotea: what ending a remote workspace (or tab) would actually stop, per
  * host — computed purely from the registry views, for the close dialog.
@@ -117,37 +118,35 @@ export function remoteTargetsAllExited(remote: Map<string, string>, surfaceIds: 
   return any;
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 /** The dialog's per-host lines, as plain text (also what the tests read). */
-export function describeHostSummary(h: RemoteCloseHostSummary): string[] {
+export function describeHostSummary(h: RemoteCloseHostSummary, t: Translator = makeT('en')): string[] {
   const lines: string[] = [];
-  const where = h.groupName ? `Host ${h.hostName}, workspace "${h.groupName}"` : `Host ${h.hostName}`;
+  const where = h.groupName ? t('remote.close.summary.hostGroup').replace('{host}', h.hostName).replace('{group}', h.groupName) : t('remote.close.summary.host').replace('{host}', h.hostName);
   lines.push(where);
   if (!h.known) {
-    lines.push(`Active sessions: unknown (${h.shownHere} shown here)`);
-    lines.push('Hidden on this device: unknown');
-    lines.push('Eridani tasks/runs: unknown');
-    lines.push('Not connected to this host: the counts are unknown.');
+    lines.push(t('remote.close.summary.unknown').replace('{count}', String(h.shownHere)));
+    lines.push(t('remote.close.summary.hiddenUnknown'));
+    lines.push(t('remote.close.summary.runsUnknown'));
+    lines.push(t('remote.close.summary.disconnected'));
     return lines;
   }
-  lines.push(`Active sessions: ${h.active}`);
-  lines.push(`Hidden on this device: ${h.hiddenHere}`);
+  lines.push(t('remote.close.summary.active').replace('{count}', String(h.active)));
+  lines.push(t('remote.close.summary.hidden').replace('{count}', String(h.hiddenHere)));
   if (h.eridani && h.eridani.length) {
-    lines.push(`Eridani runs: ${h.eridani.length}`);
-    for (const r of h.eridani) lines.push(`  task ${r.taskId ?? 'unknown'} · run ${r.runId} (generation ${r.generation})`);
+    lines.push(t('remote.close.summary.runs').replace('{count}', String(h.eridani.length)));
+    for (const r of h.eridani) lines.push(t('remote.close.summary.run').replace('{task}', r.taskId ?? t('remote.close.summary.noTask')).replace('{run}', r.runId).replace('{generation}', String(r.generation)));
   } else {
-    lines.push('Eridani runs: none');
+    lines.push(t('remote.close.summary.noRuns'));
   }
-  if (!h.connected) lines.push('Offline: these counts are from the last connection and may be stale.');
+  if (!h.connected) lines.push(t('remote.close.summary.stale'));
   return lines;
 }
 
-export function summaryHeadline(summary: RemoteCloseHostSummary[], scope: RemoteCloseRequest['scope']): string {
+export function summaryHeadline(summary: RemoteCloseHostSummary[], scope: RemoteCloseRequest['scope'], t: Translator = makeT('en')): string {
   const known = summary.every((h) => h.known && h.active !== null);
   const total = summary.reduce((n, h) => n + (h.active ?? 0), 0);
-  const count = known ? plural(total, 'session', 'sessions') : 'its sessions';
+  const count = known ? (total === 1 ? t('remote.close.summary.one') : t('remote.close.summary.many')).replace('{count}', String(total)) : t('remote.close.summary.its');
   return scope === 'workspace'
-    ? `Ending this workspace stops ${count} on every device — including sessions hidden on this device and agent runs.`
-    : `Ending stops ${count} on every device, not just this one.`;
+    ? t('remote.close.summary.endGroup').replace('{count}', count)
+    : t('remote.close.summary.end').replace('{count}', count);
 }
