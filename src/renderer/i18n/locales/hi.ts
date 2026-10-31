@@ -405,7 +405,6 @@ export const hi: Translation = {
   'settings.terminalPanel.fontSize': 'फ़ॉन्ट आकार',
   'settings.terminalPanel.colorSchemeSection': 'रंग योजना',
   'settings.terminalPanel.defaultScheme': 'डिफ़ॉल्ट योजना',
-  'settings.terminalPanel.schemeHintPart1': 'नए पैनों पर लागू होता है। प्रति पैन के लिए ',
   'settings.terminalPanel.schemeHintPart2': ' या ',
   'settings.terminalPanel.schemeHintPart3': ' से बदलें।',
   'settings.terminalPanel.customSchemesSection': 'कस्टम योजनाएँ',

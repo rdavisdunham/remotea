@@ -124,17 +124,16 @@ All four children remain visible but disabled/unchecked if master not granted; b
 
 ### Integration diagnostics
 
-Implementation integration note: the diagnostics change must be merged before this subsection is treated as shipped UI. Reconcile the final control labels with that component before removing this note.
-
 The diagnostics readout separates saved consent/configuration from observed managed files for each provider. File observations distinguish present, missing, modified and inspection errors; runtime readiness remains **unprobed**. File presence does not establish an installed/authenticated agent or active process, and a host connection does not establish Eridani execution readiness.
 
 | Control / readout | Effect and boundary |
 |---|---|
-| Provider configuration / consent | Reports existing integration selection; does not infer runtime availability |
-| Managed-file observations | Read-only current file inspection; missing/modified/error is distinct from configured consent |
-| Refresh diagnostics | Re-inspects files without applying configuration or launching agents |
-| Retry apply | Reapplies the currently authorized integration selection through the existing consent boundary; changes Remotea-managed configuration entries and is separate from read-only refresh |
-| Runtime readiness: unprobed | No executable, authentication or running-process probe is implied |
+| Saved choice: Granted / Declined / Not decided | Reports persisted consent independently of file observations; does not infer runtime availability |
+| Observed integration files on this desktop / provider details | Read-only inspection with per-provider counts and expandable feature/path/state/error-code rows. Present matches the managed content for this build; modified means different, not necessarily broken. Missing can be expected for disabled features or absent provider directories |
+| Refresh file status (read only) / Checking… | Re-reads consent and observes files without applying configuration, starting processes or contacting services; read failure preserves prior observations as potentially stale |
+| Retry applying saved choice | Enabled for saved granted/declined decisions. Reapplies that existing choice (including authorized removals) and refreshes observations; it does not grant consent. A failed consent save prevents home-file writes |
+| Runtime not probed / Checked at | No executable, authentication or process probe is implied. Timestamp describes the observation; desktop-process environment overrides choose the inspected paths |
+| Apply / removal errors and file-read alerts | Provider/operation/stable error code only; no credential values, file contents, environment dumps or raw OS error messages are returned through diagnostics. Failures are observations of the latest apply attempt, separate from saved consent |
 
 
 ## Sidebar

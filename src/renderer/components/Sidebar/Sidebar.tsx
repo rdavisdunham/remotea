@@ -387,7 +387,7 @@ export default function Sidebar({
                 <span className="sidebar__task-group-label">{item.label}</span>
                 <span className="sidebar__task-group-count">{item.workspaces.length}</span>
               </div>
-              {item.workspaces.map((ws) => renderRow(ws, <TaskRunChip run={taskRunHealth(ws, registryViews)} />))}
+              {item.workspaces.map((ws) => renderRow(ws, <TaskRunChip run={taskRunHealth(ws, registryViews, t)} />))}
             </div>
           )))}
       </div>

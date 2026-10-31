@@ -405,7 +405,6 @@ export const ja: Translation = {
   'settings.terminalPanel.fontSize': 'フォントサイズ',
   'settings.terminalPanel.colorSchemeSection': 'カラースキーム',
   'settings.terminalPanel.defaultScheme': '既定のスキーム',
-  'settings.terminalPanel.schemeHintPart1': '新しいペインに適用されます。ペインごとに上書きするには ',
   'settings.terminalPanel.schemeHintPart2': ' または ',
   'settings.terminalPanel.schemeHintPart3': '。',
   'settings.terminalPanel.customSchemesSection': 'カスタムスキーム',

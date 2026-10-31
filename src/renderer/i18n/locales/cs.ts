@@ -464,7 +464,6 @@ export const cs: Translation = {
   'settings.terminalPanel.fontSize': 'Velikost písma',
   'settings.terminalPanel.colorSchemeSection': 'Barevné schéma',
   'settings.terminalPanel.defaultScheme': 'Výchozí schéma',
-  'settings.terminalPanel.schemeHintPart1': 'Použije se na nové panely. Přepište pro jednotlivý panel pomocí ',
   'settings.terminalPanel.schemeHintPart2': ' nebo ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Vlastní schémata',

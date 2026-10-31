@@ -413,7 +413,6 @@ export const ko: Translation = {
   'settings.terminalPanel.fontSize': '글꼴 크기',
   'settings.terminalPanel.colorSchemeSection': '색 구성표',
   'settings.terminalPanel.defaultScheme': '기본 구성표',
-  'settings.terminalPanel.schemeHintPart1': '새 창에 적용됩니다. 창별로 재정의하려면 ',
   'settings.terminalPanel.schemeHintPart2': ' 또는 ',
   'settings.terminalPanel.schemeHintPart3': '를 사용하세요.',
   'settings.terminalPanel.customSchemesSection': '사용자 지정 구성표',

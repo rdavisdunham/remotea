@@ -1,3 +1,4 @@
+import type { Translator } from '../../i18n/core';
 /**
  * remotea (task 0ec167e4): the sidebar groups the workspaces sync made for
  * Eridani tasks (`WorkspaceInfo.eridaniTask`) under their execution target —
@@ -65,7 +66,7 @@ function surfaceIds(tree: SplitNode, out: string[] = []): string[] {
  * this workspace that Eridani started, the newest (latest generation, then
  * attempt, then creation). null when the registry has none of them.
  */
-export function taskRunHealth(workspace: { splitTree: SplitNode; eridaniTask?: EridaniTaskRef }, views: RemoteRegistryView[] | null | undefined): RunHealth | null {
+export function taskRunHealth(workspace: { splitTree: SplitNode; eridaniTask?: EridaniTaskRef }, views: RemoteRegistryView[] | null | undefined, t?: Translator): RunHealth | null {
   const task = workspace.eridaniTask;
   if (!task) return null;
   const view = views?.find((v) => v.hostId === task.hostId);
@@ -77,5 +78,5 @@ export function taskRunHealth(workspace: { splitTree: SplitNode; eridaniTask?: E
   for (const s of view.sessions) {
     if (ids.has(s.id) && s.eridani && (!best || newer(s, best) > 0)) best = s;
   }
-  return best ? runHealth(best, view.connected) : null;
+  return best ? runHealth(best, view.connected, t) : null;
 }

@@ -751,7 +751,7 @@ export const en = {
   'settings.terminalPanel.importUndo': 'Undo',
   'settings.terminalPanel.importReverted': 'Import reverted.',
   'settings.terminalPanel.defaultScheme': 'Default scheme',
-  'settings.terminalPanel.schemeHintPart1': 'Applied to new panes. Override per pane via ',
+  'settings.terminalPanel.schemeHintPart1': 'Updates terminals using the default scheme. Override per pane via ',
   'settings.terminalPanel.schemeHintPart2': ' or ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Custom schemes',

@@ -405,7 +405,6 @@ export const pl: Translation = {
   'settings.terminalPanel.fontSize': 'Rozmiar czcionki',
   'settings.terminalPanel.colorSchemeSection': 'Schemat kolorów',
   'settings.terminalPanel.defaultScheme': 'Schemat domyślny',
-  'settings.terminalPanel.schemeHintPart1': 'Stosowany do nowych paneli. Nadpisuj per panel przez ',
   'settings.terminalPanel.schemeHintPart2': ' lub ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Własne schematy',

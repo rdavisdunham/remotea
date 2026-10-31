@@ -73,6 +73,7 @@ export function HostAttentionRow({ row, onFocus, onOpenHosts }: {
 
 export default function HostAttentionBar({ onOpenHosts }: { onOpenHosts?: () => void }) {
   const t = useT();
+  const t = useT();
   useEffect(() => startRemoteHostStatus(), []);
   const hosts = useRemoteHosts((s) => s.hosts);
   const status = useRemoteHosts((s) => s.status);
@@ -86,7 +87,7 @@ export default function HostAttentionBar({ onOpenHosts }: { onOpenHosts?: () => 
   const anyHost = Object.keys(hosts).length > 0;
   // buildLocalIndex reads the store; `workspaces` is what changes it.
   const shownHere = useMemo(() => (anyHost ? new Set(buildLocalIndex().surfaces.map((s) => s.id)) : new Set<string>()), [workspaces, anyHost]);
-  const rows = useMemo(() => hostAttention(hosts, status, views, shownHere, now), [hosts, status, views, shownHere, now]);
+  const rows = useMemo(() => hostAttention(hosts, status, views, shownHere, now, t), [hosts, status, views, shownHere, now, t]);
   if (!rows.length) return null;
   return (
     <div className="host-attention" aria-label={t('settings.tab.hosts')}>

@@ -4,7 +4,7 @@ Remotea organizes terminals, coding agents and project tools in one Windows desk
 app. Work locally without a host, or connect to a Linux/WSL Remotea host for
 server-owned terminals. A supported host can optionally link to Eridani for task
 and run coordination. [Task-based help](docs/remotea/help.md) explains lifecycle,
-capabilities, phone access and CLI endpoint discovery.
+capabilities, phone access and CLI endpoint discovery. The [settings reference](docs/remotea/settings-reference.md) catalogues every preference, and the [alignment contract](docs/remotea/alignment.md) records preserved behavior and acceptance checks.
 
 **Process ownership matters:** local terminals end with their owning desktop
 window. Host terminals detach when the desktop closes and can continue while the
@@ -34,8 +34,8 @@ Laptop (Windows)                          Desktop
 
 SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the session dies, and you have to find it and restart it. herdr fixes the persistence but is a TUI. wmux has a rich Windows GUI but only runs local terminals. remotea combines them.
 
-- **Terminals live on the server.** Closing the desktop or losing its connection *detaches host terminals*. They can continue while the host and service stay available; offline status is unknown. Local desktop terminals end with their owning window.
-- **Automatic reconnect.** On wake (`powerMonitor` resume), after a dropped connection (heartbeat), or on relaunch, every pane reattaches. Short gaps replay only the bytes you missed; long ones get a full screen and scrollback snapshot.
+- **Host terminals live on the server.** Closing the desktop or losing its connection *detaches host terminals*. They can continue while the host and service stay available; offline status is unknown. Local desktop terminals end with their owning window.
+- **Automatic reconnect.** On wake (`powerMonitor` resume), after a dropped connection (heartbeat), or on relaunch, host panes reattach. Short gaps replay only the bytes you missed; long ones get a full screen and scrollback snapshot.
 - **Shared sessions, per-device layout.**
   - Sessions and workspaces (name and color) are shared by every device: a terminal opened on the desktop shows up on the laptop in the same workspace.
   - Each device keeps its own splits, windows and monitor layout.

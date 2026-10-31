@@ -20,7 +20,7 @@ This alignment implements the product, language, settings and location work from
 | Phone access | Desktop-hosted viewer/control connection, separately paired and separately authorized |
 | Snapshot / layout | Saved application structure and launch inputs; a named snapshot also restores terminal preferences |
 
-Closing a local terminal ends its process. Hiding a host tab only hides it on this device. Ending a host session is a distinct action. Quitting the desktop ends local processes and detaches from host sessions; it also stops Phone access. A host on the same physical computer, including WSL, still stops when that machine sleeps or shuts down. Optional server restart recovery is not a universal persistence guarantee.
+Closing a local terminal ends its process. Hiding a host tab only hides it on this device. Ending a host session is a distinct action. Quitting the desktop ends local processes and detaches from host sessions; it also stops Phone access. A host on the same physical computer, including WSL, cannot keep executing while that machine sleeps; shutdown can end its processes. Optional server restart recovery is not a universal persistence guarantee.
 
 ## Implemented alignment
 

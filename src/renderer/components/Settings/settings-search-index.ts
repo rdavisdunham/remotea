@@ -2,148 +2,168 @@
 export const SETTINGS_SEARCH_TERMS = {
   "General": [
     {
+      "key": "settings.general.bgPreset.lovely",
+      "label": "Lovely"
+    },
+    {
+      "key": "settings.general.bgPreset.ember",
+      "label": "Ember"
+    },
+    {
+      "key": "settings.general.bgPreset.deepSea",
+      "label": "Deep sea"
+    },
+    {
+      "key": "settings.general.bgPreset.aurora",
+      "label": "Aurora"
+    },
+    {
+      "key": "settings.general.bgPreset.graphite",
+      "label": "Graphite"
+    },
+    {
       "key": "settings.general.contextMenuLabel",
-      "label": "settings.general.contextMenuLabel"
+      "label": "Open in remotea"
     },
     {
       "key": "settings.general.languageSection",
-      "label": "settings.general.languageSection"
+      "label": "Language"
     },
     {
       "key": "settings.general.language",
-      "label": "settings.general.language"
+      "label": "Interface language"
     },
     {
       "key": "settings.general.languageHint",
-      "label": "settings.general.languageHint"
+      "label": "Changes apply immediately. Untranslated text falls back to English."
     },
     {
       "key": "settings.general.languageCustomHint",
-      "label": "settings.general.languageCustomHint"
+      "label": "Add a language, or correct one, by dropping a JSON file into"
     },
     {
       "key": "settings.general.appearanceSection",
-      "label": "settings.general.appearanceSection"
+      "label": "Appearance"
     },
     {
       "key": "settings.general.uiTheme",
-      "label": "settings.general.uiTheme"
+      "label": "App theme"
     },
     {
       "key": "settings.general.uiTheme.system",
-      "label": "settings.general.uiTheme.system"
+      "label": "Follow system"
     },
     {
       "key": "settings.general.uiTheme.dark",
-      "label": "settings.general.uiTheme.dark"
+      "label": "Dark"
     },
     {
       "key": "settings.general.uiTheme.light",
-      "label": "settings.general.uiTheme.light"
+      "label": "Light"
     },
     {
       "key": "settings.general.appearanceHint",
-      "label": "settings.general.appearanceHint"
+      "label": "Controls the sidebar, tab bar, and window chrome. Terminal colors are set separately."
     },
     {
       "key": "settings.general.inactivePaneDim",
-      "label": "settings.general.inactivePaneDim"
+      "label": "Dim unfocused panes"
     },
     {
       "key": "settings.general.inactivePaneDimHint",
-      "label": "settings.general.inactivePaneDimHint"
+      "label": "How much darker panes without focus are drawn. 0% turns dimming off. Focus mode still dims more."
     },
     {
       "key": "settings.general.shellSection",
-      "label": "settings.general.shellSection"
+      "label": "Windows Explorer"
     },
     {
       "key": "settings.general.contextMenu",
-      "label": "settings.general.contextMenu"
+      "label": "Add \"Open in remotea\" to the folder context menu"
     },
     {
       "key": "settings.general.contextMenuFailed",
-      "label": "settings.general.contextMenuFailed"
+      "label": "Could not update the context menu entry."
     },
     {
       "key": "settings.general.contextMenuHint",
-      "label": "settings.general.contextMenuHint"
+      "label": "Right-click a folder — or its empty space — to open it as a workspace, instead of pasting the path. On Windows 11 it appears under \"Show more options\" (Shift+F10); the modern top-level menu requires a signed MSIX package. Writes only to HKCU, so no admin rights are needed."
     },
     {
       "key": "settings.general.iconCache",
-      "label": "settings.general.iconCache"
+      "label": "Taskbar still showing the old remotea icon?"
     },
     {
       "key": "settings.general.iconCacheStarted",
-      "label": "settings.general.iconCacheStarted"
+      "label": "Explorer is restarting…"
     },
     {
       "key": "settings.general.iconCacheButton",
-      "label": "settings.general.iconCacheButton"
+      "label": "Refresh taskbar icons"
     },
     {
       "key": "settings.general.iconCacheHint",
-      "label": "settings.general.iconCacheHint"
+      "label": "Windows caches shell icons and only re-reads them when Explorer restarts, so after an update that changed the icon, the taskbar and a pinned button can keep drawing the old one while the window and notifications already show the new one. This restarts Explorer with that cache cleared: the taskbar disappears for a second and any open File Explorer windows close. Your terminals are not affected."
     },
     {
       "key": "settings.general.customBgSection",
-      "label": "settings.general.customBgSection"
+      "label": "Custom background"
     },
     {
       "key": "settings.general.customBgEnable",
-      "label": "settings.general.customBgEnable"
+      "label": "Enable custom background"
     },
     {
       "key": "settings.general.customBgPreset",
-      "label": "settings.general.customBgPreset"
+      "label": "Preset"
     },
     {
       "key": "settings.general.customBgPreset.none",
-      "label": "settings.general.customBgPreset.none"
+      "label": "Choose a preset…"
     },
     {
       "key": "settings.general.customBgCss",
-      "label": "settings.general.customBgCss"
+      "label": "Background (CSS)"
     },
     {
       "key": "settings.general.customBgHint",
-      "label": "settings.general.customBgHint"
+      "label": "Any CSS background: a color, gradients, or url(…) images. Drawn behind the terminals, independent of the color scheme. Terminal opacity controls how much shows through."
     },
     {
       "key": "settings.general.transparencySection",
-      "label": "settings.general.transparencySection"
+      "label": "Window transparency"
     },
     {
       "key": "settings.general.transparencyEnable",
-      "label": "settings.general.transparencyEnable"
+      "label": "Enable transparency"
     },
     {
       "key": "settings.general.transparencyMaterial",
-      "label": "settings.general.transparencyMaterial"
+      "label": "Style"
     },
     {
       "key": "settings.general.transparencyMaterial.clear",
-      "label": "settings.general.transparencyMaterial.clear"
+      "label": "Clear"
     },
     {
       "key": "settings.general.transparencyMaterial.acrylic",
-      "label": "settings.general.transparencyMaterial.acrylic"
+      "label": "Acrylic"
     },
     {
       "key": "settings.general.transparencyMaterial.mica",
-      "label": "settings.general.transparencyMaterial.mica"
+      "label": "Mica"
     },
     {
       "key": "settings.general.transparencyHint",
-      "label": "settings.general.transparencyHint"
+      "label": "Clear leaves the desktop sharp enough to read; Acrylic and Mica blur it."
     },
     {
       "key": "settings.general.transparencyRestart",
-      "label": "settings.general.transparencyRestart"
+      "label": "Restart remotea to apply."
     },
     {
       "key": "settings.general.customBgOpacity",
-      "label": "settings.general.customBgOpacity"
+      "label": "Terminal opacity"
     },
     {
       "key": "settings.general.easterEggSection",
@@ -161,167 +181,167 @@ export const SETTINGS_SEARCH_TERMS = {
   "Hosts": [
     {
       "key": "remote.host.urlExpected",
-      "label": "remote.host.urlExpected"
+      "label": "Expected wss://host:7717, or ws:// to a Tailscale name (*.ts.net) or 100.x address."
     },
     {
       "key": "remote.host.urlLoopback",
-      "label": "remote.host.urlLoopback"
+      "label": "This computer: the connection never leaves it."
     },
     {
       "key": "remote.host.urlTailscale",
-      "label": "remote.host.urlTailscale"
+      "label": "Tailscale address: the connection is encrypted by Tailscale."
     },
     {
       "key": "remote.host.urlTls",
-      "label": "remote.host.urlTls"
+      "label": "wss://: the connection is encrypted with TLS."
     },
     {
       "key": "remote.host.urlPlain",
-      "label": "remote.host.urlPlain"
+      "label": "ws:// to {host} is not encrypted: the token and everything you type cross this network in the clear. Prefer the host’s Tailscale name (*.ts.net) or 100.x address, or wss://."
     },
     {
       "key": "remote.host.urlAck",
-      "label": "remote.host.urlAck"
+      "label": "I understand this connection is unencrypted on this network"
     },
     {
       "key": "remote.host.testSuccess",
-      "label": "remote.host.testSuccess"
+      "label": "Connected to {host}: {count} session records reported."
     },
     {
       "key": "remote.host.testFailed",
-      "label": "remote.host.testFailed"
+      "label": "Connection test failed"
     },
     {
       "key": "remote.host.saveFailed",
-      "label": "remote.host.saveFailed"
+      "label": "Could not save host settings"
     },
     {
       "key": "remote.host.name",
-      "label": "remote.host.name"
+      "label": "Name"
     },
     {
       "key": "remote.host.namePlaceholder",
-      "label": "remote.host.namePlaceholder"
+      "label": "My host"
     },
     {
       "key": "remote.host.url",
-      "label": "remote.host.url"
+      "label": "URL"
     },
     {
       "key": "remote.host.token",
-      "label": "remote.host.token"
+      "label": "Token"
     },
     {
       "key": "remote.host.storedToken",
-      "label": "remote.host.storedToken"
+      "label": "•••••••• stored (leave empty to keep)"
     },
     {
       "key": "remote.host.pasteToken",
-      "label": "remote.host.pasteToken"
+      "label": "Paste the output of remotea token on the host"
     },
     {
       "key": "remote.host.enabled",
-      "label": "remote.host.enabled"
+      "label": "Enabled"
     },
     {
       "key": "remote.host.test",
-      "label": "remote.host.test"
+      "label": "Test"
     },
     {
       "key": "remote.host.save",
-      "label": "remote.host.save"
+      "label": "Save"
     },
     {
       "key": "remote.host.cancel",
-      "label": "remote.host.cancel"
+      "label": "Cancel"
     },
     {
       "key": "remote.host.hidden",
-      "label": "remote.host.hidden"
+      "label": "Hidden on this device"
     },
     {
       "key": "remote.host.hiddenHint",
-      "label": "remote.host.hiddenHint"
+      "label": "Hiding does not request termination. These are the host’s last reported records, including exited sessions; offline liveness is unknown."
     },
     {
       "key": "remote.host.inbox",
-      "label": "remote.host.inbox"
+      "label": "Inbox"
     },
     {
       "key": "remote.host.show",
-      "label": "remote.host.show"
+      "label": "Show here"
     },
     {
       "key": "remote.host.endConfirm",
-      "label": "remote.host.endConfirm"
+      "label": "End this host terminal session on every device? This requests process termination, including any running agent. It does not verify or accept an Eridani task."
     },
     {
       "key": "remote.host.end",
-      "label": "remote.host.end"
+      "label": "End session on this host"
     },
     {
       "key": "remote.host.removeConfirm",
-      "label": "remote.host.removeConfirm"
+      "label": "Remove this host from this device? This does not request termination on the host. Open tabs here stop updating; offline process status is unknown."
     },
     {
       "key": "settings.tab.hosts",
-      "label": "settings.tab.hosts"
+      "label": "Remote hosts"
     },
     {
       "key": "remote.host.lifetime",
-      "label": "remote.host.lifetime"
+      "label": "Host terminals run on that machine’s Remotea server and can continue while the desktop is disconnected, if the host and service stay available. WSL on this same PC is still a host; PC sleep or shutdown can stop it. Disconnected process status is unknown. Devices share host sessions; each keeps its own arrangement."
     },
     {
       "key": "remote.host.setup",
-      "label": "remote.host.setup"
+      "label": "Server setup (in WSL on the host): run remote-server/scripts/install.sh, then copy its URL and the output of remotea token here. This desktop token differs from Eridani link/MCP credentials and phone pairing."
     },
     {
       "key": "remote.host.notApplied",
-      "label": "remote.host.notApplied"
+      "label": "Not applied on this host:"
     },
     {
       "key": "remote.host.dismiss",
-      "label": "remote.host.dismiss"
+      "label": "Dismiss"
     },
     {
       "key": "remote.host.default",
-      "label": "remote.host.default"
+      "label": "New terminals open here by default"
     },
     {
       "key": "remote.host.edit",
-      "label": "remote.host.edit"
+      "label": "Edit"
     },
     {
       "key": "remote.host.remove",
-      "label": "remote.host.remove"
+      "label": "Remove"
     },
     {
       "key": "remote.host.shellSpec",
-      "label": "remote.host.shellSpec"
+      "label": "Compatibility shell specification for launch profiles and workspaces:"
     },
     {
       "key": "remote.host.add",
-      "label": "remote.host.add"
+      "label": "Add remote host"
     },
     {
       "key": "remote.host.eridani",
-      "label": "remote.host.eridani"
+      "label": "Eridani runs and recovery"
     },
     {
       "key": "remote.host.group",
-      "label": "remote.host.group"
+      "label": "Group Eridani runs by repository and task"
     },
     {
       "key": "remote.host.groupHint",
-      "label": "remote.host.groupHint"
+      "label": "A desktop grouping per task (or standalone run), under its execution target. This organizes existing host terminals; it does not start tasks. Activity and process exit do not establish verification or approval. Off: runs share the host’s Eridani workspace. Manual sessions are not moved."
     },
     {
       "key": "remote.host.skipRecovery",
-      "label": "remote.host.skipRecovery"
+      "label": "Skip the recovery dialog when everything restores cleanly"
     },
     {
       "key": "remote.host.skipRecoveryHint",
-      "label": "remote.host.skipRecoveryHint"
+      "label": "After start or reconnect, ask only about exited or closed terminals and worktrees with unmerged work. Restoring a view or resuming a conversation does not revive an ended process."
     }
   ],
   "Sidebar": [
@@ -461,15 +481,15 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.showWelcomeScreen",
-      "label": "Show welcome screen on startup"
+      "label": "Show the first-use tour"
     },
     {
       "key": "settings.workspacePanel.confirmClose",
-      "label": "Confirm before closing a session"
+      "label": "Confirm before closing a local workspace"
     },
     {
       "key": "settings.workspacePanel.confirmCloseHint",
-      "label": "settings.workspacePanel.confirmCloseHint"
+      "label": "Ask before closing a local workspace with the × button, context menu or Ctrl+Shift+W. CLI and agent closes never prompt. Host tabs always have a separate Hide or End decision."
     },
     {
       "key": "settings.workspacePanel.confirmAppClose",
@@ -477,11 +497,11 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.confirmAppCloseHint",
-      "label": "settings.workspacePanel.confirmAppCloseHint"
+      "label": "Ask before closing this window with × or Alt+F4. Local terminals in the window end, including agents. Host terminals detach; closing the window does not request that they stop. Updates, restarts and Windows shutdown never prompt; local processes still end."
     },
     {
       "key": "settings.workspacePanel.sessionSnapshot",
-      "label": "Snapshot sessions every"
+      "label": "Save layout snapshots every"
     },
     {
       "key": "settings.workspacePanel.sessionSnapshotOff",
@@ -509,7 +529,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.sessionSnapshotHint",
-      "label": "Keeps the last three layouts that were different, as \"Auto-save …\" entries under Load session — so a pane closed by mistake, or by an agent, can be brought back. Only a layout that actually changed uses a slot, so an idle machine keeps its history."
+      "label": "Keeps the last three changed arrangements under Restore workspace snapshot. Restore rebuilds saved tabs and supported launch details, not process memory. Named snapshots include all workspaces and terminal preferences in this window; restoring applies those preferences."
     },
     {
       "key": "settings.workspacePanel.restoreClaudeSessions",
@@ -521,7 +541,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.restoreCodexSessions",
-      "label": "Resume Codex sessions on restore"
+      "label": "Resume local Codex conversations when restoring"
     },
     {
       "key": "settings.workspacePanel.restoreCodexSessionsHint",
@@ -529,27 +549,27 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.restoreOpencodeSessions",
-      "label": "Resume OpenCode sessions on restore"
+      "label": "Resume local OpenCode conversations when restoring"
     },
     {
       "key": "settings.workspacePanel.restoreOpencodeSessionsHint",
-      "label": "settings.workspacePanel.restoreOpencodeSessionsHint"
+      "label": "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode plugin (Agent integration on). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 is captured only when started with --standalone: its shared background server cannot tell tabs apart."
     },
     {
       "key": "settings.workspacePanel.restoreAgySessions",
-      "label": "Resume Antigravity CLI conversations on restore"
+      "label": "Resume local Antigravity conversations when restoring"
     },
     {
       "key": "settings.workspacePanel.restoreAgySessionsHint",
-      "label": "settings.workspacePanel.restoreAgySessionsHint"
+      "label": "Reopens each restored tab's agy conversation with `agy --conversation`, in the directory it was in. Needs the remotea agy plugin (Status hooks on) and Node.js. A conversation is captured when it starts, or at its first message once resumed. An agy you quit back to the shell prompt is not reopened."
     },
     {
       "key": "settings.workspacePanel.restoreQwenSessions",
-      "label": "Resume Qwen Code sessions on restore"
+      "label": "Resume local Qwen Code conversations when restoring"
     },
     {
       "key": "settings.workspacePanel.restoreQwenSessionsHint",
-      "label": "settings.workspacePanel.restoreQwenSessionsHint"
+      "label": "Re-launches each restored tab that was running Qwen Code with `qwen --resume`, in the directory it was in. Needs the remotea Qwen hooks (Status hooks on) and Qwen Code 0.14 or later. Tabs whose session Qwen no longer has are skipped, and a Qwen you exited cleanly is not resumed."
     },
     {
       "key": "settings.workspacePanel.restoreOmpSessions",
@@ -557,7 +577,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.restoreOmpSessionsHint",
-      "label": "settings.workspacePanel.restoreOmpSessionsHint"
+      "label": "Reopens each restored tab's exact omp session with `omp --resume <path>`, in the directory it was in. Needs the remotea omp extension (Status hooks on). An omp session you quit normally is not reopened. If a session file was deleted since, the pane skips resume safely without creating a new session."
     },
     {
       "key": "settings.workspacePanel.detectAgentScreens",
@@ -565,7 +585,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.detectAgentScreensHint",
-      "label": "For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\\\remotea\\\\agent-detection, and use `wmux detect explain` to see which rule fired."
+      "label": "For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `wmux detect explain` to see which rule fired."
     },
     {
       "key": "settings.workspacePanel.explorerOpenByDefault",
@@ -621,11 +641,11 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.defaultCwdPlaceholder",
-      "label": "Current directory (e.g. ~\\\\projects)"
+      "label": "Current directory (e.g. ~\\projects)"
     },
     {
       "key": "execution.browseLocal",
-      "label": "execution.browseLocal"
+      "label": "Browse selects a folder on this computer. Enter a host path for remote launches."
     },
     {
       "key": "settings.workspacePanel.browse",
@@ -685,7 +705,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.noLayoutsYet",
-      "label": "No saved layouts yet — every new workspace uses the pane count and arrangement set above. Save one here to also fix each pane\\'s shell, directory and startup commands."
+      "label": "No saved layouts yet — every new workspace uses the pane count and arrangement set above. Save one here to also fix each pane's shell, directory and startup commands."
     },
     {
       "key": "settings.quickLaunch.namePlaceholder",
@@ -700,24 +720,20 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Set to Current Layout"
     },
     {
-      "key": "settings.workspacePanel.overwritten",
-      "label": "Saved ✓"
-    },
-    {
       "key": "settings.quickLaunch.remove",
       "label": "Remove"
     },
     {
       "key": "execution.browser",
-      "label": "execution.browser"
+      "label": "Browser runs on this computer. localhost refers to this computer; a host service needs a reachable URL or explicit port forwarding."
     },
     {
       "key": "execution.inherit",
-      "label": "execution.inherit"
+      "label": "Inherit workspace launch"
     },
     {
       "key": "execution.defaultDirectory",
-      "label": "execution.defaultDirectory"
+      "label": "Default directory"
     },
     {
       "key": "settings.workspacePanel.startupCommandsToggle",
@@ -730,13 +746,61 @@ export const SETTINGS_SEARCH_TERMS = {
     {
       "key": "settings.workspacePanel.restoreAppDefault",
       "label": "Restore app default"
+    },
+    {
+      "key": "execution.location",
+      "label": "Execution location"
+    },
+    {
+      "key": "execution.local",
+      "label": "This computer"
+    },
+    {
+      "key": "execution.missingHost",
+      "label": "Missing host: {host}"
+    },
+    {
+      "key": "execution.savedHost",
+      "label": "Saved host: {host} (configuration not confirmed)"
+    },
+    {
+      "key": "execution.shell",
+      "label": "Shell / command"
+    },
+    {
+      "key": "execution.command",
+      "label": "Host command (empty for login shell)"
+    },
+    {
+      "key": "execution.inheritHint",
+      "label": "Location and shell follow the workspace or default launch at launch time. Select a location to pin this profile."
+    },
+    {
+      "key": "execution.directoryScope",
+      "label": "Directory and startup commands apply on {location}. Changing this selection affects future launches only. Shells and commands are not translated between environments."
+    },
+    {
+      "key": "execution.localReadiness",
+      "label": "Local terminals use the desktop PTY manager. Desktop agent automation launches here and requires an installed runtime. Native desktop Eridani execution is unavailable."
+    },
+    {
+      "key": "execution.hostReadiness",
+      "label": "Terminal and file operations use the session host. Full Git review, desktop worktrees and opening files in desktop apps are unavailable here. Agent runtime and Eridani readiness are unknown until reported by the host; choosing a host does not install an agent."
+    },
+    {
+      "key": "execution.remote",
+      "label": "Remote host: {host}"
+    },
+    {
+      "key": "execution.hostMissing",
+      "label": "Saved host “{host}” is missing. This launch will fail; it will not run on this computer."
+    },
+    {
+      "key": "execution.invalidDirectory",
+      "label": "Remote directories must be host paths beginning with / or ~/. A desktop path cannot be used on the host."
     }
   ],
   "Terminal": [
-    {
-      "key": ",",
-      "label": ","
-    },
     {
       "key": "settings.terminalPanel.importReverted",
       "label": "Import reverted."
@@ -752,10 +816,6 @@ export const SETTINGS_SEARCH_TERMS = {
     {
       "key": "settings.terminalPanel.imported",
       "label": "Imported"
-    },
-    {
-      "key": "settings.terminalPanel.font",
-      "label": "Font"
     },
     {
       "key": "settings.terminalPanel.font",
@@ -791,7 +851,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.terminalPanel.schemeHintPart1",
-      "label": "Applied to new panes. Override per pane via "
+      "label": "Updates terminals using the default scheme. Override per pane via "
     },
     {
       "key": "settings.terminalPanel.schemeHintPart2",
@@ -810,16 +870,8 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Bring colors, font and background opacity across from a terminal you already have set up. Saved as a custom scheme and selected."
     },
     {
-      "key": "wt",
-      "label": "wt"
-    },
-    {
       "key": "settings.terminalPanel.importWt",
       "label": "From Windows Terminal"
-    },
-    {
-      "key": "ghostty",
-      "label": "ghostty"
     },
     {
       "key": "settings.terminalPanel.importGhostty",
@@ -977,11 +1029,11 @@ export const SETTINGS_SEARCH_TERMS = {
   "Prompts": [
     {
       "key": "settings.prompt.title",
-      "label": "Prompts"
+      "label": "Prompt history"
     },
     {
       "key": "settings.prompt.enabled",
-      "label": "Track prompts"
+      "label": "Record prompt history in terminal views"
     },
     {
       "key": "settings.prompt.enabledHint",
@@ -1105,7 +1157,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.prompt.outlineSideHint",
-      "label": "Which edge of the pane the overlay opens against."
+      "label": "Which edge of the pane the outline opens against."
     }
   ],
   "Notifications": [
@@ -1139,7 +1191,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.notifications.agentStopNotify",
-      "label": "settings.notifications.agentStopNotify"
+      "label": "Notify when agent finishes its turn"
     },
     {
       "key": "settings.notifications.bellNotify",
@@ -1201,11 +1253,11 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.alignment.invalidStartUrl",
-      "label": "settings.alignment.invalidStartUrl"
+      "label": "Enter a valid URL with http:// or https://, or leave empty. The previous valid start page is retained."
     },
     {
       "key": "settings.browser.defaultUrlHint",
-      "label": "Where a workspace\\'s browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea\\'s own page. Also settable in ~/.wmux/config.toml as [browser] default-url."
+      "label": "Where a workspace's browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea's own page. Also settable in ~/.wmux/config.toml as [browser] default-url."
     },
     {
       "key": "settings.browser.autoOpenDevServer",
@@ -1322,12 +1374,8 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Startup commands (one per line)"
     },
     {
-      "key": "\\n",
-      "label": "\\n"
-    },
-    {
       "key": "execution.browser",
-      "label": "execution.browser"
+      "label": "Browser runs on this computer. localhost refers to this computer; a host service needs a reachable URL or explicit port forwarding."
     },
     {
       "key": "settings.quickLaunch.urlPlaceholder",
@@ -1336,16 +1384,92 @@ export const SETTINGS_SEARCH_TERMS = {
     {
       "key": "settings.quickLaunch.addProfile",
       "label": "+ Add profile"
+    },
+    {
+      "key": "execution.location",
+      "label": "Execution location"
+    },
+    {
+      "key": "execution.inherit",
+      "label": "Inherit workspace launch"
+    },
+    {
+      "key": "execution.local",
+      "label": "This computer"
+    },
+    {
+      "key": "execution.missingHost",
+      "label": "Missing host: {host}"
+    },
+    {
+      "key": "execution.savedHost",
+      "label": "Saved host: {host} (configuration not confirmed)"
+    },
+    {
+      "key": "execution.shell",
+      "label": "Shell / command"
+    },
+    {
+      "key": "execution.command",
+      "label": "Host command (empty for login shell)"
+    },
+    {
+      "key": "execution.inheritHint",
+      "label": "Location and shell follow the workspace or default launch at launch time. Select a location to pin this profile."
+    },
+    {
+      "key": "execution.directoryScope",
+      "label": "Directory and startup commands apply on {location}. Changing this selection affects future launches only. Shells and commands are not translated between environments."
+    },
+    {
+      "key": "execution.localReadiness",
+      "label": "Local terminals use the desktop PTY manager. Desktop agent automation launches here and requires an installed runtime. Native desktop Eridani execution is unavailable."
+    },
+    {
+      "key": "execution.hostReadiness",
+      "label": "Terminal and file operations use the session host. Full Git review, desktop worktrees and opening files in desktop apps are unavailable here. Agent runtime and Eridani readiness are unknown until reported by the host; choosing a host does not install an agent."
+    },
+    {
+      "key": "execution.remote",
+      "label": "Remote host: {host}"
+    },
+    {
+      "key": "execution.hostMissing",
+      "label": "Saved host “{host}” is missing. This launch will fail; it will not run on this computer."
+    },
+    {
+      "key": "execution.invalidDirectory",
+      "label": "Remote directories must be host paths beginning with / or ~/. A desktop path cannot be used on the host."
     }
   ],
   "Shortcuts": [
     {
-      "key": "settings.keyboard.title",
-      "label": "Keyboard Shortcuts"
+      "key": "settings.keyboard.indexMods.ctrl",
+      "label": "Ctrl+1…9"
     },
     {
-      "key": "settings.keyboard.searchByName",
-      "label": "Search by name…"
+      "key": "settings.keyboard.indexMods.alt",
+      "label": "Alt+1…9"
+    },
+    {
+      "key": "settings.keyboard.indexMods.ctrlAlt",
+      "label": "Ctrl+Alt+1…9"
+    },
+    {
+      "key": "settings.keyboard.indexMods.ctrlShift",
+      "label": "Ctrl+Shift+1…9"
+    },
+    {
+      "key": "settings.keyboard.indexMods.altShift",
+      "label": "Alt+Shift+1…9"
+    },
+    {
+      "key": "settings.keyboard.indexMods.off",
+      "label": "Disabled"
+    },
+    {
+      "key": "settings.keyboard.title",
+      "label": "Keyboard Shortcuts"
     },
     {
       "key": "settings.keyboard.searchByName",
@@ -1356,8 +1480,20 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "No shortcuts match your search."
     },
     {
+      "key": "cheatSheet.category.other",
+      "label": "Other"
+    },
+    {
       "key": "settings.keyboard.indexSection",
       "label": "Number-row shortcuts"
+    },
+    {
+      "key": "settings.keyboard.workspaceIndex",
+      "label": "Select workspace by number"
+    },
+    {
+      "key": "settings.keyboard.surfaceIndex",
+      "label": "Select tab by number"
     },
     {
       "key": "settings.keyboard.indexHint",
@@ -1371,283 +1507,379 @@ export const SETTINGS_SEARCH_TERMS = {
   "Remote": [
     {
       "key": "settings.remote.error.portBusy",
-      "label": "settings.remote.error.portBusy"
+      "label": "Port {port} is already used by another program. Pick another port below."
     },
     {
       "key": "settings.remote.error.bindFailed",
-      "label": "settings.remote.error.bindFailed"
+      "label": "Could not listen on this address. Check the reachability setting below."
     },
     {
       "key": "settings.remote.error.uiNotBuilt",
-      "label": "settings.remote.error.uiNotBuilt"
+      "label": "The phone page is missing from this build of remotea."
     },
     {
       "key": "settings.remote.error.lanAddressGone",
-      "label": "settings.remote.error.lanAddressGone"
+      "label": "The network address {host} is no longer on this computer. Pick another interface, or switch to “This computer only”."
     },
     {
       "key": "settings.remote.title",
-      "label": "settings.remote.title"
+      "label": "Remote console"
     },
     {
       "key": "settings.remote.unavailable",
-      "label": "settings.remote.unavailable"
-    },
-    {
-      "key": "settings.remote.title",
-      "label": "settings.remote.title"
+      "label": "The remote console is not available in this build."
     },
     {
       "key": "settings.remote.loading",
-      "label": "settings.remote.loading"
-    },
-    {
-      "key": "settings.remote.title",
-      "label": "settings.remote.title"
+      "label": "Loading…"
     },
     {
       "key": "settings.remote.hint",
-      "label": "settings.remote.hint"
+      "label": "Watch your agents and answer them from a phone browser. Off by default: nothing listens until you turn it on here."
     },
     {
       "key": "settings.remote.pair",
-      "label": "settings.remote.pair"
+      "label": "Pair a device"
     },
     {
       "key": "settings.remote.pairNeedsRunning",
-      "label": "settings.remote.pairNeedsRunning"
+      "label": "Turn the remote console on to pair a device."
     },
     {
       "key": "settings.remote.enable",
-      "label": "settings.remote.enable"
+      "label": "Enable the remote console"
     },
     {
       "key": "settings.remote.enableWarnTitle",
-      "label": "settings.remote.enableWarnTitle"
+      "label": "Before you turn it on"
     },
     {
       "key": "settings.remote.enableWarnBody",
-      "label": "settings.remote.enableWarnBody"
+      "label": "A paired device can read your terminals and, with control access, type into them and answer your agents. Only pair devices you own, and revoke any you lose."
     },
     {
       "key": "settings.remote.turnOn",
-      "label": "settings.remote.turnOn"
+      "label": "Turn on"
     },
     {
       "key": "settings.remote.cancel",
-      "label": "settings.remote.cancel"
+      "label": "Cancel"
     },
     {
       "key": "settings.remote.statusOff",
-      "label": "settings.remote.statusOff"
+      "label": "Off"
     },
     {
       "key": "settings.remote.statusListening",
-      "label": "settings.remote.statusListening"
+      "label": "Listening on {host}:{port} · {count} connected"
     },
     {
       "key": "settings.remote.statusStarting",
-      "label": "settings.remote.statusStarting"
+      "label": "Starting…"
     },
     {
       "key": "settings.remote.rejectedOrigin",
-      "label": "settings.remote.rejectedOrigin"
+      "label": "A browser at {origin} was refused because remotea does not know that address."
     },
     {
       "key": "settings.remote.rejectedOriginCaution",
-      "label": "settings.remote.rejectedOriginCaution"
+      "label": "Any web page open on this computer can cause this message. Use it only if you recognise the address as your own, for example your Tailscale URL."
     },
     {
       "key": "settings.remote.useAsPublicUrlConfirm",
-      "label": "settings.remote.useAsPublicUrlConfirm"
+      "label": "Pairing links and QR codes will send phones to {origin}. Whoever controls that address can take over a pairing. Continue only if it is your own Tailscale address."
     },
     {
       "key": "settings.remote.useAsPublicUrlYes",
-      "label": "settings.remote.useAsPublicUrlYes"
-    },
-    {
-      "key": "settings.remote.cancel",
-      "label": "settings.remote.cancel"
+      "label": "Yes, use this address"
     },
     {
       "key": "settings.remote.useAsPublicUrl",
-      "label": "settings.remote.useAsPublicUrl"
+      "label": "Use as Public URL"
     },
     {
       "key": "settings.remote.dismiss",
-      "label": "settings.remote.dismiss"
+      "label": "Dismiss"
     },
     {
       "key": "settings.remote.reachability",
-      "label": "settings.remote.reachability"
-    },
-    {
-      "key": "settings.remote.reachability",
-      "label": "settings.remote.reachability"
+      "label": "Reachable from"
     },
     {
       "key": "settings.remote.bindLoopback",
-      "label": "settings.remote.bindLoopback"
+      "label": "This computer only"
     },
     {
       "key": "settings.remote.bindLoopbackHint",
-      "label": "settings.remote.bindLoopbackHint"
+      "label": "Reach it from a phone through Tailscale or an SSH tunnel (see below)."
     },
     {
       "key": "settings.remote.bindLan",
-      "label": "settings.remote.bindLan"
+      "label": "Local network (plain HTTP)"
     },
     {
       "key": "settings.remote.noLanAddress",
-      "label": "settings.remote.noLanAddress"
+      "label": "No local network address found."
     },
     {
       "key": "settings.remote.interface",
-      "label": "settings.remote.interface"
+      "label": "Network interface"
     },
     {
       "key": "settings.remote.addressGone",
-      "label": "settings.remote.addressGone"
+      "label": "{host} (no longer on this computer)"
     },
     {
       "key": "settings.remote.lanNotice",
-      "label": "settings.remote.lanNotice"
+      "label": "Plain HTTP: anyone on this network can read the traffic, terminal output included. Devices paired over this network can only view unless you allow control below."
     },
     {
       "key": "settings.remote.allowControl",
-      "label": "settings.remote.allowControl"
+      "label": "Allow control over plain HTTP"
     },
     {
       "key": "settings.remote.allowControlAck",
-      "label": "settings.remote.allowControlAck"
+      "label": "I understand that someone on this network could capture a paired device’s access and type into my terminals."
     },
     {
       "key": "settings.remote.allowControlContinue",
-      "label": "settings.remote.allowControlContinue"
-    },
-    {
-      "key": "settings.remote.cancel",
-      "label": "settings.remote.cancel"
+      "label": "Continue"
     },
     {
       "key": "settings.remote.allowControlConfirm",
-      "label": "settings.remote.allowControlConfirm"
+      "label": "Allow typing and answering agents over an unencrypted connection?"
     },
     {
       "key": "settings.remote.allowControlYes",
-      "label": "settings.remote.allowControlYes"
-    },
-    {
-      "key": "settings.remote.cancel",
-      "label": "settings.remote.cancel"
+      "label": "Yes, allow control"
     },
     {
       "key": "settings.remote.port",
-      "label": "settings.remote.port"
+      "label": "Port"
     },
     {
       "key": "settings.remote.apply",
-      "label": "settings.remote.apply"
+      "label": "Apply"
     },
     {
       "key": "settings.remote.publicUrl",
-      "label": "settings.remote.publicUrl"
+      "label": "Public URL"
     },
     {
       "key": "settings.remote.publicUrlPlaceholder",
-      "label": "settings.remote.publicUrlPlaceholder"
+      "label": "https://my-pc.tailnet.ts.net"
     },
     {
       "key": "settings.remote.save",
-      "label": "settings.remote.save"
+      "label": "Save"
     },
     {
       "key": "settings.remote.publicUrlHint",
-      "label": "settings.remote.publicUrlHint"
+      "label": "The https address your phone opens, for example a Tailscale serve URL. Leave empty if you have none."
+    },
+    {
+      "key": "settings.remote.scope.viewer",
+      "label": "View only"
+    },
+    {
+      "key": "settings.remote.scope.operator",
+      "label": "Control"
+    },
+    {
+      "key": "settings.remote.scope.operatorLimited",
+      "label": "Control (view only on this network)"
+    },
+    {
+      "key": "settings.remote.scope.operatorRepair",
+      "label": "Control (view only until paired again)"
     },
     {
       "key": "settings.remote.devices",
-      "label": "settings.remote.devices"
+      "label": "Paired devices"
     },
     {
       "key": "settings.remote.noDevices",
-      "label": "settings.remote.noDevices"
+      "label": "No paired devices."
     },
     {
       "key": "settings.remote.col.name",
-      "label": "settings.remote.col.name"
+      "label": "Name"
     },
     {
       "key": "settings.remote.col.scope",
-      "label": "settings.remote.col.scope"
+      "label": "Access"
     },
     {
       "key": "settings.remote.col.paired",
-      "label": "settings.remote.col.paired"
+      "label": "Paired"
     },
     {
       "key": "settings.remote.col.lastSeen",
-      "label": "settings.remote.col.lastSeen"
+      "label": "Last seen"
     },
     {
       "key": "settings.remote.col.connected",
-      "label": "settings.remote.col.connected"
+      "label": "Connected"
     },
     {
       "key": "settings.remote.col.actions",
-      "label": "settings.remote.col.actions"
+      "label": "Actions"
     },
     {
       "key": "settings.remote.never",
-      "label": "settings.remote.never"
+      "label": "Never"
     },
     {
       "key": "settings.remote.connectedYes",
-      "label": "settings.remote.connectedYes"
-    },
-    {
-      "key": "settings.remote.save",
-      "label": "settings.remote.save"
-    },
-    {
-      "key": "settings.remote.cancel",
-      "label": "settings.remote.cancel"
+      "label": "Yes"
     },
     {
       "key": "settings.remote.rename",
-      "label": "settings.remote.rename"
+      "label": "Rename"
     },
     {
       "key": "settings.remote.revoke",
-      "label": "settings.remote.revoke"
+      "label": "Revoke"
     },
     {
       "key": "settings.remote.revokeOneConfirm",
-      "label": "settings.remote.revokeOneConfirm"
-    },
-    {
-      "key": "settings.remote.revoke",
-      "label": "settings.remote.revoke"
-    },
-    {
-      "key": "settings.remote.cancel",
-      "label": "settings.remote.cancel"
+      "label": "Revoke {name}? It is signed out at once and has to be paired again."
     },
     {
       "key": "settings.remote.revokeAll",
-      "label": "settings.remote.revokeAll"
+      "label": "Revoke all"
     },
     {
       "key": "settings.remote.revokeAllConfirm",
-      "label": "settings.remote.revokeAllConfirm"
+      "label": "Revoke every paired device ({count})? Each one is signed out at once."
     },
     {
       "key": "settings.remote.revokeAllYes",
-      "label": "settings.remote.revokeAllYes"
+      "label": "Yes, revoke all"
     },
     {
-      "key": "settings.remote.cancel",
-      "label": "settings.remote.cancel"
+      "key": "settings.remote.configError.badPort",
+      "label": "The port must be a whole number from 1024 to 65535."
+    },
+    {
+      "key": "settings.remote.configError.badPublicUrl",
+      "label": "The Public URL must be a bare https address with no path, for example https://my-pc.tailnet.ts.net. Plain http is accepted only for this computer or a Tailscale address."
+    },
+    {
+      "key": "settings.remote.configError.badLanHost",
+      "label": "That network address is not on this computer."
+    },
+    {
+      "key": "settings.remote.configError.deviceCap",
+      "label": "10 devices are already paired. Revoke one before pairing another."
+    },
+    {
+      "key": "settings.remote.configError.notRunning",
+      "label": "The remote console is not running. Turn it on first."
+    },
+    {
+      "key": "settings.remote.configError.writeFailed",
+      "label": "remotea could not save the change to disk (another program may be holding the file). Try again."
+    },
+    {
+      "key": "settings.remote.configError.failed",
+      "label": "Something went wrong. The details are in remotea’s log."
+    },
+    {
+      "key": "settings.remote.actionFailed",
+      "label": "That did not work ({error})."
+    },
+    {
+      "key": "settings.remote.pair.defaultName",
+      "label": "Phone"
+    },
+    {
+      "key": "settings.remote.pair.title",
+      "label": "Pair a device"
+    },
+    {
+      "key": "settings.remote.pair.paired",
+      "label": "Paired: {name}"
+    },
+    {
+      "key": "settings.remote.pair.qrAlt",
+      "label": "Pairing QR code"
+    },
+    {
+      "key": "settings.remote.pair.scan",
+      "label": "Scan this with your phone camera, or open the address below on the phone."
+    },
+    {
+      "key": "settings.remote.pair.expiresIn",
+      "label": "Expires in {seconds} s"
+    },
+    {
+      "key": "settings.remote.pair.oneUse",
+      "label": "Works once, for 2 minutes. Anyone who opens it gets access, so do not share a screenshot."
+    },
+    {
+      "key": "settings.remote.pair.expired",
+      "label": "This code expired."
+    },
+    {
+      "key": "settings.remote.pair.voided",
+      "label": "This code is no longer valid."
+    },
+    {
+      "key": "settings.remote.pair.loopbackWarn",
+      "label": "remotea only listens on this computer and no Public URL is set, so this address will not open on a phone as it is. Make it reachable first:"
+    },
+    {
+      "key": "settings.remote.pair.again",
+      "label": "Make a new code"
+    },
+    {
+      "key": "settings.remote.pair.generate",
+      "label": "Make a pairing code"
+    },
+    {
+      "key": "settings.remote.pair.close",
+      "label": "Close"
+    },
+    {
+      "key": "settings.remote.pair.name",
+      "label": "Device name"
+    },
+    {
+      "key": "settings.remote.pair.scope",
+      "label": "Access"
+    },
+    {
+      "key": "settings.remote.pair.scopeViewer",
+      "label": "View only: watch terminals and agents"
+    },
+    {
+      "key": "settings.remote.pair.scopeOperator",
+      "label": "Control: also type and answer agents"
+    },
+    {
+      "key": "settings.remote.pair.operatorDisabled",
+      "label": "Control is off on a plain-HTTP local network. Allow it in the Remote settings first."
+    },
+    {
+      "key": "settings.remote.copied",
+      "label": "Copied"
+    },
+    {
+      "key": "settings.remote.copy",
+      "label": "Copy"
+    },
+    {
+      "key": "settings.remote.recipeTailscale",
+      "label": "Tailscale (HTTPS inside your tailnet), run on this computer:"
+    },
+    {
+      "key": "settings.remote.recipeSsh",
+      "label": "SSH tunnel, run on the device you connect from:"
+    },
+    {
+      "key": "settings.remote.funnelUnsupported",
+      "label": "Tailscale Funnel (the public internet) is not supported."
     }
   ],
   "Changelog": [
@@ -1695,11 +1927,7 @@ export const SETTINGS_SEARCH_TERMS = {
   "Help": [
     {
       "key": "settings.help.checkUpdate",
-      "label": "settings.help.checkUpdate"
-    },
-    {
-      "key": "settings.help.checkUpdate",
-      "label": "settings.help.checkUpdate"
+      "label": "Check for updates"
     },
     {
       "key": "titlebar.updateChecking",
@@ -1707,7 +1935,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.help.downloading",
-      "label": "settings.help.downloading"
+      "label": "Downloading"
     },
     {
       "key": "titlebar.updateDownloading",
@@ -1730,71 +1958,155 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Update failed"
     },
     {
-      "key": "titlebar.updateFailed",
-      "label": "Update failed"
-    },
-    {
       "key": "settings.help.updateTo",
-      "label": "settings.help.updateTo"
+      "label": "Update to"
     },
     {
       "key": "titlebar.updateAvailable",
-      "label": "titlebar.updateAvailable"
+      "label": "Update available"
     },
     {
       "key": "settings.help.upToDate",
-      "label": "settings.help.upToDate"
-    },
-    {
-      "key": "settings.help.upToDate",
-      "label": "settings.help.upToDate"
+      "label": "Up to date"
     },
     {
       "key": "settings.help.about",
-      "label": "settings.help.about"
+      "label": "About remotea"
     },
     {
       "key": "settings.help.version",
-      "label": "settings.help.version"
+      "label": "Version"
     },
     {
       "key": "settings.help.reportIssue",
-      "label": "settings.help.reportIssue"
+      "label": "Report a Remotea issue"
     },
     {
       "key": "settings.help.website",
-      "label": "settings.help.website"
+      "label": "Remotea documentation"
     },
     {
       "key": "settings.help.hint",
-      "label": "settings.help.hint"
+      "label": "Found a bug or have a request? Open an issue on GitHub."
     },
     {
       "key": "settings.help.credits",
-      "label": "settings.help.credits"
+      "label": "Credits — built on wmux and inspired by herdr"
     },
     {
       "key": "settings.help.tasks",
-      "label": "settings.help.tasks"
+      "label": "Help by task"
     },
     {
       "key": "settings.help.search",
-      "label": "settings.help.search"
-    },
-    {
-      "key": "settings.help.search",
-      "label": "settings.help.search"
+      "label": "Search help"
     },
     {
       "key": "settings.help.noResults",
-      "label": "settings.help.noResults"
+      "label": "No matching help topics."
     },
     {
       "key": "settings.help.readMore",
-      "label": "settings.help.readMore"
+      "label": "Read task guide"
+    },
+    {
+      "key": "help.task.start.title",
+      "label": "Start on this computer"
+    },
+    {
+      "key": "help.task.start.body",
+      "label": "Create a workspace and select a local shell in Settings → Workspace. Local Windows terminals and installed coding agents work without a host or Eridani. Closing their owning window ends local processes."
+    },
+    {
+      "key": "help.task.hosts.title",
+      "label": "Connect a host"
+    },
+    {
+      "key": "help.task.hosts.body",
+      "label": "Settings → Remote hosts connects this desktop to a Remotea session server using its URL and token. Host terminals can survive desktop disconnection while the host and service remain available. WSL on this same PC is still a host; PC sleep or shutdown can stop it. Offline terminal status is unknown."
+    },
+    {
+      "key": "help.task.workspace.title",
+      "label": "Arrange workspaces, panes and tabs"
+    },
+    {
+      "key": "help.task.workspace.body",
+      "label": "A workspace groups panes and tabs; a pane can contain terminals, browsers or documents. Each device keeps its arrangement. Launch profiles supply location, shell, directory and startup commands; startup commands execute when a terminal starts."
+    },
+    {
+      "key": "help.task.agents.title",
+      "label": "Work with coding agents"
+    },
+    {
+      "key": "help.task.agents.body",
+      "label": "Settings → Agent integration configures instructions, status hooks and optional plugins on this computer, with consent. Host integration is separate: run remotea hooks status on the host. Working, Needs you and Idle describe activity, not task acceptance. Prompt history records supported captured input, not system instructions. Resume continues a supported provider conversation in a new process."
+    },
+    {
+      "key": "help.task.eridani.title",
+      "label": "Inspect Eridani work"
+    },
+    {
+      "key": "help.task.eridani.body",
+      "label": "Connect the desktop to a host separately from linking that host to Eridani with remotea eridani setup. Host link keys, agent MCP keys and desktop host tokens have different purposes. A task describes work; a run is one execution and may have no task. Open this run in Eridani to inspect verification, approval and recovery. Terminal exit or agent idle does not prove success. Native Windows Eridani execution is not available."
+    },
+    {
+      "key": "help.task.files.title",
+      "label": "Use files, Git and browser tools"
+    },
+    {
+      "key": "help.task.files.body",
+      "label": "File and Git operations belong to a location and directory. Host filesystem access does not imply desktop worktree or Git feature parity. Git review is read-only; editing files can detect concurrent changes. The browser runs on this computer: localhost refers here, so use a reachable host URL or a configured tunnel. Browser engine settings affect desktop automation."
+    },
+    {
+      "key": "help.task.return.title",
+      "label": "Leave and return safely"
+    },
+    {
+      "key": "help.task.return.body",
+      "label": "Hide on this device removes a host view without requesting termination. End session on this host affects every attached device; inspect the close summary. Reconnect attaches to a reachable host session. Workspace snapshots save all workspaces, tabs and terminal preferences in this window; restoring applies those preferences and rebuilds local processes, not process memory. Layout presets create one workspace. Recovery decisions and provider conversation resume are separate."
+    },
+    {
+      "key": "help.task.phone.title",
+      "label": "Pair a phone"
+    },
+    {
+      "key": "help.task.phone.body",
+      "label": "Settings → Phone access serves a browser console from this desktop. View only cannot type; Control permits input separately. Pairing credentials differ from host and Eridani credentials. The desktop must remain running and reachable; quitting it disconnects phone access even if host terminals continue."
+    },
+    {
+      "key": "help.task.cli.title",
+      "label": "Automate the correct endpoint"
+    },
+    {
+      "key": "help.task.cli.body",
+      "label": "The desktop package exposes remotea and injects working wmux compatibility shims. On a host, remotea administers the server; wmux may reach only a status bridge. Run wmux identify and wmux capabilities before using a command family. A successful ping does not establish browser or workspace control. Desktop --remote addresses a desktop CLI bridge, not a session-server WebSocket."
+    },
+    {
+      "key": "help.task.customize.title",
+      "label": "Customize and troubleshoot"
+    },
+    {
+      "key": "help.task.customize.body",
+      "label": "Settings search finds controls and their scope. User TOML configuration can override UI preferences after reload; custom locale files fall back to English. F1 shows live shortcuts; Settings → Shortcuts and the command palette reflect rebinding. TRACE, agent navigator/office, prompt outline, browser engines and snapshots remain available. Legacy local orchestration is wmux-orchestrator compatibility, separate from OpenCode integration and Eridani. Report desktop/host versions and redacted diagnostics; never include tokens. Windows desktop and Linux/WSL host are current support boundaries."
     }
   ],
   "Agents": [
+    {
+      "key": "settings.integration.instructions",
+      "label": "Agent instructions"
+    },
+    {
+      "key": "settings.integration.hooks",
+      "label": "Status hooks"
+    },
+    {
+      "key": "settings.integration.orchestrator",
+      "label": "OpenCode status and task plugin"
+    },
+    {
+      "key": "settings.integration.browserMcp",
+      "label": "Connect agent MCP tools to the desktop browser"
+    },
     {
       "key": "settings.integration.section",
       "label": "Agent integration"
@@ -1805,7 +2117,99 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.integration.hint",
-      "label": "remotea edits files in your home directory so coding agents can drive its browser panel, markdown views and sidebar status. Turning something off here also removes what it wrote."
+      "label": "With consent, Remotea manages instructions, status hooks and selected plugins in this computer’s agent configuration files (Claude Code, OpenCode, Kiro, omp, pi, Grok, Qwen and Antigravity as supported per feature). Turning a feature off removes Remotea-owned entries. Host setup and Eridani MCP credentials are separate; enabling integration is not a live readiness test."
+    },
+    {
+      "key": "settings.integration.configuredHint",
+      "label": "Checkboxes describe the saved configuration choice. Observed files below are checked separately; a saved choice does not prove installation or agent readiness."
+    },
+    {
+      "key": "settings.integration.savedChoice",
+      "label": "Saved configuration choice"
+    },
+    {
+      "key": "settings.integration.choice.unset",
+      "label": "Not decided (no changes requested)"
+    },
+    {
+      "key": "settings.integration.choice.granted",
+      "label": "Allowed"
+    },
+    {
+      "key": "settings.integration.choice.declined",
+      "label": "Declined"
+    },
+    {
+      "key": "settings.integration.readFailed",
+      "label": "Could not read integration configuration or file status. The previous observations may be stale. Refresh to retry."
+    },
+    {
+      "key": "settings.integration.writeFailed",
+      "label": "The integration change could not be saved or applied. The previous configuration remains shown. Refresh to read the current choice, or retry your change."
+    },
+    {
+      "key": "settings.integration.checking",
+      "label": "Checking files…"
+    },
+    {
+      "key": "settings.integration.refresh",
+      "label": "Refresh file status (read only)"
+    },
+    {
+      "key": "settings.integration.retryApply",
+      "label": "Retry applying saved choice"
+    },
+    {
+      "key": "settings.integration.observedTitle",
+      "label": "Observed integration files on this desktop"
+    },
+    {
+      "key": "settings.integration.runtimeNotProbed",
+      "label": "Runtime not probed: agent executables, Node.js, live hooks, browser MCP connectivity and Eridani readiness have not been tested. Remote host setup is separate. New agent sessions may be needed."
+    },
+    {
+      "key": "settings.integration.checkedAt",
+      "label": "Last checked: {time}"
+    },
+    {
+      "key": "settings.integration.stateMeaning",
+      "label": "Present means the managed section or file matches this build; modified means it differs, not necessarily that it is broken. Missing can be expected for disabled features or providers without a user directory. Refresh never repairs files; retry applies the saved choice and can add or remove files. Custom environment overrides are resolved only from the desktop process."
+    },
+    {
+      "key": "settings.integration.writeOperation",
+      "label": "Last apply failed (file read/write)"
+    },
+    {
+      "key": "settings.integration.removeOperation",
+      "label": "Last removal failed (file read/write)"
+    },
+    {
+      "key": "settings.integration.fileReadErrors",
+      "label": "Some integration files could not be read. Expand the provider details for error codes, then refresh to retry."
+    },
+    {
+      "key": "settings.integration.fileCounts",
+      "label": "{present} present · {missing} missing · {modified} modified · {errors} read errors"
+    },
+    {
+      "key": "settings.integration.desktopEnvironment",
+      "label": "desktop user environment"
+    },
+    {
+      "key": "settings.integration.file.present",
+      "label": "Present"
+    },
+    {
+      "key": "settings.integration.file.missing",
+      "label": "Missing managed content"
+    },
+    {
+      "key": "settings.integration.file.modified",
+      "label": "Modified / differs from this build"
+    },
+    {
+      "key": "settings.integration.file.error",
+      "label": "Read error"
     }
   ]
 } as const;

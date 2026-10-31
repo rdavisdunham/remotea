@@ -405,7 +405,6 @@ export const ru: Translation = {
   'settings.terminalPanel.fontSize': 'Размер шрифта',
   'settings.terminalPanel.colorSchemeSection': 'Цветовая схема',
   'settings.terminalPanel.defaultScheme': 'Схема по умолчанию',
-  'settings.terminalPanel.schemeHintPart1': 'Применяется к новым панелям. Переопределите для панели через ',
   'settings.terminalPanel.schemeHintPart2': ' или ',
   'settings.terminalPanel.schemeHintPart3': '.',
   'settings.terminalPanel.customSchemesSection': 'Собственные схемы',

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import { readFileSync } from 'node:fs';
 import { SETTINGS_GROUPS, searchSettings } from '../../src/renderer/components/Settings/settings-navigation';
-import { PREFERENCE_FIELDS } from '../../src/renderer/components/Settings/settings-search-index';
+import { SETTINGS_SEARCH_TERMS, PREFERENCE_FIELDS } from '../../src/renderer/components/Settings/settings-search-index';
+import { en } from '../../src/renderer/i18n/locales/en';
+import { makeT } from '../../src/renderer/i18n/core';
 import { SHORTCUT_TABLE } from '../../src/renderer/shortcuts';
 import { boundedInteger, canAddScheme, isValidStartUrl } from '../../src/renderer/components/Settings/settings-validation';
 
@@ -30,6 +32,37 @@ describe('settings navigation compatibility and discovery', () => {
     for (const [id, entry] of Object.entries(SHORTCUT_TABLE)) {
       expect(searchSettings(id)).toContain('Shortcuts');
       expect(searchSettings(entry.label)).toContain('Shortcuts');
+    }
+  });
+  it('finds feature metadata by the actual English label rather than a translation-key fragment', () => {
+    expect(searchSettings('OpenCode status and task plugin')).toContain('Agents');
+    expect(searchSettings('Agent instructions')).toContain('Agents');
+    expect(searchSettings('Modified differs from this build')).toContain('Agents');
+    const plugin = SETTINGS_SEARCH_TERMS.Agents.find(term => term.key === 'settings.integration.orchestrator');
+    expect(plugin?.label).toBe('OpenCode status and task plugin');
+  });
+  it('finds location controls inherited by both workspace defaults and profiles', () => {
+    for (const label of ['Execution location', 'Inherit workspace launch', 'Host command empty for login shell']) {
+      expect(searchSettings(label)).toEqual(expect.arrayContaining(['Workspace', 'Profiles']));
+    }
+    expect(searchSettings('changing selection future launches')).toEqual(
+      expect.arrayContaining(['Workspace', 'Profiles']),
+    );
+  });
+  it('finds pairing controls and Help topic text from their related components', () => {
+    expect(searchSettings('Make a pairing code')).toContain('Remote');
+    expect(searchSettings('Control also type and answer agents')).toContain('Remote');
+    expect(searchSettings('Pairing QR code')).toContain('Remote');
+    expect(searchSettings('Pair a phone')).toContain('Help');
+    expect(searchSettings('Pairing credentials differ from host')).toContain('Help');
+  });
+  it('indexes actual localized labels from related components without losing English search', () => {
+    const french = makeT('fr');
+    const translate = (key: string, fallback: string) => french(key as keyof typeof en, fallback);
+    expect(searchSettings('Lecture seule suivre les terminaux', translate)).toContain('Remote');
+    expect(searchSettings('View only watch terminals and agents', translate)).toContain('Remote');
+    for (const terms of Object.values(SETTINGS_SEARCH_TERMS)) {
+      for (const term of terms) expect(term.label).toBe(en[term.key as keyof typeof en]);
     }
   });
   it('supports old names, translated control labels, AND queries and empty results', () => {
