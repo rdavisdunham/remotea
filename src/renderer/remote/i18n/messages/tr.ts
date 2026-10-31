@@ -17,12 +17,12 @@ export const tr: Readonly<Record<string, string>> = {
   'pair.pairing': 'Eşleştiriliyor…',
   'pair.failed': 'Eşleştirme başarısız oldu. Bilgisayarınızda yeni bir kod oluşturup tekrar deneyin.',
   'pair.rate': 'Çok fazla deneme. Biraz bekleyin, sonra Eşleştir’e tekrar dokunun.',
-  'pair.deviceCap': 'Çok fazla cihaz eşleştirilmiş. Bilgisayarınızda Ayarlar → Uzaktan bölümünden birini iptal edin, ardından yeni bir kod oluşturun.',
+  "pair.deviceCap": "Çok fazla cihaz eşleştirilmiş. Bilgisayarınızda Ayarlar → Telefon erişimi bölümünden birini iptal edin, ardından yeni bir kod oluşturun.",
 
   'expired.title': 'Kodun süresi doldu',
   'expired.body': 'Bu kodun süresi doldu — bilgisayarınızda yeni bir kod oluşturun.',
   'unpaired.title': 'Eşleştirilmedi',
-  'unpaired.body': 'Bu tarayıcı remotea ile eşleştirilmemiş. Bilgisayarınızda Ayarlar → Uzaktan → Cihaz eşleştir’i açın ve kodu tarayın.',
+  "unpaired.body": "Bu tarayıcı remotea ile eşleştirilmemiş. Bilgisayarınızda Ayarlar → Telefon erişimi → Cihaz eşleştir’i açın ve kodu tarayın.",
   'revoked.title': 'Erişim kaldırıldı',
   'revoked.body': 'Bu cihaz bilgisayarınızdaki remotea’tan kaldırıldı. Yeniden bağlanmak için tekrar eşleştirin.',
   'replaced.title': 'Başka bir sekmede yeniden eşleştirildi',
@@ -49,7 +49,7 @@ export const tr: Readonly<Record<string, string>> = {
   'console.waiting': 'Bilgisayarınız bekleniyor…',
   'console.viewerNotice': 'Yalnızca görüntüleme — bu bağlantı yazamaz ve yanıt veremez.',
   'console.controlLimited': 'Burada yalnızca görüntüleme — bu cihaz kontrol erişimiyle eşleştirildi, ancak bilgisayarınız şifrelenmemiş HTTP bağlantılarında kontrolü kapatıyor.',
-  'console.repairForControl': 'Burada yalnızca görüntüleme — bu cihaz kontrol erişimiyle eşleştirildi, ancak eşleştirmesi şifrelenmemiş HTTP üzerinden kullanıldığı için kontrol kapalı. Kontrol için bilgisayarınızda yeni bir kod oluşturun (Ayarlar → Uzaktan → Cihaz eşleştir) ve bu telefonla tarayın.',
+  "console.repairForControl": "Burada yalnızca görüntüleme — bu cihaz kontrol erişimiyle eşleştirildi, ancak eşleştirmesi şifrelenmemiş HTTP üzerinden kullanıldığı için kontrol kapalı. Kontrol için bilgisayarınızda yeni bir kod oluşturun (Ayarlar → Telefon erişimi → Cihaz eşleştir) ve bu telefonla tarayın.",
   'console.needsYouCount_one': '{n} ajan sizi bekliyor',
   'console.needsYouCount_other': '{n} ajan sizi bekliyor',
 

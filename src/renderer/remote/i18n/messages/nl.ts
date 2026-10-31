@@ -17,12 +17,12 @@ export const nl: Readonly<Record<string, string>> = {
   'pair.pairing': 'Koppelen…',
   'pair.failed': 'Koppelen mislukt. Maak een nieuwe code op je computer en probeer het opnieuw.',
   'pair.rate': 'Te veel pogingen. Wacht even en tik dan opnieuw op Koppelen.',
-  'pair.deviceCap': 'Er zijn te veel apparaten gekoppeld. Trek er op je computer een in via Instellingen → Op afstand en maak dan een nieuwe code.',
+  "pair.deviceCap": "Er zijn te veel apparaten gekoppeld. Trek er op je computer een in via Instellingen → Telefoontoegang en maak dan een nieuwe code.",
 
   'expired.title': 'Code verlopen',
   'expired.body': 'Deze code is verlopen — maak een nieuwe op je computer.',
   'unpaired.title': 'Niet gekoppeld',
-  'unpaired.body': 'Deze browser is niet gekoppeld aan wmux. Open op je computer Instellingen → Op afstand → Apparaat koppelen en scan de code.',
+  "unpaired.body": "Deze browser is niet gekoppeld aan remotea. Open op je computer Instellingen → Telefoontoegang → Apparaat koppelen en scan de code.",
   'revoked.title': 'Toegang ingetrokken',
   'revoked.body': 'Dit apparaat is op je computer uit remotea verwijderd. Koppel het opnieuw om weer te verbinden.',
   'replaced.title': 'Opnieuw gekoppeld in een ander tabblad',
@@ -49,7 +49,7 @@ export const nl: Readonly<Record<string, string>> = {
   'console.waiting': 'Wachten op je computer…',
   'console.viewerNotice': 'Alleen bekijken — deze verbinding kan niet typen of antwoorden.',
   'console.controlLimited': 'Hier alleen bekijken — dit apparaat is gekoppeld met besturing, maar je computer zet besturing uit voor onversleutelde HTTP-verbindingen.',
-  'console.repairForControl': 'Hier alleen bekijken — dit apparaat is gekoppeld met besturing, maar de koppeling is al eens via onversleuteld HTTP gebruikt, dus besturing staat uit. Maak om te besturen een nieuwe code op je computer (Instellingen → Op afstand → Apparaat koppelen) en scan die met deze telefoon.',
+  "console.repairForControl": "Hier alleen bekijken — dit apparaat is gekoppeld met besturing, maar de koppeling is al eens via onversleuteld HTTP gebruikt, dus besturing staat uit. Maak om te besturen een nieuwe code op je computer (Instellingen → Telefoontoegang → Apparaat koppelen) en scan die met deze telefoon.",
   'console.needsYouCount_one': '{n} agent wacht op jou',
   'console.needsYouCount_other': '{n} agents wachten op jou',
 

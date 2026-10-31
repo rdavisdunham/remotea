@@ -17,12 +17,12 @@ export const it: Readonly<Record<string, string>> = {
   'pair.pairing': 'Associazione…',
   'pair.failed': 'Associazione non riuscita. Genera un nuovo codice sul computer e riprova.',
   'pair.rate': 'Troppi tentativi. Attendi un momento, poi tocca di nuovo Associa.',
-  'pair.deviceCap': 'Troppi dispositivi associati. Sul computer revocane uno in Impostazioni → Remoto, poi crea un nuovo codice.',
+  "pair.deviceCap": "Troppi dispositivi associati. Sul computer revocane uno in Impostazioni → Accesso dal telefono, poi crea un nuovo codice.",
 
   'expired.title': 'Codice scaduto',
   'expired.body': 'Questo codice è scaduto: generane uno nuovo sul computer.',
   'unpaired.title': 'Non associato',
-  'unpaired.body': 'Questo browser non è associato a wmux. Sul computer apri Impostazioni → Remoto → Associa un dispositivo, poi scansiona il codice.',
+  "unpaired.body": "Questo browser non è associato a remotea. Sul computer apri Impostazioni → Accesso dal telefono → Associa un dispositivo, poi scansiona il codice.",
   'revoked.title': 'Accesso revocato',
   'revoked.body': 'Questo dispositivo è stato rimosso da remotea sul tuo computer. Associalo di nuovo per riconnetterti.',
   'replaced.title': 'Associato di nuovo in un’altra scheda',
@@ -49,7 +49,7 @@ export const it: Readonly<Record<string, string>> = {
   'console.waiting': 'In attesa del computer…',
   'console.viewerNotice': 'Sola lettura: questa connessione non può scrivere né rispondere.',
   'console.controlLimited': 'Qui sola lettura: questo dispositivo è associato con il controllo, ma il computer disattiva il controllo sulle connessioni HTTP non cifrate.',
-  'console.repairForControl': 'Qui sola lettura: questo dispositivo è associato con il controllo, ma la sua associazione è già passata su HTTP non cifrato, quindi il controllo è disattivato. Per usare il controllo, crea un nuovo codice sul computer (Impostazioni → Remoto → Associa un dispositivo) e scansionalo con questo telefono.',
+  "console.repairForControl": "Qui sola lettura: questo dispositivo è associato con il controllo, ma la sua associazione è già passata su HTTP non cifrato, quindi il controllo è disattivato. Per usare il controllo, crea un nuovo codice sul computer (Impostazioni → Accesso dal telefono → Associa un dispositivo) e scansionalo con questo telefono.",
   'console.needsYouCount_one': '{n} agente ti aspetta',
   'console.needsYouCount_other': '{n} agenti ti aspettano',
 

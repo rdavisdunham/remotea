@@ -17,12 +17,12 @@ export const es: Readonly<Record<string, string>> = {
   'pair.pairing': 'Vinculando…',
   'pair.failed': 'La vinculación ha fallado. Genera un código nuevo en tu ordenador y vuelve a intentarlo.',
   'pair.rate': 'Demasiados intentos. Espera un momento y vuelve a tocar Vincular.',
-  'pair.deviceCap': 'Hay demasiados dispositivos vinculados. En tu ordenador, revoca uno en Ajustes → Remoto y genera un código nuevo.',
+  "pair.deviceCap": "Hay demasiados dispositivos vinculados. En tu ordenador, revoca uno en Ajustes → Acceso desde el teléfono y genera un código nuevo.",
 
   'expired.title': 'Código caducado',
   'expired.body': 'Este código ha caducado: genera uno nuevo en tu ordenador.',
   'unpaired.title': 'Sin vincular',
-  'unpaired.body': 'Este navegador no está vinculado con wmux. En tu ordenador, abre Ajustes → Remoto → Vincular un dispositivo y escanea el código.',
+  "unpaired.body": "Este navegador no está vinculado con remotea. En tu ordenador, abre Ajustes → Acceso desde el teléfono → Vincular un dispositivo y escanea el código.",
   'revoked.title': 'Acceso retirado',
   'revoked.body': 'Este dispositivo se ha eliminado de remotea en tu ordenador. Vuelve a vincularlo para reconectar.',
   'replaced.title': 'Vinculado de nuevo en otra pestaña',
@@ -49,7 +49,7 @@ export const es: Readonly<Record<string, string>> = {
   'console.waiting': 'Esperando a tu ordenador…',
   'console.viewerNotice': 'Solo lectura: esta conexión no puede escribir ni responder.',
   'console.controlLimited': 'Aquí solo lectura: este dispositivo está vinculado con control, pero tu ordenador desactiva el control en conexiones HTTP sin cifrar.',
-  'console.repairForControl': 'Aquí solo lectura: este dispositivo está vinculado con control, pero su vínculo ya se usó por HTTP sin cifrar, así que el control está desactivado. Para usar el control, crea un código nuevo en tu ordenador (Ajustes → Remoto → Vincular un dispositivo) y escanéalo con este teléfono.',
+  "console.repairForControl": "Aquí solo lectura: este dispositivo está vinculado con control, pero su vínculo ya se usó por HTTP sin cifrar, así que el control está desactivado. Para usar el control, crea un código nuevo en tu ordenador (Ajustes → Acceso desde el teléfono → Vincular un dispositivo) y escanéalo con este teléfono.",
   'console.needsYouCount_one': '{n} agente te necesita',
   'console.needsYouCount_other': '{n} agentes te necesitan',
 

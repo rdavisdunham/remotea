@@ -63,8 +63,8 @@ describe('agent instruction block (issue #158)', () => {
     expect(raw).toContain('Missing browser');
     expect(raw).toContain('support does not disable status reporting');
     expect(raw).toContain('`wmux agent-state` is a desktop query');
-    expect(raw).toContain('Use your\nnormal tools');
-    expect(raw).toContain('Nothing here is a\nrestriction on what you may otherwise do');
+    expect(raw).toMatch(/Use your\s+normal tools/);
+    expect(raw).toMatch(/Nothing here is a\s+restriction on what you may otherwise do/);
   });
 
   it('preserves packaged source mapping and managed markers', () => {

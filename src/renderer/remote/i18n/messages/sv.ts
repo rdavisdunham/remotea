@@ -17,12 +17,12 @@ export const sv: Readonly<Record<string, string>> = {
   'pair.pairing': 'Parkopplar…',
   'pair.failed': 'Parkopplingen misslyckades. Skapa en ny kod på datorn och försök igen.',
   'pair.rate': 'För många försök. Vänta en stund och tryck sedan på Parkoppla igen.',
-  'pair.deviceCap': 'För många enheter är parkopplade. Återkalla en under Inställningar → Fjärr på datorn och skapa sedan en ny kod.',
+  "pair.deviceCap": "För många enheter är parkopplade. Återkalla en under Inställningar → Telefonåtkomst på datorn och skapa sedan en ny kod.",
 
   'expired.title': 'Koden har gått ut',
   'expired.body': 'Den här koden har gått ut – skapa en ny på datorn.',
   'unpaired.title': 'Inte parkopplad',
-  'unpaired.body': 'Den här webbläsaren är inte parkopplad med wmux. Öppna Inställningar → Fjärr → Parkoppla en enhet på datorn och skanna koden.',
+  "unpaired.body": "Den här webbläsaren är inte parkopplad med remotea. Öppna Inställningar → Telefonåtkomst → Parkoppla en enhet på datorn och skanna koden.",
   'revoked.title': 'Åtkomsten togs bort',
   'revoked.body': 'Den här enheten har tagits bort från remotea på datorn. Parkoppla den igen för att ansluta.',
   'replaced.title': 'Parkopplad igen i en annan flik',
@@ -49,7 +49,7 @@ export const sv: Readonly<Record<string, string>> = {
   'console.waiting': 'Väntar på datorn…',
   'console.viewerNotice': 'Endast visning – den här anslutningen kan inte skriva eller svara.',
   'console.controlLimited': 'Endast visning här – enheten är parkopplad med kontroll, men datorn stänger av kontroll för okrypterade HTTP-anslutningar.',
-  'console.repairForControl': 'Endast visning här – enheten är parkopplad med kontroll, men parkopplingen har använts över okrypterad HTTP, så kontroll är avstängd. Skapa en ny kod på datorn (Inställningar → Fjärr → Parkoppla en enhet) och skanna den med den här telefonen för att använda kontroll.',
+  "console.repairForControl": "Endast visning här – enheten är parkopplad med kontroll, men parkopplingen har använts över okrypterad HTTP, så kontroll är avstängd. Skapa en ny kod på datorn (Inställningar → Telefonåtkomst → Parkoppla en enhet) och skanna den med den här telefonen för att använda kontroll.",
   'console.needsYouCount_one': '{n} agent behöver dig',
   'console.needsYouCount_other': '{n} agenter behöver dig',
 

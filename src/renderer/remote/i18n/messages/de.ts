@@ -22,12 +22,12 @@ export const de: Readonly<Record<string, string>> = {
   'pair.pairing': 'Kopple…',
   'pair.failed': 'Koppeln fehlgeschlagen. Erzeugen Sie auf Ihrem Computer einen neuen Code und versuchen Sie es erneut.',
   'pair.rate': 'Zu viele Versuche. Warten Sie kurz und tippen Sie dann erneut auf Koppeln.',
-  'pair.deviceCap': 'Zu viele Geräte gekoppelt. Widerrufen Sie auf Ihrem Computer eines unter Einstellungen → Fernzugriff und erstellen Sie dann einen neuen Code.',
+  "pair.deviceCap": "Zu viele Geräte gekoppelt. Widerrufen Sie auf Ihrem Computer eines unter Einstellungen → Telefonzugriff und erstellen Sie dann einen neuen Code.",
 
   'expired.title': 'Code abgelaufen',
   'expired.body': 'Dieser Code ist abgelaufen – erzeugen Sie auf Ihrem Computer einen neuen.',
   'unpaired.title': 'Nicht gekoppelt',
-  'unpaired.body': 'Dieser Browser ist nicht mit remotea gekoppelt. Öffnen Sie auf Ihrem Computer Einstellungen → Fernzugriff → Gerät koppeln und scannen Sie den Code.',
+  "unpaired.body": "Dieser Browser ist nicht mit remotea gekoppelt. Öffnen Sie auf Ihrem Computer Einstellungen → Telefonzugriff → Gerät koppeln und scannen Sie den Code.",
   'revoked.title': 'Zugriff entzogen',
   'revoked.body': 'Dieses Gerät wurde auf Ihrem Computer aus remotea entfernt. Koppeln Sie es erneut, um sich wieder zu verbinden.',
   'replaced.title': 'In einem anderen Tab erneut gekoppelt',
@@ -54,7 +54,7 @@ export const de: Readonly<Record<string, string>> = {
   'console.waiting': 'Warte auf Ihren Computer…',
   'console.viewerNotice': 'Nur ansehen – diese Verbindung kann weder tippen noch antworten.',
   'console.controlLimited': 'Hier nur ansehen – dieses Gerät ist mit Steuerung gekoppelt, aber Ihr Computer schaltet die Steuerung bei unverschlüsselten HTTP-Verbindungen ab.',
-  'console.repairForControl': 'Hier nur ansehen – dieses Gerät ist mit Steuerung gekoppelt, aber seine Kopplung wurde schon über unverschlüsseltes HTTP verwendet, daher ist die Steuerung aus. Um zu steuern, erstellen Sie auf Ihrem Computer einen neuen Code (Einstellungen → Fernzugriff → Gerät koppeln) und scannen Sie ihn mit diesem Telefon.',
+  "console.repairForControl": "Hier nur ansehen – dieses Gerät ist mit Steuerung gekoppelt, aber seine Kopplung wurde schon über unverschlüsseltes HTTP verwendet, daher ist die Steuerung aus. Um zu steuern, erstellen Sie auf Ihrem Computer einen neuen Code (Einstellungen → Telefonzugriff → Gerät koppeln) und scannen Sie ihn mit diesem Telefon.",
   'console.needsYouCount_one': '{n} Agent wartet auf Sie',
   'console.needsYouCount_other': '{n} Agenten warten auf Sie',
 
