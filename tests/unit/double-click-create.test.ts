@@ -133,6 +133,35 @@ describe('tab execution location with gesture fixtures', () => {
     auxClick(element('.surface-tab'));
     expect(props.onClose).toHaveBeenCalledExactlyOnceWith(remoteSurface.id);
     expect(props.onSelect).not.toHaveBeenCalled();
+    });
+  });
+
+describe('overflowing tabs (#403)', () => {
+  it('maps mouse wheel and horizontal trackpad motion to the tab strip', () => {
+    renderTabs();
+    const strip = element('.surface-tab-bar__tabs');
+    Object.defineProperties(strip, { scrollWidth: { value: 1000 }, clientWidth: { value: 200 } });
+    const wheel = (options: WheelEventInit) => {
+      const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ...options });
+      strip.dispatchEvent(event);
+      return event;
+    };
+    expect(wheel({ deltaY: 80 }).defaultPrevented).toBe(true);
+    expect(strip.scrollLeft).toBe(80);
+    wheel({ deltaX: -30 });
+    expect(strip.scrollLeft).toBe(50);
+    wheel({ deltaY: 2, deltaMode: 1 });
+    expect(strip.scrollLeft).toBe(106);
+    expect(wheel({ deltaY: 80, ctrlKey: true }).defaultPrevented).toBe(false);
+    expect(strip.scrollLeft).toBe(106);
+  });
+  it('reveals a keyboard-selected tab without scrolling the workspace', () => {
+    renderTabs();
+    const strip = element('.surface-tab-bar__tabs');
+    vi.spyOn(strip, 'getBoundingClientRect').mockReturnValue({ left: 0, right: 200 } as DOMRect);
+    vi.spyOn(strip.children[1], 'getBoundingClientRect').mockReturnValue({ left: 250, right: 350 } as DOMRect);
+    renderTabs({ activeSurfaceIndex: 1 });
+    expect(strip.scrollLeft).toBe(150);
   });
 });
 

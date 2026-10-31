@@ -68,6 +68,7 @@ import type {
   SurfaceDragPreviewTarget,
 } from './components/SplitPane/drag-preview-types';
 import { buildSurfaceDragPreview } from './components/SplitPane/surface-drag-preview';
+import WorkspaceDropZones from './components/SplitPane/WorkspaceDropZones';
 import { forgetClosedTerminal, surfaceTerminalRegistry } from './hooks/useTerminal';
 import { forgetSurface as forgetPromptLog, hookEventSurface, recordAgentPrompt } from './utils/prompt-log';
 import { forgetAlternateScreen, RESET_TERMINAL_LEAVE_ALT_ACTION } from './utils/alt-screen-owner';
@@ -1852,6 +1853,11 @@ export default function App() {
                 onClearSurfaceDragPreview={handleClearSurfaceDragPreview}
                 onSurfaceDragCommit={handleSurfaceDragCommit}
               />
+              {surfaceDrag?.workspaceId === ws.id && ws.id === activeWorkspaceId && (
+                <WorkspaceDropZones workspace={ws} drag={surfaceDrag}
+                  onEnd={handleSurfaceDragEnd} onClearPreview={handleClearSurfaceDragPreview}
+                  onCommit={() => handleSurfaceDragCommit({ clearZoom: true })} />
+              )}
               {surfaceDragPreview?.workspaceId === ws.id && ws.id === activeWorkspaceId && (
                 <SplitPreviewOverlay
                   tree={surfaceDragPreview.previewTree}
