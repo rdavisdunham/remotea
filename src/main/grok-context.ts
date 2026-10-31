@@ -1,3 +1,4 @@
+import { reportIntegrationFailure } from './integration-failures';
 /**
  * Grok Build (xAI's `grok` CLI) integration.
  *
@@ -241,6 +242,7 @@ export function ensureGrokContext(): void {
     if (rendered === null) return;
     writeOwnedFile(getGrokRulesPath(), rendered.trimEnd() + '\n', isOurRules);
   } catch (err) {
+    reportIntegrationFailure('Grok', 'write', err);
     console.warn('[remotea] Failed to update Grok context:', err);
   }
 }
@@ -249,6 +251,7 @@ export function removeGrokContext(): void {
   try {
     for (const home of grokHomes()) removeOwnedFile(rulesPathIn(home), isOurRules);
   } catch (err) {
+    reportIntegrationFailure('Grok', 'remove', err);
     console.warn('[remotea] Failed to remove Grok context:', err);
   }
 }
@@ -258,6 +261,7 @@ export function ensureGrokHooks(): void {
     const content = JSON.stringify(buildGrokHooks(getHookScriptPath()), null, 2) + '\n';
     writeOwnedFile(getGrokHooksPath(), content, isWmuxHooksFile);
   } catch (err) {
+    reportIntegrationFailure('Grok', 'write', err);
     console.warn('[remotea] Failed to update Grok hooks:', err);
   }
 }
@@ -266,6 +270,7 @@ export function removeGrokHooks(): void {
   try {
     for (const home of grokHomes()) removeOwnedFile(hooksPathIn(home), isWmuxHooksFile);
   } catch (err) {
+    reportIntegrationFailure('Grok', 'remove', err);
     console.warn('[remotea] Failed to remove Grok hooks:', err);
   }
 }

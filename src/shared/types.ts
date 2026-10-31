@@ -714,6 +714,7 @@ export interface InsertionResult {
 
 // IPC channel names
 export const IPC_CHANNELS = {
+  INTEGRATION_STATUS: 'integration:status',
   // PTY
   PTY_CREATE: 'pty:create',
   PTY_WRITE: 'pty:write',
