@@ -8,6 +8,8 @@ import { makeT } from '../../src/renderer/i18n/core';
 import RemoteOverlay from '../../src/renderer/components/Terminal/RemoteOverlay';
 import HelpSettings from '../../src/renderer/components/Settings/HelpSettings';
 import { recoveryDetail, type RecoveryItem } from '../../src/renderer/remote-sessions/recovery';
+import RemotePendingChanges from '../../src/renderer/components/Settings/RemotePendingChanges';
+import { describeIntent, forgetEffect, intentStatus, type HostPendingChanges } from '../../src/renderer/remote-sessions/pending-changes';
 import { PRODUCT } from '../../src/shared/product';
 
 vi.mock('../../src/renderer/hooks/useUpdate', () => ({ useUpdate: () => ({ state: { phase: 'idle' }, trigger: vi.fn() }) }));
@@ -96,4 +98,40 @@ it('describes recovery as new process / conversation continuation without changi
   expect(translated).toContain('translated:remote.recovery.exitedDetail');
   expect(item.key).toBe('exited:surf-1:3');
   expect(item.choices).toEqual(['leave', 'reopen']);
+});
+
+describe('pending change acknowledgements', () => {
+  const host: HostPendingChanges = {
+    hostId: 'host', hostName: 'WSL', uncertain: 1, unlisted: 0,
+    items: [{ iid: 'change-1', hostId: 'host', state: 'uncertain', action: 'Close Agent', status: 'Unanswered', forgetEffect: 'Already applied changes remain applied.', createdAt: 1 }],
+  };
+  it.each([
+    [false, 'Could not confirm removal'],
+    [true, 'Removed from this device’s pending changes'],
+    [undefined, 'request returned without an acknowledgement'],
+  ])('reports result %s without implying host rollback', async (response, expected) => {
+    const onForget = vi.fn().mockResolvedValue(response);
+    await act(async () => root.render(createElement(RemotePendingChanges, { host, onForget })));
+    await act(async () => container.querySelector('button')!.click());
+    expect(onForget).toHaveBeenCalledWith('host', 'change-1');
+    expect(container.querySelector('[role=status]')!.textContent).toContain(expected);
+    expect(container.textContent).toMatch(/remains applied|rolled back|does not undo/);
+    expect(container.querySelector('button')!.disabled).toBe(false);
+  });
+  it('catches a rejected request and keeps the change visible for retry', async () => {
+    const onForget = vi.fn().mockRejectedValue(new Error('Unavailable'));
+    await act(async () => root.render(createElement(RemotePendingChanges, { host, onForget })));
+    await act(async () => container.querySelector('button')!.click());
+    expect(container.textContent).toContain('Could not confirm removal');
+    expect(container.querySelector('[data-iid="change-1"]')).not.toBeNull();
+    expect(container.querySelector('button')!.disabled).toBe(false);
+  });
+  it('uses translated pure descriptions without changing the pending intent', () => {
+    const intent = { t: 'close', id: 'surf-1' } as const;
+    const t = makeT('zh-TW');
+    expect(describeIntent(intent, undefined, t)).toContain('所有裝置');
+    expect(intentStatus({ state: 'uncertain', attempts: 1 }, false, t)).toContain('可能已套用');
+    expect(forgetEffect(intent, 'uncertain', t)).toContain('該變更會維持');
+    expect(intent).toEqual({ t: 'close', id: 'surf-1' });
+  });
 });

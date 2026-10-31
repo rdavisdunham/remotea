@@ -5,6 +5,20 @@
 import type { Translation } from './en';
 
 export const cs: Translation = {
+  "pending.intent.close": "Ukončit {name} na všech zařízeních (ukončí proces)",
+  "pending.status.uncertain": "Odesláno bez odpovědi: změna již mohla být provedena. Před opakováním se ověří stav hostitele.",
+  "pending.forget.alreadyApplied": "Pokud již hostitel změnu provedl, zůstává provedená.",
+  "pending.forget.applied": "Pokud hostitel změnu provede před jejím zapomenutím, zůstává provedená.",
+  "pending.forget.tab": "Nebude znovu odesláno a karta se zde může znovu objevit. {applied}",
+  "pending.forget.other": "Nebude znovu odesláno. {applied}",
+  "pending.forget.action": "Zapomenout",
+  "pending.result.acknowledged": "Odstraněno z čekajících změn tohoto zařízení. Změny již provedené hostitelem zůstávají provedené; tímto se nevrací zpět.",
+  "pending.result.failed": "Odstranění z čekajících změn tohoto zařízení nelze potvrdit. Zkontrolujte aktuální stav a zkuste to znovu. Žádná změna hostitele nebyla vrácena zpět.",
+  "pending.result.unconfirmed": "Požadavek skončil bez potvrzení. Odstranění není potvrzeno; zkontrolujte aktuální seznam. Tímto se změny hostitele nevrací zpět.",
+  "workspace.manualStatus": "Přepsat aktivitu v postranním panelu",
+  "workspace.manualStatusHint": "Mění pouze zobrazení pracovního prostoru v postranním panelu. Nemění proces, aktivitu hlášenou agentem, stav běhu Eridani, ověření ani schválení úlohy.",
+  "workspace.endHost": "Ukončit relace hostitele…",
+
   "remote.overlay.reconnecting": "Spojení s {host} je přerušeno. Obnovení spojení{retry}. Stav terminálu je do obnovení spojení neznámý.",
   "remote.overlay.lastSeen": "Naposledy dostupný: {time}.",
   "remote.overlay.suspended": "Spojení je pozastaveno během spánku tohoto počítače. Po obnovení spojení ověříme hostitele {host} a jeho terminály.",

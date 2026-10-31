@@ -1,3 +1,4 @@
+import { useT } from '../../i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../store';
 import { startRemoteHostStatus, useRemoteHosts } from '../../remote-sessions/status';
@@ -13,7 +14,7 @@ import '../../styles/remote-hosts.css';
  * review A-Q2). One compact row per remote host: its connection, the Eridani
  * runs on it waiting on you, terminals that exited non-zero, and changes made
  * here the host has not confirmed. The row goes to the first tab that needs
- * looking at; the "unconfirmed" chip opens Settings → Remote hosts, where
+ * looking at; the "unconfirmed" chip opens Connections and activity, where
  * each change is listed with a Forget action.
  *
  * Renders nothing when no remote host is configured.
@@ -32,9 +33,10 @@ export function HostAttentionRow({ row, onFocus, onOpenHosts }: {
   onFocus: (surfaceId: string) => void;
   onOpenHosts?: () => void;
 }) {
+  const t = useT();
   const firstTab = row.first ? [...row.needsYou, ...row.exitedNonZero].find((t) => t.id === row.first) : undefined;
   const hint = firstTab
-    ? `Go to ${firstTab.title} (${firstTab.kind === 'needs_you' ? `needs you${firstTab.detail ? `: ${firstTab.detail}` : ''}` : firstTab.detail})`
+    ? t('attention.goTo').replace('{title}', firstTab.title).replace('{detail}', firstTab.kind === 'needs_you' ? t('attention.needsYou') + (firstTab.detail ? `: ${firstTab.detail}` : '') : firstTab.detail ?? '')
     : `${row.hostName}: ${row.connection.label}, ${row.connection.detail}`;
   return (
     <div className="host-attention__row" data-host={row.hostId} data-tone={row.tone}>
@@ -46,12 +48,12 @@ export function HostAttentionRow({ row, onFocus, onOpenHosts }: {
         <span className="host-attention__conn">{row.connection.state === 'ready' ? '' : row.connection.label}</span>
         {row.needsYou.length > 0 && (
           <span className="host-attention__count host-attention__count--error" data-kind="needs-you">
-            {row.needsYou.length} need{row.needsYou.length === 1 ? 's' : ''} you
+            {t(row.needsYou.length === 1 ? 'attention.needsOne' : 'attention.needCount').replace('{count}', String(row.needsYou.length))}
           </span>
         )}
         {row.exitedNonZero.length > 0 && (
           <span className="host-attention__count host-attention__count--pending" data-kind="exited">
-            {row.exitedNonZero.length} exited
+            {t('attention.exitedCount').replace('{count}', String(row.exitedNonZero.length))}
           </span>
         )}
       </button>
@@ -60,9 +62,9 @@ export function HostAttentionRow({ row, onFocus, onOpenHosts }: {
           className="host-attention__count host-attention__count--pending host-attention__pending"
           data-kind="unconfirmed"
           onClick={() => onOpenHosts?.()}
-          title={`${row.unconfirmed} change${row.unconfirmed === 1 ? '' : 's'} made here not yet confirmed by ${row.hostName}${row.uncertain ? ` (${row.uncertain} unanswered)` : ''}. Review them in Settings → Remote hosts.`}
+          title={t('attention.pendingHint').replace('{count}', String(row.unconfirmed)).replace('{host}', row.hostName).replace('{uncertain}', String(row.uncertain))}
         >
-          {row.unconfirmed} unconfirmed
+          {t('attention.pendingCount').replace('{count}', String(row.unconfirmed))}
         </button>
       )}
     </div>
@@ -70,6 +72,7 @@ export function HostAttentionRow({ row, onFocus, onOpenHosts }: {
 }
 
 export default function HostAttentionBar({ onOpenHosts }: { onOpenHosts?: () => void }) {
+  const t = useT();
   useEffect(() => startRemoteHostStatus(), []);
   const hosts = useRemoteHosts((s) => s.hosts);
   const status = useRemoteHosts((s) => s.status);
@@ -86,7 +89,7 @@ export default function HostAttentionBar({ onOpenHosts }: { onOpenHosts?: () => 
   const rows = useMemo(() => hostAttention(hosts, status, views, shownHere, now), [hosts, status, views, shownHere, now]);
   if (!rows.length) return null;
   return (
-    <div className="host-attention" aria-label="Remote hosts">
+    <div className="host-attention" aria-label={t('settings.tab.hosts')}>
       {rows.map((row) => (
         <HostAttentionRow key={row.hostId} row={row} onFocus={focusRemoteTab} onOpenHosts={onOpenHosts} />
       ))}

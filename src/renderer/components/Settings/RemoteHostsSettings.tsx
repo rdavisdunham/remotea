@@ -223,7 +223,7 @@ export default function RemoteHostsSettings() {
   const views = useRegistryViews();
   const now = useNow();
   const list = Object.values(hosts);
-  const pending = pendingChanges(hosts, status, views);
+  const pending = pendingChanges(hosts, status, views, t);
   const defaultHost = parseRemoteShellSpec(workspacePrefs.defaultShell)?.hostId;
 
   const remove = async (id: string) => {

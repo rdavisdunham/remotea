@@ -8,6 +8,20 @@
 import type { Translation } from './en';
 
 export const zhTW: Translation = {
+  "pending.intent.close": "在所有裝置結束 {name}（會終止其程序）",
+  "pending.status.uncertain": "已送出但未收到回覆：變更可能已套用。重送前會先向主機確認。",
+  "pending.forget.alreadyApplied": "如果主機已套用變更，該變更會維持。",
+  "pending.forget.applied": "如果主機在忘記之前已套用變更，該變更會維持。",
+  "pending.forget.tab": "不再重送，分頁可能會在此重新出現。{applied}",
+  "pending.forget.other": "不再重送。{applied}",
+  "pending.forget.action": "忘記",
+  "pending.result.acknowledged": "已從此裝置的待處理變更移除。主機已套用的變更仍會維持；這不會復原它。",
+  "pending.result.failed": "無法確認是否已從此裝置的待處理變更移除。請檢查目前狀態後重試。沒有復原任何主機變更。",
+  "pending.result.unconfirmed": "要求已返回，但未收到確認。尚無法確認移除，請檢查目前清單。這不會復原主機變更。",
+  "workspace.manualStatus": "覆寫側邊欄活動顯示",
+  "workspace.manualStatusHint": "只變更此工作區在側邊欄的顯示，不會改變程序、agent 回報的活動、Eridani 執行狀態、驗證或任務核准。",
+  "workspace.endHost": "結束主機工作階段…",
+
   "remote.overlay.reconnecting": "已中斷與 {host} 的連線。正在重新連線{retry}。重新連線前無法確認終端機狀態。",
   "remote.overlay.lastSeen": "最後連線時間：{time}。",
   "remote.overlay.suspended": "此電腦睡眠期間已暫停連線。恢復連線後將檢查 {host} 及其終端機。",

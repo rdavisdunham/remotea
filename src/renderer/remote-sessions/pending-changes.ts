@@ -1,3 +1,4 @@
+import { makeT, type Translator } from '../i18n/core';
 /**
  * remotea: the pending-changes summary (Astra review A-Q2). Registry changes
  * made on this device (close, hide, rename, move, workspace edits) wait in
@@ -38,58 +39,58 @@ function sessionName(s: SessionRecord | undefined, id: string): string {
   return s?.title || s?.agent?.provider || s?.cmd || id;
 }
 
-function groupName(view: RemoteRegistryView | undefined, id: string | null | undefined): string {
-  if (!id || id === INBOX_GROUP_ID) return 'Inbox';
+function groupName(view: RemoteRegistryView | undefined, id: string | null | undefined, t: Translator): string {
+  if (!id || id === INBOX_GROUP_ID) return t('pending.inbox');
   return view?.groups.find((g) => g.id === id)?.name ?? id;
 }
 
 /** One intent as a sentence, verb first, with the names the registry mirror has for its targets. */
-export function describeIntent(intent: OutboxIntent, view: RemoteRegistryView | undefined): string {
+export function describeIntent(intent: OutboxIntent, view: RemoteRegistryView | undefined, t: Translator = makeT('en')): string {
   const session = view?.sessions.find((s) => s.id === intent.id);
   const name = `"${sessionName(session, intent.id)}"`;
   switch (intent.t) {
     case 'close':
-      return `Close ${name} on every device (ends its process)`;
+      return t('pending.intent.close').replace('{name}', name);
     case 'hide':
-      return `Hide ${name} on this device`;
+      return t('pending.intent.hide').replace('{name}', name);
     case 'unhide':
-      return `Show ${name} on this device again`;
+      return t('pending.intent.unhide').replace('{name}', name);
     case 'groupClose':
-      return `Close workspace "${groupName(view, intent.id)}" and every session in it`;
+      return t('pending.intent.groupClose').replace('{group}', groupName(view, intent.id, t));
     case 'groupUpsert': {
       const existing = view?.groups.find((g) => g.id === intent.id);
-      if (!existing) return `Create workspace "${intent.name}"`;
-      if (existing.name !== intent.name) return `Rename workspace "${existing.name}" to "${intent.name}"`;
-      return `Recolour workspace "${intent.name}"`;
+      if (!existing) return t('pending.intent.create').replace('{name}', intent.name);
+      if (existing.name !== intent.name) return t('pending.intent.renameGroup').replace('{from}', existing.name).replace('{to}', intent.name);
+      return t('pending.intent.color').replace('{name}', intent.name);
     }
     case 'sessionUpdate': {
       const parts: string[] = [];
-      if (intent.title !== undefined) parts.push(intent.title ? `rename ${name} to "${intent.title}"` : `clear the name of ${name}`);
+      if (intent.title !== undefined) parts.push(intent.title ? t('pending.intent.rename').replace('{name}', name).replace('{title}', intent.title) : t('pending.intent.clear').replace('{name}', name));
       if (intent.groupId !== undefined || intent.group) {
-        const target = intent.group?.name ?? groupName(view, intent.groupId);
-        parts.push(`${parts.length ? 'move it' : `move ${name}`} to workspace "${target}"`);
+        const target = intent.group?.name ?? groupName(view, intent.groupId, t);
+        parts.push(t('pending.intent.move').replace('{subject}', parts.length ? t('pending.intent.moveIt') : t('pending.intent.moveName').replace('{name}', name)).replace('{target}', target));
       }
-      if (!parts.length) return `Update ${name}`;
-      const text = parts.join(' and ');
+      if (!parts.length) return t('pending.intent.update').replace('{name}', name);
+      const text = parts.join(t('pending.intent.and'));
       return text.charAt(0).toUpperCase() + text.slice(1);
     }
   }
 }
 
 /** Where an open change stands. */
-export function intentStatus(item: Pick<OutboxOpenItem, 'state' | 'attempts'>, connected: boolean): string {
-  if (item.state === 'uncertain') return 'Sent, no answer: it may already be applied. Checked against the host before any resend.';
-  if (item.attempts === 0) return connected ? 'Sending…' : 'Waiting to be sent: the host is not connected.';
-  return connected ? 'Sent, waiting for the host to confirm.' : 'Sent before the connection dropped; resent when the host is back.';
+export function intentStatus(item: Pick<OutboxOpenItem, 'state' | 'attempts'>, connected: boolean, t: Translator = makeT('en')): string {
+  if (item.state === 'uncertain') return t('pending.status.uncertain');
+  if (item.attempts === 0) return connected ? t('pending.status.sending') : t('pending.status.waiting');
+  return connected ? t('pending.status.sent') : t('pending.status.dropped');
 }
 
 /** What "Forget" does to one change. */
-export function forgetEffect(intent: OutboxIntent, state: OutboxOpenItem['state']): string {
+export function forgetEffect(intent: OutboxIntent, state: OutboxOpenItem['state'], t: Translator = makeT('en')): string {
   const applied = state === 'uncertain'
-    ? 'If the host already applied it, it stays applied there.'
-    : 'If the host applied it before you forget it, it stays applied there.';
-  if (intent.t === 'close' || intent.t === 'hide' || intent.t === 'groupClose') return `Not sent again, and the tab can come back here. ${applied}`;
-  return `Not sent again. ${applied}`;
+    ? t('pending.forget.alreadyApplied')
+    : t('pending.forget.applied');
+  if (intent.t === 'close' || intent.t === 'hide' || intent.t === 'groupClose') return t('pending.forget.tab').replace('{applied}', applied);
+  return t('pending.forget.other').replace('{applied}', applied);
 }
 
 /**
@@ -100,6 +101,7 @@ export function pendingChanges(
   hosts: Record<string, { id: string; name: string }>,
   status: Record<string, HostStatus | undefined>,
   views: RemoteRegistryView[] | null | undefined,
+  t: Translator = makeT('en'),
 ): HostPendingChanges[] {
   const out: HostPendingChanges[] = [];
   for (const host of Object.values(hosts)) {
@@ -112,9 +114,9 @@ export function pendingChanges(
       iid: o.iid,
       hostId: host.id,
       state: o.state,
-      action: describeIntent(o.intent, view),
-      status: intentStatus(o, connected),
-      forgetEffect: forgetEffect(o.intent, o.state),
+      action: describeIntent(o.intent, view, t),
+      status: intentStatus(o, connected, t),
+      forgetEffect: forgetEffect(o.intent, o.state, t),
       createdAt: o.createdAt,
     }));
     out.push({ hostId: host.id, hostName: host.name, items, unlisted: Math.max(0, outbox.pending - items.length), uncertain: outbox.uncertain ?? 0 });
