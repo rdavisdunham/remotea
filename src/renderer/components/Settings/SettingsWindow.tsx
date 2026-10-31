@@ -70,16 +70,49 @@ export default function SettingsWindow({ onClose, initialTab }: SettingsWindowPr
         </div>
         <div className="settings-body">
           <div className="settings-tabs">
-            <input className="settings-input settings-global-search" aria-label={t("settings.alignment.searchLabel")} placeholder={t("settings.alignment.searchPlaceholder")} value={query} onChange={e => setQuery(e.target.value)} />
+            <input
+              className="settings-input settings-global-search"
+              aria-label={t('settings.alignment.searchLabel')}
+              placeholder={t('settings.alignment.searchPlaceholder')}
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+            />
             {SETTINGS_GROUPS.map(group => {
               const sections = group.sections.filter(section => matches.includes(section));
-              return sections.length > 0 && <div key={group.label} className="settings-nav-group"><h3>{t(('settings.alignment.group.' + group.sections[0]) as TranslationKey, group.label)}</h3>{sections.map(tab => <button key={tab} className={`settings-tab ${activeTab === tab ? 'settings-tab--active' : ''}`} onClick={() => setActiveTab(tab)}>{t(TAB_LABEL_KEYS[tab])}</button>)}</div>;
+              if (sections.length === 0) return null;
+              const labelKey = `settings.alignment.group.${group.sections[0]}` as TranslationKey;
+              return (
+                <div key={group.label} className="settings-nav-group">
+                  <h3>{t(labelKey, group.label)}</h3>
+                  {sections.map(tab => (
+                    <button
+                      key={tab}
+                      className={`settings-tab ${activeTab === tab ? 'settings-tab--active' : ''}`}
+                      onClick={() => setActiveTab(tab)}
+                    >
+                      {t(TAB_LABEL_KEYS[tab])}
+                    </button>
+                  ))}
+                </div>
+              );
             })}
-            {matches.length === 0 && <p className="settings-hint" role="status">{t("settings.alignment.noMatch")}</p>}
+            {matches.length === 0 && (
+              <p className="settings-hint" role="status">
+                {t('settings.alignment.noMatch')}
+              </p>
+            )}
           </div>
           <div className="settings-content">
             <SettingsScope section={activeTab} />
-            {activeTab === 'Agents' && <div className="settings-section"><h3>{t("settings.alignment.agentsTitle")}</h3><p className="settings-hint">{t("settings.alignment.integrationScope")}</p><p className="settings-hint">{t("settings.alignment.eridaniAuthority")}</p><p className="settings-hint">{t("settings.alignment.activityHints")}</p><AgentIntegrationSettings /></div>}
+            {activeTab === 'Agents' && (
+              <div className="settings-section">
+                <h3>{t('settings.alignment.agentsTitle')}</h3>
+                <p className="settings-hint">{t('settings.alignment.integrationScope')}</p>
+                <p className="settings-hint">{t('settings.alignment.eridaniAuthority')}</p>
+                <p className="settings-hint">{t('settings.alignment.activityHints')}</p>
+                <AgentIntegrationSettings />
+              </div>
+            )}
             {activeTab === 'General' && <GeneralSettings />}
             {activeTab === 'Hosts' && <RemoteHostsSettings />}
             {activeTab === 'Sidebar' && <SidebarSettings />}

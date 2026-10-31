@@ -195,7 +195,13 @@ export default function KeyboardSettings() {
       </p>
 
       <div className="shortcut-footer">
-        <button className="settings-btn settings-btn--danger" onClick={() => { resetShortcuts(); setKeyboardPrefs(DEFAULT_KEYBOARD_PREFS); }}>
+        <button
+          className="settings-btn settings-btn--danger"
+          onClick={() => {
+            resetShortcuts();
+            setKeyboardPrefs(DEFAULT_KEYBOARD_PREFS);
+          }}
+        >
           {t('settings.keyboard.resetAll', 'Reset All')}
         </button>
       </div>

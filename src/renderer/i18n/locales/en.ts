@@ -1200,6 +1200,21 @@ export const en = {
   "settings.alignment.group.Shortcuts": "Keyboard shortcuts",
   "settings.alignment.group.Help": "Help & about",
   'settings.alignment.scopeBrief': 'Scope: this desktop user / app instance. Most edits save immediately; launch and restore choices apply to future actions.',
+  "settings.alignment.scope.General": "Desktop appearance and language save immediately. Transparency can require a window restart. Explorer integration changes the desktop registry; taskbar refresh is an explicit system action.",
+  "settings.alignment.scope.Sidebar": "Desktop sidebar presentation saves and applies immediately in this window; it does not change host workspace metadata.",
+  "settings.alignment.scope.Workspace": "Desktop workspace defaults save immediately and govern future launch, close and restore actions. Saved layouts are local presets; named session restores may replace terminal preferences. Keep-awake is main-owned and controls this desktop computer.",
+  "settings.alignment.scope.Profiles": "Launch profiles save immediately to this desktop user / app instance. Commands, directories and shells apply when a profile is launched. Project .wmux.json profiles are separate files.",
+  "settings.alignment.scope.Terminal": "Terminal preferences save immediately for this window. Per-pane overrides can take precedence over global colors. Named session restores can replace these preferences.",
+  "settings.alignment.scope.Prompts": "Prompt-history presentation and capture preferences save immediately for this desktop window. These controls do not configure an agent provider or Eridani.",
+  "settings.alignment.scope.Agents": "Consent is main-owned in settings.json. Changes immediately write or remove integration files in this desktop user’s home directory. Agents may need a new session to load them; remote host integration is configured separately.",
+  "settings.alignment.scope.Hosts": "Remote host connection definitions and credentials use separate main-owned stores. Connect/disconnect and host activity controls act on the selected host; they are not renderer preference changes or Eridani approval decisions.",
+  "settings.alignment.scope.Remote": "Phone access uses a separate main-owned configuration and paired-device store. Enabling or changing listener settings affects the desktop phone server; pairing, permissions and revocation are explicit access actions. The desktop must remain running.",
+  "settings.alignment.scope.Browser": "Desktop browser preferences save immediately. Start-page and startup choices apply when a browser panel opens; browser panels run on the desktop even when a terminal uses a remote host. Runtime dev-port additions reset on config reload.",
+  "settings.alignment.scope.Notifications": "Desktop notification preferences save immediately and govern future notifications. Custom audio is stored as a separate file in this app instance’s data directory.",
+  "settings.alignment.scope.Shortcuts": "App-action and number-row shortcuts save and apply immediately in this window. Reset All resets both families; it does not reset unrelated preferences.",
+  "settings.alignment.scope.Help": "Help and support links do not change preferences. External links open only when selected.",
+  "settings.alignment.scope.Changelog": "Release history loads when this section is selected. Reading it does not change preferences or install an update.",
+  'settings.alignment.noRendererSnapshot': 'This section has no renderer preference snapshot to inspect. Its controls and status read their owning service; no per-field file provenance is available here.',
 } as const;
 
 /** Every key the UI may ask for — derived from English, the source of truth. */

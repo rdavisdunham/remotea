@@ -1027,6 +1027,10 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Start page"
     },
     {
+      "key": "settings.alignment.invalidStartUrl",
+      "label": "settings.alignment.invalidStartUrl"
+    },
+    {
       "key": "settings.browser.defaultUrlHint",
       "label": "Where a workspace\\'s browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea\\'s own page. Also settable in ~/.wmux/config.toml as [browser] default-url."
     },

@@ -29,3 +29,29 @@ it('preserves old initialTab links and mounts operational sections only when sel
   expect(mounted.phone).not.toHaveBeenCalled();
   expect(mounted.changelog).not.toHaveBeenCalled();
 });
+
+it('shows section-owned snapshots and separates host, phone and integration ownership', async () => {
+  const { default: SettingsScope } = await import('../../src/renderer/components/Settings/SettingsScope');
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  cleanup = () => { act(() => root.unmount()); container.remove(); };
+
+  await act(async () => root.render(createElement(SettingsScope, { section: 'Terminal' })));
+  const snapshot = JSON.parse(container.querySelector('pre')!.textContent!);
+  expect(Object.keys(snapshot)).toEqual(['terminalPrefs']);
+  expect(container.textContent).toContain('cannot identify whether an individual value');
+
+  await act(async () => root.render(createElement(SettingsScope, { section: 'Hosts' })));
+  expect(container.querySelector('pre')).toBeNull();
+  expect(container.textContent).toContain('connection definitions and credentials');
+  expect(container.textContent).not.toContain('Ordinary preferences save immediately');
+
+  await act(async () => root.render(createElement(SettingsScope, { section: 'Remote' })));
+  expect(container.querySelector('pre')).toBeNull();
+  expect(container.textContent).toContain('paired-device store');
+
+  await act(async () => root.render(createElement(SettingsScope, { section: 'Agents' })));
+  expect(container.querySelector('pre')).toBeNull();
+  expect(container.textContent).toContain('immediately write or remove integration files');
+});

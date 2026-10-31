@@ -55,12 +55,20 @@ export default function BrowserSettings() {
           className="settings-input"
           value={urlDraft}
           aria-invalid={!validUrl}
-          onChange={(e) => { const next = e.target.value; setUrlDraft(next); if (isValidStartUrl(next)) setBrowserPrefs({ defaultUrl: next.trim() }); }}
+          onChange={(event) => {
+            const next = event.target.value;
+            setUrlDraft(next);
+            if (isValidStartUrl(next)) setBrowserPrefs({ defaultUrl: next.trim() });
+          }}
           placeholder="http://localhost:3000"
           spellCheck={false}
         />
       </div>
-      {!validUrl && <p className="settings-hint" role="alert">{t("settings.alignment.invalidStartUrl")}</p>}
+      {!validUrl && (
+        <p className="settings-hint" role="alert">
+          {t('settings.alignment.invalidStartUrl')}
+        </p>
+      )}
       <p className="settings-hint">
         {t(
           'settings.browser.defaultUrlHint',
