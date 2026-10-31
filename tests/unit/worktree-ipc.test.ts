@@ -3,6 +3,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { IPC_CHANNELS } from '../../src/shared/types';
 
+// These handler tests never spawn a PTY and must not load platform bindings.
+vi.mock('node-pty', () => ({ spawn: vi.fn() }));
+
 const registeredHandlers = new Map<string, Function>();
 
 vi.mock('electron', () => ({
@@ -43,7 +46,7 @@ vi.mock('../../src/main/git-worktree', () => ({
   probeRepo: (...args: any[]) => mockProbeRepo(...args),
 }));
 
-import { registerIpcHandlers } from '../../src/main/ipc-handlers';
+import { registerIpcHandlers, ptyManager } from '../../src/main/ipc-handlers';
 
 const WT = 'C:\\Users\\user\\AppData\\Local\\wmux\\wt\\repo\\feat-12345678';
 
@@ -63,6 +66,22 @@ describe('worktree IPC handlers (#366)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('refuses remote and unknown terminal owners before desktop Git/worktree calls', async () => {
+    const remote = vi.spyOn(ptyManager, 'isRemote').mockImplementation((id) => id === 'surf-remote');
+    const known = vi.spyOn(ptyManager, 'has').mockReturnValue(false);
+    try {
+      for (const id of ['surf-remote', 'surf-missing']) {
+        expect(await createHandler({}, '/host/repo', 'branch', undefined, id)).toMatchObject({ ok: false, code: 'unsupported_location' });
+        expect(await probeHandler({}, '/host/repo', id)).toBeNull();
+        await expect(registeredHandlers.get(IPC_CHANNELS.DIFF_GET_FILES)!({}, '/host/repo', undefined, id)).rejects.toThrow(/not routed/);
+        await expect(registeredHandlers.get(IPC_CHANNELS.DIFF_GET_DIFF)!({}, '/host/repo', 'file', undefined, id)).rejects.toThrow(/not routed/);
+        expect(await registeredHandlers.get(IPC_CHANNELS.GIT_VIEW)!({}, { op: 'repo', cwd: '/host/repo' }, id)).toMatchObject({ ok: false });
+      }
+      expect(mockCreateWorktree).not.toHaveBeenCalled();
+      expect(mockProbeRepo).not.toHaveBeenCalled();
+    } finally { remote.mockRestore(); known.mockRestore(); }
   });
 
   it('registers the worktree handlers', () => {

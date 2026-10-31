@@ -1,3 +1,5 @@
+import { decodeLaunch } from '../../../shared/execution-location';
+import { findLeaf, getAllPaneIds } from '../../store/split-utils';
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
@@ -23,6 +25,12 @@ export default function NewWorktreeModal({ onClose, cwd }: NewWorktreeModalProps
   const t = useT();
   const activeWorkspace = useStore((s) => s.workspaces.find((w) => w.id === s.activeWorkspaceId));
   const targetCwd = cwd ?? activeWorkspace?.cwd ?? '';
+  const terminals = activeWorkspace?.splitTree ? getAllPaneIds(activeWorkspace.splitTree).flatMap((id) => findLeaf(activeWorkspace.splitTree, id)?.surfaces ?? []).filter((surface) => surface.type === 'terminal') : [];
+  // A workspace cwd has no owner field. If several environments report the
+  // same path, refuse the desktop operation rather than guess a local owner.
+  const sources = terminals.filter((surface) => (surface.currentCwd || surface.cwd) === targetCwd);
+  const source = sources.find((surface) => decodeLaunch(surface.shell).location.kind === 'remote') ?? sources[0];
+  const remoteSource = decodeLaunch(source?.shell ?? activeWorkspace?.shell).location.kind === 'remote';
 
   const [isRepo, setIsRepo] = useState<boolean | null>(null);
   const [repoRoot, setRepoRoot] = useState<string>('');
@@ -37,11 +45,11 @@ export default function NewWorktreeModal({ onClose, cwd }: NewWorktreeModalProps
   useEffect(() => {
     let cancelled = false;
     const probe = window.wmux?.worktree?.probe;
-    if (!probe || !targetCwd) {
+    if (remoteSource || !probe || !targetCwd) {
       setIsRepo(false);
       return;
     }
-    probe(targetCwd)
+    probe(targetCwd, ...(source ? [source.id] : []))
       .then((res: { repoRoot: string; currentBranch: string } | null) => {
         if (cancelled) return;
         if (!res || !res.repoRoot) {
@@ -59,7 +67,7 @@ export default function NewWorktreeModal({ onClose, cwd }: NewWorktreeModalProps
     return () => {
       cancelled = true;
     };
-  }, [targetCwd]);
+  }, [targetCwd, remoteSource, source?.id]);
 
   useEffect(() => {
     if (isRepo) {
@@ -86,14 +94,14 @@ export default function NewWorktreeModal({ onClose, cwd }: NewWorktreeModalProps
 
   const isBranchValid = isValidBranchName(branch);
   const showBranchError = (touched || branch.length > 0) && !isBranchValid;
-  const canSubmit = isRepo === true && isBranchValid && !creating;
+  const canSubmit = isRepo === true && !remoteSource && isBranchValid && !creating;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setCreating(true);
     setErrorMessage('');
     try {
-      const res = await window.wmux?.worktree?.create(repoRoot, branch.trim(), base.trim() || undefined);
+      const res = await window.wmux?.worktree?.create(repoRoot, branch.trim(), base.trim() || undefined, ...(source ? [source.id] : []));
       if (res?.ok && res.worktree) {
         const createWorkspace = useStore.getState().createWorkspace;
         const selectWorkspace = useStore.getState().selectWorkspace;
@@ -155,7 +163,7 @@ export default function NewWorktreeModal({ onClose, cwd }: NewWorktreeModalProps
 
         {isRepo === false && (
           <div className="worktree-modal__warning">
-            {t('worktreeModal.notRepo', 'Current folder is not a Git repository')}
+            {remoteSource ? t('execution.desktopOnly') : t('worktreeModal.notRepo', 'Current folder is not a Git repository')}
           </div>
         )}
 

@@ -56,6 +56,15 @@ describe('surface-slice', () => {
     });
   });
 
+  it('retains the remote owner on Git and diff tabs instead of treating host cwd as local', () => {
+    const terminal = currentLeaf().surfaces[0];
+    useStore.getState().updateSurface(workspaceId, paneId, terminal.id, { shell: 'remote:desk', cwd: '/repo' });
+    useStore.getState().addSurface(workspaceId, paneId, 'git', { cwd: '/repo' });
+    expect(currentLeaf().surfaces.at(-1)).toMatchObject({ type: 'git', shell: 'remote:desk' });
+    useStore.getState().addSurface(workspaceId, paneId, 'diff', { cwd: '/repo' });
+    expect(currentLeaf().surfaces.at(-1)).toMatchObject({ type: 'diff', shell: 'remote:desk' });
+  });
+
   describe('closeOtherSurfaces', () => {
     it('keeps only the target surface and drops the rest', () => {
       const keep = currentLeaf().surfaces[0].id;

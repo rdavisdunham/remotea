@@ -1403,20 +1403,26 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     return deleteNamedSession(name);
   });
 
+  // Legacy calls without a source remain explicitly desktop-local. A supplied
+  // source must be a known local terminal; remote or unknown ownership is refused.
+  const remoteDesktopAction = (source: unknown): boolean => typeof source === 'string' && (ptyManager.isRemote(source as SurfaceId) || !ptyManager.has(source as SurfaceId));
+
   // Diff viewer handlers
   // Fallback: prefer process.cwd() (often the project dir) over USERPROFILE (never a git repo)
   // `baseRef` is a worktree workspace's base commit (#366). It lands in git's
   // argv, so anything that is not one safe revision is dropped, not passed.
   const diffBaseRef = (baseRef: unknown): string | undefined =>
     isSafeRev(baseRef) ? baseRef : undefined;
-  ipcMain.handle(IPC_CHANNELS.DIFF_GET_FILES, async (_event, cwd: string, baseRef?: unknown) => {
+  ipcMain.handle(IPC_CHANNELS.DIFF_GET_FILES, async (_event, cwd: string, baseRef?: unknown, sourceSurfaceId?: unknown) => {
+    if (remoteDesktopAction(sourceSurfaceId)) throw new Error('Full Git/diff review is not routed to remote hosts.');
     const resolvedCwd = cwd || process.cwd();
     const ref = diffBaseRef(baseRef);
     const files = await getChangedFiles(resolvedCwd, ref);
     return { files };
   });
 
-  ipcMain.handle(IPC_CHANNELS.DIFF_GET_DIFF, async (_event, cwd: string, file: string, baseRef?: unknown) => {
+  ipcMain.handle(IPC_CHANNELS.DIFF_GET_DIFF, async (_event, cwd: string, file: string, baseRef?: unknown, sourceSurfaceId?: unknown) => {
+    if (remoteDesktopAction(sourceSurfaceId)) throw new Error('Full Git/diff review is not routed to remote hosts.');
     const resolvedCwd = cwd || process.cwd();
     const ref = diffBaseRef(baseRef);
     const diff = await getFileDiff(resolvedCwd, file, ref);
@@ -1425,7 +1431,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   // Project Git view (#362). Read-only; every argument is validated in
   // git-view.ts, which never throws across IPC.
-  ipcMain.handle(IPC_CHANNELS.GIT_VIEW, (_event, request: GitViewRequest) => handleGitView(request));
+  ipcMain.handle(IPC_CHANNELS.GIT_VIEW, (_event, request: GitViewRequest, sourceSurfaceId?: unknown) => remoteDesktopAction(sourceSurfaceId) ? { ok: false, code: 'invalid', error: 'Full Git review is not routed to remote hosts.' } : handleGitView(request));
 
   // Markdown viewer (issue #54): manual "open markdown file" entry point.
   // Shows a native file picker filtered to the allowed extensions, then reads
@@ -1795,7 +1801,8 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   // renderer cannot name a branch to delete or a directory to remove.
   ipcMain.handle(
     IPC_CHANNELS.GIT_WORKTREE_CREATE,
-    async (_event, repoDir: unknown, branch: unknown, base: unknown) => {
+    async (_event, repoDir: unknown, branch: unknown, base: unknown, sourceSurfaceId?: unknown) => {
+      if (remoteDesktopAction(sourceSurfaceId)) return { ok: false, code: 'unsupported_location', error: 'Desktop worktree management is not routed to remote hosts.' };
       if (
         typeof repoDir !== 'string' ||
         typeof branch !== 'string' ||
@@ -1838,7 +1845,8 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   ipcMain.handle(
     IPC_CHANNELS.GIT_WORKTREE_PROBE,
-    async (_event, dir: unknown) => {
+    async (_event, dir: unknown, sourceSurfaceId?: unknown) => {
+      if (remoteDesktopAction(sourceSurfaceId)) return null;
       if (typeof dir !== 'string') return null;
       try {
         return await probeRepo(dir);

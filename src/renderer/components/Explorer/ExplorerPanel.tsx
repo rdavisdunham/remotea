@@ -1,6 +1,9 @@
+import { decodeLaunch } from '../../../shared/execution-location';
+import { executionLocationText } from '../../utils/execution-location-text';
+import { useRemoteHosts } from '../../remote-sessions/status';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../store';
-import { findLeaf } from '../../store/split-utils';
+import { findLeaf, getAllPaneIds } from '../../store/split-utils';
 import { useT } from '../../i18n';
 import {
   EXPLORER_MAX_ENTRIES,
@@ -84,6 +87,9 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
     }
   }, [activeWorkspaceId, focusedPaneId, focusedSurface, liveRoot]);
 
+  const hosts = useRemoteHosts((s) => s.hosts);
+  const rootSurface = workspace ? getAllPaneIds(workspace.splitTree).flatMap((id) => findLeaf(workspace.splitTree, id)?.surfaces ?? []).find((surface) => surface.id === (focusedSurface && liveRoot ? focusedSurface.id : sticky?.surfaceId)) : undefined;
+  const location = decodeLaunch(rootSurface?.shell).location;
   const surfaceId = (focusedSurface && liveRoot ? focusedSurface.id : sticky?.surfaceId) ?? null;
   // The cwd as REPORTED by the shell. Good enough to identify a fetch, and it
   // is what main resolves a root from — but never good enough to build a path
@@ -419,9 +425,10 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
   // A folder row opens the view unselected — it has no single file to show.
   const viewChanges = useCallback((row: ExplorerRow | null) => {
     if (!activeWorkspaceId || !absRoot) return;
+    if (location.kind === 'remote') { setOpenError('remote'); return; }
     const file = row && row.entry.kind === 'file' ? row.relPath : null;
     openDiffView(useStore.getState(), activeWorkspaceId, focusedPaneId, absRoot, file);
-  }, [activeWorkspaceId, focusedPaneId, absRoot]);
+  }, [activeWorkspaceId, focusedPaneId, absRoot, location.kind]);
 
   const rootLabel = absRoot ? (absRoot.split(/[\\/]/).filter(Boolean).pop() ?? absRoot) : '';
 
@@ -429,7 +436,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
     <div className="explorer-panel">
       <div className="explorer-panel__header">
         <span className="explorer-panel__root" title={absRoot}>
-          {rootLabel || t('explorer.title', 'Explorer')}
+          {t('execution.files').replace('{location}', executionLocationText(t, location, hosts))} · {rootLabel || t('explorer.title', 'Explorer')}
         </span>
         <button
           className="explorer-panel__action"
@@ -440,7 +447,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
           <button
             className="explorer-panel__action"
             title={t('shortcutAction.openGitPanel', 'Open Git view')}
-            onClick={() => openGitView(useStore.getState(), activeWorkspaceId, focusedPaneId)}
+            onClick={() => location.kind === 'remote' ? setOpenError('remote') : openGitView(useStore.getState(), activeWorkspaceId, focusedPaneId)}
           >{'⑂'}</button>
         )}
         <button
@@ -528,7 +535,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
             `error` does would throw away the tree the user is browsing. */}
         {openError && (
           <div className="explorer-panel__message">
-            {t(explorerErrorKey(openError), openError)}
+            {openError === 'remote' ? t('execution.desktopOnly') : t(explorerErrorKey(openError), openError)}
           </div>
         )}
       </div>

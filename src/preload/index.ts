@@ -508,8 +508,8 @@ contextBridge.exposeInMainWorld('wmux', {
       ipcRenderer.invoke(IPC_CHANNELS.CODE_WRITE_FILE, surfaceId, relPath, content, expectedMtimeMs),
   },
   diff: {
-    getFiles: (cwd: string, baseRef?: string) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_GET_FILES, cwd, baseRef),
-    getFileDiff: (cwd: string, file: string, baseRef?: string) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_GET_DIFF, cwd, file, baseRef),
+    getFiles: (cwd: string, baseRef?: string, sourceSurfaceId?: string) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_GET_FILES, cwd, baseRef, sourceSurfaceId),
+    getFileDiff: (cwd: string, file: string, baseRef?: string, sourceSurfaceId?: string) => ipcRenderer.invoke(IPC_CHANNELS.DIFF_GET_DIFF, cwd, file, baseRef, sourceSurfaceId),
     onUpdate: (callback: (data: { file?: string }) => void) => {
       const handler = (_event: any, data: any) => callback(data);
       ipcRenderer.on(IPC_CHANNELS.DIFF_UPDATE, handler);
@@ -519,7 +519,7 @@ contextBridge.exposeInMainWorld('wmux', {
   // The project Git view (#362). One read-only request shape, validated in
   // main; the renderer never names a git sub-command or an argument.
   git: {
-    view: (request: unknown) => ipcRenderer.invoke(IPC_CHANNELS.GIT_VIEW, request),
+    view: (request: unknown, sourceSurfaceId?: string) => ipcRenderer.invoke(IPC_CHANNELS.GIT_VIEW, request, sourceSurfaceId),
   },
   cdp: {
     attach: (webContentsId: number, surfaceId?: string | null, workspaceId?: string | null) =>
@@ -598,13 +598,13 @@ contextBridge.exposeInMainWorld('wmux', {
   // nothing else: main reads the repository and branch from its own record of
   // what it created, so there is no "delete this branch" call to abuse.
   worktree: {
-    create: (repoDir: string, branch: string, base?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_CREATE, repoDir, branch, base),
+    create: (repoDir: string, branch: string, base?: string, sourceSurfaceId?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_CREATE, repoDir, branch, base, ...(sourceSurfaceId ? [sourceSurfaceId] : [])),
     inspect: (worktreePath: string): Promise<WorktreeInspectResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_INSPECT, worktreePath),
     remove: (worktreePath: string, mode: WorktreeCloseMode): Promise<WorktreeRemoveResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_REMOVE, worktreePath, mode),
-    probe: (dir: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_PROBE, dir),
+    probe: (dir: string, sourceSurfaceId?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.GIT_WORKTREE_PROBE, dir, ...(sourceSurfaceId ? [sourceSurfaceId] : [])),
   },
 });

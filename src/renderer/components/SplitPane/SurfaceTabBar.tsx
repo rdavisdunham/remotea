@@ -1,3 +1,6 @@
+import { findLeaf, getAllPaneIds } from '../../store/split-utils';
+import { executionLocationText } from '../../utils/execution-location-text';
+import { decodeLaunch } from '../../../shared/execution-location';
 import React, { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { hideRemoteSurface, isRemoteSurface } from '../../remote-sessions/sync';
 import { latestRemoteViews, subscribeRemoteViews } from '../../remote-sessions/registry-cache';
@@ -126,6 +129,7 @@ export default function SurfaceTabBar({
   const menuRef = useRef<HTMLDivElement>(null);
   const agentMeta = useStore((state) => state.agentMeta);
   const activeWorkspaceId = useStore((state) => state.activeWorkspaceId);
+  const workspaces = useStore((state) => state.workspaces);
   const renameSurface = useStore((state) => state.renameSurface);
   const surfaceProgress = useStore((state) => state.surfaceProgress);
   const getAgentMeta = (surfaceId: string) => agentMeta.get(surfaceId as any);
@@ -363,6 +367,9 @@ export default function SurfaceTabBar({
       <div ref={tabsRef} className="surface-tab-bar__tabs">
         {surfaces.map((surface, index) => {
           const isActive = index === activeSurfaceIndex;
+          const workspace = workspaces.find((workspace) => getAllPaneIds(workspace.splitTree).some((id) => findLeaf(workspace.splitTree, id)?.surfaces.some((tab) => tab.id === surface.id)));
+          const source = surface.codeRootSurfaceId ? workspaces.flatMap((workspace) => getAllPaneIds(workspace.splitTree).flatMap((id) => findLeaf(workspace.splitTree, id)?.surfaces ?? [])).find((tab) => tab.id === surface.codeRootSurfaceId) : surface;
+          const tabLocation = decodeLaunch(source?.shell || source?.resolvedShell || workspace?.shell).location;
           const agentMeta = getAgentMeta(surface.id);
           const isAgent = !!agentMeta;
           const isRenaming = renamingId === surface.id;
@@ -382,6 +389,7 @@ export default function SurfaceTabBar({
                 isAgent ? 'surface-tab--agent' : '',
               ].filter(Boolean).join(' ')}
               data-agent-state={agentState ?? undefined}
+              title={`${surface.type === 'browser' ? t('execution.browser') : executionLocationText(t, tabLocation)}${surface.currentCwd || surface.cwd ? ` · ${surface.currentCwd || surface.cwd}` : ''}`}
               role="tab"
               aria-selected={isActive}
               onClick={() => onSelect(index)}
@@ -432,6 +440,7 @@ export default function SurfaceTabBar({
               }}
             >
               <span className="surface-tab__icon">{surfaceIcon(surface.type, isAgent)}</span>
+              {(surface.type === 'terminal' || surface.type === 'code') && <small className="surface-tab__location">{executionLocationText(t, tabLocation)}</small>}
               {isRenaming ? (
                 <input
                   ref={renameInputRef}
