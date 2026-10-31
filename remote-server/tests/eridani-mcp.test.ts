@@ -1,6 +1,6 @@
 /**
  * Task 3bc2803c: a spawned agent gets Eridani's MCP server (submit_plan,
- * task_step, task_interview, session_link), with the key read from its own
+ * submit_plan_review, task_step, task_interview, session_link), with the key read from its own
  * file, never the link key, and never in argv, logs, the runs file, the
  * registry, the journal, the outbox or the status file. A missing key file
  * spawns without it and says so (`mcp.configured=false` with a reason).
@@ -372,7 +372,7 @@ describe('context: the agent is told whether it has the Eridani tools', () => {
 
   it('configured: names the tools and the server', async () => {
     const out = await svc({ configured: true }).sessionStart('s', { sessionId: 'abc', source: 'startup' });
-    expect(out).toContain('Eridani tools: submit_plan, task_step, task_interview, session_link are available via the eridani MCP server.');
+    expect(out).toContain('Eridani tools: submit_plan, submit_plan_review, task_step, task_interview, session_link are available via the eridani MCP server.');
   });
 
   it('not configured: says the tools are unavailable and why', async () => {

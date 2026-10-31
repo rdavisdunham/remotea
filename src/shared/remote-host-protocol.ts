@@ -230,6 +230,13 @@ export interface EridaniBinding {
   webUrl?: string;
   /** The task's title as the spawn carried it (`title`), when it carried one. */
   taskTitle?: string;
+  /**
+   * Hyperplan: the role the spawn named (`planner` when absent) and its
+   * read-only mode (absent: writable). Kept on the record so a resume keeps
+   * the same launch flags and a reviewer is still known as one after a restart.
+   */
+  role?: 'planner' | 'reviewer' | 'worker';
+  mode?: 'plan' | 'review';
 }
 
 /** Stage D: the latest verification attempt on a surface (verify-attempts.ts). */
