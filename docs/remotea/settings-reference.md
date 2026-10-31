@@ -206,7 +206,7 @@ Additional fields stored in workspacePrefs but shown under **Remote hosts**: `gr
 
 ## Terminal
 
-All in terminalPrefs. Typography, cursor, scrollback, input handling and title policies affect terminal views; changing a preference is distinct from restarting a shell. Theme hint says “Applied to new panes”, but the terminal hook subscribes live to the resolved global/per-pane scheme and all font/cursor/scrollback fields (`hooks/useTerminal.ts:902–905,2248–2291`). Existing panes without an explicit scheme therefore update too; panes with explicit overrides retain those. This hint should be corrected, not treated as an accurate application boundary.
+All in terminalPrefs. Typography, cursor, scrollback, input handling and title policies affect terminal views; changing a preference is distinct from restarting a shell. The terminal hook subscribes live to the resolved global/per-pane scheme and all font/cursor/scrollback fields (`hooks/useTerminal.ts:902–905,2248–2291`). Existing panes without an explicit scheme update too; panes with explicit overrides retain those. The aligned hint now describes this live behavior; the old “new panes” restriction has been removed.
 
 | Exact label / control | Field / default | Available values / condition / effect | UI source |
 |---|---|---|---|
