@@ -38,6 +38,11 @@ const mockCreateWorktree = vi.fn();
 const mockRemoveWorktree = vi.fn();
 const mockInspectWorktree = vi.fn();
 const mockProbeRepo = vi.fn();
+const mockProjectProfiles = vi.fn();
+vi.mock('../../src/main/config-loader', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  loadProjectProfiles: (...args: unknown[]) => mockProjectProfiles(...args),
+}));
 
 vi.mock('../../src/main/git-worktree', () => ({
   createWorktree: (...args: any[]) => mockCreateWorktree(...args),
@@ -82,6 +87,22 @@ describe('worktree IPC handlers (#366)', () => {
       expect(mockCreateWorktree).not.toHaveBeenCalled();
       expect(mockProbeRepo).not.toHaveBeenCalled();
     } finally { remote.mockRestore(); known.mockRestore(); }
+  });
+
+  it('does not interpret remote or unknown project-profile ownership as desktop paths', async () => {
+    const handler = registeredHandlers.get('config:getProjectProfiles')!;
+    const remote = vi.spyOn(ptyManager, 'isRemote').mockImplementation((id) => id === 'surf-remote');
+    mockProjectProfiles.mockResolvedValue([{ id: 'local-profile' }]);
+    try {
+      expect(await handler({}, '/host/repo', { shell: 'remote:desk' })).toEqual([]);
+      expect(await handler({}, '/host/repo', { shell: '' })).toEqual([]);
+      expect(await handler({}, '/host/repo', { shell: 'pwsh.exe', surfaceId: 'surf-remote' })).toEqual([]);
+      expect(mockProjectProfiles).not.toHaveBeenCalled();
+      expect(await handler({}, 'C:\\repo', { shell: 'local:', surfaceId: 'surf-local' })).toEqual([{ id: 'local-profile' }]);
+      expect(mockProjectProfiles).toHaveBeenLastCalledWith('C:\\repo');
+      await handler({}, 'C:\\legacy');
+      expect(mockProjectProfiles).toHaveBeenLastCalledWith('C:\\legacy');
+    } finally { remote.mockRestore(); }
   });
 
   it('registers the worktree handlers', () => {

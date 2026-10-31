@@ -1,3 +1,4 @@
+import { useProjectProfiles } from '../../hooks/useProjectProfiles';
 import { useT } from '../../i18n';
 import { decodeLaunch, resolveLaunchDirectory } from '../../../shared/execution-location';
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
@@ -78,7 +79,7 @@ export default function PaneWrapper({
   const shortcuts = useStore((s) => s.shortcuts);
   const workspace = useStore((s) => s.workspaces.find(w => w.id === workspaceId));
   const globalProfiles = useStore((s) => s.quickLaunchProfiles);
-  const [projectProfiles, setProjectProfiles] = useState<QuickLaunchProfile[]>([]);
+  const projectProfiles = useProjectProfiles(workspace);
   const [availableShells, setAvailableShells] = useState<ShellInfo[]>([]);
 
   const surfaceIds = useMemo(() => surfaces.map((s) => s.id), [surfaces]);
@@ -419,23 +420,6 @@ export default function PaneWrapper({
       addSurface(activeWorkspaceId, paneId, type, gitRoot ? { cwd: gitRoot } : undefined);
     }
   };
-
-  // Load project-level quick-launch profiles from <workspace cwd>/.wmux.json
-  // (issue #32, mirrors cmux's cmux.json). Reloads when the workspace cwd changes.
-  useEffect(() => {
-    let cancelled = false;
-    const dir = workspace?.cwd;
-    if (!dir || !window.wmux?.config?.getProjectProfiles) {
-      setProjectProfiles([]);
-      return;
-    }
-    window.wmux.config.getProjectProfiles(dir)
-      .then((profiles: QuickLaunchProfile[]) => {
-        if (!cancelled) setProjectProfiles(Array.isArray(profiles) ? profiles : []);
-      })
-      .catch(() => { if (!cancelled) setProjectProfiles([]); });
-    return () => { cancelled = true; };
-  }, [workspace?.cwd]);
 
   // Fetch available shells once on mount for the shell picker dropdown
   useEffect(() => {
