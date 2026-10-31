@@ -3,6 +3,7 @@ import { readIntegrationStatus } from './integration-status';
 import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents, safeStorage } from 'electron';
 import { isSafeExternalUrl } from './security-policy';
 import { nextZoomFactor } from './zoom-factor';
+import { focusBrowserDevTools } from './browser-tools';
 import * as path from 'path';
 import { promises as fsp } from 'fs';
 import { IPC_CHANNELS, SurfaceId, WindowId, WorkspaceId, AgentId, type InsertionResult, type ExplorerListError } from '../shared/types';
@@ -1126,9 +1127,12 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   ipcMain.on(
     IPC_CHANNELS.CDP_ATTACH,
-    (_event, webContentsId: number, surfaceId?: string | null, workspaceId?: string | null) => {
+    (event, webContentsId: number, surfaceId?: string | null, workspaceId?: string | null) => {
       // surfaceId/workspaceId let main route per-caller browser commands to the
       // right pane so concurrent agents don't collide (issue #62).
+      if (!Number.isInteger(webContentsId) || webContentsId <= 0) return;
+      const guest = webContents.fromId(webContentsId);
+      if (!guest || guest.isDestroyed() || guest.getType() !== 'webview' || guest.hostWebContents !== event.sender) return;
       cdpBridge.attach(webContentsId, surfaceId, workspaceId);
       cdpProxyInstance?.setWebContentsId(webContentsId);
     },
@@ -1189,13 +1193,11 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   // openDevTools() is a no-op when the detached window already exists, so
   // clicking it again used to leave DevTools behind wmux (#413).
   ipcMain.handle(IPC_CHANNELS.BROWSER_FOCUS_DEVTOOLS, (event, webContentsId: unknown) => {
-    if (typeof webContentsId !== 'number') return false;
+    if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId) || webContentsId <= 0) return false;
     const guest = webContents.fromId(webContentsId);
     if (!guest || guest.isDestroyed() || guest.getType() !== 'webview' || guest.hostWebContents !== event.sender) return false;
     try {
-      if (!guest.isDevToolsOpened()) guest.openDevTools({ mode: 'detach' });
-      const tools = guest.devToolsWebContents;
-      if (tools && !tools.isDestroyed()) tools.focus();
+      focusBrowserDevTools(guest);
       return true;
     } catch {
       return false;
