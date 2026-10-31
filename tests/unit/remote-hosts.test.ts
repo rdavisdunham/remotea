@@ -189,11 +189,18 @@ describe('TerminalRouter', () => {
       detachAllNow: vi.fn(),
     };
     const router = new TerminalRouter(local as never, remote as never);
-    const res = await router.create({ shell: 'remote:desk claude', cwd: 'C:\\Users\\me', env: {}, surfaceId: 'surf-r' as never, cols: 100, rows: 30 });
+    const res = await router.create({ shell: 'remote:desk claude', cwd: '/home/me', env: {}, surfaceId: 'surf-r' as never, cols: 100, rows: 30 });
     expect(res).toMatchObject({ id: 'surf-r', remote: true, snapshot: { data: 'x' } });
-    // A Windows path means nothing on the server; the command rides in the spec.
-    expect(client.create).toHaveBeenCalledWith(expect.objectContaining({ spec: expect.objectContaining({ cmd: 'claude', cwd: undefined }) }));
+    await expect(router.create({ shell: 'remote:desk', cwd: 'C:\\Users\\me', env: {} })).rejects.toThrow(/Remote directories/);
+    // Host paths and commands retain their original routing.
+    expect(client.create).toHaveBeenCalledWith(expect.objectContaining({ spec: expect.objectContaining({ cmd: 'claude', cwd: '/home/me' }) }));
+    await expect(router.create({ shell: 'remote:???', cwd: '', env: {} })).rejects.toThrow(/Invalid remote/);
+    expect(local.create).not.toHaveBeenCalled();
     await expect(router.create({ shell: 'remote:nowhere', cwd: '', env: {} })).rejects.toThrow(/Unknown remote host/);
+    await router.create({ shell: 'local:', cwd: '', env: {} });
+    expect(local.create).toHaveBeenCalledWith(expect.objectContaining({ shell: '' }));
+    expect(() => router.kill('surf-never-mounted' as never, 'remote:removed')).toThrow(/Unknown remote host/);
+    expect(local.kill).not.toHaveBeenCalled();
     router.write('surf-r' as never, 'a');
     router.write('surf-l' as never, 'b');
     expect(client.write).toHaveBeenCalledWith('surf-r', 'a');

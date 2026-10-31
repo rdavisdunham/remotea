@@ -95,7 +95,10 @@ export function toggleGitView(
   if (!target) return null;
   const root = gitRootFor(workspace, target);
   let tree = splitNode(workspace.splitTree, target, newPaneId, 'git', 'horizontal');
-  if (root) tree = patchLeafPrimarySurface(tree, newPaneId, { cwd: root });
+  const sourceLeaf = findLeaf(workspace.splitTree, target);
+  const activeSource = sourceLeaf?.surfaces[sourceLeaf.activeSurfaceIndex];
+  const source = activeSource?.type === 'terminal' ? activeSource : sourceLeaf?.surfaces.find((surface) => surface.type === 'terminal');
+  tree = patchLeafPrimarySurface(tree, newPaneId, { ...(root ? { cwd: root } : {}), shell: source?.shell || source?.resolvedShell || workspace.shell });
   ops.updateSplitTree(workspaceId, tree);
   return 'opened';
 }

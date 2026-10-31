@@ -1,7 +1,9 @@
+import { useT } from '../../i18n';
+import { decodeLaunch, resolveLaunchDirectory } from '../../../shared/execution-location';
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { PaneId, SplitNode, SurfaceId, WorkspaceId, QuickLaunchProfile, ShellInfo, engineOf } from '../../../shared/types';
 import { workspaceFallbackCwd } from '../../../shared/paths';
-import { findLeaf, splitNode } from '../../store/split-utils';
+import { findLeaf, getAllPaneIds, splitNode } from '../../store/split-utils';
 import KeptAliveTerminal from '../Terminal/KeptAliveTerminal';
 import BrowserPane from '../Browser/BrowserPane';
 import MarkdownPane from '../Markdown/MarkdownPane';
@@ -56,6 +58,7 @@ export default function PaneWrapper({
   onSurfaceDragCommit,
   onActivate,
 }: PaneWrapperProps) {
+  const t = useT();
   const { surfaces, activeSurfaceIndex, paneId } = leaf;
 
   const notifications = useStore((s) => s.notifications);
@@ -254,6 +257,9 @@ export default function PaneWrapper({
 
   const renderAllSurfaces = () =>
     surfaces.map((surface, index) => {
+      const reviewRoot = surface.cwd ?? workspace?.cwd;
+      const hostSource = workspace && !surface.shell && reviewRoot ? getAllPaneIds(workspace.splitTree).flatMap((id) => findLeaf(workspace.splitTree, id)?.surfaces ?? []).find((tab) => tab.type === 'terminal' && (tab.currentCwd || tab.cwd) === reviewRoot && decodeLaunch(tab.shell || tab.resolvedShell || workspace.shell).location.kind === 'remote') : undefined;
+      const reviewIsRemote = decodeLaunch(surface.shell || hostSource?.shell || hostSource?.resolvedShell || workspace?.shell).location.kind === 'remote';
       const isActive = index === activeSurfaceIndex;
       const isVisible = isActive && isWorkspaceActive;
       return (
@@ -377,7 +383,8 @@ export default function PaneWrapper({
           {/* A tab opened from the explorer is pinned to the explorer's root
               (#325); one made by Ctrl+Shift+G follows the workspace. A
               worktree workspace's base applies only inside its worktree. */}
-          {surface.type === 'diff' && (
+          {(surface.type === 'diff' || surface.type === 'git') && reviewIsRemote && <p role="status">{t('execution.desktopOnly')}</p>}
+          {surface.type === 'diff' && !reviewIsRemote && (
             <DiffPane
               surfaceId={surface.id}
               cwd={surface.cwd ?? workspace?.cwd}
@@ -387,7 +394,7 @@ export default function PaneWrapper({
           {surface.type === 'code' && <CodePane surfaceId={surface.id} />}
           {surface.type === 'prompts' && <PromptsPane surfaceId={surface.id} />}
           {/* Pinned to its own folder (#362): it never follows focus. */}
-          {surface.type === 'git' && (
+          {surface.type === 'git' && !reviewIsRemote && (
             <GitPane
               surfaceId={surface.id}
               cwd={surface.cwd ?? workspace?.cwd}
@@ -456,19 +463,7 @@ export default function PaneWrapper({
     // Relative profile cwd (e.g. "./server" in a project .wmux.json) resolves
     // against the workspace cwd; otherwise node-pty would resolve it against the
     // app directory. Absolute paths (drive-letter, UNC, or POSIX root) pass through.
-    const resolveCwd = (cwd?: string): string | undefined => {
-      if (!cwd) return undefined;
-      const isAbsolute = /^[a-zA-Z]:[\\/]/.test(cwd) || cwd.startsWith('\\\\') || cwd.startsWith('/');
-      const base = workspace?.cwd;
-      if (isAbsolute || !base) return cwd;
-      const rel = cwd.replace(/^[.][\\/]/, '').replace(/\//g, '\\');
-      // Strip trailing separators without a regex (avoids ReDoS-class patterns).
-      let trimmedBase = base;
-      while (trimmedBase.length > 0 && (trimmedBase.endsWith('\\') || trimmedBase.endsWith('/'))) {
-        trimmedBase = trimmedBase.slice(0, -1);
-      }
-      return trimmedBase + '\\' + rel;
-    };
+    const resolveCwd = (cwd?: string) => resolveLaunchDirectory(cwd, workspace?.cwd, profile.shell || workspace?.shell || useStore.getState().workspacePrefs.defaultShell);
     addSurface(activeWorkspaceId, paneId, profile.type, {
       // The profile's name is the tab's DEFAULT, not a rename (#291): a program
       // that sets its own window title takes the label over.

@@ -8,6 +8,26 @@
 // its translations is safe.
 
 export const en = {
+  'execution.savedHost': 'Saved host: {host} (configuration not confirmed)',
+  'execution.localReadiness': 'Local terminals use the desktop PTY manager. Desktop agent automation launches here and requires an installed runtime. Native desktop Eridani execution is unavailable.',
+  'execution.hostReadiness': 'Terminal and file operations use the session host. Full Git review, desktop worktrees and opening files in desktop apps are unavailable here. Agent runtime and Eridani readiness are unknown until reported by the host; choosing a host does not install an agent.',
+  'execution.inherit': 'Inherit workspace launch',
+  'execution.inheritHint': 'Location and shell follow the workspace or default launch at launch time. Select a location to pin this profile.',
+  "execution.local": "This computer",
+  "execution.remote": "Remote host: {host}",
+  "execution.location": "Execution location",
+  "execution.missingHost": "Missing host: {host}",
+  "execution.shell": "Shell / command",
+  "execution.command": "Host command (empty for login shell)",
+  "execution.directoryScope": "Directory and startup commands apply on {location}. Changing this selection affects future launches only. Shells and commands are not translated between environments.",
+  "execution.browser": "Browser runs on this computer. localhost refers to this computer; a host service needs a reachable URL or explicit port forwarding.",
+  "execution.browseLocal": "Browse selects a folder on this computer. Enter a host path for remote launches.",
+  "execution.defaultDirectory": "Default directory",
+  "execution.desktopOnly": "This desktop action is not routed to remote hosts. Remote file browsing, editing and change statistics remain available.",
+  "execution.invalidDirectory": "Remote directories must be host paths beginning with / or ~/. A desktop path cannot be used on the host.",
+  "execution.hostMissing": "Saved host \u201c{host}\u201d is missing. This launch will fail; it will not run on this computer.",
+  "execution.files": "Files on {location}",
+
   // Settings — window chrome
   'settings.title': 'Settings',
   'settings.tab.general': 'General',

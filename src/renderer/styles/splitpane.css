@@ -190,6 +190,15 @@ html.wmux-transparent .split-divider--horizontal {
 }
 .surface-tab:hover { background: var(--ui-bg-5); color: var(--ui-text-secondary); }
 .surface-tab--active { background: var(--ui-border); color: var(--ui-text-primary); }
+.surface-tab__location {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+  font-size: 10px;
+  pointer-events: none;
+}
 .surface-tab__label { pointer-events: none; }
 .surface-tab__label--ephemeral { font-style: italic; }
 .surface-tab__rename-input {

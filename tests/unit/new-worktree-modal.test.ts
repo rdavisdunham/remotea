@@ -102,6 +102,15 @@ describe('NewWorktreeModal', () => {
     delete (window as any).wmux;
   });
 
+  it('refuses a remote workspace directory without probing the desktop filesystem', async () => {
+    useStore.setState({ workspaces: [{ id: 'ws-remote' as WorkspaceId, shell: 'remote:desk', cwd: '/repo', title: 'Host repo', splitTree: { type: 'leaf', paneId: 'pane-r', activeSurfaceIndex: 0, surfaces: [{ id: 'surf-r', type: 'terminal', shell: 'remote:desk', cwd: '/repo' }] } } as any], activeWorkspaceId: 'ws-remote' as WorkspaceId });
+    await act(async () => root.render(createElement(NewWorktreeModal, { onClose: vi.fn() })));
+    expect(mockProbe).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('not routed to remote hosts');
+    expect(host.querySelector<HTMLButtonElement>('.confirm-dialog__btn--primary')?.disabled).toBe(true);
+  });
+
   it('shows notRepo warning and disables create button when probe returns null', async () => {
     mockProbe.mockResolvedValue(null);
 

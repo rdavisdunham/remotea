@@ -1,3 +1,4 @@
+import { executionLocationText, executionWarningText } from '../../utils/execution-location-text';
 import { useEffect, useState } from 'react';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
@@ -5,7 +6,8 @@ import { getAllPaneIds, findLeaf, patchLeafPrimarySurface, MAX_WORKSPACE_PANES }
 import type { PaneId, WorkspaceLayout, KeepAwakeMode } from '../../../shared/types';
 import { useKeepAwake } from '../../hooks/useKeepAwake';
 import { useRemoteHosts, startRemoteHostStatus } from '../../remote-sessions/status';
-import { remoteShellSpec } from '../../../shared/remote-shell-spec';
+import { decodeLaunch, launchWarnings } from '../../../shared/execution-location';
+import LaunchLocationEditor from './LaunchLocationEditor';
 
 /**
  * One editable startup-command line for a saved layout's pane.
@@ -100,7 +102,8 @@ export default function WorkspaceSettings() {
   const keepAwake = useKeepAwake();
   // remotea: configured remote hosts become default-shell choices.
   useEffect(() => startRemoteHostStatus(), []);
-  const remoteHosts = useRemoteHosts((s) => s.hosts);
+
+  const { hosts: remoteHosts, loaded: hostsLoaded, loadError: hostsLoadError } = useRemoteHosts();
   // Which layout id was just overwritten, for a transient "Saved" confirmation
   // next to its button — unlike "+ Save as new preset", overwriting an
   // existing row changes data invisibly (the row itself doesn't change shape).
@@ -110,6 +113,7 @@ export default function WorkspaceSettings() {
   // only way to express `~` or `%USERPROFILE%\dev`, which is what makes a
   // synced settings.json work on a second machine.
   const pickDefaultCwd = () => {
+    if (decodeLaunch(workspacePrefs.defaultShell).location.kind === 'remote') return;
     void (async () => {
       const res = await window.wmux?.system?.pickFolder?.();
       if (!res || res.canceled || !res.path) return;
@@ -450,24 +454,7 @@ export default function WorkspaceSettings() {
       <div className="settings-divider" />
       <h3 className="settings-section-title">{t('settings.workspacePanel.shellSection', 'Shell')}</h3>
 
-      <div className="settings-row">
-        <label className="settings-label">{t('settings.workspacePanel.defaultShell', 'Default shell')}</label>
-        <select
-          className="settings-select"
-          value={workspacePrefs.defaultShell}
-          onChange={(e) => setWorkspacePrefs({ defaultShell: e.target.value })}
-        >
-          <option value="">{t('settings.workspacePanel.shell.systemDefault', 'System default')}</option>
-          <option value="powershell.exe">PowerShell</option>
-          <option value="pwsh.exe">PowerShell Core</option>
-          <option value="cmd.exe">Command Prompt</option>
-          <option value="bash.exe">Git Bash</option>
-          <option value="wsl.exe">WSL</option>
-          {Object.values(remoteHosts).map((h) => (
-            <option key={h.id} value={remoteShellSpec(h.id)}>Remote: {h.name}</option>
-          ))}
-        </select>
-      </div>
+      <LaunchLocationEditor shell={workspacePrefs.defaultShell} cwd={workspacePrefs.defaultCwd} onChange={(defaultShell) => setWorkspacePrefs({ defaultShell })} />
 
       <div className="settings-row">
         <label className="settings-label">{t('settings.workspacePanel.defaultCwd', 'Starting directory')}</label>
@@ -479,7 +466,7 @@ export default function WorkspaceSettings() {
           placeholder={t('settings.workspacePanel.defaultCwdPlaceholder', 'Current directory (e.g. ~\\projects)')}
           spellCheck={false}
         />
-        <button className="settings-button" onClick={pickDefaultCwd}>
+        <button className="settings-button" disabled={decodeLaunch(workspacePrefs.defaultShell).location.kind === 'remote'} title={t('execution.browseLocal')} onClick={pickDefaultCwd}>
           {t('settings.workspacePanel.browse', 'Browse…')}
         </button>
       </div>
@@ -596,6 +583,7 @@ export default function WorkspaceSettings() {
               </button>
             </div>
 
+            {panes.map(({ paneId, leaf }) => <div key={`compat-${paneId}`} className="settings-hint">{leaf?.surfaces.map((surface) => <p key={surface.id}>{surface.type === 'browser' ? t('execution.browser') : `${surface.shell ? executionLocationText(t, decodeLaunch(surface.shell).location, remoteHosts) : t('execution.inherit')} · ${surface.cwd || t('execution.defaultDirectory')}`}{launchWarnings(surface.shell, surface.cwd, remoteHosts, hostsLoaded && !hostsLoadError).map((warning) => <span key={warning}> — {executionWarningText(t, warning, decodeLaunch(surface.shell).location)}</span>)}</p>)}</div>)}
             {panes.length > 0 && (
               <button className="ql-profile__toggle" onClick={() => toggleExpanded(layout.id)}>
                 {expandedIds.has(layout.id) ? '▾' : '▸'} {t('settings.workspacePanel.startupCommandsToggle', 'Startup commands')}

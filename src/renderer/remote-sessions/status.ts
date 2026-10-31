@@ -9,6 +9,8 @@ import type { HostDTO, HostStatus } from '../../shared/remote-hosts-types';
 interface RemoteHostsState {
   /** False until the first list() answer, so "unknown host" is not claimed too early. */
   loaded: boolean;
+  /** A failed list is unknown configuration, not evidence that a saved host was removed. */
+  loadError?: boolean;
   hosts: Record<string, Pick<HostDTO, 'id' | 'name' | 'url' | 'enabled' | 'hasToken' | 'unencryptedAcknowledged'>>;
   status: Record<string, HostStatus>;
 }
@@ -47,9 +49,9 @@ export async function refreshRemoteHosts(): Promise<void> {
       hosts[h.id] = { id: h.id, name: h.name, url: h.url, enabled: h.enabled, hasToken: h.hasToken, unencryptedAcknowledged: h.unencryptedAcknowledged };
       status[h.id] = h.status;
     }
-    useRemoteHosts.setState({ loaded: true, hosts, status });
+    useRemoteHosts.setState({ loaded: true, loadError: false, hosts, status });
   } catch {
-    useRemoteHosts.setState({ loaded: true });
+    useRemoteHosts.setState({ loaded: true, loadError: true });
   }
 }
 

@@ -1,3 +1,4 @@
+import { remoteDirectoryIssue } from '../shared/execution-location';
 /**
  * Every terminal operation in main goes through here: local surfaces to the
  * ConPTY-backed PtyManager, remote surfaces (shell `remote:<host>`) to that
@@ -49,7 +50,12 @@ export class TerminalRouter {
 
   async create(options: RouterCreateOptions): Promise<RouterCreateResult> {
     const spec = parseRemoteShellSpec(options.shell);
-    if (!spec) return this.local.create(options);
+    if (!spec) {
+      if (options.shell?.startsWith('remote:')) throw new Error('Invalid remote host launch specification. Select a configured remote host.');
+      return this.local.create(options.shell === 'local:' ? { ...options, shell: '' } : options);
+    }
+    const directoryIssue = remoteDirectoryIssue(options.cwd);
+    if (directoryIssue) throw new Error(directoryIssue);
     const client = this.remote.client(spec.hostId);
     if (!client) throw new Error(`Unknown remote host "${spec.hostId}". Add it in Settings → Remote hosts.`);
     const id = (options.surfaceId ?? `surf-${uuidv4()}`) as SurfaceId;
@@ -107,8 +113,13 @@ export class TerminalRouter {
     }
     const spec = parseRemoteShellSpec(shellSpec);
     const byHost = spec ? this.remote.client(spec.hostId) : undefined;
-    if (byHost) byHost.kill(id);
-    else this.local.kill(id);
+    if (spec) {
+      if (!byHost) throw new Error(`Unknown remote host \"${spec.hostId}\". The session was not ended locally.`);
+      byHost.kill(id);
+      return;
+    }
+    if (shellSpec?.startsWith('remote:')) throw new Error('Invalid remote host launch specification. The session was not ended locally.');
+    this.local.kill(id);
   }
 
   /** A renderer lost its copy of a remote terminal (reload): send it the server's screen. Local: nothing to do. */
