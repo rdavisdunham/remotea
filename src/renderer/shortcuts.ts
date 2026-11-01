@@ -94,6 +94,7 @@ export const SHORTCUT_TABLE: Record<ShortcutAction, ShortcutEntry> = {
   toggleSidebar: { label: 'Toggle sidebar', category: 'View' },
   showNotifications: { label: 'Show notifications', category: 'View' },
   flashFocused: { label: 'Flash focused pane', category: 'View' },
+  refreshSurface: { label: 'Refresh focused tab', category: 'View' },
   openBrowser: { label: 'Toggle browser panel', category: 'View' },
   browserDevTools: { label: 'Toggle browser DevTools', category: 'View' },
   browserConsole: { label: 'Toggle browser console', category: 'View' },

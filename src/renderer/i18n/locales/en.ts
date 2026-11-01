@@ -718,6 +718,7 @@ export const en = {
   'shortcutAction.togglePromptOutline': 'Toggle prompt outline',
   'shortcutAction.togglePinnedPrompt': 'Pin or unpin prompt',
   'shortcutAction.followOutput': 'Follow output',
+  'shortcutAction.refreshSurface': 'Refresh focused tab',
   // Settings — Quick-launch profiles panel
   'settings.quickLaunch.title': 'Quick-launch profiles',
   'settings.quickLaunch.hintPart1': 'One-click tab presets shown in the ',

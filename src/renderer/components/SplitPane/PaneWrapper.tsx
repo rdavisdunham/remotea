@@ -49,6 +49,7 @@ interface PaneWrapperProps {
   onActivate?: () => void;
   /** Focus another pane — the one a split from this pane's tab bar just created. */
   onFocusPane?: (paneId: PaneId) => void;
+  paneZoom?: number;
 }
 
 export default function PaneWrapper({
@@ -63,6 +64,7 @@ export default function PaneWrapper({
   onSurfaceDragCommit,
   onActivate,
   onFocusPane,
+  paneZoom = 1,
 }: PaneWrapperProps) {
   const t = useT();
   const { surfaces, activeSurfaceIndex, paneId } = leaf;
@@ -731,7 +733,7 @@ export default function PaneWrapper({
         isDragActive={dragActive}
         isFocused={isFocused}
       />
-      <div className="pane-wrapper__content">
+      <div className="pane-wrapper__content" style={{ zoom: paneZoom }}>
         {renderAllSurfaces()}
         <NotificationRing visible={hasUnread} flashing={justFired} />
         <div

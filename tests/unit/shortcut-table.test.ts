@@ -65,7 +65,7 @@ describe('the shortcut table', () => {
 
   it('labels use one vocabulary: verb first, sentence case, "tab" never "surface"', () => {
     const verbs = new Set(['New', 'Close', 'Open', 'Go', 'Rename', 'Pin', 'Mark', 'Show', 'Reopen', 'Toggle', 'Split', 'Focus', 'Resize',
-      'Find', 'Enter', 'Copy', 'Paste', 'Increase', 'Decrease', 'Reset', 'Follow', 'Flash']);
+      'Find', 'Enter', 'Copy', 'Paste', 'Increase', 'Decrease', 'Refresh', 'Reset', 'Follow', 'Flash']);
     for (const [action, e] of Object.entries(SHORTCUT_TABLE)) {
       expect(verbs, `${action}: "${e.label}"`).toContain(e.label.split(' ')[0]);
       expect(e.label, action).not.toMatch(/surface/i);
