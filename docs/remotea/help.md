@@ -35,6 +35,10 @@ Settings → Agent integration configures instructions, status hooks and optiona
 
 Connect the desktop to a host separately from linking that host to Eridani with remotea eridani setup. Host link keys, agent MCP keys and desktop host tokens have different purposes. A task describes work; a run is one execution and may have no task. Open this run in Eridani to inspect verification, approval and recovery. Terminal exit or agent idle does not prove success. Native Windows Eridani execution is not available.
 
+Supported managed runs keep questions and plans available for later answers in Eridani. The run header shows the workflow stage; the activity line above its message input shows current model or tool activity. Pause preserves the workspace and pending decisions. Resume reconciles interrupted work, while Cancel ends execution and retains its history. Queued, saved and delivered messages have separate receipts.
+
+A managed terminal displays the conversation while Eridani controls it. Open Host activity and choose **Take over in terminal** to stop managed control and continue the same conversation locally in that terminal. The transfer persists across reconnects; Eridani displays **Terminal has control**. Legacy terminal sessions retain their native provider approval behavior. Model and effort choices come from the host's verified installed harness, and unsupported choices require correction instead of a silent substitution.
+
 ## Use files, Git and browser tools
 
 <a id="files"></a>
