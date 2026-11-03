@@ -1,4 +1,6 @@
 .terminal-pane {
+  display: flex;
+  flex-direction: column;
   position: relative;
   width: 100%;
   height: 100%;
@@ -29,7 +31,7 @@
 /* Visual bell (#335). An absolutely positioned overlay rather than a border or a
    background change: a border would resize the box xterm measures, and the
    container's own background is painted UNDER the canvas, where it cannot be
-   seen. Positioned against .terminal-pane (the container has no position of its
+   seen. Positioned against .terminal-pane__viewport (the container has no position of its
    own), above the renderer and decorations, and never hit-testable. Under
    prefers-reduced-motion, global.css shortens it to an instant, which still
    fires the animationend that removes the class. */
@@ -209,3 +211,29 @@
   75%  { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* The viewport owns every terminal overlay. Its measured height excludes the
+   footer, so xterm's ResizeObserver fits all rows above the input affordance. */
+.terminal-pane__viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.managed-control {
+  flex: none;
+  padding: 8px 12px;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-bg-1);
+  color: var(--ui-text-primary);
+  font-size: 12px;
+}
+.managed-control__heading { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.managed-control__heading > span, .managed-control__status { color: var(--ui-text-secondary); }
+.managed-control__row { display: flex; gap: 8px; margin-top: 6px; }
+.managed-control__input { flex: 1; min-width: 0; padding: 8px; border: 1px solid var(--ui-border); border-radius: 5px; background: var(--ui-bg-0); color: var(--ui-text-secondary); opacity: .65; cursor: not-allowed; }
+.managed-control button { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 5px; background: var(--ui-bg-2); color: var(--ui-text-primary); cursor: pointer; }
+.managed-control button:disabled { opacity: .55; cursor: default; }
+.managed-control button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.managed-control kbd { font: inherit; font-size: 11px; color: var(--ui-text-secondary); }
+.managed-control__status { margin: 5px 0 0; overflow-wrap: anywhere; }

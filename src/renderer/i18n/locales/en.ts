@@ -1515,6 +1515,15 @@ export const en = {
   "settings.integration.choice.declined": "Declined",
   "settings.integration.fileCounts": "{present} present \u00b7 {missing} missing \u00b7 {modified} modified \u00b7 {errors} read errors",
   "settings.integration.fileReadErrors": "Some integration files could not be read. Expand the provider details for error codes, then refresh to retry.",
+  "managedControl.label": "Eridani controls this session",
+  "managedControl.browsing": "Read only · Scroll, copy and find are available",
+  "managedControl.input": "Input disabled while Eridani has control",
+  "managedControl.takeover": "Take over",
+  "managedControl.retryAction": "Retry takeover",
+  "managedControl.retry": "The host still reports Eridani control. You can retry the handoff. Input remains disabled.",
+  "managedControl.awaiting": "Waiting for the host to confirm terminal control…",
+  "managedControl.offline": "Reconnect to the host to take over. Input remains disabled.",
+  "managedControl.ended": "This session has ended. Its transcript remains available.",
 } as const;
 
 /** Every key the UI may ask for — derived from English, the source of truth. */

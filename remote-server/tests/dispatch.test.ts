@@ -148,10 +148,10 @@ describe('dispatch: managed integration', () => {
     expect(registry.session(surf)?.eridani).toMatchObject({ execution: 'managed', controller: 'eridani' });
     expect(adapter.inputs).toHaveLength(1);
     adapter.complete();
-    expect((await run(input('managed-input-1', 'Follow up'))).state).toBe('executed');
+    expect(await run(input('managed-input-1', 'Follow up'))).toMatchObject({ state: 'executed', result: { surf, incarnation: 1, generation: 1, managed: true } });
     expect(adapter.inputs).toEqual([expect.any(String), 'Follow up']);
     adapter.complete();
-    expect((await run(input('managed-input-1', 'Follow up'))).state).toBe('executed');
+    expect(await run(input('managed-input-1', 'Follow up'))).toMatchObject({ state: 'executed', result: { surf, incarnation: 1, generation: 1, managed: true } });
     expect(adapter.inputs).toHaveLength(2);
   });
 

@@ -112,6 +112,8 @@ export type LinkCap =
   | 'worktrees.scan'
   // The host takes `terminal.focus`: bring the run's tab to the front in the connected desktop app(s).
   | 'terminal.focus'
+  | 'run.cleanup'
+  | 'run.cleanup.handoff'
   // The host reports `remotea doctor`'s summary: in hello (`doctor`), and as a `doctor` frame when it changes.
   // The frame goes only to an Eridani whose welcome advertised `doctor`.
   | 'doctor'
@@ -136,7 +138,7 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
 /** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus` and the `doctor` summary. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles']);
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -511,6 +513,7 @@ export interface PromptBody extends OpFields {
 export interface ManagedAttention { kind: 'permission_denied' | 'receipt_uncertain'; reason: string; tool?: string; question_id?: string; action?: Record<string, unknown> }
 
 export interface StatusBody extends OpFields {
+  run_id?: string | null; generation?: number;
   execution?: 'managed'; controller?: 'eridani' | 'terminal'; paused?: boolean; pause_reason?: ManagedAttention['kind'] | null; attention?: ManagedAttention;
   t: 'status';
   /** Coalescing key: `status:${surf}`. */
@@ -529,6 +532,7 @@ export interface StatusBody extends OpFields {
 }
 
 export interface ExitBody extends OpFields {
+  run_id?: string | null; generation?: number;
   t: 'exit';
   surf: string;
   incarnation: number;
@@ -900,6 +904,16 @@ export interface AnswerCommand extends OpFields {
   expires_at?: number | string;
 }
 
+/** Explicit whole-run finalization; no cleanup follows from missing snapshot entries. */
+export interface RunCleanupSurface { surf: string; incarnation: number; generation: number }
+export type RunCleanupStatus = 'closed' | 'already_closed' | 'operator_control' | 'native_live' | 'stale' | 'unknown' | 'stop_failed';
+export interface RunCleanupSurfaceResult extends RunCleanupSurface { status: RunCleanupStatus; detail?: string }
+export type RunCleanupCommand = OpFields & {
+  t: 'run.cleanup'; run_id: string; generation: number;
+  surfaces: RunCleanupSurface[]; expires_at: number | string;
+} & ({ scope?: 'finished_run'; terminal_state: 'completed' | 'stopped' | 'capped' | 'failed'; handoff_to?: never }
+  | { scope: 'retired_planner'; terminal_state?: never; handoff_to: RunCleanupSurface });
+
 export interface RunPauseCommand extends OpFields {
   t: 'run.pause' | 'run.resume'; run_id: string; generation: number; surf: string; incarnation: number; expires_at: number | string;
 }
@@ -1202,7 +1216,7 @@ const noControl = (s: string) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f
 export const isPasteSafe = (s: string) => !/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/.test(s);
 
 /** Effectful commands: each must carry `expires_at` within the replay horizon (L11, stage F). */
-export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify', 'run.pause', 'run.resume']);
+export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify', 'run.pause', 'run.resume', 'run.cleanup']);
 
 /**
  * Validate a stage C command's body. Returns null when it is well formed,
@@ -1264,6 +1278,17 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
         if (!a.choice_ids?.length && !(typeof a.text === 'string' && a.text.trim())) return 'empty answer';
       }
       return null;
+    case 'run.cleanup':
+      if (!isStr(m.run_id, 128) || !RUN_ID_RE.test(m.run_id) || !isInt(m.generation)) return 'bad cleanup run';
+      if (m.scope !== undefined && m.scope !== 'finished_run' && m.scope !== 'retired_planner') return 'bad cleanup scope';
+      if (m.scope !== 'retired_planner' && !['completed', 'stopped', 'capped', 'failed'].includes(m.terminal_state as string)) return 'bad terminal_state';
+      if (!Array.isArray(m.surfaces) || !m.surfaces.length || m.surfaces.length > 128) return 'bad cleanup surfaces';
+      if (!m.surfaces.every((surface) => isObj(surface) && isStr(surface.surf, 120) && isInt(surface.incarnation, 1) && isInt(surface.generation) && surface.generation <= (m.generation as number))) return 'bad cleanup fence';
+      if (m.scope === 'retired_planner') {
+        const worker = m.handoff_to;
+        if (m.terminal_state !== undefined || m.surfaces.length !== 1 || !isObj(worker) || !isStr(worker.surf, 120) || !isInt(worker.incarnation, 1) || !isInt(worker.generation) || worker.generation > (m.generation as number) || worker.surf === (m.surfaces[0] as Record<string, unknown>).surf) return 'bad planner handoff fence';
+      } else if (m.handoff_to !== undefined) return 'bad cleanup scope';
+      return new Set(m.surfaces.map((surface) => (surface as Record<string, unknown>).surf)).size === m.surfaces.length ? null : 'duplicate cleanup surface';
     case 'run.pause':
     case 'run.resume':
       return isStr(m.surf, 120) && isInt(m.incarnation) && isStr(m.run_id, 128) && isInt(m.generation) ? null : 'bad fence';

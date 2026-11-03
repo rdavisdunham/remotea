@@ -101,7 +101,7 @@ import type { JournalRecord } from './eridani-journal';
 import type { ExecutionTarget, LaunchSpec } from './eridani-targets';
 import { liveWriters, type EnsuredWorktree, type WorktreeManager } from './worktrees';
 import { ManagedSessions, type ManagedSpec } from './managed-sessions';
-import type { RunPauseCommand } from '../../src/shared/eridani-link-protocol';
+import type { RunCleanupCommand, RunCleanupSurface, RunCleanupSurfaceResult, RunPauseCommand } from '../../src/shared/eridani-link-protocol';
 import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
@@ -249,6 +249,8 @@ export class EridaniConn implements HubConn {
   }
 
   close(): void {}
+
+  closeSurface(id: string): void { this.hub.handle(this, { t: 'close', rid: this.rid++, id: id as RemoteSurfaceId }); }
 
   /** Create (or respawn) a session. Synchronous: the hub spawns inside `handle`. */
   open(id: string, create: CreateSpec): { ok: true } | { ok: false; message: string } {
@@ -433,6 +435,7 @@ export class Dispatch {
       input: (c, ctx) => this.input(c as unknown as InputCommand, ctx),
       stop: (c, ctx) => this.stop(c as unknown as StopCommand, ctx),
       answer: async (c, ctx) => this.managed.findQuestion((c as unknown as AnswerCommand).question_id) ? this.managed.answer(c as unknown as AnswerCommand, () => ctx.begin()) : this.deps.questions.answer(c as unknown as AnswerCommand, () => ctx.begin()),
+      'run.cleanup': (c, ctx) => this.cleanupRun(c as unknown as RunCleanupCommand, ctx),
       'run.pause': (c, ctx) => this.pauseRun(c as unknown as RunPauseCommand, ctx),
       'run.resume': (c, ctx) => this.pauseRun(c as unknown as RunPauseCommand, ctx),
       verify: (c, ctx) => this.verify(c as unknown as VerifyCommand, ctx),
@@ -673,13 +676,66 @@ export class Dispatch {
         const surf = typeof body?.surf === 'string' ? body.surf : null;
         // S-Q5: the PTY keeper kept the process; the stop stays requested and boot sent it again.
         if (surf && this.deps.hub.isLive(surf)) return { state: 'failed', detail: 'interrupted by a server restart; the process outlived it, the stop stays requested and was sent again' };
-        return { state: 'executed', detail: 'the process ended with the server restart' };
+        return { state: 'executed', detail: 'the process ended with the server restart', ...(surf ? { outcome: { ...this.surfaceFacts(surf), exited: true } } : {}) };
       }
+      case 'run.cleanup':
+        return body ? { state: 'executed', outcome: { ...(body.scope === 'retired_planner' ? { scope: body.scope, handoff_to: body.handoff_to } : { terminal_state: body.terminal_state }), surfaces: this.recoverCleanup({ ...body, op_id: rec.op_id } as unknown as RunCleanupCommand) } } : null;
       case 'verify':
         return { state: 'failed', detail: 'interrupted by a server restart' };
       default:
         return null; // input, answer: the bytes may or may not have reached the agent
     }
+  }
+
+  private cleanupStatus(cmd: RunCleanupCommand, surface: RunCleanupSurface): RunCleanupSurfaceResult | null {
+    const rec = this.deps.registry.session(surface.surf);
+    if (!rec) return { ...surface, status: this.deps.registry.sessionTombstone(surface.surf) ? 'already_closed' : 'unknown' };
+    const binding = rec.eridani;
+    if (this.deps.registry.sessions().some((session) => session.eridani?.runId === cmd.run_id && session.eridani.generation > cmd.generation)) return { ...surface, status: 'stale', detail: 'a newer run generation exists' };
+    if (!binding || binding.runId !== cmd.run_id || binding.generation !== surface.generation || (rec.incarnation ?? 0) !== surface.incarnation || cmd.generation < surface.generation) return { ...surface, status: 'stale', detail: 'surface ownership or incarnation changed' };
+    if (cmd.scope === 'retired_planner') {
+      if (binding.role !== 'planner') return { ...surface, status: 'stale', detail: 'only the retired planner may be closed during handoff' };
+      const next = cmd.handoff_to, worker = this.deps.registry.session(next.surf), workerBinding = worker?.eridani;
+      if (!worker || next.surf === surface.surf || worker.state !== 'live' || !this.deps.hub.isLive(next.surf) || !worker.agent?.sessionId || !workerBinding || workerBinding.runId !== cmd.run_id || workerBinding.role !== 'worker' || worker.agent.provider !== workerBinding.harness || (worker.incarnation ?? 0) !== next.incarnation || workerBinding.generation !== next.generation) return { ...surface, status: 'stale', detail: 'the distinct worker attachment is not confirmed live' };
+    }
+    if (binding.controller === 'terminal' && (rec.state !== 'exited' || this.deps.hub.isLive(surface.surf))) return { ...surface, status: 'operator_control', detail: 'manual terminal control is preserved' };
+    return null;
+  }
+
+  private closeCleanedSurface(cmd: RunCleanupCommand, surface: RunCleanupSurface): RunCleanupSurfaceResult {
+    const fenced = this.cleanupStatus(cmd, surface); if (fenced) return fenced;
+    const rec = this.deps.registry.session(surface.surf)!;
+    if (this.deps.hub.isLive(surface.surf) || rec.state !== 'exited') return { ...surface, status: 'stop_failed', detail: 'process exit is not confirmed' };
+    this.conn.closeSurface(surface.surf); this.deps.registry.saveNow();
+    return { ...surface, status: 'closed' };
+  }
+
+  private async cleanupRun(cmd: RunCleanupCommand, ctx: CommandContext): Promise<CommandResult> {
+    ctx.begin();
+    // Save every exact stop intent before awaiting any process. Boot must not resume a finalized run.
+    for (const surface of cmd.surfaces) if (!this.cleanupStatus(cmd, surface) && this.deps.hub.isLive(surface.surf)) this.markStop(surface.surf, 'kill', cmd.op_id, surface.generation);
+    const surfaces = await Promise.all(cmd.surfaces.map(async (surface): Promise<RunCleanupSurfaceResult> => {
+      const fenced = this.cleanupStatus(cmd, surface); if (fenced) return fenced;
+      const rec = this.deps.registry.session(surface.surf)!;
+      if (this.deps.hub.isLive(surface.surf)) {
+        try {
+          if (rec.eridani?.execution === 'managed' && rec.eridani.controller !== 'terminal') await this.managed.stop(surface.surf);
+          else if (await this.terminate(surface.surf, 'kill') === null) return { ...surface, status: 'stop_failed', detail: 'native process exit is not confirmed' };
+        } catch { return { ...surface, status: 'stop_failed', detail: 'process termination failed; terminal retained' }; }
+      } else if (rec.state === 'lost' && rec.eridani?.stopRequested?.op === cmd.op_id) this.finishLost(rec, 'finalized run cleanup; the process ended with the server restart');
+      return this.closeCleanedSurface(cmd, surface);
+    }));
+    this.deps.changed?.();
+    return { state: 'executed', result: { ...(cmd.scope === 'retired_planner' ? { scope: cmd.scope, handoff_to: cmd.handoff_to } : { terminal_state: cmd.terminal_state }), surfaces } };
+  }
+
+  private recoverCleanup(cmd: RunCleanupCommand): RunCleanupSurfaceResult[] {
+    return cmd.surfaces.map((surface) => {
+      const fenced = this.cleanupStatus(cmd, surface); if (fenced) return fenced;
+      const rec = this.deps.registry.session(surface.surf)!;
+      if (rec.state === 'lost' && rec.eridani?.stopRequested?.op === cmd.op_id && !this.deps.hub.isLive(surface.surf)) this.finishLost(rec, 'finalized run cleanup; the process ended with the server restart');
+      return this.closeCleanedSurface(cmd, surface);
+    });
   }
 
   private async takeover(surf: string): Promise<{ ok: boolean; error?: string }> {
@@ -1090,7 +1146,7 @@ export class Dispatch {
       if (!(await this.hold(w, this.timing.steerDelayMs))) return this.interrupted(w, w.canceled ?? 'canceled');
       const why = await this.type(w, cmd.text);
       if (why) return this.interrupted(w, why);
-      return { state: 'executed', result: { mode: 'steer', generation: cmd.generation } };
+      return { state: 'executed', result: { mode: 'steer', ...this.surfaceFacts(cmd.surf) } };
     } finally {
       this.endWrite(w);
     }
@@ -1102,7 +1158,8 @@ export class Dispatch {
       if (cmd.plan_revision !== undefined && cmd.plan_revision !== rec.eridani!.planRevision) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, planRevision: cmd.plan_revision } }); this.managed.planRevision(cmd.surf, cmd.plan_revision); rec = this.deps.registry.session(cmd.surf)!; }
       if (cmd.generation > rec.eridani!.generation) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation } }); this.managed.generation(cmd.surf, cmd.generation); }
       if (cmd.mode === 'steer') { ctx.begin(); await this.managed.interrupt(cmd.surf); }
-      return this.managed.send(cmd.surf, cmd.text, cmd.op_id, false, () => ctx.begin());
+      const result = await this.managed.send(cmd.surf, cmd.text, cmd.op_id, false, () => ctx.begin());
+      return result.state === 'executed' ? { ...result, result: { managed: true, ...result.result, ...this.surfaceFacts(cmd.surf) } } : result;
     }
     if (cmd.mode === 'steer') return this.steer(cmd, ctx);
     return new Promise<CommandResult>((resolve) => {
@@ -1151,7 +1208,7 @@ export class Dispatch {
         // `executed` only once Enter was sent; a cancel before it is reported as interrupted.
         void this.type(w, head.cmd.text).then((why) => {
           this.endWrite(w);
-          head.resolve(why ? this.interrupted(w, why) : { state: 'executed', result: { mode: 'queue', generation: head.cmd.generation } });
+          head.resolve(why ? this.interrupted(w, why) : { state: 'executed', result: { mode: 'queue', ...this.surfaceFacts(surf) } });
         });
       }
       if (list.length) this.pollTimers.set(surf, this.timers.setTimeout(tick, this.timing.queuePollMs));
@@ -1216,19 +1273,21 @@ export class Dispatch {
     });
   }
 
+  private surfaceFacts(surf: string): Record<string, unknown> { const rec = this.deps.registry.session(surf); return { surf, incarnation: rec?.incarnation ?? 0, generation: rec?.eridani?.generation ?? 0 }; }
+
   private async stop(cmd: StopCommand, ctx: CommandContext): Promise<CommandResult> {
-    if (this.deps.registry.session(cmd.surf)?.eridani?.execution === 'managed') { ctx.begin(); await this.managed.cancel(cmd.surf); return { state: 'executed', result: { surf: cmd.surf, exited: true } }; }
+    if (this.deps.registry.session(cmd.surf)?.eridani?.execution === 'managed') { ctx.begin(); await this.managed.cancel(cmd.surf); return { state: 'executed', result: { ...this.surfaceFacts(cmd.surf), exited: true } }; }
     this.markStop(cmd.surf, cmd.mode, cmd.op_id, cmd.generation);
     ctx.begin();
     if (!this.deps.hub.isLive(cmd.surf)) {
       this.clearStop(cmd.surf);
-      return { state: 'executed', detail: 'not running', result: { surf: cmd.surf, exited: true } };
+      return { state: 'executed', detail: 'not running', result: { ...this.surfaceFacts(cmd.surf), exited: true } };
     }
     const code = await this.terminate(cmd.surf, cmd.mode);
     if (code === null) {
       return { state: 'failed', detail: cmd.mode === 'kill' ? 'the process did not exit after SIGKILL' : 'still running after Ctrl-C; send mode:kill (the stop stays requested)' };
     }
-    return { state: 'executed', result: { surf: cmd.surf, exited: true, code } };
+    return { state: 'executed', result: { ...this.surfaceFacts(cmd.surf), exited: true, code } };
   }
 
   /** Interrupt or kill, then wait for the exit. Null: it did not exit in time. */

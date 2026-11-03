@@ -8,6 +8,7 @@ import NewOutputPill from './NewOutputPill';
 import ResetNotice from './ResetNotice';
 import RemoteOverlay from './RemoteOverlay';
 import RemoteSizeBadge from './RemoteSizeBadge';
+import ManagedControl from './ManagedControl';
 import { useStore } from '../../store';
 import { parseRemoteShellSpec } from '../../../shared/remote-shell-spec';
 import '../../styles/terminal.css';
@@ -141,35 +142,40 @@ export default function TerminalPane({
     onFindBarClose?.();
   }, [searchAddonRef, onFindBarClose]);
 
+  const focusAfterTakeover = useCallback(() => { xtermRef.current?.focus(); }, [xtermRef]);
+
   return (
     <div className={`terminal-pane ${focused ? 'terminal-pane--focused' : ''}`}>
-      <div ref={terminalRef} className="terminal-pane__container" />
-      {remoteHostId && <RemoteOverlay hostId={remoteHostId} />}
-      {remoteHostId && surfaceId && <RemoteSizeBadge surfaceId={surfaceId} />}
-      {/* Prompt-log views (issue #207). All three are absolutely positioned over
-          the container, never flow siblings of it: a flow sibling would be
-          pushed out of the container's height:100% box WITHOUT firing the
-          ResizeObserver, so the PTY would keep its old row count and the bottom
-          lines would hide underneath (issue #82).
+      <div className="terminal-pane__viewport">
+        <div ref={terminalRef} className="terminal-pane__container" />
+        {remoteHostId && <RemoteOverlay hostId={remoteHostId} />}
+        {remoteHostId && surfaceId && <RemoteSizeBadge surfaceId={surfaceId} />}
+        {/* Prompt-log views (issue #207). All three are absolutely positioned over
+            the container, never flow siblings of it: a flow sibling would be
+            pushed out of the container's height:100% box WITHOUT firing the
+            ResizeObserver, so the PTY would keep its old row count and the bottom
+            lines would hide underneath (issue #82).
 
-          Gated on `visible`, not on `focused`: every tab in a pane stays mounted
-          (visibility:hidden unmounts nothing), so without the gate a hidden tab
-          would render its own sticky header on top of the tab the user is
-          actually looking at. The outline additionally needs `focused` — it
-          takes keyboard focus, and only one pane may. */}
-      {visible && surfaceId && <PinnedPrompt surfaceId={surfaceId} />}
-      {visible && surfaceId && <NewOutputPill surfaceId={surfaceId} />}
-      {visible && focused && surfaceId && <PromptOutline surfaceId={surfaceId} />}
-      {showFindBar && (
-        <FindBar
-          onSearch={handleSearch}
-          onNext={handleNext}
-          onPrevious={handlePrevious}
-          onClose={handleFindBarClose}
-        />
-      )}
-      <CopyMode active={copyModeActive} />
-      {visible && surfaceId && <ResetNotice surfaceId={surfaceId} />}
+            Gated on `visible`, not on `focused`: every tab in a pane stays mounted
+            (visibility:hidden unmounts nothing), so without the gate a hidden tab
+            would render its own sticky header on top of the tab the user is
+            actually looking at. The outline additionally needs `focused` — it
+            takes keyboard focus, and only one pane may. */}
+        {visible && surfaceId && <PinnedPrompt surfaceId={surfaceId} />}
+        {visible && surfaceId && <NewOutputPill surfaceId={surfaceId} />}
+        {visible && focused && surfaceId && <PromptOutline surfaceId={surfaceId} />}
+        {showFindBar && (
+          <FindBar
+            onSearch={handleSearch}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onClose={handleFindBarClose}
+          />
+        )}
+        <CopyMode active={copyModeActive} />
+        {visible && surfaceId && <ResetNotice surfaceId={surfaceId} />}
+      </div>
+      {remoteHostId && surfaceId && <ManagedControl surfaceId={surfaceId} hostId={remoteHostId} active={focused && visible} onTakenOver={focusAfterTakeover} />}
     </div>
   );
 }

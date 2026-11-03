@@ -6,6 +6,7 @@ import { EventEmitter } from 'events';
 import { spawnPty } from './pty-spawn';
 import type { PtyLike } from './pty-spawn';
 import { CodexRuntimeAdapter, ClaudeRuntimeAdapter, type HarnessSpec, type HarnessRequest, type RuntimeAdapter } from './managed-harness';
+import { ManagedTranscript } from './managed-transcript';
 import { writePrivate } from './eridani-mcp';
 import { canonicalJson } from '../../src/shared/eridani-link-protocol';
 import { redact } from './collector/redact';
@@ -17,7 +18,7 @@ type Up = Omit<QuestionBody | ActivityBody, 'op_id' | 'digest'> | Record<string,
 export interface ManagedSpec extends HarnessSpec { surf: string; runId: string; generation: number; incarnation: number; prompt: string; operationId: string; planRevision?: number | null }
 interface Decision { planRevision?: number; id: string; digest: string; request: HarnessRequest; items: QuestionItem[]; kind: 'ask' | 'approval'; state: 'pending' | 'submitted' | 'uncertain' | 'resolved'; sessionId: string; turnId: string | null; generation: number; response?: unknown; action?: QuestionBody['action'] }
 interface Saved { attention?: ManagedAttention; pausedBy?: 'operator' | 'attention'; initialization?: 'executing' | 'ready'; sessionId: string; turnId: string | null; sequence: number; paused: boolean; active: boolean; decisions: Decision[]; operations: Record<string, 'queued' | 'executing' | 'delivered' | 'uncertain'>; queue: Array<{ text: string; op: string; generation: number }> }
-interface Entry { spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; receiptTimers: Map<string, NodeJS.Timeout>; receiptRequests: Map<string, HarnessRequest>; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
+interface Entry { spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; transcript: ManagedTranscript; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; receiptTimers: Map<string, NodeJS.Timeout>; receiptRequests: Map<string, HarnessRequest>; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
 export interface ManagedDeps {
   dir: string | null; emit(body: Up): void; changed(surf: string, sessionId: string, paused: boolean, attention?: ManagedAttention | null): void;
   decisionReceiptMs?: number;
@@ -66,7 +67,7 @@ export class ManagedSessions {
     state.active = false;
     const adapter = this.deps.factory?.({ ...spec, sessionId: state.sessionId || undefined }) ?? (spec.harness === 'codex' ? new CodexRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }) : new ClaudeRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }));
     const terminal = new ManagedTerminal();
-    const e: Entry = { spec, state, adapter, terminal, ready: Promise.resolve(), liveRequests: new Map(), busy: false, receiptTimers: new Map(), receiptRequests: new Map(), items: new Map(), waiters: new Map() };
+    const e: Entry = { spec, state, adapter, terminal, transcript: new ManagedTranscript(text => terminal.output(text)), ready: Promise.resolve(), liveRequests: new Map(), busy: false, receiptTimers: new Map(), receiptRequests: new Map(), items: new Map(), waiters: new Map() };
     this.entries.set(surf, e);
     for (const q of state.decisions) if (q.state === 'submitted') q.state = 'uncertain';
     for (const [op, status] of Object.entries(state.operations)) if (status === 'executing') state.operations[op] = 'uncertain';
@@ -77,7 +78,7 @@ export class ManagedSessions {
     adapter.on('exit', (code) => { state.active = false; try { this.save(e); } catch { this.attention(e, 'Cannot persist provider exit'); } if (!e.handingOff) terminal.emit('exit', { exitCode: code }); });
     terminal.on('stop', () => void adapter.stop().catch(() => this.attention(e, 'Provider termination unconfirmed')));
     e.ready = Promise.resolve().then(async () => {
-      terminal.output('Managed Eridani session · use Take over to control this conversation\n');
+      e.transcript.notice('Managed Eridani conversation · take over to use the terminal directly');
       if (!recovered && state.initialization === 'executing') throw new Error('Conversation creation receipt unknown; reconcile provider sessions before starting again');
       state.initialization = 'executing'; this.save(e);
       const id = recovered ? await adapter.resume() : await adapter.start();
@@ -100,7 +101,7 @@ export class ManagedSessions {
     e.lastActivity = { kind, label, at: now }; e.state.sequence++; this.save(e);
     this.deps.emit({ t: 'activity', run_id: e.spec.runId, generation: e.spec.generation, surf: e.spec.surf, incarnation: e.spec.incarnation, session_id: e.state.sessionId, turn_id: e.state.turnId, sequence: e.state.sequence, at: Date.now(), kind, ...(label ? { label } : {}) });
   }
-  private attention(e: Entry, label: string): void { e.terminal.output(`\n[${label}]\n`); try { this.activity(e, 'waiting', label); } catch { e.terminal.output('[Managed persistence unavailable; execution is blocked]\n'); } }
+  private attention(e: Entry, label: string): void { e.transcript.notice(label); try { this.activity(e, 'waiting', label); } catch { e.terminal.output('[Managed persistence unavailable; execution is blocked]\n'); } }
   private publish(e: Entry, q: Decision, recovering = false): void {
     this.deps.emit({ t: 'question', question_id: q.id, surf: e.spec.surf, incarnation: e.spec.incarnation, run_id: e.spec.runId, generation: q.generation, plan_revision: q.planRevision ?? 0, provider: e.spec.harness, provider_session_id: q.sessionId, provider_request_id: String(q.request.id), provider_turn_id: q.turnId, kind: q.kind, group_id: q.id, items: q.items.map(redactItem), hold_until: 0, durable: true, request_digest: q.digest, ...(q.action ? { action: q.action } : {}), recovery: recovering || q.state !== 'pending' ? 'attention_required' : 'pending' });
   }
@@ -116,9 +117,10 @@ export class ManagedSessions {
     if (!q) { q = { id: `managed-${crypto.randomUUID()}`, digest: hash, request: req, items, kind, state: 'pending', sessionId: e.state.sessionId, turnId: e.state.turnId, generation: e.spec.generation, planRevision: e.spec.planRevision ?? 0 }; e.state.decisions.push(q); }
     if (kind === 'approval') q.action = { tool: req.method === 'claude/permission' ? String(req.params.tool_name) : req.method, input: JSON.parse(redact(JSON.stringify(req.params))), cwd: e.spec.cwd, digest: hash, ...(req.params.permissions ? { permissions: JSON.parse(redact(JSON.stringify(req.params.permissions))) } : {}) };
     if (e.recovering) e.recovering = false;
-    q.request = req; e.liveRequests.set(q.id, req); this.save(e); this.publish(e, q); this.activity(e, 'waiting');
+    q.request = req; e.liveRequests.set(q.id, req); this.save(e); this.publish(e, q); this.activity(e, 'waiting', kind === 'ask' ? 'Waiting for your answer' : 'Waiting for approval');
   }
   private event(e: Entry, m: any): void {
+    e.transcript.event(m);
     const p = m.params ?? {};
     if (m.type === 'remotea/permission-denied') {
       const input = m.input ?? {}, tool = String(input.tool_name ?? 'tool');
@@ -153,15 +155,14 @@ export class ManagedSessions {
     if (m.type === 'user') for (const block of m.message?.content ?? []) if (block.type === 'tool_result') { this.confirm(e, String(block.tool_use_id), true); if (block.is_error && String(e.items.get(block.tool_use_id)?.name ?? '').startsWith('mcp__eridani__')) this.toolFailed(e); }
     if (m.method === 'turn/started') { this.promptAccepted(e); e.state.active = true; this.activity(e, 'thinking'); }
     if (m.method?.startsWith('item/reasoning/')) this.activity(e, 'thinking');
-    if (m.method === 'item/agentMessage/delta') { e.finalText = (e.finalText ?? '') + String(p.delta ?? ''); e.terminal.output(String(p.delta ?? '')); }
+    if (m.method === 'item/agentMessage/delta') { e.finalText = (e.finalText ?? '') + String(p.delta ?? ''); }
     if (m.method === 'item/completed' && p.item?.type === 'mcpToolCall' && (p.item.status === 'failed' || p.item.error)) this.toolFailed(e);
     if (m.method === 'item/completed' && p.item?.type === 'agentMessage' && typeof p.item.text === 'string') e.finalText = p.item.text;
     if (m.method === 'item/started' && p.item?.id) e.items.set(p.item.id, p.item);
     if (m.method === 'item/started') this.toolActivity(e, p.item?.type ?? '', p.item?.command ?? '');
-    if (m.method === 'item/commandExecution/outputDelta') e.terminal.output(String(p.delta ?? ''));
-    if (m.method === 'turn/completed' || m.type === 'result') { e.state.active = false; e.busy = false; this.hook(e, 'Stop', { turnId: e.state.turnId ?? `${e.state.sessionId}:${e.prompt?.op ?? 'recovered'}`, lastAssistantMessage: m.type === 'result' && typeof m.result === 'string' ? m.result : e.finalText ?? '' }); this.activity(e, e.state.paused ? 'waiting' : 'idle', e.state.paused ? 'Paused; review required' : undefined); e.terminal.output('\n'); void this.pump(e); }
+    if (m.method === 'turn/completed' || m.type === 'result') { e.state.active = false; e.busy = false; this.hook(e, 'Stop', { turnId: e.state.turnId ?? `${e.state.sessionId}:${e.prompt?.op ?? 'recovered'}`, lastAssistantMessage: m.type === 'result' && typeof m.result === 'string' ? m.result : e.finalText ?? '' }); this.activity(e, e.state.paused ? 'waiting' : 'idle', e.state.paused ? 'Paused; review required' : undefined); void this.pump(e); }
     if (m.type === 'stream_event') {
-      const ev = m.event; if (ev?.delta?.type === 'text_delta') e.terminal.output(String(ev.delta.text));
+      const ev = m.event;
       if (ev?.delta?.type === 'thinking_delta') this.activity(e, 'thinking');
       if (ev?.type === 'content_block_start' && ev.content_block?.type === 'tool_use') this.toolActivity(e, ev.content_block.name, ev.content_block.input?.command ?? '');
     }
@@ -173,7 +174,9 @@ export class ManagedSessions {
     void e.adapter.interrupt().catch(() => this.attention(e, 'Provider interrupt unconfirmed; execution remains paused'));
   }
   private toolActivity(e: Entry, tool: string, command: string): void {
-    if (/read|grep|glob|search/i.test(tool)) this.activity(e, 'searching', 'Reading');
+    if (tool.toLowerCase() === 'reasoning') this.activity(e, 'thinking');
+    else if (tool === 'agentMessage') this.activity(e, 'thinking', 'Writing a response');
+    else if (/read|grep|glob|search/i.test(tool)) this.activity(e, 'searching', 'Reading');
     else if (/edit|write|fileChange/i.test(tool)) this.activity(e, 'editing');
     else if (/\b(test|pytest|vitest|jest)\b/.test(command)) this.activity(e, 'testing');
     else this.activity(e, 'tool');
@@ -183,6 +186,7 @@ export class ManagedSessions {
   }
   private promptAccepted(e: Entry): void {
     if (!e.prompt || e.prompt.published) return; e.prompt.published = true;
+    e.transcript.user(e.prompt.text);
     this.hook(e, 'UserPromptSubmit', { prompt: e.prompt.text });
   }
   async send(surf: string, text: string, op: string, startup = false, begin: () => void = () => {}): Promise<CommandResult> {
@@ -204,11 +208,16 @@ export class ManagedSessions {
     try {
       if (head.generation !== e.spec.generation) { e.state.queue.shift(); this.save(e); waiter.resolve({ state: 'rejected', detail: 'stale generation' }); return; }
       waiter.begin(); e.state.operations[head.op] = 'executing'; e.state.active = true; e.busy = true;
-      e.prompt = { text: head.text, op: head.op, published: false }; e.finalText = ''; this.save(e);
+      e.prompt = { text: head.text, op: head.op, published: false }; e.finalText = ''; e.state.turnId = null; this.save(e);
       await e.adapter.send(head.text, head.op); this.promptAccepted(e); e.state.operations[head.op] = 'delivered'; e.state.queue.shift(); this.save(e);
-      this.activity(e, 'thinking'); waiter.resolve({ state: 'executed', result: { surf: e.spec.surf, managed: true } });
+      if (e.state.active && !e.state.paused && !this.pending(e.spec.surf).length) this.activity(e, 'thinking');
+      waiter.resolve({ state: 'executed', result: { surf: e.spec.surf, managed: true } });
     } catch { e.state.operations[head.op] = 'uncertain'; e.state.queue.shift(); try { this.save(e); } catch { /* block until persistence recovers */ } this.attention(e, 'Input receipt stalled; reconcile before retry'); waiter.resolve({ state: 'uncertain', detail: 'provider input receipt unknown' }); }
-    finally { e.waiters.delete(head.op); e.pumping = false; }
+    finally {
+      e.waiters.delete(head.op); e.pumping = false;
+      // Completion can arrive while send() is still awaiting its receipt. Its pump attempt was guarded; retry now.
+      void this.pump(e);
+    }
   }
   findQuestion(id: string): { entry: Entry; question: Decision } | undefined { for (const entry of this.entries.values()) { const question = entry.state.decisions.find((q) => q.id === id); if (question) return { entry, question }; } return undefined; }
   precheck(cmd: AnswerCommand): string | null {
