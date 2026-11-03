@@ -26,7 +26,7 @@ import { Registry } from './registry';
 import { TermSession, type ConnLike, type Timers } from './session';
 import type { PtyLike, SpawnFn, SpawnRequest } from './pty-spawn';
 import { DEFAULT_THEME, type ThemeColors } from './queries';
-import { probeSession, type ProbeResult } from './agent-probe';
+import { probeSession, resolveCodexResumeThread, type ProbeResult } from './agent-probe';
 import type { FsRequest } from './remote-fs';
 import { childrenIndex } from './proc';
 import { AgentStateTracker } from './agent-state';
@@ -87,6 +87,8 @@ export interface HubDeps {
   log?: (msg: string) => void;
   /** Injectable for tests; defaults to reading /proc. */
   probe?: (pid: number, index: Map<number, number[]>) => ProbeResult;
+  /** Resolve legacy native Codex IDs; injectable to keep tests off the user's Codex index. */
+  resolveCodexThread?: (id: string) => string | null;
   /** Extra environment for every spawned session (the hook bridge's address and token). */
   sessionEnv?: (id: string) => Record<string, string>;
   /** Where app diagnostics go; absent = the server does not offer 'diag'. */
@@ -162,6 +164,9 @@ export class Hub {
     this.log = deps.log ?? (() => {});
     this.sink = deps.sink ?? null;
     this.statusRev = this.now();
+    // Repair legacy native IDs before welcome/recovery snapshots reach apps.
+    // Eridani owns its provider thread identities and recovery separately.
+    for (const rec of this.registry.sessions()) this.repairCodexAgent(rec);
     this.agentState = new AgentStateTracker({
       now: this.now,
       onChange: ({ surf, info }) => {
@@ -477,6 +482,11 @@ export class Hub {
       return;
     }
 
+    if (rec && this.cfg.resumeAgents && !this.repairCodexAgent(rec)) {
+      conn.sendJson({ t: 'openError', rid: msg.rid, id: msg.id, code: 'spawn-failed', message: 'The saved Codex ID belongs to an internal review or subagent thread, but its parent conversation could not be verified. Open the parent conversation manually with codex resume.' });
+      return;
+    }
+
     // Create — brand new, or respawning a lost one in place.
     const spec = msg.create!;
     const wasLost = !!rec;
@@ -521,7 +531,9 @@ export class Hub {
     }
     const resume = custom !== undefined ? custom : wasLost && this.cfg.resumeAgents && rec?.agent ? resumeCommand(rec.agent) : null;
     const spawnCmd = custom !== undefined ? custom ?? undefined : resume && record.cmd ? resume : record.cmd;
-    const startup = custom !== undefined ? undefined : resume && !record.cmd ? [resume] : spec.startupCommands;
+    // A direct resume command already starts the agent. Never type the
+    // client's stale startup commands into that restored conversation.
+    const startup = custom !== undefined ? undefined : resume ? (record.cmd ? undefined : [resume]) : spec.startupCommands;
     let session: TermSession;
     try {
       session = this.makeSession(record, this.deps.spawn, msg.cols, msg.rows, startup, spawnCmd, wasLost ? undefined : spec.env);
@@ -790,9 +802,26 @@ export class Hub {
 
   private noteAgent(id: string, agent: AgentHandle): void {
     const rec = this.registry.session(id);
-    if (!rec || (rec.agent?.sessionId === agent.sessionId && rec.agent.provider === agent.provider)) return;
+    if (!rec) return;
+    if (!rec.eridani && agent.provider === 'codex') {
+      const sessionId = (this.deps.resolveCodexThread ?? resolveCodexResumeThread)(agent.sessionId);
+      if (!sessionId) return;
+      agent = { ...agent, sessionId };
+    }
+    if (rec.agent?.sessionId === agent.sessionId && rec.agent.provider === agent.provider) return;
     this.registry.updateSession(id, { agent });
     this.broadcast({ t: 'meta', id: id as RemoteSurfaceId, agent });
+  }
+
+  /** False only for a known internal thread whose parent cannot be recovered. */
+  private repairCodexAgent(rec: SessionRecord): boolean {
+    if (rec.eridani || rec.agent?.provider !== 'codex') return true;
+    const sessionId = (this.deps.resolveCodexThread ?? resolveCodexResumeThread)(rec.agent.sessionId);
+    if (!sessionId) return false;
+    if (sessionId !== rec.agent.sessionId) {
+      this.registry.updateSession(rec.id, { agent: { ...rec.agent, sessionId } });
+    }
+    return true;
   }
 
   prune(): void {
