@@ -195,15 +195,17 @@ function snapshotSurfaceBuffer(
  * `…\ssh.exe`, persisted that way, and a restored ssh workspace then started
  * an ssh with no destination, printed usage and exited. The label only ever
  * needed a name to show, so it gets its own field and the spec stays intact.
+ * Main also returns the original effective launch spec on reattachment, so
+ * inheritance preserves arguments even if workspace/default preferences changed.
  */
-function setResolvedShellForSurface(surfaceId: string | undefined, resolvedShell: string): void {
+function setResolvedShellForSurface(surfaceId: string | undefined, resolvedShell: string, launchShell: string | undefined): void {
   if (!surfaceId || !resolvedShell) return;
   const state = useStore.getState();
   const workspace = state.workspaces.find((ws) => treeHasSurface(ws.splitTree, surfaceId));
   if (!workspace) return;
   const location = findSurfaceLocation(workspace.splitTree, surfaceId);
   if (!location) return;
-  state.updateSurface(workspace.id, location.paneId as any, surfaceId as any, { resolvedShell });
+  state.updateSurface(workspace.id, location.paneId as any, surfaceId as any, { resolvedShell, launchShell });
 }
 
 /**
@@ -2081,7 +2083,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           // remotea: a remote session is filed under this workspace's shared group (created on first use).
           const remoteGroup = remoteSpec ? ensureRemoteGroup(surfaceId, remoteSpec.hostId) : null;
           window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, surfaceId, startupCommands: spawnCommands, cols: initialCols, rows: initialRows, ...(remoteGroup ? { remote: remoteGroup } : {}) })
-            .then((created: { id: string; shell: string; reused: boolean; shellFallbackFrom?: string; snapshot?: TerminalSnapshot; unavailable?: PtyExitInfo; remote?: boolean }) => {
+            .then((created: { id: string; shell: string; launchShell?: string; reused: boolean; shellFallbackFrom?: string; snapshot?: TerminalSnapshot; unavailable?: PtyExitInfo; remote?: boolean }) => {
               // PTY persists (keep-alive); a remount re-attaches via pty.has.
               if (disposed) return;
               if (created.unavailable) {
@@ -2089,7 +2091,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
                 return;
               }
               if (created.remote) pinShellForSurface(surfaceId, effectiveShell);
-              setResolvedShellForSurface(surfaceId, created.shell);
+              setResolvedShellForSurface(surfaceId, created.shell, created.launchShell);
               // `reused`: StrictMode's second mount loses the has() race and
               // lands here on the PTY its first mount just created.
               restoreSurfaceState(created.reused, created.snapshot);
@@ -2102,9 +2104,9 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     } else {
       // No surfaceId hint — always create new PTY
       window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, startupCommands: startupCommandsRef.current, cols: initialCols, rows: initialRows })
-        .then((created: { id: string; shell: string; reused: boolean; shellFallbackFrom?: string }) => {
+        .then((created: { id: string; shell: string; launchShell?: string; reused: boolean; shellFallbackFrom?: string }) => {
           if (disposed) return;
-          setResolvedShellForSurface(surfaceId, created.shell);
+          setResolvedShellForSurface(surfaceId, created.shell, created.launchShell);
           restoreSurfaceState(created.reused);
           noteShellFallback(created);
           attachToPty(created.id);

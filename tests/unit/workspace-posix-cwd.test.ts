@@ -135,6 +135,12 @@ describe('workspaceFallbackCwd', () => {
     expect(workspaceFallbackCwd(shell, { cwd: '/home/u/project' })).toBeUndefined();
   });
 
+  it('gives a remote host only a host path, never the desktop one (#422 splits)', () => {
+    expect(workspaceFallbackCwd('remote:desk', { cwd: 'C:\\Users\\me' })).toBeUndefined();
+    expect(workspaceFallbackCwd('remote:desk claude', { cwd: '/home/me/proj' })).toBe('/home/me/proj');
+    expect(workspaceFallbackCwd('remote:desk', { cwd: '~/proj' })).toBe('~/proj');
+  });
+
   it('returns undefined for a surface with no workspace', () => {
     expect(workspaceFallbackCwd('wsl.exe', null)).toBeUndefined();
     expect(workspaceFallbackCwd('wsl.exe', undefined)).toBeUndefined();

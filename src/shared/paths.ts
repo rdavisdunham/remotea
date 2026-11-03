@@ -7,6 +7,9 @@
 // belongs to. Keeping the predicate here rather than in pty-manager.ts lets the
 // renderer apply the same rule the PTY layer does, instead of re-deriving it.
 
+import { remoteDirectoryIssue } from './execution-location';
+import { parseRemoteShellSpec } from './remote-shell-spec';
+
 /**
  * A POSIX/WSL path (e.g. /home/user/project restored from session.json — issue
  * #60). Such a path is NOT a valid working dir for a Win32 process and makes
@@ -99,6 +102,9 @@ export function workspaceFallbackCwd(
   workspace: { cwd?: string; posixCwd?: string } | null | undefined,
 ): string | undefined {
   if (!workspace) return undefined;
+  // remotea: a remote host takes only a host path (main refuses a desktop one);
+  // a host directory that is missing there starts the session at its home.
+  if (parseRemoteShellSpec(shell)) return workspace.cwd && !remoteDirectoryIssue(workspace.cwd) ? workspace.cwd : undefined;
   if (!isWslShell(shell)) return workspace.cwd && !isPosixPath(workspace.cwd) ? workspace.cwd : undefined;
   if (workspace.posixCwd) return workspace.posixCwd;
   return workspace.cwd && isPosixPath(workspace.cwd) ? workspace.cwd : undefined;

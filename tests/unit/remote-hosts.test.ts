@@ -191,6 +191,8 @@ describe('TerminalRouter', () => {
     const router = new TerminalRouter(local as never, remote as never);
     const res = await router.create({ shell: 'remote:desk claude', cwd: '/home/me', env: {}, surfaceId: 'surf-r' as never, cols: 100, rows: 30 });
     expect(res).toMatchObject({ id: 'surf-r', remote: true, snapshot: { data: 'x' } });
+    // A split or new tab inherits the host, not the command (#422).
+    expect(res.launchShell).toBe('remote:desk');
     await expect(router.create({ shell: 'remote:desk', cwd: 'C:\\Users\\me', env: {} })).rejects.toThrow(/Remote directories/);
     // Host paths and commands retain their original routing.
     expect(client.create).toHaveBeenCalledWith(expect.objectContaining({ spec: expect.objectContaining({ cmd: 'claude', cwd: '/home/me' }) }));

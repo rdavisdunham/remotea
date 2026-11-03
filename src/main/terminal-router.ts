@@ -19,7 +19,7 @@ import type { PtyManager, CreateOptions, CreateResult } from './pty-manager';
 import type { SurfaceId } from '../shared/types';
 import type { GroupId } from '../shared/remote-host-protocol';
 import type { PtyExitInfo, RemoteSize, TerminalSnapshot } from '../shared/remote-hosts-types';
-import { parseRemoteShellSpec } from '../shared/remote-shell-spec';
+import { parseRemoteShellSpec, remoteShellSpec } from '../shared/remote-shell-spec';
 import type { RemoteHosts } from './remote-hosts';
 
 export interface RouterCreateOptions extends CreateOptions {
@@ -75,6 +75,9 @@ export class TerminalRouter {
     return {
       id,
       shell: options.shell,
+      // The host, not the command: a split of `remote:desk claude --resume x`
+      // opens a shell on desk rather than resuming the same session twice.
+      launchShell: remoteShellSpec(spec.hostId),
       startupCommandsConsumed: !!options.startupCommands?.length,
       reused: res.reused,
       snapshot: res.snapshot,
