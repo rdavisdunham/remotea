@@ -1,7 +1,7 @@
 import { findLeaf, getAllPaneIds } from '../../store/split-utils';
 import { executionLocationText } from '../../utils/execution-location-text';
 import { decodeLaunch } from '../../../shared/execution-location';
-import React, { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { hideRemoteSurface, isRemoteSurface } from '../../remote-sessions/sync';
 import { latestRemoteViews, subscribeRemoteViews } from '../../remote-sessions/registry-cache';
 import { eridaniLinkForSurface, eridaniTabTitle, type EridaniTabLink } from '../../../shared/eridani-deep-link';
@@ -17,6 +17,9 @@ import { parseSurfaceDragData } from './surface-drag-preview';
 import { getSurfaceLabel } from './surface-label';
 import { useOscTitleLookup } from './use-osc-title';
 import StartupCommandDialog from './StartupCommandDialog';
+import { chatIsUnread } from '../../../shared/chat-attention';
+import { actOnChat, chatActivityState, markChatRead, useLocalChatAttention } from '../../remote-sessions/chat-attention';
+import ChatReminderDialog from '../Terminal/ChatReminderDialog';
 import { formatAccelerator } from '../../shortcuts';
 
 interface SurfaceTabBarProps {
@@ -111,6 +114,9 @@ export default function SurfaceTabBar({
   const [renameValue, setRenameValue] = useState('');
   // Right-click tab context menu.
   const [ctxMenu, setCtxMenu] = useState<{ surfaceId: SurfaceId; x: number; y: number } | null>(null);
+  const [reminderFor, setReminderFor] = useState<SurfaceId | null>(null);
+  const localAttention = useLocalChatAttention(s => s.entries);
+  const [attentionError, setAttentionError] = useState('');
   // The surface whose startup commands are being edited (#284), if any.
   const [startupFor, setStartupFor] = useState<SurfaceId | null>(null);
   const ctxMenuRef = useRef<HTMLDivElement>(null);
@@ -142,13 +148,18 @@ export default function SurfaceTabBar({
   // bar and the sidebar can never disagree about whether a pane is blocked.
   const agentStates = useStore((state) => state.agentStates);
   const agentDetections = useStore((state) => state.agentDetections);
-  const tabAgentState = (surfaceId: string): string | null =>
+  const tabAgentState = (surfaceId: string) =>
     surfaceAgentState(agentStates[surfaceId], agentDetections[surfaceId])?.state ?? null;
 
   // remotea: a tab Eridani started links back to its run (the server records
   // Eridani's web URL on the session's binding). Re-renders on every registry push.
   const remoteViews = useSyncExternalStore(subscribeRemoteViews, latestRemoteViews);
   const eridaniLink = (surfaceId: string): EridaniTabLink | null => eridaniLinkForSurface(remoteViews, surfaceId);
+  const chatAttentionFor = (id: string) => {
+    const host = remoteViews?.find(v => v.sessions.some(s => s.id === id));
+    const attention = host ? host.sessions.find(s => s.id === id)?.chatAttention : localAttention[id];
+    return { attention, unread: chatIsUnread(attention, host?.deviceId ?? 'local') };
+  };
   const ctxEridani = ctxMenu ? eridaniLink(ctxMenu.surfaceId) : null;
 
   // Live binding labels for control tooltips (issue #64): read from the store so
@@ -170,6 +181,14 @@ export default function SurfaceTabBar({
       setInsertIndex(null);
     }
   }, [isDragActive]);
+
+  useLayoutEffect(() => {
+    const menu = ctxMenuRef.current;
+    if (!ctxMenu || !menu) return;
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(ctxMenu.x, window.innerWidth - rect.width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(ctxMenu.y, window.innerHeight - rect.height - 8))}px`;
+  }, [ctxMenu]);
 
   // Start rename for the active surface
   const startRename = useCallback(() => {
@@ -376,7 +395,10 @@ export default function SurfaceTabBar({
           const progress = surfaceProgress[surface.id];
           // A blocked agent in a BACKGROUND tab was invisible: the sidebar says
           // its workspace needs you, and nothing in the pane says which tab.
-          const agentState = tabAgentState(surface.id);
+          const serverSession = remoteViews?.flatMap(v => v.sessions).find(s => s.id === surface.id);
+          const currentState = chatActivityState(serverSession, tabAgentState(surface.id) ?? undefined);
+          const agentState = currentState === 'needs_you' ? 'blocked' : currentState;
+          const chat = chatAttentionFor(surface.id);
           return (
             <div
               key={surface.id}
@@ -388,11 +410,12 @@ export default function SurfaceTabBar({
                 insertIndex === index + 1 && index === surfaces.length - 1 ? 'surface-tab--insert-after' : '',
                 isAgent ? 'surface-tab--agent' : '',
               ].filter(Boolean).join(' ')}
+              data-chat-unread={chat.unread ? "true" : undefined}
               data-agent-state={agentState ?? undefined}
               title={`${surface.type === 'browser' ? t('execution.browser') : executionLocationText(t, tabLocation)}${surface.currentCwd || surface.cwd ? ` · ${surface.currentCwd || surface.cwd}` : ''}`}
               role="tab"
               aria-selected={isActive}
-              onClick={() => onSelect(index)}
+              onClick={() => { markChatRead(surface.id); onSelect(index); }}
               onMouseDown={(e) => {
                 // Autoscroll starts on press, before the middle-button auxclick.
                 if (e.button === 1) e.preventDefault();
@@ -439,6 +462,7 @@ export default function SurfaceTabBar({
                 requestCenterPreview();
               }}
             >
+              {chat.unread && <span className="chat-unread-dot" title="Unread chat" aria-label="Unread chat">●</span>}
               <span className="surface-tab__icon">{surfaceIcon(surface.type, isAgent)}</span>
               {(surface.type === 'terminal' || surface.type === 'code') && <small className="surface-tab__location">{executionLocationText(t, tabLocation)}</small>}
               {isRenaming ? (
@@ -653,12 +677,16 @@ export default function SurfaceTabBar({
         document.body,
       )}
 
+      {attentionError && <button className="chat-attention-error" role="alert" onClick={() => setAttentionError('')}>{attentionError} ×</button>}
+      {reminderFor && <ChatReminderDialog surfaceId={reminderFor} onClose={() => setReminderFor(null)} />}
       {ctxMenu && createPortal(
         <div
           ref={ctxMenuRef}
           className="ctx-menu"
           role="menu"
           style={{
+            maxHeight: 'calc(100dvh - 16px)',
+            overflowY: 'auto',
             left: Math.min(ctxMenu.x, window.innerWidth - 200),
             top: Math.min(ctxMenu.y, window.innerHeight - 120),
           }}
@@ -670,6 +698,14 @@ export default function SurfaceTabBar({
           >
             {t('surfaceTab.rename', 'Rename')}
           </div>
+          {ctxSurface?.type === 'terminal' && <>
+            <button className="ctx-menu__item" role="menuitem" onClick={() => {
+              const chat = chatAttentionFor(ctxMenu.surfaceId);
+              void actOnChat(ctxMenu.surfaceId, chat.unread ? { action: 'read', revision: chat.attention!.revision } : { action: 'unread' }).then(r => setAttentionError(r.ok ? '' : r.error ?? 'Could not update chat.')).catch(() => setAttentionError('Could not reach the server.'));
+              setCtxMenu(null);
+            }}>{chatAttentionFor(ctxMenu.surfaceId).unread ? 'Mark chat read' : 'Mark chat unread'}</button>
+            {isRemoteSurface(ctxMenu.surfaceId) && <button className="ctx-menu__item" role="menuitem" onClick={() => { setReminderFor(ctxMenu.surfaceId); setCtxMenu(null); }}>Remind me…</button>}
+          </>}
           {ctxFilePath && (
             <div
               className="ctx-menu__item"

@@ -412,6 +412,12 @@ export class RemoteHosts {
     return client.takeover(surfaceId);
   }
 
+  chatAttention(hostId: string, surfaceId: string, action: import('../../shared/remote-host-protocol').ChatAttentionAction) {
+    const client = this.clients.get(hostId);
+    if (!client || !SURFACE_ID_RE.test(surfaceId)) return Promise.resolve({ ok: false, error: 'Invalid host or session.' });
+    return client.chatAttention(surfaceId, action);
+  }
+
   groupUpsert(hostId: string, group: { id: string; name: string; color?: string }): void {
     const c = this.clients.get(hostId);
     if (!c || !GROUP_ID_RE.test(group?.id ?? '') || typeof group.name !== 'string') return;

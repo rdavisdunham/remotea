@@ -1,3 +1,4 @@
+import { isChatAttentionAction } from '../shared/remote-host-protocol';
 import { readIntegrationStatus } from './integration-status';
 import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents, safeStorage } from 'electron';
 import { isSafeExternalUrl } from './security-policy';
@@ -813,6 +814,10 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(IPC_CHANNELS.RSESS_TAKEOVER, (_event, hostId: unknown, surfaceId: unknown) =>
     typeof hostId === 'string' && typeof surfaceId === 'string'
       ? remoteHosts.takeover(hostId, surfaceId) : { ok: false, error: 'Invalid host or session.' });
+  ipcMain.handle(IPC_CHANNELS.RSESS_CHAT_ATTENTION, (_event, hostId: unknown, surfaceId: unknown, action: unknown) => {
+    if (typeof hostId !== 'string' || typeof surfaceId !== 'string' || !isChatAttentionAction(action)) return { ok: false, error: 'Invalid chat action.' };
+    return remoteHosts.chatAttention(hostId, surfaceId, action);
+  });
   ipcMain.on(IPC_CHANNELS.RSESS_REPORT, (event, r: { ready?: unknown; surfaceIds?: unknown }) => {
     const wc = event.sender;
     const ids = Array.isArray(r?.surfaceIds) ? (r.surfaceIds as unknown[]).filter((x): x is string => typeof x === 'string') : [];

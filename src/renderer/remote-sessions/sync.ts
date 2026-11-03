@@ -20,6 +20,7 @@ import { INBOX_GROUP_ID } from '../../shared/remote-host-protocol';
 import { planEridaniMigration, planRemoteSync, type LocalIndex, type SyncAction } from './plan';
 import { setLatestRemoteViews } from './registry-cache';
 import { noteRegistryForRecovery } from './recovery-runtime';
+import { notifyChatReminders } from './chat-reminder-notifications';
 
 
 type Bridge = {
@@ -211,6 +212,7 @@ function runSync(): void {
     groupEridani,
   });
   if (actions.length) applySyncActions(actions);
+  if (latest.placer) notifyChatReminders(latest.views);
 }
 
 function queueSync(): void {

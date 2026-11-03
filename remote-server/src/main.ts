@@ -181,6 +181,7 @@ async function main(): Promise<void> {
   });
   process.on('SIGUSR2', () => drainer.requested());
 
+  const reminderTimer = setInterval(() => hub.chatAttention.tick(), 1000);
   const lagTimer = setInterval(() => hub.pumpLagging(), 250);
   const probeTimer = setInterval(() => hub.probeAgents(), 5_000);
   const pruneTimer = setInterval(() => hub.prune(), 60 * 60 * 1000);
@@ -191,6 +192,7 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     log(`${signal}: shutting down`);
+    clearInterval(reminderTimer);
     clearInterval(lagTimer);
     clearInterval(probeTimer);
     clearInterval(pruneTimer);

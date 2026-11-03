@@ -129,6 +129,9 @@ export interface SessionRecord {
   agentState?: AgentStateInfo;
   /** Agent turns captured in this session so far (turn-capture.ts). */
   turnSeq?: number;
+  /** Durable attention and one local, server-scheduled reminder. */
+  chatAttention?: ChatAttention;
+  chatReminder?: ChatReminder | null;
   /** Where turn capture is in the current conversation (turn-capture.ts). */
   turnCursor?: TurnCursor;
   /** Set when Eridani started this session for a run (remote-server/src/dispatch.ts). */
@@ -314,6 +317,37 @@ export interface CreateSpec {
   title?: string;
 }
 
+export interface ChatAttention {
+  revision: number;
+  at: number;
+  kind: 'finished' | 'needs_you' | 'unread' | 'reminder';
+  /** Last revision acknowledged on each device. Viewing never answers an agent. */
+  seenBy: Record<string, number>;
+}
+
+export interface ChatReminder {
+  dueAt: number;
+  createdBy: DeviceId;
+  note?: string;
+  firedAt?: number;
+}
+
+export type ChatAttentionAction =
+  | { action: 'read'; revision: number }
+  | { action: 'unread' }
+  | { action: 'remind'; dueAt: number; note?: string }
+  | { action: 'cancelReminder' };
+
+export function isChatAttentionAction(raw: unknown): raw is ChatAttentionAction {
+  if (!isObj(raw)) return false;
+  switch (raw.action) {
+    case 'read': return isInt(raw.revision, 1, Number.MAX_SAFE_INTEGER);
+    case 'unread': case 'cancelReminder': return true;
+    case 'remind': return isInt(raw.dueAt, 1, 8_640_000_000_000_000) && isOptStr(raw.note, 300);
+    default: return false;
+  }
+}
+
 // ── Messages ───────────────────────────────────────────────────────────────
 
 export type ClientMsg =
@@ -323,6 +357,7 @@ export type ClientMsg =
   | { t: 'detach'; ids: RemoteSurfaceId[] }
   | { t: 'close'; rid: number; id: RemoteSurfaceId }
   | { t: 'takeover'; rid: number; id: RemoteSurfaceId }
+  | ({ t: 'chatAttention'; rid: number; id: RemoteSurfaceId } & ChatAttentionAction)
   | { t: 'resize'; id: RemoteSurfaceId; cols: number; rows: number }
   | { t: 'claim'; id: RemoteSurfaceId }
   | { t: 'deliver'; id: RemoteSurfaceId; commands: string[] }
@@ -358,7 +393,7 @@ export interface DiagEvent {
 }
 
 /** Features a server announces in `welcome`; an app uses a feature only when listed. */
-export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions';
+export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention';
 
 /**
  * Features an app announces in `hello`. `focus`: it brings a session's tab to
@@ -587,6 +622,8 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
     case 'hide':
     case 'unhide':
       return isRid(m.rid) && isSurfaceId(m.id) ? (m as unknown as ClientMsg) : null;
+    case 'chatAttention':
+      return isRid(m.rid) && isSurfaceId(m.id) && isChatAttentionAction(m) ? (m as unknown as ClientMsg) : null;
     case 'resize':
       return isSurfaceId(m.id) && isInt(m.cols, 1, LIMITS.maxCols) && isInt(m.rows, 1, LIMITS.maxRows)
         ? (m as unknown as ClientMsg) : null;

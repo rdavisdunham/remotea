@@ -8,6 +8,9 @@ import { agentsForWorkspace, resolveAgentLinger, WorkspaceAgentsView } from '../
 import { claudeSessionsForWorkspace, HookActivityEntry } from '../../store/claude-session-view';
 import { rollupAgents } from '../../store/agent-rollup';
 import UnreadBadge from './UnreadBadge';
+import { useRemoteRegistry } from '../../remote-sessions/registry-cache';
+import { useLocalChatAttention } from '../../remote-sessions/chat-attention';
+import { chatIsUnread } from '../../../shared/chat-attention';
 import PrStatusIcon from './PrStatusIcon';
 import { traceState, toolChannel } from './trace-signals';
 import { resolveStatusText, statusClassFor, stateDotClassFor, backgroundShellsText, type StatusTextInputs, type T } from './workspace-status';
@@ -129,6 +132,12 @@ export default function WorkspaceRow({
   runChip,
 }: WorkspaceRowProps) {
   const t = useT();
+  const attentionViews = useRemoteRegistry(s => s.views);
+  const localAttention = useLocalChatAttention(s => s.entries);
+  const attentionCount = getAllSurfaceIds(workspace.splitTree).filter(id => {
+    const host = attentionViews?.find(v => v.sessions.some(s => s.id === id));
+    return chatIsUnread(host ? host.sessions.find(s => s.id === id)?.chatAttention : localAttention[id], host?.deviceId ?? 'local');
+  }).length;
   const [isRenaming, setIsRenaming] = useState(false);
   // What the row shows: the stored title, or the program's window title while
   // wmux picked the name. A rename starts from it, and counts as one only if
@@ -457,7 +466,8 @@ export default function WorkspaceRow({
         </span>
       )}
 
-      {workspace.unreadCount > 0 && (
+      {attentionCount > 0 && <span className="chat-attention-count" title={`${attentionCount} unread chats`} aria-label={`${attentionCount} unread chats`}>● {attentionCount}</span>}
+      {workspace.unreadCount > 0 && attentionCount === 0 && (
         <UnreadBadge count={workspace.unreadCount} isSelected={isActive} />
       )}
     </>

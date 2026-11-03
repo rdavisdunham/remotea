@@ -17,6 +17,9 @@
 
 :root {
   --ui-overlay-rgb: 255, 255, 255;
+  --ui-chat-unread: #f5ad55;
+  --ui-chat-ready: #5fc58b;
+  --ui-chat-working: #e8a33d;
 
   /* Accent (issue #116 follow-up). Until now #0091ff was hardcoded in 53 places
      across 13 stylesheets — the one chrome colour that never went through this
@@ -61,6 +64,9 @@
 }
 
 :root[data-ui-theme='light'] {
+  --ui-chat-unread: #9c520a;
+  --ui-chat-ready: #137344;
+  --ui-chat-working: #8b5a0a;
   --ui-overlay-rgb: 0, 0, 0;
 
   /* Darkened for the light palette: #0091ff on #ffffff is 2.6:1, below the AA

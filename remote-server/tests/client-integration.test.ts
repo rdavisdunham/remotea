@@ -84,6 +84,31 @@ function collect(client: RemoteHostClient, id: string) {
 }
 
 describe('RemoteHostClient against a real server', () => {
+  it('round trips unread state and reminders without writing input to a terminal', async () => {
+    const rig = await startServer();
+    const a = makeClient(rig.port, 'device-attention-a').client;
+    const b = makeClient(rig.port, 'device-attention-b').client;
+    a.start(); b.start();
+    await waitFor(() => a.ready && b.ready);
+    const id = 'surf-attention-wire';
+    await a.create({ id, cols: 80, rows: 24, spec: {} });
+    rig.hub.agentState.hook(id, { event: 'UserPromptSubmit' });
+    rig.hub.agentState.hook(id, { event: 'Stop' });
+    await waitFor(() => b.sessions.get(id)?.chatAttention?.kind === 'finished');
+    expect((await a.chatAttention(id, { action: 'read', revision: 1 })).ok).toBe(true);
+    await waitFor(() => b.sessions.get(id)?.chatAttention?.seenBy['device-attention-a'] === 1);
+    expect(b.sessions.get(id)?.chatAttention?.seenBy['device-attention-b']).toBeUndefined();
+    expect((await a.chatAttention(id, { action: 'remind', dueAt: Date.now() + 60000, note: 'Read the answer' })).ok).toBe(true);
+    await waitFor(() => b.sessions.get(id)?.chatReminder?.note === 'Read the answer');
+    const reminder = rig.hub['deps'].registry.session(id)!.chatReminder!;
+    reminder.dueAt = Date.now() - 1; rig.hub.chatAttention.tick();
+    await waitFor(() => b.sessions.get(id)?.chatAttention?.kind === 'reminder');
+    expect(b.sessions.get(id)?.chatReminder?.firedAt).toBeGreaterThan(0);
+    expect((await a.chatAttention(id, { action: 'cancelReminder' })).ok).toBe(true);
+    await waitFor(() => b.sessions.get(id)?.chatReminder === null);
+    expect(rig.sp.last().written).toEqual([]);
+  });
+
   it('a second create while the first is in flight is a reuse (no double forwarding)', async () => {
     const rig = await startServer();
     const { client } = makeClient(rig.port, 'device-alpha01');
@@ -291,6 +316,9 @@ describe('RemoteHostClient against a real server', () => {
     client.start();
     await waitFor(() => client.ready);
     await client.create({ id: 'surf-int-6', cols: 80, rows: 24, spec: { cwd: '/srv' } });
+    const dueAt = Date.now() + 86400000;
+    await client.chatAttention('surf-int-6', { action: 'unread' });
+    await client.chatAttention('surf-int-6', { action: 'remind', dueAt, note: 'After restart' });
     const io = collect(client, 'surf-int-6');
     first.sp.last().emit('old output\r\n');
     await waitFor(() => io.text().includes('old output'));
@@ -303,6 +331,11 @@ describe('RemoteHostClient against a real server', () => {
     await waitFor(() => client.ready && second.sp.ptys.length === 1, 8000);
     await waitFor(() => io.text().includes('restarted; session restored'));
     expect(second.sp.last().req.cwd).toBe('/srv');
+    await waitFor(() => client.sessions.get('surf-int-6')?.state === 'live');
+    expect(client.sessions.get('surf-int-6')).toMatchObject({ chatAttention: { kind: 'unread', revision: 1 }, chatReminder: { dueAt, note: 'After restart' } });
+    second.hub['deps'].registry.session('surf-int-6')!.chatReminder!.dueAt = Date.now() - 1;
+    second.hub.chatAttention.tick();
+    await waitFor(() => client.sessions.get('surf-int-6')?.chatAttention?.kind === 'reminder');
     expect(io.exits).toHaveLength(0);
   });
 
