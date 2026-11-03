@@ -522,6 +522,8 @@ export class Hub {
       hiddenBy: rec?.hiddenBy ?? [],
       // A respawn is a new process on the same surface: a new incarnation, the same turn numbering.
       incarnation: (rec?.incarnation ?? 0) + 1,
+      chatAttention: rec?.chatAttention,
+      chatReminder: rec?.chatReminder,
       turnSeq: rec?.turnSeq,
       turnCursor: rec?.turnCursor,
       eridani: rec?.eridani,

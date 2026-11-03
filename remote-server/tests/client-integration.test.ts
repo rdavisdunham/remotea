@@ -316,6 +316,9 @@ describe('RemoteHostClient against a real server', () => {
     client.start();
     await waitFor(() => client.ready);
     await client.create({ id: 'surf-int-6', cols: 80, rows: 24, spec: { cwd: '/srv' } });
+    const dueAt = Date.now() + 86400000;
+    await client.chatAttention('surf-int-6', { action: 'unread' });
+    await client.chatAttention('surf-int-6', { action: 'remind', dueAt, note: 'After restart' });
     const io = collect(client, 'surf-int-6');
     first.sp.last().emit('old output\r\n');
     await waitFor(() => io.text().includes('old output'));
@@ -328,6 +331,11 @@ describe('RemoteHostClient against a real server', () => {
     await waitFor(() => client.ready && second.sp.ptys.length === 1, 8000);
     await waitFor(() => io.text().includes('restarted; session restored'));
     expect(second.sp.last().req.cwd).toBe('/srv');
+    await waitFor(() => client.sessions.get('surf-int-6')?.state === 'live');
+    expect(client.sessions.get('surf-int-6')).toMatchObject({ chatAttention: { kind: 'unread', revision: 1 }, chatReminder: { dueAt, note: 'After restart' } });
+    second.hub['deps'].registry.session('surf-int-6')!.chatReminder!.dueAt = Date.now() - 1;
+    second.hub.chatAttention.tick();
+    await waitFor(() => client.sessions.get('surf-int-6')?.chatAttention?.kind === 'reminder');
     expect(io.exits).toHaveLength(0);
   });
 
