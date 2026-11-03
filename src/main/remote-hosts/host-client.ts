@@ -306,6 +306,12 @@ export class RemoteHostClient {
     return this.request((rid) => ({ t: 'hooksInstall', rid }));
   }
 
+  /** Explicit handoff only; an uncertain reply is reconciled through the session registry. */
+  takeover(id: string): Promise<RequestResult> {
+    if (!this.features.has('managedSessions')) return Promise.resolve({ ok: false, error: 'Update this host to take over managed sessions.' });
+    return this.request((rid) => ({ t: 'takeover', rid, id: id as RemoteSurfaceId }));
+  }
+
   /** Something that decides `hooks.prompt` changed outside this client (the user dismissed the prompt). */
   refreshStatus(): void {
     this.deps.onStatus(this.status());

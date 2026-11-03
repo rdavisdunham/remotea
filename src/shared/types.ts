@@ -745,6 +745,7 @@ export const IPC_CHANNELS = {
   RSESS_HIDE: 'rsess:hide',
   RSESS_UNHIDE: 'rsess:unhide',
   RSESS_CLOSE: 'rsess:close',
+  RSESS_TAKEOVER: 'rsess:takeover',
   RSESS_GROUP_UPSERT: 'rsess:group-upsert',
   RSESS_GROUP_CLOSE: 'rsess:group-close',
   // Remote file upload (ssh panes) — main resolves the whole paste/drop

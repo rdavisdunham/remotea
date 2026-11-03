@@ -810,6 +810,9 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.handle(IPC_CHANNELS.RHOST_OUTBOX_FORGET, (_event, hostId: unknown, iid: unknown) =>
     typeof hostId === 'string' && typeof iid === 'string' ? remoteHosts.forgetIntent(hostId, iid) : false);
   ipcMain.handle(IPC_CHANNELS.RSESS_VIEWS, () => remoteHosts.views());
+  ipcMain.handle(IPC_CHANNELS.RSESS_TAKEOVER, (_event, hostId: unknown, surfaceId: unknown) =>
+    typeof hostId === 'string' && typeof surfaceId === 'string'
+      ? remoteHosts.takeover(hostId, surfaceId) : { ok: false, error: 'Invalid host or session.' });
   ipcMain.on(IPC_CHANNELS.RSESS_REPORT, (event, r: { ready?: unknown; surfaceIds?: unknown }) => {
     const wc = event.sender;
     const ids = Array.isArray(r?.surfaceIds) ? (r.surfaceIds as unknown[]).filter((x): x is string => typeof x === 'string') : [];

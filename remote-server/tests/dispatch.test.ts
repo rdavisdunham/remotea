@@ -1,10 +1,12 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { EventEmitter } from 'events';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Hub } from '../src/hub';
 import { Registry } from '../src/registry';
-import { Dispatch, launchCommand, resumeLine, surfFor } from '../src/dispatch';
+import { Dispatch, launchCommand, resumeLine, surfFor, type DispatchDeps } from '../src/dispatch';
+import type { HarnessRequest, HarnessSpec, RuntimeAdapter } from '../src/managed-harness';
 import { QuestionBroker } from '../src/questions-claude';
 import type { CommandContext, CommandResult } from '../src/eridani-link';
 import type { ExecutionTarget } from '../src/eridani-targets';
@@ -43,7 +45,7 @@ const TARGET: ExecutionTarget = {
 
 const FAST = { queuePollMs: 2, pasteEnterMs: 1, steerDelayMs: 1, ctrlCGapMs: 1, ctrlCRetryMs: 5, stopWaitMs: 60, killWaitMs: 60 };
 
-function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean; wt?: Record<string, unknown> } = {}) {
+function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean; wt?: Record<string, unknown>; managedFactory?: DispatchDeps['managedFactory'] } = {}) {
   const registry = opts.registry ?? Registry.load({ file: null, bootId: 'boot-1' });
   const sp = fakeSpawner();
   const hub = new Hub({ registry, spawn: sp.spawn, bootId: opts.bootId ?? 'boot-1', serverId: 'srv', hostname: 'box', timers: new ManualTimers(), probe: () => ({}) });
@@ -70,6 +72,8 @@ function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boo
     worktrees,
     targets: () => [TARGET],
     questions,
+    managedFactory: opts.managedFactory,
+    managedEmit: (body) => emitted.push(body),
     emit: (b) => verified.push(b as unknown as Record<string, unknown>),
     linkReady: () => ready,
     timing: FAST,
@@ -107,6 +111,78 @@ const spawnCmd = (over: Record<string, unknown> = {}) => ({
   run_token: 'tok-123',
   expires_at: Date.now() + 60_000,
   ...over,
+});
+
+class FakeManagedAdapter extends EventEmitter implements RuntimeAdapter {
+  inputs: string[] = [];
+  responses: Array<{ request: HarnessRequest; response: unknown }> = [];
+  interrupted = 0;
+  async start() { return 'managed-provider-session'; }
+  async resume() { return this.start(); }
+  async send(text: string) { this.inputs.push(text); }
+  async interrupt() { this.interrupted++; }
+  async respond(request: HarnessRequest, response: unknown) { this.responses.push({ request, response }); }
+  async stop() {}
+  complete() { this.emit('event', { method: 'turn/completed', params: { threadId: 'managed-provider-session', turn: { id: 'turn-managed', status: 'completed' } } }); }
+}
+
+describe('dispatch: managed integration', () => {
+  function managedSetup() {
+    const adapter = new FakeManagedAdapter();
+    const specifications: HarnessSpec[] = [];
+    const fixture = setup({ silentAgent: true, managedFactory: spec => { specifications.push(spec); return adapter; } });
+    return { ...fixture, adapter, specifications };
+  }
+  const managedSpawn = () => spawnCmd({ execution: 'managed', harness: 'codex', model: 'gpt-6.1-sol', effort: 'xhigh', permission_profile: 'read-only', mode: 'plan', role: 'planner' });
+  const input = (op_id: string, text: string) => ({ t: 'input', op_id, digest: 'd', surf: surfFor('run-1', 1, 1), incarnation: 1, run_id: 'run-1', generation: 1, mode: 'queue', text, durable: true, expires_at: 0 });
+
+  it('launches through the structured adapter with role options and no native terminal writer', async () => {
+    const { run, dispatch, sp, registry, adapter, specifications } = managedSetup();
+    const result = await run(managedSpawn());
+    expect(result.state).toBe('executed');
+    const surf = surfFor('run-1', 1, 1);
+    await dispatch.managed.ready(surf);
+    expect(sp.ptys).toHaveLength(0);
+    expect(specifications[0]).toMatchObject({ harness: 'codex', model: 'gpt-6.1-sol', effort: 'xhigh', profile: 'read-only' });
+    expect(registry.session(surf)?.eridani).toMatchObject({ execution: 'managed', controller: 'eridani' });
+    expect(adapter.inputs).toHaveLength(1);
+    adapter.complete();
+    expect((await run(input('managed-input-1', 'Follow up'))).state).toBe('executed');
+    expect(adapter.inputs).toEqual([expect.any(String), 'Follow up']);
+    adapter.complete();
+    expect((await run(input('managed-input-1', 'Follow up'))).state).toBe('executed');
+    expect(adapter.inputs).toHaveLength(2);
+  });
+
+  it('keeps queued follow-ups until a busy managed agent finishes', async () => {
+    const { run, dispatch, adapter } = managedSetup();
+    await run(managedSpawn());
+    await dispatch.managed.ready(surfFor('run-1', 1, 1));
+    let settled = false;
+    const delivery = run(input('managed-queued-1', 'Please review the tests too')).then(result => { settled = true; return result; });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(adapter.inputs).toHaveLength(1);
+    expect(settled).toBe(false);
+    adapter.complete();
+    expect(await delivery).toMatchObject({ state: 'executed' });
+    expect(adapter.inputs.at(-1)).toBe('Please review the tests too');
+  });
+
+  it('persists pause separately, and preserves a pending approval without interrupting its callback', async () => {
+    const { run, dispatch, adapter, registry, emitted } = managedSetup();
+    await run(managedSpawn());
+    const surf = surfFor('run-1', 1, 1);
+    await dispatch.managed.ready(surf);
+    adapter.emit('event', { id: 'provider-approval', method: 'item/commandExecution/requestApproval', params: { threadId: 'managed-provider-session', turnId: 'turn-managed', itemId: 'tool-1', command: 'npm test', cwd: '/repo' } });
+    expect(emitted.some(event => event.t === 'question' && event.durable === true)).toBe(true);
+    expect(await run({ ...input('pause-1', ''), t: 'run.pause' })).toMatchObject({ state: 'executed' });
+    expect(registry.session(surf)?.eridani?.paused).toBe(true);
+    expect(adapter.interrupted).toBe(0);
+    expect(dispatch.managed.pending(surf)).toHaveLength(1);
+    expect(await run({ ...input('resume-1', ''), t: 'run.resume' })).toMatchObject({ state: 'executed' });
+    expect(registry.session(surf)?.eridani?.paused).toBe(false);
+    expect(dispatch.managed.pending(surf)).toHaveLength(1);
+  });
 });
 
 describe('dispatch: spawn', () => {
