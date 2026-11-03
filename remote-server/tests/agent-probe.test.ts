@@ -109,6 +109,15 @@ describe('agent-probe', () => {
     expect(codexThreadFromFds(process.pid)).toBeNull();
   });
 
+  it('does not assume an unreadable open rollout is a child when another root is readable', () => {
+    const f = fixture();
+    f.open(f.thread(ROOT));
+    const other = f.thread(OTHER);
+    fs.writeFileSync(other, '{ unfinished');
+    f.open(other);
+    expect(codexThreadFromFds(process.pid)).toBeNull();
+  });
+
   it('uses the state fallback only for roots, filtering children before its result limit', () => {
     const f = fixture();
     for (let i = 0; i < 6; i++) {

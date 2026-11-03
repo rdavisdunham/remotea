@@ -118,6 +118,7 @@ export function codexThreadFromFds(pid: number): string | null | undefined {
     return undefined;
   }
   let found = false;
+  let unreadable = false;
   const roots = new Set<string>();
   for (const fd of fds) {
     try {
@@ -126,12 +127,13 @@ export function codexThreadFromFds(pid: number): string | null | undefined {
       if (!id) continue;
       found = true;
       const meta = readCodexSessionMeta(file, id);
-      if (meta && !meta.child) roots.add(meta.id);
+      if (!meta) unreadable = true;
+      else if (!meta.child) roots.add(meta.id);
     } catch {
       /* closed meanwhile */
     }
   }
-  return roots.size === 1 ? [...roots][0] : found ? null : undefined;
+  return !unreadable && roots.size === 1 ? [...roots][0] : found ? null : undefined;
 }
 
 /** Process start time in epoch ms (from /proc, clock ticks since boot). */
