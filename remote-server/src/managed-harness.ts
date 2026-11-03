@@ -10,9 +10,13 @@ export interface HarnessSpec {
   model: string; effort?: string; profile: 'read-only' | 'workspace-write'; sessionId?: string;
 }
 export interface HarnessRequest { id: string | number; method: string; params: Record<string, any> }
+export interface DirectInputContext { active: boolean; turnId: string | null }
+export interface DirectInputReceipt { turnId: string | null; providerAcknowledged: boolean }
+export class ProviderRequestRejected extends Error { constructor(message: string, readonly code?: number, readonly data?: unknown) { super(message); this.name = 'ProviderRequestRejected'; } }
 export interface RuntimeAdapter {
   start(): Promise<string>;
   send(text: string, operationId: string): Promise<void>;
+  sendDirect?(text: string, operationId: string, context: DirectInputContext): Promise<DirectInputReceipt>;
   interrupt(): Promise<void>;
   resume(): Promise<string>;
   respond(request: HarnessRequest, response: unknown): Promise<void>;
@@ -56,13 +60,22 @@ export class HarnessProcess extends EventEmitter {
     if (message.type === 'control_response') message = { id: message.response?.request_id, ...(message.response?.subtype === 'error' ? { error: { message: message.response.error } } : { result: message.response?.response }) };
     if (message.id !== undefined && !message.method) {
       const call = this.calls.get(String(message.id));
-      if (call) { this.calls.delete(String(message.id)); clearTimeout(call.timer); message.error ? call.reject(new Error(String(message.error.message ?? 'provider error'))) : call.resolve(message.result); return; }
+      if (call) { this.calls.delete(String(message.id)); clearTimeout(call.timer); message.error ? call.reject(new ProviderRequestRejected(String(message.error.message ?? 'provider error'), message.error.code, message.error.data)) : call.resolve(message.result); return; }
     }
     this.emit('event', message);
   }
   protected write(message: unknown): void {
     if (!this.child?.stdin.writable) throw new Error('provider unavailable');
     this.child.stdin.write(`${JSON.stringify(message)}\n`);
+  }
+  /** Resolve when bytes have been accepted by the existing harness pipe, independently of model consumption. */
+  protected writeAccepted(message: unknown): Promise<void> {
+    const input = this.child?.stdin;
+    if (!input?.writable) return Promise.reject(new ProviderRequestRejected('provider input is not writable'));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('provider pipe write receipt is uncertain')), this.timeoutMs);
+      input.write(`${JSON.stringify(message)}\n`, (error) => { clearTimeout(timer); error ? reject(error) : resolve(); });
+    });
   }
   call(method: string, params: unknown): Promise<any> {
     const id = `remotea-${++this.next}`;
@@ -86,6 +99,11 @@ export class HarnessProcess extends EventEmitter {
 
 export class CodexRuntimeAdapter extends HarnessProcess implements RuntimeAdapter {
   sessionId = ''; turnId: string | null = null;
+  protected override receive(message: any): void {
+    if (message.method === 'turn/started' && message.params?.turn?.id) this.turnId = message.params.turn.id;
+    if (message.method === 'turn/completed' && (!message.params?.turn?.id || message.params.turn.id === this.turnId)) this.turnId = null;
+    super.receive(message);
+  }
   private async initializeTransport(): Promise<void> {
     this.launch(['app-server', '--stdio', ...this.spec.args]);
     await this.call('initialize', { clientInfo: { name: 'remotea', version: '0.1.0' }, capabilities: { experimentalApi: true } });
@@ -106,6 +124,21 @@ export class CodexRuntimeAdapter extends HarnessProcess implements RuntimeAdapte
   async send(text: string, operationId: string): Promise<void> {
     const result = await this.call('turn/start', { threadId: this.sessionId, clientUserMessageId: operationId, input: [{ type: 'text', text, text_elements: [] }], model: this.spec.model, ...(this.spec.effort ? { effort: this.spec.effort } : {}) });
     this.turnId = result.turn.id;
+  }
+  async sendDirect(text: string, operationId: string, context: DirectInputContext): Promise<DirectInputReceipt> {
+    const expected = context.turnId ?? this.turnId;
+    if (context.active) {
+      if (!expected) throw new ProviderRequestRejected('active turn identity is not yet available');
+      try {
+        const result = await this.call('turn/steer', { threadId: this.sessionId, expectedTurnId: expected, clientUserMessageId: operationId, input: [{ type: 'text', text, text_elements: [] }] });
+        return { turnId: result.turnId, providerAcknowledged: true };
+      } catch (error) {
+        // Only an explicit native rejection proves this input was not consumed. Never retry a timed-out effect.
+        if (!(error instanceof ProviderRequestRejected) || !/^(no active turn(?: to steer)?(?: on (?:this )?thread)?[.!]?|thread has no active turn[.!]?)$/i.test(error.message.trim())) throw error;
+      }
+    }
+    this.emit('event', { type: 'remotea/direct-start', input_id: operationId });
+    await this.send(text, operationId); return { turnId: this.turnId, providerAcknowledged: true };
   }
   async recreate(request: HarnessRequest): Promise<void> {
     const result = await this.call('turn/start', { threadId: this.sessionId, input: [{ type: 'text', text: `A host restart interrupted an UNAPPROVED request. Reconcile read-only context, then recreate only this exact request for fresh human review. Do not claim any action executed, do not replay prior uncertain actions, and do not perform unrelated work. Pending request: ${canonicalJson({ method: request.method, params: request.params })}`, text_elements: [] }], model: this.spec.model, ...(this.spec.effort ? { effort: this.spec.effort } : {}), approvalPolicy: 'untrusted', approvalsReviewer: 'user', sandboxPolicy: { type: 'readOnly', networkAccess: false } });
@@ -149,6 +182,10 @@ export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapt
       this.on('event', listener);
       try { this.write({ type: 'user', session_id: this.sessionId, uuid: operationId, message: { role: 'user', content: text }, parent_tool_use_id: null }); } catch (e) { clearTimeout(timeout); this.off('event', listener); reject(e); }
     });
+  }
+  async sendDirect(text: string, operationId: string, context: DirectInputContext): Promise<DirectInputReceipt> {
+    await this.writeAccepted({ type: 'user', session_id: this.sessionId, uuid: operationId, message: { role: 'user', content: text }, parent_tool_use_id: null });
+    return { turnId: context.turnId, providerAcknowledged: false };
   }
   async recreate(request: HarnessRequest): Promise<void> {
     this.recoveryGate = true; await this.call('control:set_permission_mode', { mode: 'manual' });

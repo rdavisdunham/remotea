@@ -68,6 +68,15 @@ describe('eridani link protocol', () => {
     expect(parseUpFrame(env({ ...prompt, op_id: undefined }))).toBeNull();
   });
 
+  it('validates native direct provenance and public output without weakening old queue inputs',()=>{
+    const input={t:'input',op_id:'o',digest:'d',run_id:'run-1',surf:'surface',generation:1,incarnation:1,text:'note',mode:'direct',expires_at:0,origin:'human',automation_hold:true,automation_hold_revision:1};
+    expect(commandShapeError(input)).toBeNull();expect(commandShapeError({...input,origin:'automation'})).toContain('revisioned human');
+    expect(commandShapeError({...input,mode:'queue',origin:undefined,automation_hold:undefined,automation_hold_revision:undefined})).toBeNull();
+    const output={t:'output.live',op_id:'o',digest:'d',run_id:'run-1',generation:1,surf:'surface',incarnation:1,session_id:'session',turn_id:'turn',message_id:'message',sequence:1,at:1,kind:'commentary',text:'public',complete:true,truncated:false};
+    expect(parseUpFrame(env(output))).not.toBeNull();expect(parseUpFrame(env({...output,kind:'reasoning'}))).toBeNull();
+    expect(parseUpFrame(env({...output,text:'x'.repeat(32769)}))).toBeNull();
+  });
+
   it('truncates by code point and says so', () => {
     expect(truncateText('abc', 3)).toEqual({ text: 'abc', truncated: false });
     expect(truncateText('😀😀😀', 2)).toEqual({ text: '😀😀', truncated: true });

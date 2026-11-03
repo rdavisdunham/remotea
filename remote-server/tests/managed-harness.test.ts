@@ -16,12 +16,13 @@ rl.on('line',line=>{const m=JSON.parse(line);
  if(m.method==='initialize') send({id:m.id,result:{}});
  if(m.method==='model/list')send({id:m.id,result:{data:[{model:'actual-sol',displayName:'Actual Sol',hidden:false,isDefault:true,defaultReasoningEffort:'low',supportedReasoningEfforts:[{reasoningEffort:'low'},{reasoningEffort:'ultra'}]}],nextCursor:null}});
  if(m.method==='thread/start'||m.method==='thread/resume'){send({id:m.id,result:{thread:{id:'provider-session'}}});send({method:'test/profile',params:m.params});}
- if(m.method==='turn/start'){send({id:m.id,result:{turn:{id:'provider-turn'}}});send({id:42,method:'item/commandExecution/requestApproval',params:{threadId:'provider-session',turnId:'provider-turn',itemId:'command',command:'npm test'}});}
+ if(m.method==='turn/steer'){send({type:'test/steer',params:m.params});if(process.env.REMOTEA_TEST_STEER==='uncertain')return;if(process.env.REMOTEA_TEST_STEER==='ended')send({id:m.id,error:{code:-32600,message:'no active turn to steer'}});else if(process.env.REMOTEA_TEST_STEER==='mismatch')send({id:m.id,error:{code:-32600,message:'expected turn does not match active turn'}});else send({id:m.id,result:{turnId:'provider-turn'}});}
+ if(m.method==='turn/start'){send({type:'test/start',params:m.params});send({id:m.id,result:{turn:{id:'provider-turn'}}});send({id:42,method:'item/commandExecution/requestApproval',params:{threadId:'provider-session',turnId:'provider-turn',itemId:'command',command:'npm test'}});}
  if(m.type==='control_request'&&m.request.subtype==='initialize')send({type:'control_response',response:{subtype:'success',request_id:m.request_id,response:{models:[{value:'model',supportedEffortLevels:['low']}]}}});
  if(m.type==='control_request'&&m.request.subtype==='initialize'&&process.env.REMOTEA_TEST_DEFERRED)send({type:'control_request',request_id:'hook-test',request:{subtype:'hook_callback',callback_id:'remotea-defer-ask',input:{tool_name:'AskUserQuestion',tool_use_id:'deferred-id',tool_input:{questions:[{question:'Which?',options:[{label:'A'}]}]}}}});
  if(m.type==='control_response'&&m.response.request_id==='hook-test')send({type:'test/deferred',output:m.response.response});
  if(m.type==='control_request'&&m.request.subtype==='initialize'&&process.env.REMOTEA_TEST_DENIED)send({type:'control_request',request_id:'denial-hook',request:{subtype:'hook_callback',callback_id:'remotea-permission-denied',input:{hook_event_name:'PermissionDenied',tool_name:'Bash',tool_input:{command:'blocked-action'},tool_use_id:'denied-id',reason:'Classifier unavailable'}}});
- if(m.type==='user'){send(m);send({type:'control_request',request_id:'permission',request:{subtype:'can_use_tool',tool_name:'Bash',input:{command:'npm test'},tool_use_id:'tool'}});}
+ if(m.type==='user'){send({type:'test/input',uuid:m.uuid});if(process.env.REMOTEA_TEST_BUFFERED&&m.message.content==='buffered'){global.buffered=m;return;}if(m.message.content==='release'&&global.buffered)send(global.buffered);send(m);send({type:'control_request',request_id:'permission',request:{subtype:'can_use_tool',tool_name:'Bash',input:{command:'npm test'},tool_use_id:'tool'}});}
  if(m.id===42||m.type==='control_response')send({type:'test/decision',response:m.result??m.response.response});
 });
 `, { mode: 0o700 });
@@ -73,6 +74,31 @@ describe('structured provider subprocess transports', () => {
       expect(events.find((e) => e.type === 'test/decision').response).toEqual({ hookSpecificOutput: { hookEventName: 'PermissionDenied', retry: false } });
       expect(events.find((e) => e.type === 'remotea/permission-denied').input).toMatchObject({ tool_name: 'Bash', reason: 'Classifier unavailable' });
     } finally { await adapter.stop(); }
+  });
+  it('uses native busy steer and idle start without interrupting, preserving input identities', async () => {
+    const adapter = new CodexRuntimeAdapter(fixture('codex'), 1000); const events: any[]=[]; adapter.on('event',e=>events.push(e));
+    try { await adapter.start(); await adapter.sendDirect('idle','idle-id',{active:false,turnId:null});
+      expect(await adapter.sendDirect('followup','direct-id',{active:true,turnId:'provider-turn'})).toEqual({turnId:'provider-turn',providerAcknowledged:true});
+      await eventually(()=>events.some(e=>e.type==='test/steer'));
+      expect(events.find(e=>e.type==='test/steer').params).toMatchObject({expectedTurnId:'provider-turn',clientUserMessageId:'direct-id',input:[{text:'followup'}]});
+      expect(events.filter(e=>e.type==='test/start')).toHaveLength(1);
+    } finally {await adapter.stop();}
+  });
+  it.each(['ended','mismatch','uncertain'])('retries a Codex turn-end race only after confirmed no-active rejection: %s',async(mode)=>{
+    const spec=fixture('codex');spec.env.REMOTEA_TEST_STEER=mode;const adapter=new CodexRuntimeAdapter(spec,1000);const events:any[]=[];adapter.on('event',e=>events.push(e));
+    try {await adapter.start();const request=adapter.sendDirect('note','direct-id',{active:true,turnId:'old'});
+      if(mode==='ended') {await expect(request).resolves.toMatchObject({providerAcknowledged:true});expect(events.find(e=>e.type==='remotea/direct-start')).toMatchObject({input_id:'direct-id'});}
+      else await expect(request).rejects.toThrow(mode==='uncertain'?'uncertain':'expected turn');
+      await eventually(()=>events.some(e=>e.type==='test/steer'));expect(events.filter(e=>e.type==='test/start')).toHaveLength(mode==='ended'?1:0);
+    }finally{await adapter.stop();}
+  });
+  it('hands Claude messages directly to its active stream without waiting for later replay acknowledgment',async()=>{
+    const spec=fixture('claude');spec.env.REMOTEA_TEST_BUFFERED='1';const adapter=new ClaudeRuntimeAdapter(spec,1000);const events:any[]=[];adapter.on('event',e=>events.push(e));
+    try {await adapter.start();expect(await adapter.sendDirect('buffered','buffered-id',{active:true,turnId:'active'})).toEqual({turnId:'active',providerAcknowledged:false});
+      await eventually(()=>events.some(e=>e.type==='test/input'&&e.uuid==='buffered-id'));
+      await new Promise(resolve=>setTimeout(resolve,1100));expect(events.some(e=>e.type==='user'&&e.uuid==='buffered-id')).toBe(false);
+      await adapter.sendDirect('release','release-id',{active:false,turnId:null});await eventually(()=>events.some(e=>e.type==='user'&&e.uuid==='buffered-id'));
+    }finally{await adapter.stop();}
   });
   it('bounds stalled receipts and never retries the effect', async () => {
     const adapter = new CodexRuntimeAdapter(fixture('codex'), 1000);

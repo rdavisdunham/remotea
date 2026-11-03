@@ -121,6 +121,7 @@ class FakeManagedAdapter extends EventEmitter implements RuntimeAdapter {
   async start() { return 'managed-provider-session'; }
   async resume() { return this.start(); }
   async send(text: string) { this.inputs.push(text); }
+  async sendDirect(text: string, _id: string, context: {turnId:string|null}) { this.inputs.push(text); return {turnId:context.turnId,providerAcknowledged:true}; }
   async interrupt() { this.interrupted++; }
   async respond(request: HarnessRequest, response: unknown) { this.responses.push({ request, response }); }
   async stop() {}
@@ -137,6 +138,27 @@ describe('dispatch: managed integration', () => {
   const managedSpawn = () => spawnCmd({ execution: 'managed', harness: 'codex', model: 'gpt-6.1-sol', effort: 'xhigh', permission_profile: 'read-only', mode: 'plan', role: 'planner' });
   const input = (op_id: string, text: string) => ({ t: 'input', op_id, digest: 'd', surf: surfFor('run-1', 1, 1), incarnation: 1, run_id: 'run-1', generation: 1, mode: 'queue', text, durable: true, expires_at: 0 });
 
+  it('delivers busy native direct input and revisioned human hold without interruption',async()=>{
+    const {run,dispatch,adapter}=managedSetup();await run(managedSpawn());const surf=surfFor('run-1',1,1);await dispatch.managed.ready(surf);
+    expect(await run({...input('direct-note','literal note'),mode:'direct',origin:'human',automation_hold:true,automation_hold_revision:1})).toMatchObject({state:'executed',result:{receipt:'handed_to_harness',provider_ack:'confirmed',generation:1}});
+    expect(adapter.inputs.at(-1)).toBe('literal note');expect(adapter.interrupted).toBe(0);
+    expect(dispatch.hubHooks().snapshot!(surf)).toMatchObject({automation_hold:true,automation_hold_revision:1});
+    expect(await run({...input('stale-auto','automatic'),origin:'automation',automation_hold_revision:0})).toMatchObject({state:'rejected',began:false});
+    expect(await run({t:'automation.hold',op_id:'release',digest:'d',run_id:'run-1',generation:1,held:false,automation_hold_revision:2,origin:'human',expires_at:0})).toMatchObject({state:'executed',result:{automation_hold:false,automation_hold_revision:2}});
+  });
+  it('preserves older offline human sends after the newest hold snapshot while rejecting stale automation',async()=>{
+    const {run,dispatch,adapter}=managedSetup();await run(managedSpawn());const surf=surfFor('run-1',1,1);await dispatch.managed.ready(surf);
+    dispatch.applyRunsSnapshot([{run_id:'run-1',generation:1,desired:'continue',automation_hold:true,automation_hold_revision:3}]);
+    expect(await run({t:'automation.hold',op_id:'old-hold',digest:'d',run_id:'run-1',generation:1,held:true,automation_hold_revision:2,origin:'human',expires_at:0})).toMatchObject({state:'executed',result:{automation_hold_revision:3}});
+    for(const revision of [2,3]) expect(await run({...input('human-'+revision,'note '+revision),mode:'direct',origin:'human',automation_hold:true,automation_hold_revision:revision})).toMatchObject({state:'executed'});
+    expect(adapter.inputs.slice(-2)).toEqual(['note 2','note 3']);expect(dispatch.managed.automation.get('run-1').revision).toBe(3);
+  });
+  it('holds a run before any surface exists and refuses automatic spawn before worktree effects',async()=>{
+    const {run,dispatch,ensured}=managedSetup();expect(await run({t:'automation.hold',op_id:'hold',digest:'d',run_id:'run-1',generation:1,held:true,automation_hold_revision:1,origin:'human',expires_at:0})).toMatchObject({state:'executed'});
+    expect(await run({...managedSpawn(),origin:'automation',automation_hold_revision:0})).toMatchObject({state:'rejected',began:false});expect(ensured).toHaveLength(0);
+    expect(dispatch.managed.automation.get('run-1')).toMatchObject({held:true,revision:1});
+  });
+
   it('launches through the structured adapter with role options and no native terminal writer', async () => {
     const { run, dispatch, sp, registry, adapter, specifications } = managedSetup();
     const result = await run(managedSpawn());
@@ -148,10 +170,10 @@ describe('dispatch: managed integration', () => {
     expect(registry.session(surf)?.eridani).toMatchObject({ execution: 'managed', controller: 'eridani' });
     expect(adapter.inputs).toHaveLength(1);
     adapter.complete();
-    expect((await run(input('managed-input-1', 'Follow up'))).state).toBe('executed');
+    expect(await run(input('managed-input-1', 'Follow up'))).toMatchObject({ state: 'executed', result: { surf, incarnation: 1, generation: 1, managed: true } });
     expect(adapter.inputs).toEqual([expect.any(String), 'Follow up']);
     adapter.complete();
-    expect((await run(input('managed-input-1', 'Follow up'))).state).toBe('executed');
+    expect(await run(input('managed-input-1', 'Follow up'))).toMatchObject({ state: 'executed', result: { surf, incarnation: 1, generation: 1, managed: true } });
     expect(adapter.inputs).toHaveLength(2);
   });
 

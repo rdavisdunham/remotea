@@ -68,6 +68,8 @@ import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
 import { installRemoteQuerySwallow } from '../../shared/remote-query-swallow';
 import { ensureRemoteGroup } from '../remote-sessions/sync';
 import { setRemoteView } from '../remote-sessions/status';
+import { latestRemoteViews, subscribeRemoteViews } from '../remote-sessions/registry-cache';
+import { managedInputBlocked, forwardTerminalInput } from '../remote-sessions/managed-control';
 import type { PtyExitInfo, RemoteSize, TerminalSnapshot } from '../../shared/remote-hosts-types';
 import '@xterm/xterm/css/xterm.css';
 
@@ -760,7 +762,7 @@ function handleTerminalWheel(
   const isAltBuffer = terminal.buffer.active.type !== 'normal';
   const isMouseEnabled = !!surfaceId && isMouseTracking(surfaceMouseModes.get(surfaceId));
 
-  if (!isAltBuffer && !isMouseEnabled) {
+  if (managedInputBlocked(latestRemoteViews(), surfaceId) || (!isAltBuffer && !isMouseEnabled)) {
     ev.preventDefault();
     ev.stopPropagation();
     const lines = wheelDeltaToLines(ev, terminal, host, surfaceId);
@@ -928,6 +930,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         // the late result after disposal.
         const currentTerminal = xtermRef.current;
         if (!currentTerminal || !ptyIdRef.current) return;
+        if (managedInputBlocked(latestRemoteViews(), surfaceId)) return;
         applyInsertion(currentTerminal, surfaceId, translatorRef.current, result);
       })
       .catch(() => { /* nothing pasted rather than something wrong */ });
@@ -1125,6 +1128,11 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     if (remoteSpec) installRemoteQuerySwallow(terminal);
 
     // Open terminal in the DOM
+    const updateInputOwnership = () => {
+      terminal.options.disableStdin = managedInputBlocked(latestRemoteViews(), surfaceId);
+    };
+    updateInputOwnership();
+    cleanupFnsRef.current.push(subscribeRemoteViews(updateInputOwnership));
     terminal.open(terminalRef.current);
 
     // Size the buffer to the pane BEFORE anything is written into it. xterm
@@ -1468,7 +1476,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     const onDragOver = (ev: DragEvent) => {
       if (ev.dataTransfer?.types?.includes('Files')) {
         ev.preventDefault();
-        ev.dataTransfer.dropEffect = 'copy';
+        ev.dataTransfer.dropEffect = managedInputBlocked(latestRemoteViews(), surfaceId) ? 'none' : 'copy';
       }
     };
     const onDrop = (ev: DragEvent) => {
@@ -1476,6 +1484,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       if (!files || files.length === 0) return;
       ev.preventDefault();
       ev.stopPropagation();
+      if (managedInputBlocked(latestRemoteViews(), surfaceId)) return;
       // Shift inverts: insert the local path even when the pane is remote.
       // Drop only — Ctrl+Shift+V is already the paste binding, so Shift is
       // not free as a paste modifier (cmux scopes it to drop for the same
@@ -1511,7 +1520,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       }
       // The SAME resolver as Ctrl+V, so a right-click means exactly what it
       // does: bracketed paste, image/file paste, scp for an ssh pane (#195).
-      finishInsertion(window.wmux.remote.resolvePaste(surfaceId ?? ''));
+      if (!managedInputBlocked(latestRemoteViews(), surfaceId)) finishInsertion(window.wmux.remote.resolvePaste(surfaceId ?? ''));
     };
     dropHost.addEventListener('dragover', onDragOver);
     dropHost.addEventListener('drop', onDrop);
@@ -1701,7 +1710,8 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // including wmux's own shortcuts — that is the point of remapping
       // (issue #146). Routed through terminal.input (→ onData) rather than
       // pty.write so broadcast-input fans a remapped key out like any other.
-      if (applyKeyRemap(event, (data) => terminal.input(data, true))) return false;
+      if (!managedInputBlocked(latestRemoteViews(), surfaceId) && applyKeyRemap(event, (data) => terminal.input(data, true))) return false;
+
       if (event.type === 'keydown' && event.ctrlKey && isLetterKey(event, 'c', 'KeyC')) {
         // ConPTY pads lines to full width with real spaces — trim them or
         // pasted blocks carry ragged trailing whitespace (issue #102).
@@ -1711,6 +1721,19 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           terminal.clearSelection();
           return false;
         }
+      }
+      if (managedInputBlocked(latestRemoteViews(), surfaceId)) {
+        // Keep app find/copy/navigation shortcuts, but never remap or resolve a
+        // paste/upload in a controlled session. onData also gates IME, mouse,
+        // programmatic paste and broadcast input against current ownership.
+        const { shortcuts, keyboardPrefs } = useStore.getState();
+        if (event.type === 'keydown' && claimsKeyEvent(event, shortcuts, keyboardPrefs)) return false;
+        if (event.type === 'keydown' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+          if (event.key === 'PageUp') terminal.scrollPages(-1);
+          if (event.key === 'PageDown') terminal.scrollPages(1);
+        }
+        event.preventDefault();
+        return false;
       }
       // Ctrl+V: main reads the clipboard and tells us what to type.
       if (event.type === 'keydown' && event.ctrlKey && isLetterKey(event, 'v', 'KeyV')) {
@@ -2005,13 +2028,11 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       if (st.broadcastInputActive && surfaceId) {
         const ws = st.workspaces.find((w) => treeHasSurface(w.splitTree, surfaceId));
         if (ws) {
-          for (const id of collectActiveTerminalSurfaceIds(ws.splitTree)) {
-            window.wmux.pty.write(id, data);
-          }
+          forwardTerminalInput(surfaceId, collectActiveTerminalSurfaceIds(ws.splitTree), data, window.wmux.pty.write);
           return;
         }
       }
-      window.wmux.pty.write(ptyIdRef.current, data);
+      forwardTerminalInput(surfaceId, [ptyIdRef.current], data, window.wmux.pty.write);
     });
 
     // ResizeObserver to auto-fit and relay size to PTY (debounced to prevent IPC spam)
@@ -2146,7 +2167,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     const handler = async (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.surfaceId !== surfaceId) return;
-      if (!xtermRef.current || !ptyIdRef.current) return;
+      if (!xtermRef.current || !ptyIdRef.current || managedInputBlocked(latestRemoteViews(), surfaceId)) return;
       finishInsertion(window.wmux.remote.resolvePaste(surfaceId ?? ''));
     };
     document.addEventListener('wmux:paste-terminal', handler);

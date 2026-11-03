@@ -15,9 +15,26 @@
 // is runSmokeMode in index.ts; the env isolation (own instance, no agent
 // integration, no updater) is smoke-env.ts, imported first by index.ts.
 
+import { planQuit } from './quit-sequence';
+
 export const SMOKE_FLAG = '--smoke';
 export const SMOKE_TOKEN = 'smoke-ok';
 export const DEFAULT_SMOKE_TIMEOUT_MS = 90_000;
+
+/** Smoke uses app.exit(), which bypasses will-quit and its normal PTY drain. */
+export function shutdownSmoke(deps: {
+  ptyCount(): number;
+  killAll(): void;
+  defer(exit: () => void, ms: number): void;
+  exit(code: number): void;
+}, code: number): void {
+  const ptysAtQuit = deps.ptyCount();
+  try { deps.killAll(); } catch { /* preserve the smoke result even if cleanup fails */ }
+  // The hard timeout remains an immediate emergency exit; normal pass/fail reuses the established drain.
+  const drainMs = code === 2 ? 0 : planQuit({ ptysAtQuit, agentBrowserPending: false, alreadyDeferred: false }).drainMs;
+  if (drainMs > 0) deps.defer(() => deps.exit(code), drainMs);
+  else deps.exit(code);
+}
 
 export interface SmokeOptions {
   /** Where the JSON result goes; null = the caller's default (app data dir). */

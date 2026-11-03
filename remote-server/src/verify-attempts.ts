@@ -59,6 +59,8 @@ export interface VerifyAttemptsDeps {
   log: (m: string) => void;
   debounceMs: number;
   mintId?: () => string;
+  automaticAllowed?: (runId: string, revision?: number) => boolean;
+  automaticRevision?: (runId: string) => number;
 }
 
 interface Tuple {
@@ -74,6 +76,7 @@ interface Attempt {
   /** The host's id, when Eridani's command adopted a host attempt. */
   adopted?: string;
   initiator: 'host' | 'eridani';
+  automationRevision?: number;
   surf: string;
   tuple: Tuple;
   state: 'pending' | 'running' | 'done';
@@ -123,7 +126,7 @@ export class VerifyAttempts {
 
   /** A root turn was captured on `t.surf`. */
   onTurn(t: TurnFields): void {
-    if (!t.run_id || t.interim) return;
+    if (!t.run_id || t.interim || this.deps.automaticAllowed?.(t.run_id) === false) return;
     const rec = this.deps.session(t.surf);
     const b = rec?.eridani;
     if (!rec || !b || b.runId !== t.run_id) return;
@@ -141,6 +144,7 @@ export class VerifyAttempts {
     const a: Attempt = {
       id: `local:${(this.deps.mintId ?? crypto.randomUUID)()}`,
       initiator: 'host',
+      automationRevision: this.deps.automaticRevision?.(t.run_id),
       surf: t.surf,
       tuple: { run_id: t.run_id, generation: t.generation, turn_seq: t.seq, plan_revision: b.verify.planRevision, verify_id: b.verify.verifyId },
       state: 'pending',
@@ -149,7 +153,7 @@ export class VerifyAttempts {
     this.current.set(t.surf, a);
     a.timer = this.deps.timers.setTimeout(() => {
       a.timer = undefined;
-      if (this.current.get(t.surf) === a) void this.start(a);
+      if (this.current.get(t.surf) === a) { if (this.deps.automaticAllowed?.(a.tuple.run_id, a.automationRevision) === false) this.cancel(t.surf, 'Eridani automation is held'); else void this.start(a); }
     }, this.deps.debounceMs);
     this.persist(a, 'pending');
   }
@@ -158,6 +162,8 @@ export class VerifyAttempts {
 
   /** An Eridani `verify` command for the run bound to `surf` (fences already checked). */
   async command(surf: string, cmd: VerifyCommand): Promise<CommandedOutcome> {
+    const blocked = () => cmd.origin === 'automation' && this.deps.automaticAllowed?.(cmd.run_id, cmd.automation_hold_revision) === false;
+    if (blocked()) return {state:'rejected',detail:'Eridani automation is held or superseded'};
     const tuple: Tuple = { run_id: cmd.run_id, generation: cmd.generation, turn_seq: cmd.turn_seq, plan_revision: cmd.plan_revision, verify_id: cmd.verify_id };
     const cur = this.current.get(surf);
     if (cur && sameTuple(cur.tuple, tuple)) {
@@ -188,6 +194,7 @@ export class VerifyAttempts {
         return this.outcome(copy);
       }
     }
+    if (blocked()) return {state:'rejected',detail:'Eridani automation is held or superseded'};
     const a: Attempt = { id: cmd.attempt_id, initiator: 'eridani', surf, tuple, state: 'pending', startedAt: null };
     this.current.set(surf, a);
     return this.outcome(await this.start(a));

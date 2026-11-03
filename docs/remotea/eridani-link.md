@@ -36,6 +36,52 @@ The design is in `docs/remotea/plan.md` and the mission-control plan (v2,
 | `remote-server/src/verify-sandbox.ts` | The bubblewrap sandbox verify runs in, and the loopback forwarder. |
 | `remote-server/src/doctor.ts` | `remotea doctor`: the readiness checks, the report, and the summary sent to Eridani ([Doctor](#doctor)). |
 
+## Managed direct input and automation hold
+
+Managed Codex and Claude sessions negotiate `input.direct`. An `input` command with
+`mode: "direct"` hands the message to the existing provider transport immediately:
+Codex uses `turn/steer` with `expectedTurnId` while a turn is active and `turn/start`
+when idle; Claude writes a user message with its stable operation UUID to the
+existing streaming input. This does not interrupt the worker. The provider decides
+when to consume the input. Legacy `queue` and interrupting `steer` modes keep their
+semantics, including messages already queued before this capability was available.
+
+The direct message carries `origin: "human"`, `automation_hold: true` and a
+monotonic `automation_hold_revision`. The separate `automation.hold` command carries
+`run_id`, `generation`, `held`, `automation_hold_revision` and `origin: "human"`;
+it also works before the run has attached a surface. Desired hold state travels in
+run snapshots so reconnection cannot silently release it. The host persists the
+hold, rejects stale automatic commands and removes explicitly tagged automatic
+inputs that have not yet been handed to the provider. Human messages and explicit
+decision responses remain possible. A hold does not interrupt a worker or undo
+input already handed to it. Releasing it requires an explicit newer revision.
+
+`input.receipt` correlates `input_id` with the original command operation and reports
+`handed_to_harness`, `provider_acknowledged` or `uncertain`, with run, generation,
+surface, incarnation, provider session/turn and timestamp. A successful direct
+command outcome reports `receipt: "handed_to_harness"` and whether the provider
+acknowledgment is confirmed or pending. Claude's delayed replay of the user UUID
+upgrades the receipt separately; a busy turn is not a reason to time out that
+acknowledgment. These stages do not assert that the model read the message. Unknown
+delivery is never blindly retried, and repeated operation IDs do not send twice.
+
+The negotiated `output.live` event carries published assistant commentary or
+responses, never provider reasoning. Each full message snapshot has `run_id`,
+`generation`, `surf`, `incarnation`, `session_id`, nullable `turn_id`, `message_id`,
+monotonic `sequence`, `at`, `kind` (`commentary` or `response`), `text`, `complete`
+and `truncated`. `complete` means the message is complete, not that the turn ended.
+The host persists a bounded snapshot for replay after reconnect; Eridani replaces
+earlier snapshots by identity and sequence and reconciles completed turn history.
+Partial or completed live messages never count as completed turns or trigger a
+judge. Normal final-turn capture remains the authority for that.
+
+The Eridani drawer's **Show chat** is local view state and sends no control command.
+Accepted **Send** saves the message and holds automation atomically, including while
+the link is offline. **Resume automation** waits for reconciliation and an explicit
+host-confirmed release. A host without direct support requires an update; the UI
+does not silently substitute next-turn queueing. Worker pause, permission decisions,
+manual terminal ownership and configured hard limits remain separate controls.
+
 ## Configuration
 
 Both files live in the server's config dir (`~/.config/remotea`, or

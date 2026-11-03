@@ -10,9 +10,11 @@ import {
   parseSmokeArgs,
   runSmoke,
   screenShowsToken,
+  shutdownSmoke,
   type RendererProbe,
   type SmokeDeps,
 } from '../../src/main/smoke';
+import { PTY_EXIT_DRAIN_MS } from '../../src/main/quit-sequence';
 
 describe('parseSmokeArgs', () => {
   it('is off for a normal launch', () => {
@@ -144,6 +146,34 @@ describe('runSmoke', () => {
     const r = await runSmoke(deps, { timeoutMs: 90_000 });
     expect(r.ok).toBe(true);
     expect(r.steps.find((s) => s.name === 'shell-ready')?.detail).toBe('no prompt seen; typing anyway');
+  });
+});
+
+describe('smoke shutdown', () => {
+  it.each([0, 1])('kills and drains a live PTY before preserving smoke exit code %s', (code) => {
+    const events: unknown[] = []; let leave: (() => void) | undefined;
+    shutdownSmoke({
+      ptyCount: () => 1,
+      killAll: () => events.push('kill'),
+      defer: (exit, ms) => { events.push(['drain', ms]); leave = exit; },
+      exit: (result) => events.push(['exit', result]),
+    }, code);
+    expect(events).toEqual(['kill', ['drain', PTY_EXIT_DRAIN_MS]]);
+    leave!(); expect(events.at(-1)).toEqual(['exit', code]);
+  });
+
+  it('exits immediately without a live PTY and never delays the emergency timeout', () => {
+    for (const [ptys, code] of [[0, 0], [1, 2]]) {
+      const events: unknown[] = [];
+      shutdownSmoke({ ptyCount: () => ptys, killAll: () => events.push('kill'), defer: () => events.push('unexpected drain'), exit: result => events.push(['exit', result]) }, code);
+      expect(events).toEqual(['kill', ['exit', code]]);
+    }
+  });
+
+  it('retains a failing result when PTY cleanup throws', () => {
+    const events: unknown[] = []; let leave: (() => void) | undefined;
+    shutdownSmoke({ ptyCount: () => 1, killAll: () => { throw new Error('native cleanup failed'); }, defer: exit => { leave = exit; }, exit: code => events.push(code) }, 1);
+    expect(events).toEqual([]); leave!(); expect(events).toEqual([1]);
   });
 });
 

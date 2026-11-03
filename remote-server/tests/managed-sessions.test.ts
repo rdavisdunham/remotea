@@ -28,6 +28,20 @@ function fixture(dir: string | null = null, decisionReceiptMs?: number) {
 function answer(q: any, choice = 'allow_once'): AnswerCommand { return { t: 'answer', op_id: 'answer-op', digest: 'digest', question_id: q.question_id, provider_request_id: q.provider_request_id, answers: [{ item_id: 'approval', choice_ids: [choice] }] }; }
 
 describe('managed durable ownership', () => {
+  it('formats the actual managed terminal stream by turn without changing accepted prompts or semantic responses', async () => {
+    const { manager, adapter, terminal } = fixture(); const output: string[] = []; terminal.onData(text => output.push(text)); await manager.ready(spec.surf);
+    await manager.send(spec.surf, 'Explain the result', 'readable-turn');
+    adapter.emit('event', { method: 'item/started', params: { item: { id: 'tool', type: 'commandExecution', command: 'npm test' } } });
+    adapter.emit('event', { method: 'item/commandExecution/outputDelta', params: { itemId: 'tool', delta: 'All tests passed\n' } });
+    adapter.emit('event', { method: 'item/completed', params: { item: { id: 'tool', type: 'commandExecution', exitCode: 0 } } });
+    adapter.emit('event', { method: 'item/agentMessage/delta', params: { itemId: 'reply', delta: 'The tests passed.\n' } });
+    adapter.emit('event', { method: 'item/completed', params: { item: { id: 'reply', type: 'agentMessage', text: 'The tests passed.\n' } } });
+    adapter.emit('event', { method: 'turn/completed', params: { turn: { id: 'readable-turn' } } });
+    const text = output.join('').replace(/\r\n/g, '\n');
+    expect(text).toContain('── User · Turn 1 ──\nExplain the result'); expect(text).toContain('── Tool · Command ──\n  npm test'); expect(text).toContain('── Assistant ──\nThe tests passed.'); expect(text.match(/The tests passed\./g)).toHaveLength(1);
+    expect(adapter.sent).toEqual([['Explain the result', 'readable-turn']]); expect(text).not.toContain('"method"');
+  });
+
   it('uses an output-only terminal, explicit once/deny choices and provider confirmation', async () => {
     const { manager, adapter, events, terminal } = fixture(); await manager.ready(spec.surf);
     terminal.write('rm -rf anything\r'); expect(adapter.sent).toEqual([]);

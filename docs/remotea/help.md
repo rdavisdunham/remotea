@@ -37,7 +37,13 @@ Connect the desktop to a host separately from linking that host to Eridani with 
 
 Supported managed runs keep questions and plans available for later answers in Eridani. The run header shows the workflow stage; the activity line above its message input shows current model or tool activity. Pause preserves the workspace and pending decisions. Resume reconciles interrupted work, while Cancel ends execution and retains its history. Queued, saved and delivered messages have separate receipts.
 
-A managed terminal displays the conversation while Eridani controls it. Open Host activity and choose **Take over in terminal** to stop managed control and continue the same conversation locally in that terminal. The transfer persists across reconnects; Eridani displays **Terminal has control**. Legacy terminal sessions retain their native provider approval behavior. Model and effort choices come from the host's verified installed harness, and unsupported choices require correction instead of a silent substitution.
+A managed terminal displays the conversation with separate user, assistant, and tool sections while Eridani controls it. A persistent notice and disabled input explain who has control. You can scroll, select, copy, and find text. Use **Take over** below the transcript, **Ctrl+Shift+Space** in the focused pane, or **Take over in terminal** in Host activity to continue the same conversation in its native terminal. A conflicting custom shortcut takes priority. Input stays disabled until the host confirms terminal ownership; uncertain confirmation can offer an explicit retry after a fresh connected registry update. The transfer persists across reconnects; Eridani displays **Terminal has control**.
+
+Final acceptance, cancellation, failure, and a reached run limit close the run's server terminals after process exit is confirmed. Plan approval, questions, pauses, and disconnects leave terminals open. Worktrees, provider conversations, and Eridani history remain available. A live terminal you have taken over is protected from automatic closure. Cleanup requires updated API and server support; older hosts keep their existing behavior.
+
+If a separate worker takes over after planning, the planner's terminal closes once that worker has successfully attached and is live. The worker continues in its own terminal. A failed or pending worker start leaves the planner available, and a planner continuing as the worker keeps the same terminal.
+
+Legacy terminal sessions retain their native provider approval behavior. Model and effort choices come from the host's verified installed harness, and unsupported choices require correction instead of a silent substitution. An activity gap is shown as **No recent output · last reported …**, preserving the last observed activity without claiming the agent is still actively producing output.
 
 ## Use files, Git and browser tools
 

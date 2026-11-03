@@ -173,6 +173,7 @@ export class Hub {
           surf,
           incarnation: rec.incarnation ?? 0,
           revision: this.statusRev,
+          ...(rec.eridani ? { run_id: rec.eridani.runId, generation: rec.eridani.generation } : {}),
           state: info.state,
           since: info.since,
           ...(info.reason ? { reason: info.reason } : {}),
@@ -583,7 +584,7 @@ export class Hub {
     this.registry.saveNow();
     this.broadcast({ t: 'sessionUpdated', session: updated });
     this.agentState.exit(id, -1);
-    this.sink?.exit({ surf: id, incarnation: updated.incarnation ?? 0, code: -1, exited_at: exitedAt, reason: reason.slice(0, 300) });
+    this.sink?.exit({ surf: id, incarnation: updated.incarnation ?? 0, code: -1, exited_at: exitedAt, ...(updated.eridani ? { run_id: updated.eridani.runId, generation: updated.eridani.generation } : {}), reason: reason.slice(0, 300) });
     this.eridani.exited?.(id, -1);
     this.log(`${id}: ${reason}; left exited`);
     return updated;
@@ -599,7 +600,7 @@ export class Hub {
     if (updated) this.broadcast({ t: 'sessionUpdated', session: updated });
     this.agentState.exit(id, code);
     this.permissionMode.delete(id);
-    if (updated) this.sink?.exit({ surf: id, incarnation: updated.incarnation ?? 0, code, exited_at: exitedAt });
+    if (updated) this.sink?.exit({ surf: id, incarnation: updated.incarnation ?? 0, code, exited_at: exitedAt, ...(updated.eridani ? { run_id: updated.eridani.runId, generation: updated.eridani.generation } : {}) });
     this.eridani.exited?.(id, code);
   }
 

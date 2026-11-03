@@ -102,7 +102,7 @@ const enters = (pty: FakePty) => pty.written.filter((w) => w === '\r').length;
 
 describe('S-N1: a steer writes nothing once it is superseded', () => {
   it('runs to completion when nothing intervenes, and only then reports executed', async () => {
-    const { pty, steer, advance } = await setup();
+    const { pty, surf, steer, advance } = await setup();
     const s = steer('plan b', 2);
     await settle();
     expect(pty.written).toEqual(['\x1b']);
@@ -111,7 +111,7 @@ describe('S-N1: a steer writes nothing once it is superseded', () => {
     expect(s.done()).toBeNull(); // the Enter is still due: not executed yet
     await advance(ENTER_MS);
     expect(pty.written.at(-1)).toBe('\r');
-    expect(s.done()).toMatchObject({ state: 'executed', result: { mode: 'steer', generation: 2 } });
+    expect(s.done()).toMatchObject({ state: 'executed', result: { mode: 'steer', surf, incarnation: 1, generation: 2 } });
   });
 
   it('a stop command during the Escape delay: no paste, no Enter, and the steer reports interrupted', async () => {
@@ -277,7 +277,7 @@ describe('S-N1: queued input keeps its behaviour, and its Enter is fenced too', 
     expect(q.done()).toBeNull();
     await advance(ENTER_MS);
     expect(pty.written.at(-1)).toBe('\r');
-    expect(q.done()).toMatchObject({ state: 'executed', result: { mode: 'queue', generation: 1 } });
+    expect(q.done()).toMatchObject({ state: 'executed', result: { mode: 'queue', surf, incarnation: 1, generation: 1 } });
   });
 
   it('a stop during its Enter delay: Enter is not sent, and it reports interrupted with the text pasted', async () => {

@@ -11,6 +11,13 @@
 import { findKeyRemap, KeyRemap, ChordEvent } from '../shared/key-sequence';
 
 let remaps: readonly KeyRemap[] = [];
+const listeners = new Set<() => void>();
+
+/** Lets shortcut affordances follow config reloads without rebuilding xterm. */
+export function subscribeKeyRemaps(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
 
 /**
  * Replace the active remaps. Called with the whole list (never a patch) so
@@ -19,6 +26,7 @@ let remaps: readonly KeyRemap[] = [];
  */
 export function setKeyRemaps(next: readonly KeyRemap[] | undefined): void {
   remaps = next ?? [];
+  for (const listener of listeners) listener();
 }
 
 export function getKeyRemaps(): readonly KeyRemap[] {
