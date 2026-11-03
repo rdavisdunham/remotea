@@ -114,6 +114,7 @@ export type LinkCap =
   | 'terminal.focus'
   | 'run.cleanup'
   | 'run.cleanup.handoff'
+  | 'input.direct' | 'output.live'
   // The host reports `remotea doctor`'s summary: in hello (`doctor`), and as a `doctor` frame when it changes.
   // The frame goes only to an Eridani whose welcome advertised `doctor`.
   | 'doctor'
@@ -237,6 +238,19 @@ export interface Part {
 
 export interface ModelCatalogEntry {
   harness: Harness; model: string; label?: string; default?: boolean; efforts: string[]; default_effort?: string; permission_profiles: string[];
+}
+
+export interface AutomationHoldFields { automation_hold?: boolean; automation_hold_revision?: number; origin?: 'human' | 'automation' }
+export interface AutomationHoldCommand extends OpFields {
+  t: 'automation.hold'; run_id: string; generation: number; held: boolean; automation_hold_revision: number; origin: 'human'; surf?: string; incarnation?: number; expires_at: number | string;
+}
+export interface LiveOutputBody extends OpFields {
+  t: 'output.live'; run_id: string; generation: number; surf: string; incarnation: number; session_id: string; turn_id: string | null; message_id: string; sequence: number; at: number;
+  kind: 'commentary' | 'response'; text: string; complete: boolean; truncated: boolean;
+}
+export interface InputReceiptBody extends OpFields {
+  t: 'input.receipt'; input_id: string; run_id: string; generation: number; surf: string; incarnation: number; session_id: string; turn_id: string | null; at: number;
+  stage: 'handed_to_harness' | 'provider_acknowledged' | 'uncertain';
 }
 
 export interface ActivityBody extends OpFields {
@@ -542,7 +556,7 @@ export interface ExitBody extends OpFields {
   reason?: string;
 }
 
-export interface SnapshotSurface {
+export interface SnapshotSurface extends AutomationHoldFields {
   plan_revision?: number;
   execution?: 'managed'; controller?: 'eridani' | 'terminal'; paused?: boolean; pause_reason?: ManagedAttention['kind'] | null; attention?: ManagedAttention;
   surf: string;
@@ -795,7 +809,7 @@ export interface ContextResponseBody {
 
 export type Harness = 'claude' | 'codex';
 
-export interface SpawnCommand extends OpFields {
+export interface SpawnCommand extends OpFields, AutomationHoldFields {
   plan_revision?: number;
   execution?: 'managed';
   effort?: string;
@@ -875,7 +889,7 @@ export interface RunVerifyConfig {
   plan_revision: number;
 }
 
-export interface InputCommand extends OpFields {
+export interface InputCommand extends OpFields, AutomationHoldFields {
   plan_revision?: number;
   t: 'input';
   surf: string;
@@ -884,7 +898,7 @@ export interface InputCommand extends OpFields {
   generation: number;
   text: string;
   /** queue: delivered when the agent is next at its prompt. steer: interrupt now, then deliver (generation advances). */
-  mode: 'queue' | 'steer';
+  mode: 'queue' | 'steer' | 'direct';
   expires_at?: number | string;
 }
 
@@ -894,7 +908,7 @@ export interface AnswerItem {
   text?: string;
 }
 
-export interface AnswerCommand extends OpFields {
+export interface AnswerCommand extends OpFields, AutomationHoldFields {
   surf?: string; incarnation?: number; run_id?: string; generation?: number;
   request_digest?: string; plan_revision?: number;
   t: 'answer';
@@ -914,11 +928,11 @@ export type RunCleanupCommand = OpFields & {
 } & ({ scope?: 'finished_run'; terminal_state: 'completed' | 'stopped' | 'capped' | 'failed'; handoff_to?: never }
   | { scope: 'retired_planner'; terminal_state?: never; handoff_to: RunCleanupSurface });
 
-export interface RunPauseCommand extends OpFields {
+export interface RunPauseCommand extends OpFields, AutomationHoldFields {
   t: 'run.pause' | 'run.resume'; run_id: string; generation: number; surf: string; incarnation: number; expires_at: number | string;
 }
 
-export interface StopCommand extends OpFields {
+export interface StopCommand extends OpFields, AutomationHoldFields {
   t: 'stop';
   surf: string;
   incarnation: number;
@@ -929,7 +943,7 @@ export interface StopCommand extends OpFields {
   expires_at?: number | string;
 }
 
-export interface VerifyCommand extends OpFields {
+export interface VerifyCommand extends OpFields, AutomationHoldFields {
   t: 'verify';
   attempt_id: string;
   run_id: string;
@@ -977,7 +991,7 @@ export interface TerminalFocusCommand extends OpFields {
 export const SESSION_TOOLS: ReadonlySet<string> = new Set<SessionTool>(['claude_code', 'claude_desktop', 'codex_cli', 'codex_desktop']);
 
 /** Eridani's answer to sessions.snapshot: what each run should be doing. */
-export interface RunsSnapshotEntry {
+export interface RunsSnapshotEntry extends AutomationHoldFields {
   plan_revision?: number;
   run_id: string;
   generation: number;
@@ -1056,6 +1070,8 @@ export type UpBody =
   | SessionsSnapshotBody
   | ContextRequestBody
   | CommandOutcomeBody
+  | LiveOutputBody
+  | InputReceiptBody
   | ActivityBody
   | QuestionBody
   | QuestionResolvedBody
@@ -1155,6 +1171,10 @@ export function parseUpFrame(raw: unknown): UpFrame | null {
       return isStr(m.req_id, 200) && isStr(m.surf, 120) && isNum(m.incarnation) && isNum(m.generation) ? (m as unknown as UpFrame) : null;
     case 'command.outcome':
       return op && isStr(m.command_id, 200) && ['executed', 'failed', 'rejected', 'uncertain'].includes(m.state as string) ? (m as unknown as UpFrame) : null;
+    case 'output.live':
+      return op && isStr(m.run_id, 128) && isStr(m.surf, 120) && isNum(m.incarnation) && isNum(m.generation) && isStr(m.session_id, 200) && (m.turn_id === null || isStr(m.turn_id, 200)) && isStr(m.message_id, 200) && isNum(m.sequence) && isNum(m.at) && ['commentary', 'response'].includes(m.kind as string) && typeof m.text === 'string' && m.text.length <= 32768 && typeof m.complete === 'boolean' && typeof m.truncated === 'boolean' ? (m as unknown as UpFrame) : null;
+    case 'input.receipt':
+      return op && isStr(m.input_id, 200) && isStr(m.run_id, 128) && isStr(m.surf, 120) && isNum(m.incarnation) && isNum(m.generation) && isStr(m.session_id, 200) && (m.turn_id === null || isStr(m.turn_id, 200)) && isNum(m.at) && ['handed_to_harness', 'provider_acknowledged', 'uncertain'].includes(m.stage as string) ? (m as unknown as UpFrame) : null;
     case 'activity':
       return op && isStr(m.run_id, 128) && isStr(m.surf, 120) && isNum(m.generation) && isNum(m.incarnation) && isNum(m.sequence) && isNum(m.at) && isStr(m.session_id, 200) && (m.turn_id === null || isStr(m.turn_id, 200)) && ['thinking', 'tool', 'searching', 'editing', 'testing', 'waiting', 'idle', 'unknown'].includes(m.kind as string) ? (m as unknown as UpFrame) : null;
     case 'question':
@@ -1216,7 +1236,7 @@ const noControl = (s: string) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f
 export const isPasteSafe = (s: string) => !/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/.test(s);
 
 /** Effectful commands: each must carry `expires_at` within the replay horizon (L11, stage F). */
-export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify', 'run.pause', 'run.resume', 'run.cleanup']);
+export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify', 'run.pause', 'run.resume', 'run.cleanup', 'automation.hold']);
 
 /**
  * Validate a stage C command's body. Returns null when it is well formed,
@@ -1225,6 +1245,9 @@ export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input'
  */
 export function commandShapeError(m: Record<string, unknown>): string | null {
   if (!isExpiry(m.expires_at)) return 'bad expires_at';
+  if (m.origin !== undefined && !['human', 'automation'].includes(m.origin as string)) return 'bad input origin';
+  if (m.automation_hold !== undefined && typeof m.automation_hold !== 'boolean') return 'bad automation hold';
+  if (m.automation_hold_revision !== undefined && !isInt(m.automation_hold_revision)) return 'bad automation hold revision';
   if (m.plan_revision !== undefined && !isInt(m.plan_revision)) return 'bad plan_revision';
   switch (m.t) {
     case 'spawn': {
@@ -1262,7 +1285,8 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
     }
     case 'input':
       if (!isStr(m.surf, 120) || !isInt(m.incarnation) || !isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
-      if (m.mode !== 'queue' && m.mode !== 'steer') return 'bad mode';
+      if (m.mode !== 'queue' && m.mode !== 'steer' && m.mode !== 'direct') return 'bad mode';
+      if (m.mode === 'direct' && (m.origin !== 'human' || m.automation_hold !== true || !isInt(m.automation_hold_revision))) return 'direct input requires a revisioned human automation hold';
       if (typeof m.text !== 'string' || !m.text.trim() || m.text.length > ERIDANI_LIMITS.promptInChars) return 'bad text';
       if (!isPasteSafe(m.text)) return 'text may not contain control characters (only newline and tab)';
       // A leading `/` is a slash command and `!` is Claude Code's shell mode: input is a message, never either.
@@ -1277,6 +1301,10 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
         if (a.text !== undefined && !(typeof a.text === 'string' && a.text.length <= 4000)) return 'bad answer text';
         if (!a.choice_ids?.length && !(typeof a.text === 'string' && a.text.trim())) return 'empty answer';
       }
+      return null;
+    case 'automation.hold':
+      if (!isStr(m.run_id, 128) || !RUN_ID_RE.test(m.run_id) || !isInt(m.generation) || typeof m.held !== 'boolean' || !isInt(m.automation_hold_revision) || m.origin !== 'human') return 'bad automation hold';
+      if (m.surf !== undefined && !isStr(m.surf, 120) || m.incarnation !== undefined && !isInt(m.incarnation, 1)) return 'bad automation hold fence';
       return null;
     case 'run.cleanup':
       if (!isStr(m.run_id, 128) || !RUN_ID_RE.test(m.run_id) || !isInt(m.generation)) return 'bad cleanup run';

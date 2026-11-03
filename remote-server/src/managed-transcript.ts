@@ -42,6 +42,7 @@ export class ManagedTranscript {
     this.heading(`User · Turn ${this.turn}`, `user:${this.turn}`);
     this.output(transcriptText(text)); this.line();
   }
+  followup(text: string): void { this.flushAssistant(); this.heading('User · Follow-up', `followup:${++this.serial}`); this.output(transcriptText(text)); this.line(); }
   notice(text: string): void {
     this.flushAssistant(); this.heading('Status', `notice:${++this.serial}`); this.output(transcriptText(text)); this.line();
   }

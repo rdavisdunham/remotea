@@ -50,6 +50,12 @@ describe('TurnCapture', () => {
     expect(recs.get('surf-1')!.turnSeq).toBe(2);
   });
 
+  it('captures explicit managed Claude hooks with the stable live-output turn identity', () => {
+    claude('UserPromptSubmit', { provider: 'claude', prompt: 'direct note' });
+    expect(claude('Stop', { provider: 'claude', turnId: 'input:direct-op', lastAssistantMessage: 'completed public answer' })).toEqual({provider:'claude',sessionId:'sess-a'});
+    expect(turns).toMatchObject([{provider_turn_id:'input:direct-op',text:'completed public answer',prompt:'direct note'}]);
+  });
+
   it('a duplicate Stop for the same turn is dropped (Claude and Codex)', () => {
     claude('UserPromptSubmit');
     claude('Stop', { lastAssistantMessage: 'a' });

@@ -101,7 +101,7 @@ import type { JournalRecord } from './eridani-journal';
 import type { ExecutionTarget, LaunchSpec } from './eridani-targets';
 import { liveWriters, type EnsuredWorktree, type WorktreeManager } from './worktrees';
 import { ManagedSessions, type ManagedSpec } from './managed-sessions';
-import type { RunCleanupCommand, RunCleanupSurface, RunCleanupSurfaceResult, RunPauseCommand } from '../../src/shared/eridani-link-protocol';
+import type { AutomationHoldCommand, RunCleanupCommand, RunCleanupSurface, RunCleanupSurfaceResult, RunPauseCommand } from '../../src/shared/eridani-link-protocol';
 import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
@@ -409,6 +409,8 @@ export class Dispatch {
     } });
     this.conn = new EridaniConn(deps.hub);
     this.attempts = new VerifyAttempts({
+      automaticRevision: run => this.managed.automation.get(run).revision,
+      automaticAllowed: (run, revision) => !this.managed.automation.blocked(run, 'automation', revision),
       session: (id) => deps.registry.session(id),
       setStatus: (id, verify) => {
         if (!deps.registry.session(id)) return;
@@ -435,6 +437,7 @@ export class Dispatch {
       input: (c, ctx) => this.input(c as unknown as InputCommand, ctx),
       stop: (c, ctx) => this.stop(c as unknown as StopCommand, ctx),
       answer: async (c, ctx) => this.managed.findQuestion((c as unknown as AnswerCommand).question_id) ? this.managed.answer(c as unknown as AnswerCommand, () => ctx.begin()) : this.deps.questions.answer(c as unknown as AnswerCommand, () => ctx.begin()),
+      'automation.hold': (c, ctx) => this.holdAutomation(c as unknown as AutomationHoldCommand, ctx),
       'run.cleanup': (c, ctx) => this.cleanupRun(c as unknown as RunCleanupCommand, ctx),
       'run.pause': (c, ctx) => this.pauseRun(c as unknown as RunPauseCommand, ctx),
       'run.resume': (c, ctx) => this.pauseRun(c as unknown as RunPauseCommand, ctx),
@@ -463,7 +466,7 @@ export class Dispatch {
       snapshot: (id): Partial<SnapshotSurface> => {
         const qs = [...this.deps.questions.openIds(id), ...this.managed.pending(id)];
         const binding = this.deps.registry.session(id)?.eridani;
-        return { ...(qs.length ? { questions: qs } : {}), ...(binding?.execution === 'managed' ? { execution: 'managed', controller: binding.controller ?? 'eridani', paused: !!binding.paused, pause_reason: binding.attention?.kind ?? null, ...(binding.attention ? { attention: binding.attention } : {}) } : {}) };
+        return { ...(binding ? { automation_hold: this.managed.automation.get(binding.runId).held, automation_hold_revision: this.managed.automation.get(binding.runId).revision } : {}), ...(qs.length ? { questions: qs } : {}), ...(binding?.execution === 'managed' ? { execution: 'managed', controller: binding.controller ?? 'eridani', paused: !!binding.paused, pause_reason: binding.attention?.kind ?? null, ...(binding.attention ? { attention: binding.attention } : {}) } : {}) };
       },
     };
   }
@@ -513,7 +516,15 @@ export class Dispatch {
 
   /** Fences and policy, checked before a command is accepted (and again before a replay). */
   precheck(cmd: CommandBody): string | null {
+    const provenance = cmd as unknown as { run_id?: string; origin?: 'human' | 'automation'; automation_hold?: boolean; automation_hold_revision?: number };
+    if (provenance.run_id && provenance.origin === 'automation' && (provenance.automation_hold || this.managed.automation.blocked(provenance.run_id, provenance.origin, provenance.automation_hold_revision))) return 'Eridani automation is held or superseded';
     switch (cmd.t) {
+      case 'automation.hold': {
+        const c = cmd as unknown as AutomationHoldCommand;
+        if (c.surf) { const rec = this.deps.registry.session(c.surf); if (!rec?.eridani || rec.eridani.runId !== c.run_id || c.incarnation !== undefined && c.incarnation !== rec.incarnation) return 'stale automation hold surface'; }
+        if (this.deps.registry.sessions().some(rec => rec.eridani?.runId === c.run_id && rec.eridani.generation > c.generation)) return 'stale generation';
+        return null;
+      }
       case 'spawn': {
         const c = cmd as unknown as SpawnCommand;
         const t = this.target(c.target.id);
@@ -529,6 +540,7 @@ export class Dispatch {
       }
       case 'input': {
         const c = cmd as unknown as InputCommand;
+        if (c.mode === 'direct' && !this.managed.canDirect(c.surf)) return 'native direct input is unavailable';
         const currentPlan = this.deps.registry.session(c.surf)?.eridani?.planRevision ?? 0;
         if (c.plan_revision !== undefined && c.plan_revision < currentPlan) return 'stale plan revision';
         return this.fence(c, c.mode === 'steer' ? 'steer' : 'input');
@@ -672,6 +684,16 @@ export class Dispatch {
         // No session was recorded, so no process survived: nothing to reconcile, and it is not re-run.
         return { state: 'failed', detail: 'the server restarted before the session started' };
       }
+      case 'input': {
+        if (!body || body.mode !== 'direct' || typeof body.surf !== 'string') return null;
+        const result = this.managed.recoveredDirect(body.surf, rec.op_id);
+        return result?.state === 'executed' ? {state:'executed',outcome:{...result.result,...this.surfaceFacts(body.surf)}} : null;
+      }
+      case 'automation.hold': {
+        if (!body) return null;
+        const error = this.managed.holdRun(String(body.run_id), Number(body.generation), body.held === true, Number(body.automation_hold_revision));
+        return error ? {state:'rejected',detail:error} : {state:'executed',outcome:{automation_hold:body.held,automation_hold_revision:body.automation_hold_revision}};
+      }
       case 'stop': {
         const surf = typeof body?.surf === 'string' ? body.surf : null;
         // S-Q5: the PTY keeper kept the process; the stop stays requested and boot sent it again.
@@ -766,9 +788,27 @@ export class Dispatch {
     return scoped;
   }
 
-  private prepareManaged(surf: string, b: EridaniBinding, launch: LaunchSpec, prompt: string, operationId: string, args: string[], env: Record<string, string>, incarnation = 1): void {
+  private prepareManaged(surf: string, b: EridaniBinding, launch: LaunchSpec, prompt: string, operationId: string, args: string[], env: Record<string, string>, incarnation = 1, origin?: 'human' | 'automation', automationHoldRevision?: number): void {
     const scoped = this.roleMcpArgs(b, args);
-    this.managed.prepare({ surf, runId: b.runId, generation: b.generation, incarnation, prompt, operationId, harness: b.harness, bin: launch.bin ?? b.harness, args: [...scoped, ...(launch.args ?? [])], cwd: b.worktree, env: { ...env, ...(this.mcpEnv.get(surf) ?? {}) }, model: b.model, effort: b.effort, planRevision: b.planRevision ?? b.verify?.planRevision ?? 0, profile: b.permissionProfile ?? (b.mode ? 'read-only' : 'workspace-write') });
+    this.managed.prepare({ origin, automationHoldRevision, surf, runId: b.runId, generation: b.generation, incarnation, prompt, operationId, harness: b.harness, bin: launch.bin ?? b.harness, args: [...scoped, ...(launch.args ?? [])], cwd: b.worktree, env: { ...env, ...(this.mcpEnv.get(surf) ?? {}) }, model: b.model, effort: b.effort, planRevision: b.planRevision ?? b.verify?.planRevision ?? 0, profile: b.permissionProfile ?? (b.mode ? 'read-only' : 'workspace-write') });
+  }
+
+  private automationBlocked(cmd: { run_id: string; origin?: 'human' | 'automation'; automation_hold?: boolean; automation_hold_revision?: number }): string | null {
+    return cmd.origin === 'automation' && (cmd.automation_hold || this.managed.automation.blocked(cmd.run_id, cmd.origin, cmd.automation_hold_revision)) ? 'Eridani automation is held or superseded' : null;
+  }
+  private applyAutomation(cmd: { run_id: string; generation: number; automation_hold?: boolean; automation_hold_revision?: number }): string | null {
+    if (cmd.automation_hold === undefined || cmd.automation_hold_revision === undefined) return null;
+    const current = this.managed.automation.get(cmd.run_id);
+    if (cmd.automation_hold_revision < current.revision && cmd.generation === current.generation) return null;
+    // A command cannot release a prior human hold; the explicit release operation must be acknowledged first.
+    if (!cmd.automation_hold && this.managed.automation.get(cmd.run_id).held) return null;
+    return this.managed.holdRun(cmd.run_id, cmd.generation, cmd.automation_hold, cmd.automation_hold_revision);
+  }
+
+  private async holdAutomation(cmd: AutomationHoldCommand, ctx: CommandContext): Promise<CommandResult> {
+    const pre = this.precheck(cmd as unknown as CommandBody); if (pre) return { state: 'rejected', detail: pre };
+    ctx.begin(); const error = this.managed.holdRun(cmd.run_id, cmd.generation, cmd.held, cmd.automation_hold_revision);
+    return error ? { state: 'rejected', detail: error } : { state: 'executed', result: { automation_hold: this.managed.automation.get(cmd.run_id).held, automation_hold_revision: this.managed.automation.get(cmd.run_id).revision } };
   }
 
   private async pauseRun(cmd: RunPauseCommand, ctx: CommandContext): Promise<CommandResult> {
@@ -843,6 +883,7 @@ export class Dispatch {
   }
 
   private async spawn(cmd: SpawnCommand, ctx: CommandContext): Promise<CommandResult> {
+    const invalidAutomation = this.automationBlocked(cmd) ?? this.applyAutomation(cmd); if (invalidAutomation) return { state: 'rejected', detail: invalidAutomation };
     const surf = surfFor(cmd.run_id, cmd.generation, cmd.attempt);
     const existing = this.deps.registry.session(surf);
     if (existing?.eridani) return { state: 'executed', detail: 'already started', result: this.spawnFacts(existing) };
@@ -891,6 +932,7 @@ export class Dispatch {
         this.log(`eridani: prepare for run ${cmd.run_id} in ${wt.path}: ${!prepare ? 'none' : !prepare.ran ? 'already done' : prepare.ok ? `ok (${prepare.steps.map((x) => x.id).join(', ')})` : `FAILED: ${prepare.reason ?? '?'}`}${prepare?.log ? `; log ${prepare.log}` : ''}`);
         if (prepare && !prepare.ok) return { state: 'failed', detail: `prepare: ${prepare.reason ?? 'failed'}`, result: { worktree: wt.path, branch: wt.branch, target: target.id, prepare } };
       }
+      const superseded = this.automationBlocked(cmd); if (superseded) return {state:'rejected',detail:superseded};
       const note = cmd.prompt ? freshnessNote(wt, cmd.migration ?? null) : '';
       const prompt = note ? `${note}\n\n${cmd.prompt}` : cmd.prompt;
       const env: Record<string, string> = {
@@ -944,7 +986,7 @@ export class Dispatch {
       if (webUrl) binding.webUrl = webUrl;
       const mcp = this.prepareMcp(surf, target, cmd.harness);
       if (mcp) binding.mcp = mcp.status;
-      if (cmd.execution === 'managed') this.prepareManaged(surf, binding, launch, prompt, cmd.op_id, mcp?.args ?? [], env);
+      if (cmd.execution === 'managed') this.prepareManaged(surf, binding, launch, prompt, cmd.op_id, mcp?.args ?? [], env, 1, cmd.origin, cmd.automation_hold_revision);
       const { groupId, group } = this.groupFor(cmd.group ?? 'Eridani');
       const res = this.conn.open(surf, {
         cmd: launchCommand(cmd.harness, cmd.model, launch, !!prompt, mcp?.args, cmd.mode),
@@ -1153,12 +1195,15 @@ export class Dispatch {
   }
 
   private async input(cmd: InputCommand, ctx: CommandContext): Promise<CommandResult> {
+    const invalid = this.precheck(cmd as unknown as CommandBody) ?? this.applyAutomation(cmd); if (invalid) return { state: 'rejected', detail: invalid };
     if (this.deps.registry.session(cmd.surf)?.eridani?.execution === 'managed') {
       let rec = this.deps.registry.session(cmd.surf)!;
       if (cmd.plan_revision !== undefined && cmd.plan_revision !== rec.eridani!.planRevision) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, planRevision: cmd.plan_revision } }); this.managed.planRevision(cmd.surf, cmd.plan_revision); rec = this.deps.registry.session(cmd.surf)!; }
       if (cmd.generation > rec.eridani!.generation) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation } }); this.managed.generation(cmd.surf, cmd.generation); }
       if (cmd.mode === 'steer') { ctx.begin(); await this.managed.interrupt(cmd.surf); }
-      const result = await this.managed.send(cmd.surf, cmd.text, cmd.op_id, false, () => ctx.begin());
+      const result = cmd.mode === 'direct'
+        ? await this.managed.sendDirect(cmd.surf, cmd.text, cmd.op_id, cmd.automation_hold_revision!, () => ctx.begin())
+        : await this.managed.send(cmd.surf, cmd.text, cmd.op_id, false, () => ctx.begin(), cmd);
       return result.state === 'executed' ? { ...result, result: { managed: true, ...result.result, ...this.surfaceFacts(cmd.surf) } } : result;
     }
     if (cmd.mode === 'steer') return this.steer(cmd, ctx);
@@ -1178,9 +1223,9 @@ export class Dispatch {
       const list = this.queues.get(surf);
       if (!list?.length) return;
       const head = list[0];
-      const stale = this.fence(head.cmd, 'input');
+      const stale = this.fence(head.cmd, 'input') ?? this.automationBlocked(head.cmd);
       const expires = typeof head.cmd.expires_at === 'number' ? head.cmd.expires_at : typeof head.cmd.expires_at === 'string' ? Date.parse(head.cmd.expires_at) : NaN;
-      if (stale || (Number.isFinite(expires) && expires < this.now())) {
+      if (stale || (Number.isFinite(expires) && expires !== 0 && expires < this.now())) {
         list.shift();
         head.resolve({ state: 'rejected', detail: stale ?? 'expired while queued' });
         return this.pollQueue(surf);
@@ -1332,6 +1377,7 @@ export class Dispatch {
   // ── verify ───────────────────────────────────────────────────────────────
 
   private async verify(cmd: VerifyCommand, ctx: CommandContext): Promise<CommandResult> {
+    const invalidAutomation = this.automationBlocked(cmd) ?? this.applyAutomation(cmd); if (invalidAutomation) return { state: 'rejected', detail: invalidAutomation };
     const rec = this.boundSession(cmd.run_id);
     const b = rec?.eridani;
     const t = b ? this.target(b.target) : undefined;
@@ -1354,6 +1400,8 @@ export class Dispatch {
    * Eridani's runs.snapshot is the reconcile, and it has not been applied
    * yet. Every pending write is canceled (and says so); none is resumed.
    */
+  replayOutput(): void { this.managed.replayOutput(); }
+
   linkUp(): void {
     this.linkEpoch++;
     this.managed.replay();
@@ -1442,6 +1490,7 @@ export class Dispatch {
    */
   applyRunsSnapshot(runs: RunsSnapshotEntry[]): void {
     for (const r of runs) {
+      if (r.automation_hold !== undefined && r.automation_hold_revision !== undefined) this.managed.holdRun(r.run_id, r.generation, r.automation_hold, r.automation_hold_revision);
       const targets = this.deps.registry.sessions().filter((s) => s.eridani?.runId === r.run_id
         && (r.surf !== undefined ? s.id === r.surf : r.attempt === undefined || s.eridani!.attempt === r.attempt));
       for (const rec of targets) {

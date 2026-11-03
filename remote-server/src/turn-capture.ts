@@ -152,7 +152,7 @@ export class TurnCapture {
   hook(surf: string, params: Record<string, unknown>): { provider: 'claude' | 'codex'; sessionId: string } | null {
     const event = typeof params.event === 'string' ? params.event : '';
     if (event !== 'UserPromptSubmit' && event !== 'Stop') return null;
-    const provider = params.provider === 'codex' ? 'codex' : params.provider ? null : 'claude';
+    const provider = params.provider === 'codex' ? 'codex' : params.provider === 'claude' || !params.provider ? 'claude' : null;
     const sessionId = typeof params.sessionId === 'string' && SESSION_RE.test(params.sessionId) ? params.sessionId : '';
     if (!provider || !sessionId) return null;
     // A subagent's own events are never the root turn.

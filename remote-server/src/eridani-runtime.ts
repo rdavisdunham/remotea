@@ -203,6 +203,7 @@ export class EridaniRuntime {
   private probedAt = 0;
   private readonly build: BuildInfo;
   private replayTimer: NodeJS.Timeout | null = null;
+  private outputDirty = false;
   private worktreesSent = '';
   private worktreesRev = 0;
   private worktreesBusy = false;
@@ -252,6 +253,8 @@ export class EridaniRuntime {
       questions: this.questions,
       managedSupported: (target, harness) => { const launch = target.launch[harness]; const p = this.probes.get(probeKey(harness, launch?.bin ?? harness)); return !!p?.ok && managedVersionSupported(harness, p.version); },
       managedEmit: (body) => {
+        if (body.t === 'output.live') { if (this.link?.peerHas('output.live')) void this.link.enqueue(body, 1, `output:${body.surf}:${body.session_id}:${body.turn_id}:${body.message_id}`, Number(body.sequence)); return; }
+        if (body.t === 'input.receipt') { if (this.link?.peerHas('input.direct')) void this.link.enqueue(body, 1, `input:${body.surf}:${body.input_id}`, body.stage === 'provider_acknowledged' ? 3 : body.stage === 'uncertain' ? 2 : 1); return; }
         if (body.t === 'activity') {
           hub.agentState.report(String(body.surf), { awaitingHuman: body.kind === 'waiting', runDepth: ['waiting', 'idle', 'unknown'].includes(String(body.kind)) ? 0 : 1, reason: body.kind === 'waiting' ? String(body.label ?? 'Waiting for a decision') : null });
           if (!this.link?.peerHas('activity')) return;
@@ -325,6 +328,7 @@ export class EridaniRuntime {
       this.stamp = stamp;
       this.reconfigure();
     }
+    if (this.outputDirty && this.link?.ready && this.link.spool.fill < MAX_FILL_FOR_SCAN) { this.outputDirty = false; this.dispatch.replayOutput(); }
     if (this.link) this.refreshProbes();
     if (this.link && Date.now() - this.doctorAt >= (this.deps.doctorMs ?? DOCTOR_MS)) void this.runDoctor();
     const req = path.join(this.deps.dir, ERIDANI_COLLECT_REQUEST);
@@ -413,7 +417,7 @@ export class EridaniRuntime {
         ? { state: 'failed', detail: 'interrupted by a server restart' }
         : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
-      caps: () => !Object.values(this.harnesses()).some((h) => h?.managed) ? linkCaps(mode) : [...linkCaps(mode), 'managed.sessions', 'decisions.durable', 'commands.durable', 'role.options', 'run.pause', 'activity', 'model_catalog'],
+      caps: () => !Object.values(this.harnesses()).some((h) => h?.managed) ? linkCaps(mode) : [...linkCaps(mode), 'managed.sessions', 'input.direct', 'output.live', 'decisions.durable', 'commands.durable', 'role.options', 'run.pause', 'activity', 'model_catalog'],
       modelCatalog: () => [...(this.codexModels.length ? this.codexModels : hostModelCatalog(path.join(os.homedir(), '.codex', 'models_cache.json'))), ...this.claudeModels],
       targets: () => this.helloTargets(),
       doctor: () => this.doctor,
@@ -433,6 +437,7 @@ export class EridaniRuntime {
         if (!parity && entry.body.t === 'session.report' && entry.entity) this.state?.dirty(entry.entity);
       },
       onDirty: (entity) => {
+        if (entity.startsWith('output:')) { this.outputDirty = true; return; }
         if (entity === WORKTREES_ENTITY) this.worktreesSent = '';
         else if (entity === 'doctor') this.doctorAt = 0; // not queued: computed and offered again on the next tick
         else this.state?.dirty(entity);

@@ -54,7 +54,7 @@ function binding(over: Partial<NonNullable<SessionRecord['eridani']>> = {}): Non
   };
 }
 
-function unit(opts: { eridani?: SessionRecord['eridani'] } = {}) {
+function unit(opts: { eridani?: SessionRecord['eridani']; automaticAllowed?: () => boolean } = {}) {
   const timers = new ManualTimers();
   const rec = { id: 'surf-1', eridani: 'eridani' in opts ? opts.eridani : binding() } as SessionRecord;
   const statuses: VerifyAttemptStatus[] = [];
@@ -63,6 +63,7 @@ function unit(opts: { eridani?: SessionRecord['eridani'] } = {}) {
   let fp = 'head:tree';
   let n = 0;
   const a = new VerifyAttempts({
+    automaticAllowed: opts.automaticAllowed,
     session: (id) => (id === rec.id ? rec : undefined),
     setStatus: (_id, s) => statuses.push(s),
     spec: (_r, id) => (id === 'test' ? SPEC : undefined),
@@ -88,6 +89,13 @@ const vcmd = (over: Record<string, unknown> = {}) => ({
 });
 
 describe('verify attempts: automatic after turns', () => {
+  it('suppresses automatic verifies held before debounce handoff while allowing explicit human checks',async()=>{
+    let allowed=true;const {a,timers,runner,statuses}=unit({automaticAllowed:()=>allowed});a.onTurn(turn(1));allowed=false;timers.advance(2000);expect(runner.calls).toHaveLength(0);expect(statuses.at(-1)?.state).toBe('canceled');
+    a.onTurn(turn(2));timers.advance(2000);expect(runner.calls).toHaveLength(0);
+    expect(await a.command('surf-1',vcmd({origin:'automation'}))).toMatchObject({state:'rejected'});
+    const human=a.command('surf-1',vcmd({origin:'human'}));expect(runner.calls).toHaveLength(1);runner.calls[0].finish();expect(await human).toMatchObject({state:'executed'});
+  });
+
   it('waits 2 s after a root turn, then runs once with a local attempt id and the full tuple', async () => {
     const { a, timers, runner, emitted, statuses } = unit();
     a.onTurn(turn(1));

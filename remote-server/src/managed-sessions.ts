@@ -5,20 +5,23 @@ import crypto from 'crypto';
 import { EventEmitter } from 'events';
 import { spawnPty } from './pty-spawn';
 import type { PtyLike } from './pty-spawn';
-import { CodexRuntimeAdapter, ClaudeRuntimeAdapter, type HarnessSpec, type HarnessRequest, type RuntimeAdapter } from './managed-harness';
+import { CodexRuntimeAdapter, ClaudeRuntimeAdapter, type HarnessSpec, type HarnessRequest, type RuntimeAdapter, ProviderRequestRejected } from './managed-harness';
+import { ManagedAutomation } from './managed-automation';
+import { ManagedOutput, emptyOutput, type OutputState } from './managed-output';
 import { ManagedTranscript } from './managed-transcript';
 import { writePrivate } from './eridani-mcp';
 import { canonicalJson } from '../../src/shared/eridani-link-protocol';
 import { redact } from './collector/redact';
 import { buildAnswers, toItems, redactItem } from './questions-claude';
-import type { AnswerCommand, QuestionBody, QuestionItem, ActivityBody, ManagedAttention } from '../../src/shared/eridani-link-protocol';
+import type { AnswerCommand, QuestionBody, QuestionItem, ActivityBody, ManagedAttention, AutomationHoldFields } from '../../src/shared/eridani-link-protocol';
 import type { CommandResult } from './eridani-link';
 
 type Up = Omit<QuestionBody | ActivityBody, 'op_id' | 'digest'> | Record<string, unknown>;
-export interface ManagedSpec extends HarnessSpec { surf: string; runId: string; generation: number; incarnation: number; prompt: string; operationId: string; planRevision?: number | null }
+export interface ManagedSpec extends HarnessSpec { surf: string; runId: string; generation: number; incarnation: number; prompt: string; operationId: string; planRevision?: number | null; origin?: 'human' | 'automation'; automationHoldRevision?: number }
 interface Decision { planRevision?: number; id: string; digest: string; request: HarnessRequest; items: QuestionItem[]; kind: 'ask' | 'approval'; state: 'pending' | 'submitted' | 'uncertain' | 'resolved'; sessionId: string; turnId: string | null; generation: number; response?: unknown; action?: QuestionBody['action'] }
-interface Saved { attention?: ManagedAttention; pausedBy?: 'operator' | 'attention'; initialization?: 'executing' | 'ready'; sessionId: string; turnId: string | null; sequence: number; paused: boolean; active: boolean; decisions: Decision[]; operations: Record<string, 'queued' | 'executing' | 'delivered' | 'uncertain'>; queue: Array<{ text: string; op: string; generation: number }> }
-interface Entry { spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; transcript: ManagedTranscript; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; receiptTimers: Map<string, NodeJS.Timeout>; receiptRequests: Map<string, HarnessRequest>; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
+interface DirectRecord { nativeStarted?: boolean; assignedTurn?: string; text: string; generation: number; revision: number; stage: 'waiting' | 'executing' | 'handed_to_harness' | 'provider_acknowledged' | 'uncertain' | 'rejected'; turnId: string | null; active: boolean; displayed: boolean; at: number }
+interface Saved { inputs: Record<string, DirectRecord>; output: OutputState; claudeTurnSerial?: number; attention?: ManagedAttention; pausedBy?: 'operator' | 'attention'; initialization?: 'executing' | 'ready'; sessionId: string; turnId: string | null; sequence: number; paused: boolean; active: boolean; decisions: Decision[]; operations: Record<string, 'queued' | 'executing' | 'delivered' | 'uncertain' | 'rejected'>; queue: Array<{ text: string; op: string; generation: number; origin?: 'human' | 'automation'; revision?: number }> }
+interface Entry { spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; transcript: ManagedTranscript; output: ManagedOutput; directTail?: Promise<void>; directPending: Set<string>; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; receiptTimers: Map<string, NodeJS.Timeout>; receiptRequests: Map<string, HarnessRequest>; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
 export interface ManagedDeps {
   dir: string | null; emit(body: Up): void; changed(surf: string, sessionId: string, paused: boolean, attention?: ManagedAttention | null): void;
   decisionReceiptMs?: number;
@@ -38,11 +41,12 @@ export class ManagedTerminal extends EventEmitter implements PtyLike {
   output(text: string): void { this.emit('data', text.replace(/\r?\n/g, '\r\n')); }
 }
 const digest = (v: unknown) => crypto.createHash('sha256').update(canonicalJson(v)).digest('hex');
-const empty = (): Saved => ({ sessionId: '', turnId: null, sequence: 0, paused: false, active: false, decisions: [], operations: {}, queue: [] });
+const empty = (): Saved => ({ inputs: {}, output: emptyOutput(), sessionId: '', turnId: null, sequence: 0, paused: false, active: false, decisions: [], operations: {}, queue: [] });
 export class ManagedSessions {
   private entries = new Map<string, Entry>();
   private staged = new Map<string, ManagedSpec>();
-  constructor(private readonly deps: ManagedDeps) {}
+  readonly automation: ManagedAutomation;
+  constructor(private readonly deps: ManagedDeps) { this.automation = new ManagedAutomation(deps.dir); }
   private file(surf: string): string | null { return this.deps.dir ? path.join(this.deps.dir, 'managed', `${digest(surf)}.json`) : null; }
   private load(surf: string): Saved {
     const file = this.file(surf); if (!file) return empty();
@@ -67,8 +71,11 @@ export class ManagedSessions {
     state.active = false;
     const adapter = this.deps.factory?.({ ...spec, sessionId: state.sessionId || undefined }) ?? (spec.harness === 'codex' ? new CodexRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }) : new ClaudeRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }));
     const terminal = new ManagedTerminal();
-    const e: Entry = { spec, state, adapter, terminal, transcript: new ManagedTranscript(text => terminal.output(text)), ready: Promise.resolve(), liveRequests: new Map(), busy: false, receiptTimers: new Map(), receiptRequests: new Map(), items: new Map(), waiters: new Map() };
+    let e!: Entry;
+    const output = new ManagedOutput(state.output, () => ({ run_id: spec.runId, generation: spec.generation, surf: spec.surf, incarnation: spec.incarnation, session_id: state.sessionId, turn_id: state.turnId }), () => this.save(e), body => this.deps.emit(body), () => this.attention(e, 'Public output could not be persisted'));
+    e = { spec, state, adapter, terminal, transcript: new ManagedTranscript(text => terminal.output(text)), output, directPending: new Set(), ready: Promise.resolve(), liveRequests: new Map(), busy: false, receiptTimers: new Map(), receiptRequests: new Map(), items: new Map(), waiters: new Map() };
     this.entries.set(surf, e);
+    for (const input of Object.values(state.inputs)) if (input.stage === 'executing') input.stage = 'uncertain';
     for (const q of state.decisions) if (q.state === 'submitted') q.state = 'uncertain';
     for (const [op, status] of Object.entries(state.operations)) if (status === 'executing') state.operations[op] = 'uncertain';
     state.queue = state.queue.filter((input) => state.operations[input.op] === 'queued');
@@ -91,7 +98,7 @@ export class ManagedSessions {
         else if (interruptedTurn || Object.values(state.operations).includes('uncertain')) this.attention(e, 'Recovered conversation; previous action needs reconciliation before continuing');
         else this.activity(e, 'idle');
         await this.recreatePending(e);
-      } else if (spec.prompt) await this.send(surf, spec.prompt, spec.operationId, true);
+      } else if (spec.prompt) await this.send(surf, spec.prompt, spec.operationId, true, () => {}, { origin: spec.origin, automation_hold_revision: spec.automationHoldRevision });
     }).catch((error) => { e.startupError = error as Error; this.attention(e, 'Provider startup or receipt stalled; reconcile before retry'); });
     return terminal;
   }
@@ -120,7 +127,11 @@ export class ManagedSessions {
     q.request = req; e.liveRequests.set(q.id, req); this.save(e); this.publish(e, q); this.activity(e, 'waiting', kind === 'ask' ? 'Waiting for your answer' : 'Waiting for approval');
   }
   private event(e: Entry, m: any): void {
+    if (m.type === 'remotea/direct-start') { const input = e.state.inputs[m.input_id]; if (input) { input.active = false; input.turnId = null; e.prompt = { text: input.text, op: m.input_id, published: false }; e.finalText = ''; e.state.turnId = null; e.state.active = true; this.save(e); } return; }
+    if (e.spec.harness === 'claude' && !e.state.active && (m.type === 'assistant' || m.type === 'stream_event' && m.event?.type === 'message_start')) this.beginClaudePending(e);
+    if (m.method === 'turn/started' || e.spec.harness === 'claude' && (m.type === 'assistant' || m.type === 'stream_event' && m.event?.type === 'message_start')) { const input = e.prompt && e.state.inputs[e.prompt.op]; if (input) input.nativeStarted = true; }
     e.transcript.event(m);
+    e.output.event(m);
     const p = m.params ?? {};
     if (m.type === 'remotea/permission-denied') {
       const input = m.input ?? {}, tool = String(input.tool_name ?? 'tool');
@@ -150,6 +161,7 @@ export class ManagedSessions {
     if (m.type === 'system' && m.session_id) { e.state.sessionId = m.session_id; this.save(e); this.deps.changed(e.spec.surf, m.session_id, e.state.paused); }
     if (p.turn?.id) e.state.turnId = p.turn.id;
     if (m.method === 'serverRequest/resolved') this.confirm(e, String(p.requestId));
+    if (m.type === 'user' && typeof m.uuid === 'string' && e.state.inputs[m.uuid] && (!m.session_id || m.session_id === e.state.sessionId)) this.inputAcknowledged(e, m.uuid);
     if (m.type === 'user' && m.uuid === e.prompt?.op) this.promptAccepted(e);
     if (m.type === 'assistant') { e.finalText = (m.message?.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(''); }
     if (m.type === 'user') for (const block of m.message?.content ?? []) if (block.type === 'tool_result') { this.confirm(e, String(block.tool_use_id), true); if (block.is_error && String(e.items.get(block.tool_use_id)?.name ?? '').startsWith('mcp__eridani__')) this.toolFailed(e); }
@@ -186,19 +198,97 @@ export class ManagedSessions {
   }
   private promptAccepted(e: Entry): void {
     if (!e.prompt || e.prompt.published) return; e.prompt.published = true;
-    e.transcript.user(e.prompt.text);
+    const input = e.state.inputs[e.prompt.op];
+    if (!input?.displayed) { e.transcript.user(e.prompt.text); if (input) { input.displayed = true; this.save(e); } }
     this.hook(e, 'UserPromptSubmit', { prompt: e.prompt.text });
   }
-  async send(surf: string, text: string, op: string, startup = false, begin: () => void = () => {}): Promise<CommandResult> {
+  async send(surf: string, text: string, op: string, startup = false, begin: () => void = () => {}, options: AutomationHoldFields = {}): Promise<CommandResult> {
     const e = this.entries.get(surf); if (!e) return { state: 'rejected', detail: 'unknown managed session' };
     if (!startup) await e.ready;
     if (e.persistenceError) return { state: 'failed', detail: 'managed persistence unavailable' };
     if (e.startupError) return { state: 'failed', detail: 'provider startup failed' };
+    if (this.automation.blocked(e.spec.runId, options.origin, options.automation_hold_revision)) return { state: 'rejected', detail: 'Eridani automation is held or superseded' };
     const previous = e.state.operations[op];
-    if (previous && previous !== 'queued') return { state: previous === 'delivered' ? 'executed' : 'uncertain', detail: previous === 'delivered' ? 'provider received input' : 'input receipt unknown; reconcile before retry' };
+    if (previous && previous !== 'queued') return { state: previous === 'delivered' ? 'executed' : previous === 'rejected' ? 'rejected' : 'uncertain', detail: previous === 'delivered' ? 'provider received input' : 'input receipt unknown; reconcile before retry' };
     if (e.waiters.has(op)) return { state: 'rejected', detail: 'input already queued' };
-    if (!previous) { e.state.queue.push({ text, op, generation: e.spec.generation }); e.state.operations[op] = 'queued'; this.save(e); }
+    if (!previous) { e.state.queue.push({ text, op, generation: e.spec.generation, origin: options.origin, revision: options.automation_hold_revision }); e.state.operations[op] = 'queued'; this.save(e); }
     return new Promise<CommandResult>((resolve) => { e.waiters.set(op, { resolve, begin }); void this.pump(e); });
+  }
+  canDirect(surf: string): boolean { return typeof this.entries.get(surf)?.adapter.sendDirect === 'function'; }
+  holdRun(run: string, generation: number, held: boolean, revision: number): string | null {
+    const current = this.automation.get(run);
+    if (generation === current.generation && held && current.held && revision < current.revision) return null;
+    const error = this.automation.set(run, generation, held, revision); if (error) return error;
+    for (const entry of this.entries.values()) if (entry.spec.runId === run) {
+      entry.state.queue = entry.state.queue.filter(input => {
+        if (entry.state.operations[input.op] !== 'queued' || !this.automation.blocked(run, input.origin, input.revision)) return true;
+        entry.state.operations[input.op] = 'rejected'; entry.waiters.get(input.op)?.resolve({ state: 'rejected', detail: 'Eridani automation is held or superseded' }); entry.waiters.delete(input.op); return false;
+      }); this.save(entry); if (!held) void this.pump(entry);
+    }
+    return null;
+  }
+  private inputReceipt(e: Entry, id: string): void {
+    const input = e.state.inputs[id]; if (!input || !['handed_to_harness', 'provider_acknowledged', 'uncertain'].includes(input.stage)) return;
+    this.deps.emit({ t: 'input.receipt', input_id: id, run_id: e.spec.runId, generation: input.generation, surf: e.spec.surf, incarnation: e.spec.incarnation, session_id: e.state.sessionId, turn_id: input.turnId, at: input.at, stage: input.stage });
+  }
+  private beginClaudePending(e: Entry): void {
+    // Replay UUIDs prove receipt, not the time of consumption. A fresh assistant stream after result proves a new native turn.
+    const pending = Object.entries(e.state.inputs).filter(([, input]) => !input.assignedTurn && ['executing', 'handed_to_harness', 'provider_acknowledged', 'uncertain'].includes(input.stage));
+    const first = pending[0], id = first?.[0], turnId = id ? `input:${id}` : `native:${e.state.sessionId}:${e.state.claudeTurnSerial = (e.state.claudeTurnSerial ?? 0) + 1}`;
+    if (first) first[1].assignedTurn = turnId;
+    e.prompt = id ? { text: first[1].text, op: id, published: false } : undefined; e.finalText = ''; e.state.turnId = turnId; e.state.active = true; this.save(e); this.promptAccepted(e);
+    if (e.state.paused) void e.adapter.interrupt().catch(() => this.attention(e, 'Paused provider input requires reconciliation'));
+  }
+  private inputAcknowledged(e: Entry, id: string): void {
+    const input = e.state.inputs[id]; if (!input || input.stage === 'provider_acknowledged' || input.stage === 'rejected' || input.stage === 'waiting') return;
+    input.stage = 'provider_acknowledged'; input.at = Date.now(); this.save(e); this.inputReceipt(e, id);
+    if (!input.displayed) { input.active ? e.transcript.followup(input.text) : e.transcript.user(input.text); input.displayed = true; this.save(e); }
+    // A UUID replay confirms receipt only. Later assistant stream boundaries assign buffered inputs to a new native turn.
+  }
+  async sendDirect(surf: string, text: string, id: string, revision: number, begin: () => void): Promise<CommandResult> {
+    const e = this.entries.get(surf); if (!e?.adapter.sendDirect) return { state: 'rejected', detail: 'native direct input is unavailable' };
+    await e.ready;
+    if (e.persistenceError || e.startupError || e.handingOff || e.state.paused) return { state: 'rejected', detail: e.state.paused ? 'run paused' : 'managed session unavailable' };
+    const old = e.state.inputs[id];
+    if (old && (old.text !== text || old.revision !== revision || old.generation !== e.spec.generation)) return { state: 'rejected', detail: 'input identity mismatch' };
+    if (old && old.stage !== 'waiting') return this.directResult(e, id);
+    if (e.directPending.has(id)) return { state: 'rejected', detail: 'input handoff already in progress' };
+    begin(); const currentHold = this.automation.get(e.spec.runId); const held = revision < currentHold.revision && e.spec.generation === currentHold.generation ? null : this.holdRun(e.spec.runId, e.spec.generation, true, revision); if (held) return { state: 'rejected', detail: held };
+    e.state.inputs[id] ??= { text, revision, generation: e.spec.generation, stage: 'waiting', turnId: e.state.turnId, active: e.state.active || e.busy, displayed: false, at: Date.now() }; this.save(e);
+    const previous = e.directTail ?? Promise.resolve(); let release!: () => void; e.directTail = new Promise<void>(resolve => { release = resolve; }); e.directPending.add(id);
+    await previous;
+    try {
+      const input = e.state.inputs[id];
+      if (e.state.paused || e.handingOff || input.generation !== e.spec.generation) { input.stage = 'rejected'; this.save(e); return this.directResult(e, id); }
+      const active = e.state.active || e.busy; input.active = active; input.turnId = e.state.turnId;
+      input.stage = 'executing'; input.at = Date.now(); this.save(e);
+      if (!active) { e.prompt = { text, op: id, published: false }; e.finalText = ''; e.state.turnId = e.spec.harness === 'claude' ? `input:${id}` : null; if (e.state.turnId) input.assignedTurn = e.state.turnId; e.state.active = true; }
+      const receipt = await e.adapter.sendDirect!(text, id, { active, turnId: input.turnId });
+      input.turnId = receipt.turnId ?? input.turnId ?? e.state.turnId;
+      if ((input as DirectRecord).stage !== 'provider_acknowledged') input.stage = receipt.providerAcknowledged ? 'provider_acknowledged' : 'handed_to_harness';
+      input.at = Date.now(); this.save(e);
+      if (!input.displayed) { input.active ? e.transcript.followup(text) : e.transcript.user(text); input.displayed = true; this.save(e); }
+      if (!input.active && receipt.providerAcknowledged) this.promptAccepted(e);
+      this.inputReceipt(e, id); return this.directResult(e, id);
+    } catch (error) {
+      const input = e.state.inputs[id];
+      if (input.stage !== 'provider_acknowledged') input.stage = error instanceof ProviderRequestRejected ? 'rejected' : 'uncertain'; input.at = Date.now(); this.save(e);
+      if (input.stage === 'rejected' && !input.active && !input.nativeStarted && e.prompt?.op === id) { e.state.active = false; e.busy = false; e.state.turnId = null; e.prompt = undefined; this.save(e); }
+      if (input.stage === 'uncertain') { this.attention(e, 'Native input handoff is uncertain; do not resend without reconciliation'); this.inputReceipt(e, id); }
+      return this.directResult(e, id);
+    } finally { e.directPending.delete(id); release(); }
+  }
+  replayOutput(): void { for (const entry of this.entries.values()) entry.output.replay(); }
+  recoveredDirect(surf: string, id: string): CommandResult | null {
+    const e = this.entries.get(surf), input = e?.state.inputs[id] ?? this.load(surf).inputs[id];
+    if (!input || !['handed_to_harness', 'provider_acknowledged'].includes(input.stage)) return null;
+    return { state: 'executed', result: { surf, input_id: id, receipt: 'handed_to_harness', provider_ack: input.stage === 'provider_acknowledged' ? 'confirmed' : 'pending', session_id: e?.state.sessionId ?? this.load(surf).sessionId, turn_id: input.turnId, managed: true } };
+  }
+  private directResult(e: Entry, id: string): CommandResult {
+    const input = e.state.inputs[id];
+    if (input.stage === 'rejected') return { state: 'rejected', detail: 'native harness rejected the input before handoff' };
+    if (input.stage === 'uncertain' || input.stage === 'executing' || input.stage === 'waiting') return { state: 'uncertain', detail: 'native input delivery requires reconciliation' };
+    return { state: 'executed', result: { surf: e.spec.surf, input_id: id, receipt: 'handed_to_harness', provider_ack: input.stage === 'provider_acknowledged' ? 'confirmed' : 'pending', session_id: e.state.sessionId, turn_id: input.turnId, managed: true } };
   }
   private async pump(e: Entry): Promise<void> {
     if (e.persistenceError || !e.started || e.pumping || e.handingOff || e.state.paused || e.busy || e.state.active || this.pending(e.spec.surf).length) return;
@@ -206,9 +296,10 @@ export class ManagedSessions {
     const waiter = e.waiters.get(head.op); if (!waiter) return; // recovered input waits for journal replay/reconciliation
     e.pumping = true;
     try {
+      if (this.automation.blocked(e.spec.runId, head.origin, head.revision)) { e.state.queue.shift(); e.state.operations[head.op] = 'rejected'; this.save(e); waiter.resolve({ state: 'rejected', detail: 'Eridani automation is held or superseded' }); return; }
       if (head.generation !== e.spec.generation) { e.state.queue.shift(); this.save(e); waiter.resolve({ state: 'rejected', detail: 'stale generation' }); return; }
       waiter.begin(); e.state.operations[head.op] = 'executing'; e.state.active = true; e.busy = true;
-      e.prompt = { text: head.text, op: head.op, published: false }; e.finalText = ''; e.state.turnId = null; this.save(e);
+      e.prompt = { text: head.text, op: head.op, published: false }; e.finalText = ''; e.state.turnId = e.spec.harness === 'claude' ? `input:${head.op}` : null; this.save(e);
       await e.adapter.send(head.text, head.op); this.promptAccepted(e); e.state.operations[head.op] = 'delivered'; e.state.queue.shift(); this.save(e);
       if (e.state.active && !e.state.paused && !this.pending(e.spec.surf).length) this.activity(e, 'thinking');
       waiter.resolve({ state: 'executed', result: { surf: e.spec.surf, managed: true } });
@@ -310,5 +401,5 @@ export class ManagedSessions {
     for (const q of e.state.decisions) if (q.generation < generation && q.state !== 'resolved') { q.state = q.state === 'pending' ? 'resolved' : 'uncertain'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: q.planRevision ?? 0, outcome: 'canceled', still_open: false, at: Date.now() }); }
     this.save(e);
   }
-  replay(): void { for (const e of this.entries.values()) for (const q of e.state.decisions) if (q.state !== 'resolved') this.publish(e, q, !e.liveRequests.has(q.id)); }
+  replay(): void { for (const e of this.entries.values()) { for (const q of e.state.decisions) if (q.state !== 'resolved') this.publish(e, q, !e.liveRequests.has(q.id)); for (const id of Object.keys(e.state.inputs)) this.inputReceipt(e, id); e.output.replay(); } }
 }
