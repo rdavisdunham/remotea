@@ -18,7 +18,7 @@ import {
   popupWindowTitle,
 } from './webview-navigation';
 import { decidePermission } from './security-policy';
-import { parseSmokeArgs, runSmoke, type SmokeOptions } from './smoke';
+import { parseSmokeArgs, runSmoke, shutdownSmoke, type SmokeOptions } from './smoke';
 import { correctedDashboardHeaders, DASHBOARD_HEADER_FILTER } from './dashboard-content-type';
 import {
   agentBrowserNeedsTeardown,
@@ -1206,8 +1206,12 @@ async function runSmokeMode(opts: SmokeOptions): Promise<void> {
       console.error('[smoke] could not write the result:', err);
     }
     console.log(`[smoke] ${code === 0 ? 'PASS' : 'FAIL'} -> ${outFile}`);
-    try { ptyManager.killAll(); } catch { /* exiting anyway */ }
-    app.exit(code);
+    shutdownSmoke({
+      ptyCount: () => ptyManager.count(),
+      killAll: () => ptyManager.killAll(),
+      defer: (leave, ms) => { logDiagnostic('smoke-exit-drain', { code, ms }); setTimeout(leave, ms); },
+      exit: (exitCode) => { logDiagnostic('exit', { via: 'app.exit', reason: 'smoke', code: exitCode }); app.exit(exitCode); },
+    }, code);
   };
   const hardStop = setTimeout(() => finish({ ok: false, error: `smoke run exceeded ${opts.timeoutMs + 15_000} ms` }, 2), opts.timeoutMs + 15_000);
   hardStop.unref?.();
