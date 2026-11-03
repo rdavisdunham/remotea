@@ -71,6 +71,16 @@ describe('chat status and reminders', () => {
     expect(read()).toBe('Needs you');
   });
 
+  it('keeps a current native screen question visible when the server reports an ended turn', async () => {
+    setLatestRemoteViews(view(finish()));
+    useStore.setState({ agentStates: { [id]: { surfaceId: id as never, state: 'idle', idleSince: 1 } }, agentDetections: { [id]: { agent: 'codex', state: 'question', observedAt: Date.now(), sessionId: null } } as never });
+    await render();
+    expect(read()).toBe('Needs you');
+    // Managed chats use the provider's structured server status instead.
+    await act(async () => setLatestRemoteViews(view({ ...finish(), eridani: { execution: 'managed' } as never })));
+    expect(read()).not.toBe('Needs you');
+  });
+
   it('keeps local unread state independent of remote sessions', async () => {
     setLatestRemoteViews(null); await render();
     await click('Mark unread');

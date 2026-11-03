@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import { surfaceAgentState } from '../store/agent-rollup';
 import { useRemoteRegistry } from './registry-cache';
 import { chatIsUnread } from '../../shared/chat-attention';
-import type { AgentStateName, ChatAttention, ChatAttentionAction } from '../../shared/remote-host-protocol';
+import type { AgentStateName, ChatAttention, ChatAttentionAction, SessionRecord } from '../../shared/remote-host-protocol';
 
 const KEY = 'remotea-chat-attention-v1';
 function load(): Record<string, ChatAttention> {
@@ -40,6 +40,15 @@ export function observeLocalChat(id: string, state: AgentStateName | 'unknown' |
   save(id, { revision: (old?.revision ?? 0) + 1, at: Date.now(), kind, seenBy: {} });
 }
 
+/** Preserve the desktop's existing screen/question precedence for unmanaged chats. */
+export function chatActivityState(session: SessionRecord | undefined, fallback: AgentStateName | 'blocked' | 'question' | 'unknown' | undefined): AgentStateName | 'unknown' | undefined {
+  if (session?.state === 'exited') return 'exited';
+  if (session?.state === 'lost') return 'unknown';
+  if (session?.eridani?.execution === 'managed') return session.agentState?.state ?? (fallback === 'blocked' || fallback === 'question' ? 'needs_you' : fallback);
+  if (session?.agentState?.state === 'needs_you' || fallback === 'blocked' || fallback === 'question') return 'needs_you';
+  return fallback ?? session?.agentState?.state;
+}
+
 export function useChatAttention(surfaceId: string) {
   const views = useRemoteRegistry(s => s.views);
   const host = views?.find(v => v.sessions.some(s => s.id === surfaceId));
@@ -47,7 +56,7 @@ export function useChatAttention(surfaceId: string) {
   const declared = useStore(s => s.agentStates?.[surfaceId]);
   const detected = useStore(s => s.agentDetections?.[surfaceId]);
   const fallback = surfaceAgentState(declared, detected)?.state;
-  const state: AgentStateName | 'unknown' | undefined = session?.state === 'exited' ? 'exited' : session?.state === 'lost' ? 'unknown' : session?.agentState?.state ?? (fallback === 'blocked' || fallback === 'question' ? 'needs_you' : fallback);
+  const state = chatActivityState(session, fallback);
   const local = useLocalChatAttention(s => s.entries[surfaceId]);
   useEffect(() => { if (!session) observeLocalChat(surfaceId, state); }, [surfaceId, state, !!session]);
   const attention = session ? session.chatAttention : local;

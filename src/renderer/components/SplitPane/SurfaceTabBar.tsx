@@ -18,7 +18,7 @@ import { getSurfaceLabel } from './surface-label';
 import { useOscTitleLookup } from './use-osc-title';
 import StartupCommandDialog from './StartupCommandDialog';
 import { chatIsUnread } from '../../../shared/chat-attention';
-import { actOnChat, markChatRead, useLocalChatAttention } from '../../remote-sessions/chat-attention';
+import { actOnChat, chatActivityState, markChatRead, useLocalChatAttention } from '../../remote-sessions/chat-attention';
 import ChatReminderDialog from '../Terminal/ChatReminderDialog';
 import { formatAccelerator } from '../../shortcuts';
 
@@ -148,7 +148,7 @@ export default function SurfaceTabBar({
   // bar and the sidebar can never disagree about whether a pane is blocked.
   const agentStates = useStore((state) => state.agentStates);
   const agentDetections = useStore((state) => state.agentDetections);
-  const tabAgentState = (surfaceId: string): string | null =>
+  const tabAgentState = (surfaceId: string) =>
     surfaceAgentState(agentStates[surfaceId], agentDetections[surfaceId])?.state ?? null;
 
   // remotea: a tab Eridani started links back to its run (the server records
@@ -396,8 +396,8 @@ export default function SurfaceTabBar({
           // A blocked agent in a BACKGROUND tab was invisible: the sidebar says
           // its workspace needs you, and nothing in the pane says which tab.
           const serverSession = remoteViews?.flatMap(v => v.sessions).find(s => s.id === surface.id);
-          const serverState = serverSession?.state === 'lost' ? 'unknown' : serverSession?.state === 'exited' ? 'exited' : serverSession?.agentState?.state;
-          const agentState = serverState === 'needs_you' ? 'blocked' : serverState ?? tabAgentState(surface.id);
+          const currentState = chatActivityState(serverSession, tabAgentState(surface.id) ?? undefined);
+          const agentState = currentState === 'needs_you' ? 'blocked' : currentState;
           const chat = chatAttentionFor(surface.id);
           return (
             <div
