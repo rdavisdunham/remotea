@@ -43,7 +43,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { hostModelCatalog, claudeModelCatalog, managedVersionSupported } from './managed-models';
+import { hostModelCatalog, claudeModelCatalog, codexModelCatalog, managedVersionSupported } from './managed-models';
 import {
   ERIDANI_CAPS_VERSION,
   ERIDANI_LIMITS,
@@ -184,6 +184,9 @@ export function stageBCaps(versions: { claude: string | null; codex: string | nu
 
 export class EridaniRuntime {
   private link: EridaniLink | null = null;
+  private started = false;
+  private catalogReady: Promise<void> = Promise.resolve();
+  private codexModels: import('../../src/shared/eridani-link-protocol').ModelCatalogEntry[] = [];
   private claudeModels: import('../../src/shared/eridani-link-protocol').ModelCatalogEntry[] = [];
   /** S-Q5: draining for a restart (`remotea upgrade`); a link made meanwhile drains too. */
   private draining: string | null = null;
@@ -224,7 +227,6 @@ export class EridaniRuntime {
   constructor(private readonly deps: EridaniRuntimeDeps) {
     const { hub, registry } = deps;
     this.build = deps.build ?? loadBuildInfo();
-    if (process.platform === 'linux' && !deps.probe) void claudeModelCatalog().then((models) => { this.claudeModels = models; });
     this.questions = new QuestionBroker({
       session: (id) => registry.session(id),
       canHold: (id) => !!this.link?.ready && !!registry.session(id)?.eridani && registry.session(id)?.eridani?.execution !== 'managed',
@@ -279,13 +281,18 @@ export class EridaniRuntime {
   }
 
   start(): void {
-    this.dispatch.resumeOnBoot();
+    this.started = true;
+    this.dispatch.resumeOnBoot({ includeManaged: false });
+    const versions = this.probeAll(launchersToProbe(loadTargets(this.deps.dir)));
+    this.catalogReady = versions.then(async () => { if (this.started && process.platform === 'linux' && !this.deps.probe) await this.refreshCatalog(); });
+    void versions.then(() => { if (this.started) this.dispatch.resumeOnBoot({ onlyManaged: true }); });
     this.check();
     this.checkTimer = setInterval(() => this.check(), this.deps.checkMs ?? CHECK_MS);
     this.checkTimer.unref?.();
   }
 
   stop(): void {
+    this.started = false;
     if (this.checkTimer) clearInterval(this.checkTimer);
     this.checkTimer = null;
     this.teardown('shutdown');
@@ -407,7 +414,7 @@ export class EridaniRuntime {
         : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
       caps: () => !Object.values(this.harnesses()).some((h) => h?.managed) ? linkCaps(mode) : [...linkCaps(mode), 'managed.sessions', 'decisions.durable', 'commands.durable', 'role.options', 'run.pause', 'activity', 'model_catalog'],
-      modelCatalog: () => [...hostModelCatalog(path.join(os.homedir(), '.codex', 'models_cache.json')), ...this.claudeModels],
+      modelCatalog: () => [...(this.codexModels.length ? this.codexModels : hostModelCatalog(path.join(os.homedir(), '.codex', 'models_cache.json'))), ...this.claudeModels],
       targets: () => this.helloTargets(),
       doctor: () => this.doctor,
       collectorStatus: () => this.collectorStatus(),
@@ -449,8 +456,8 @@ export class EridaniRuntime {
     const launchers = launchersToProbe(loadTargets(this.deps.dir));
     const known = launchers.every((l) => this.probes.has(probeKey(l.harness, l.bin)));
     this.probedAt = Date.now();
-    const probed = this.probeAll(launchers);
-    if (known) link.start();
+    const probed = Promise.all([this.probeAll(launchers), this.catalogReady]);
+    if (known) void this.catalogReady.then(() => { if (this.link === link) link.start(); });
     else void probed.then(() => {
       if (this.link === link) link.start();
     });
@@ -464,10 +471,20 @@ export class EridaniRuntime {
     this.scanTimer.unref?.();
   }
 
+  private async refreshCatalog(): Promise<void> {
+    const targets = loadTargets(this.deps.dir);
+    const supportedBin = (harness: 'claude' | 'codex'): string | undefined => {
+      const bins = [...targets.flatMap((target) => target.launch[harness] ? [target.launch[harness]!.bin ?? harness] : []), harness];
+      return bins.find((bin) => { const probe = this.probes.get(probeKey(harness, bin)); return !!probe?.ok && managedVersionSupported(harness, probe.version); });
+    };
+    const claude = supportedBin('claude'), codex = supportedBin('codex');
+    [this.claudeModels, this.codexModels] = await Promise.all([claude ? claudeModelCatalog(claude) : Promise.resolve([]), codex ? codexModelCatalog(codex) : Promise.resolve([])]);
+  }
+
   /** The host-wide harness matrix from the latest probes (launch-caps.ts). */
   harnesses(): CapabilityMatrix {
     const matrix = harnessMatrix(this.probes, loadTargets(this.deps.dir), (this.deps.adapterHooks ?? (() => adapterHooks()))());
-    for (const [name, caps] of Object.entries(matrix)) if (caps) { caps.managed = !!caps.installed && managedVersionSupported(name, caps.version); caps.managed_questions = caps.managed ? ['ask', 'approval'] : []; }
+    for (const [name, caps] of Object.entries(matrix)) if (caps) { caps.managed = [...this.probes.entries()].some(([key, probe]) => key.startsWith(`${name}\0`) && probe.ok && managedVersionSupported(name, probe.version)); caps.managed_questions = caps.managed ? ['ask', 'approval'] : []; }
     return matrix;
   }
 

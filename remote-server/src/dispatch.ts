@@ -1302,8 +1302,10 @@ export class Dispatch {
     const b = rec.eridani;
     if (!b) return undefined;
     if (b.execution === 'managed' && b.controller !== 'terminal') {
+      const target = this.target(b.target);
+      if (process.platform !== 'linux' || !target || this.deps.managedSupported && !this.deps.managedSupported(target, b.harness)) return null;
       if (b.stopRequested || this.deps.resumeAgents === false) return null;
-      const target = this.target(b.target); const launch = target?.launch[b.harness];
+      const launch = target.launch[b.harness];
       if (!launch) return null;
       const mcp = this.prepareMcp(rec.id, target, b.harness);
       this.prepareManaged(rec.id, b, launch, '', b.spawnOp, mcp?.args ?? [], this.secrets[rec.id]?.env ?? {}, (rec.incarnation ?? 0) + 1);
@@ -1327,7 +1329,7 @@ export class Dispatch {
    * session whose stop was requested is not resumed; its process is gone,
    * so the stop is complete.
    */
-  resumeOnBoot(): void {
+  resumeOnBoot(options: { includeManaged?: boolean; onlyManaged?: boolean } = {}): void {
     for (const rec of this.deps.registry.sessions()) this.attempts.recover(rec);
     // S-Q5: a process the PTY keeper kept is the same incarnation: what vouched for it still does.
     const launched = this.loadLaunched();
@@ -1345,6 +1347,8 @@ export class Dispatch {
     if (this.launchedWith.size || Object.keys(launched).length) this.saveLaunched();
     for (const rec of this.deps.registry.sessions()) {
       if (!rec.eridani || rec.state !== 'lost') continue;
+      const managed = rec.eridani.execution === 'managed' && rec.eridani.controller !== 'terminal';
+      if (options.includeManaged === false && managed || options.onlyManaged && !managed) continue;
       if (rec.eridani.stopRequested) {
         this.finishLost(rec, 'stopped (the process ended with the server restart)');
         continue;

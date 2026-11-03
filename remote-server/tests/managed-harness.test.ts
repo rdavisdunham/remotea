@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { codexModelCatalog } from '../src/managed-models';
 import { CodexRuntimeAdapter, ClaudeRuntimeAdapter, type HarnessSpec } from '../src/managed-harness';
 const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
@@ -13,6 +14,7 @@ const rl=require('readline').createInterface({input:process.stdin});
 const send=m=>process.stdout.write(JSON.stringify(m)+'\\n');
 rl.on('line',line=>{const m=JSON.parse(line);
  if(m.method==='initialize') send({id:m.id,result:{}});
+ if(m.method==='model/list')send({id:m.id,result:{data:[{model:'actual-sol',displayName:'Actual Sol',hidden:false,isDefault:true,defaultReasoningEffort:'low',supportedReasoningEfforts:[{reasoningEffort:'low'},{reasoningEffort:'ultra'}]}],nextCursor:null}});
  if(m.method==='thread/start'||m.method==='thread/resume'){send({id:m.id,result:{thread:{id:'provider-session'}}});send({method:'test/profile',params:m.params});}
  if(m.method==='turn/start'){send({id:m.id,result:{turn:{id:'provider-turn'}}});send({id:42,method:'item/commandExecution/requestApproval',params:{threadId:'provider-session',turnId:'provider-turn',itemId:'command',command:'npm test'}});}
  if(m.type==='control_request'&&m.request.subtype==='initialize')send({type:'control_response',response:{subtype:'success',request_id:m.request_id,response:{models:[{value:'model',supportedEffortLevels:['low']}]}}});
@@ -59,6 +61,10 @@ describe('structured provider subprocess transports', () => {
       await eventually(() => events.filter((e) => e.type === 'test/deferred').length === 2);
       expect(events.filter((e) => e.type === 'test/deferred').at(-1).output.hookSpecificOutput).toMatchObject({ permissionDecision: 'allow', updatedInput: { answers: { 'Which?': 'A' } } });
     } finally { await adapter.stop(); }
+  });
+  it('reads authoritative default and efforts with model/list without creating a thread or inference turn', async () => {
+    const spec = fixture('codex'); const catalog = await codexModelCatalog(spec.bin);
+    expect(catalog).toMatchObject([{ model: 'actual-sol', default: true, efforts: ['low', 'ultra'], default_effort: 'low' }]);
   });
   it('bounds stalled receipts and never retries the effect', async () => {
     const adapter = new CodexRuntimeAdapter(fixture('codex'), 1000);

@@ -85,10 +85,18 @@ export class HarnessProcess extends EventEmitter {
 
 export class CodexRuntimeAdapter extends HarnessProcess implements RuntimeAdapter {
   sessionId = ''; turnId: string | null = null;
-  async start(): Promise<string> {
+  private async initializeTransport(): Promise<void> {
     this.launch(['app-server', '--stdio', ...this.spec.args]);
     await this.call('initialize', { clientInfo: { name: 'remotea', version: '0.1.0' }, capabilities: { experimentalApi: true } });
     this.write({ method: 'initialized' });
+  }
+  async modelCatalog(): Promise<any[]> {
+    await this.initializeTransport(); const models: any[] = []; let cursor: string | null = null;
+    for (let page = 0; page < 5; page++) { const result = await this.call('model/list', { limit: 100, includeHidden: false, ...(cursor ? { cursor } : {}) }); models.push(...result.data); cursor = result.nextCursor ?? null; if (!cursor) break; }
+    return models;
+  }
+  async start(): Promise<string> {
+    await this.initializeTransport();
     const params = { model: this.spec.model, cwd: this.spec.cwd, sandbox: this.spec.profile, approvalPolicy: 'on-request', approvalsReviewer: 'auto_review', config: this.spec.effort ? { model_reasoning_effort: this.spec.effort } : {} };
     const result = await this.call(this.spec.sessionId ? 'thread/resume' : 'thread/start', { ...params, ...(this.spec.sessionId ? { threadId: this.spec.sessionId } : {}) });
     this.sessionId = result.thread.id; return this.sessionId;

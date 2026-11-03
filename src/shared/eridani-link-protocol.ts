@@ -653,6 +653,7 @@ export interface QuestionBody extends OpFields {
 export type QuestionOutcome = 'accepted' | 'timed_out' | 'failed' | 'canceled' | 'answered_locally';
 
 export interface QuestionResolvedBody extends OpFields {
+  provider_request_id?: string; surf?: string; incarnation?: number; request_digest?: string; plan_revision?: number;
   t: 'question.resolved';
   question_id: string;
   generation: number;

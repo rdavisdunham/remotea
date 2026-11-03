@@ -27,6 +27,6 @@ it('advertises only verified Linux provider versions and actual model-specific e
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-models-')); const file = path.join(dir, 'models.json');
   try {
     fs.writeFileSync(file, JSON.stringify({ models: [{ slug: 'model', display_name: 'Actual', default_reasoning_level: 'low', supported_reasoning_levels: ['low', 'ultra'].map((effort) => ({ effort })) }] }));
-    expect(hostModelCatalog(file)).toMatchObject([{ model: 'model', efforts: ['low', 'ultra'], default_effort: 'low' }]);
+    expect(hostModelCatalog(file)).toMatchObject([{ model: 'model', default: false, efforts: ['low', 'ultra'], default_effort: 'low' }]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

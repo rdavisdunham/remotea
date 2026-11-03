@@ -45,7 +45,7 @@ const TARGET: ExecutionTarget = {
 
 const FAST = { queuePollMs: 2, pasteEnterMs: 1, steerDelayMs: 1, ctrlCGapMs: 1, ctrlCRetryMs: 5, stopWaitMs: 60, killWaitMs: 60 };
 
-function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean; wt?: Record<string, unknown>; managedFactory?: DispatchDeps['managedFactory'] } = {}) {
+function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean; wt?: Record<string, unknown>; managedFactory?: DispatchDeps['managedFactory']; managedSupported?: DispatchDeps['managedSupported'] } = {}) {
   const registry = opts.registry ?? Registry.load({ file: null, bootId: 'boot-1' });
   const sp = fakeSpawner();
   const hub = new Hub({ registry, spawn: sp.spawn, bootId: opts.bootId ?? 'boot-1', serverId: 'srv', hostname: 'box', timers: new ManualTimers(), probe: () => ({}) });
@@ -73,6 +73,7 @@ function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boo
     targets: () => [TARGET],
     questions,
     managedFactory: opts.managedFactory,
+    managedSupported: opts.managedSupported,
     managedEmit: (body) => emitted.push(body),
     emit: (b) => verified.push(b as unknown as Record<string, unknown>),
     linkReady: () => ready,
@@ -392,6 +393,18 @@ describe('dispatch: stop', () => {
 });
 
 describe('dispatch: recovery', () => {
+  it('defers managed boot recovery until readiness and refuses an unverified launcher without native fallback', async () => {
+    const dir = tmpDir(), file = path.join(dir, 'registry.json');
+    const first = setup({ registry: Registry.load({ file, bootId: 'boot-1' }), dir, silentAgent: true, managedFactory: () => new FakeManagedAdapter() });
+    await first.run(spawnCmd({ execution: 'managed', harness: 'codex' })); first.registry.saveNow();
+    let factories = 0;
+    const second = setup({ registry: Registry.load({ file, bootId: 'boot-2' }), dir, bootId: 'boot-2', managedSupported: () => false, managedFactory: () => { factories++; return new FakeManagedAdapter(); } });
+    const surf = surfFor('run-1', 1, 1);
+    second.dispatch.resumeOnBoot({ includeManaged: false }); expect(second.registry.session(surf)!.state).toBe('lost');
+    second.dispatch.resumeOnBoot({ onlyManaged: true }); expect(second.registry.session(surf)!.state).toBe('exited');
+    expect(factories).toBe(0); expect(second.sp.ptys).toHaveLength(0); expect(fs.readdirSync(path.join(dir, 'managed'))).toHaveLength(1);
+  });
+
   it('resumes a lost Eridani session on boot with its model and permission mode', async () => {
     const dir = tmpDir();
     const file = path.join(dir, 'registry.json');

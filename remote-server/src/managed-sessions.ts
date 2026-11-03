@@ -109,7 +109,7 @@ export class ManagedSessions {
     const hash = digest({ method: req.method, params: contextParams, sessionId: e.state.sessionId, generation: e.spec.generation, runId: e.spec.runId, profile: e.spec.profile, cwd: e.spec.cwd, model: e.spec.model, effort: e.spec.effort ?? null, planRevision: e.spec.planRevision ?? null });
     let q = e.state.decisions.find((d) => d.digest === hash && d.state !== 'resolved');
     if (!q && e.recovering) {
-      for (const previous of e.state.decisions) if (previous.state === 'pending') { previous.state = 'resolved'; this.deps.emit({ t: 'question.resolved', question_id: previous.id, surf: e.spec.surf, generation: previous.generation, outcome: 'canceled', still_open: false, detail: 'Provider recreated a changed action after restart; fresh review required', at: Date.now() }); }
+      for (const previous of e.state.decisions) if (previous.state === 'pending') { previous.state = 'resolved'; this.deps.emit({ t: 'question.resolved', question_id: previous.id, surf: e.spec.surf, generation: previous.generation, provider_request_id: String(previous.request.id), incarnation: e.spec.incarnation, request_digest: previous.digest, plan_revision: e.spec.planRevision ?? 0, outcome: 'canceled', still_open: false, detail: 'Provider recreated a changed action after restart; fresh review required', at: Date.now() }); }
     }
     if (!q) { q = { id: `managed-${crypto.randomUUID()}`, digest: hash, request: req, items, kind, state: 'pending', sessionId: e.state.sessionId, turnId: e.state.turnId, generation: e.spec.generation }; e.state.decisions.push(q); }
     if (kind === 'approval') q.action = { tool: req.method === 'claude/permission' ? String(req.params.tool_name) : req.method, input: JSON.parse(redact(JSON.stringify(req.params))), cwd: e.spec.cwd, digest: hash, ...(req.params.permissions ? { permissions: JSON.parse(redact(JSON.stringify(req.params.permissions))) } : {}) };
@@ -233,7 +233,7 @@ export class ManagedSessions {
   private confirm(e: Entry, id: string, tool = false): void {
     const q = e.state.decisions.find((q) => q.state === 'submitted' && String(tool ? q.request.params.tool_use_id : q.request.id) === id);
     if (!q) return; q.state = 'resolved'; this.save(e); e.liveRequests.delete(q.id);
-    this.deps.emit({ t: 'question.resolved', question_id: q.id, surf: e.spec.surf, generation: q.generation, outcome: 'accepted', still_open: false, at: Date.now() });
+    this.deps.emit({ t: 'question.resolved', question_id: q.id, surf: e.spec.surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: e.spec.planRevision ?? 0, outcome: 'accepted', still_open: false, at: Date.now() });
   }
   private async recreatePending(e: Entry): Promise<void> {
     const pending = e.state.decisions.filter((q) => q.state === 'pending' && q.generation === e.spec.generation && q.request.method !== 'claude/deferred' && !e.liveRequests.has(q.id));
@@ -252,7 +252,7 @@ export class ManagedSessions {
   async cancel(surf: string): Promise<void> {
     const e = this.entries.get(surf); if (!e) return;
     e.state.paused = true; this.save(e); await e.adapter.stop();
-    for (const q of e.state.decisions) if (q.state !== 'resolved') { q.state = 'resolved'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, outcome: 'canceled', still_open: false, at: Date.now() }); }
+    for (const q of e.state.decisions) if (q.state !== 'resolved') { q.state = 'resolved'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: e.spec.planRevision ?? 0, outcome: 'canceled', still_open: false, at: Date.now() }); }
     e.state.queue = []; this.save(e); for (const waiter of e.waiters.values()) waiter.resolve({ state: 'rejected', detail: 'run canceled' }); e.waiters.clear();
   }
   async stop(surf: string): Promise<void> { await this.entries.get(surf)?.adapter.stop(); }
@@ -267,7 +267,7 @@ export class ManagedSessions {
   async takeover(surf: string): Promise<string> { const e = this.entries.get(surf); if (!e?.state.sessionId) throw new Error('provider conversation is not ready'); await e.adapter.interrupt(); await e.adapter.stop(); return e.state.sessionId; }
   generation(surf: string, generation: number): void {
     const e = this.entries.get(surf); if (!e || generation <= e.spec.generation) return; e.spec.generation = generation;
-    for (const q of e.state.decisions) if (q.generation < generation && q.state !== 'resolved') { q.state = q.state === 'pending' ? 'resolved' : 'uncertain'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, outcome: 'canceled', still_open: false, at: Date.now() }); }
+    for (const q of e.state.decisions) if (q.generation < generation && q.state !== 'resolved') { q.state = q.state === 'pending' ? 'resolved' : 'uncertain'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: e.spec.planRevision ?? 0, outcome: 'canceled', still_open: false, at: Date.now() }); }
     this.save(e);
   }
   replay(): void { for (const e of this.entries.values()) for (const q of e.state.decisions) if (q.state !== 'resolved') this.publish(e, q, !e.liveRequests.has(q.id)); }
