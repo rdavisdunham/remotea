@@ -312,6 +312,11 @@ export class RemoteHostClient {
     return this.request((rid) => ({ t: 'takeover', rid, id: id as RemoteSurfaceId }));
   }
 
+  chatAttention(id: string, action: import('../../shared/remote-host-protocol').ChatAttentionAction): Promise<RequestResult> {
+    if (!this.features.has('chatAttention')) return Promise.resolve({ ok: false, error: 'Update the Remotea server to use unread state and reminders.' });
+    return this.request(rid => ({ t: 'chatAttention', rid, id: id as RemoteSurfaceId, ...action }));
+  }
+
   /** Something that decides `hooks.prompt` changed outside this client (the user dismissed the prompt). */
   refreshStatus(): void {
     this.deps.onStatus(this.status());

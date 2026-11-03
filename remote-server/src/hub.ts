@@ -22,6 +22,7 @@ import {
   type ServerMsg,
   type SessionRecord,
 } from '../../src/shared/remote-host-protocol';
+import { ChatAttentionService } from './chat-attention';
 import { Registry } from './registry';
 import { TermSession, type ConnLike, type Timers } from './session';
 import type { PtyLike, SpawnFn, SpawnRequest } from './pty-spawn';
@@ -150,6 +151,7 @@ export class Hub {
   private readonly now: () => number;
   private readonly log: (msg: string) => void;
   readonly agentState: AgentStateTracker;
+  readonly chatAttention: ChatAttentionService;
   readonly turns: TurnCapture;
   private sink: HubEventSink | null;
   private eridani: HubEridaniHooks = {};
@@ -167,12 +169,18 @@ export class Hub {
     // Repair legacy native IDs before welcome/recovery snapshots reach apps.
     // Eridani owns its provider thread identities and recovery separately.
     for (const rec of this.registry.sessions()) this.repairCodexAgent(rec);
+    this.chatAttention = new ChatAttentionService(this.registry, session => this.broadcast({ t: 'sessionUpdated', session }), this.now, this.log);
+    this.chatAttention.tick();
     this.agentState = new AgentStateTracker({
       now: this.now,
       onChange: ({ surf, info }) => {
+        const previous = this.registry.session(surf);
+        const attention = previous?.chatAttention;
+        if (previous) this.chatAttention.stateChanged(previous, info);
         const rec = this.registry.updateSession(surf, { agentState: info });
         if (!rec) return;
         this.broadcast({ t: 'meta', id: surf as RemoteSurfaceId, agentState: info });
+        if (attention !== rec.chatAttention) this.broadcast({ t: 'sessionUpdated', session: rec });
         this.statusRev = Math.max(this.statusRev + 1, this.now());
         this.sink?.status({
           surf,
@@ -283,6 +291,11 @@ export class Hub {
         return;
       case 'close': return this.close(conn, msg.rid, msg.id);
       case 'takeover': return void this.takeover(conn, msg);
+      case 'chatAttention': {
+        const result = this.chatAttention.apply(msg.id, device, msg);
+        conn.sendJson({ t: 'ack', rid: msg.rid, ...result });
+        return;
+      }
       case 'resize': this.sessions.get(msg.id)?.resize(conn.id, msg.cols, msg.rows); return;
       case 'claim': this.sessions.get(msg.id)?.claim(conn.id); return;
       case 'deliver':
@@ -316,7 +329,7 @@ export class Hub {
   }
 
   private features(): ServerFeature[] {
-    const f: ServerFeature[] = ['rpc'];
+    const f: ServerFeature[] = ['rpc', 'chatAttention'];
     if (this.deps.diag) f.push('diag');
     if (this.deps.hooks) f.push('hooks');
     if (this.deps.fs) f.push('fs');

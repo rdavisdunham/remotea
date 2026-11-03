@@ -84,6 +84,31 @@ function collect(client: RemoteHostClient, id: string) {
 }
 
 describe('RemoteHostClient against a real server', () => {
+  it('round trips unread state and reminders without writing input to a terminal', async () => {
+    const rig = await startServer();
+    const a = makeClient(rig.port, 'device-attention-a').client;
+    const b = makeClient(rig.port, 'device-attention-b').client;
+    a.start(); b.start();
+    await waitFor(() => a.ready && b.ready);
+    const id = 'surf-attention-wire';
+    await a.create({ id, cols: 80, rows: 24, spec: {} });
+    rig.hub.agentState.hook(id, { event: 'UserPromptSubmit' });
+    rig.hub.agentState.hook(id, { event: 'Stop' });
+    await waitFor(() => b.sessions.get(id)?.chatAttention?.kind === 'finished');
+    expect((await a.chatAttention(id, { action: 'read', revision: 1 })).ok).toBe(true);
+    await waitFor(() => b.sessions.get(id)?.chatAttention?.seenBy['device-attention-a'] === 1);
+    expect(b.sessions.get(id)?.chatAttention?.seenBy['device-attention-b']).toBeUndefined();
+    expect((await a.chatAttention(id, { action: 'remind', dueAt: Date.now() + 60000, note: 'Read the answer' })).ok).toBe(true);
+    await waitFor(() => b.sessions.get(id)?.chatReminder?.note === 'Read the answer');
+    const reminder = rig.hub['deps'].registry.session(id)!.chatReminder!;
+    reminder.dueAt = Date.now() - 1; rig.hub.chatAttention.tick();
+    await waitFor(() => b.sessions.get(id)?.chatAttention?.kind === 'reminder');
+    expect(b.sessions.get(id)?.chatReminder?.firedAt).toBeGreaterThan(0);
+    expect((await a.chatAttention(id, { action: 'cancelReminder' })).ok).toBe(true);
+    await waitFor(() => b.sessions.get(id)?.chatReminder === null);
+    expect(rig.sp.last().written).toEqual([]);
+  });
+
   it('a second create while the first is in flight is a reuse (no double forwarding)', async () => {
     const rig = await startServer();
     const { client } = makeClient(rig.port, 'device-alpha01');

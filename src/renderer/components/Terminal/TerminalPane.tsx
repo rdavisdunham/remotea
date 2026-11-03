@@ -9,6 +9,7 @@ import ResetNotice from './ResetNotice';
 import RemoteOverlay from './RemoteOverlay';
 import RemoteSizeBadge from './RemoteSizeBadge';
 import ManagedControl from './ManagedControl';
+import ChatStatus from './ChatStatus';
 import { useStore } from '../../store';
 import { parseRemoteShellSpec } from '../../../shared/remote-shell-spec';
 import '../../styles/terminal.css';
@@ -175,6 +176,7 @@ export default function TerminalPane({
         <CopyMode active={copyModeActive} />
         {visible && surfaceId && <ResetNotice surfaceId={surfaceId} />}
       </div>
+      {surfaceId && <ChatStatus surfaceId={surfaceId} active={focused && visible} />}
       {remoteHostId && surfaceId && <ManagedControl surfaceId={surfaceId} hostId={remoteHostId} active={focused && visible} onTakenOver={focusAfterTakeover} />}
     </div>
   );

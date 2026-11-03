@@ -29,6 +29,8 @@ A workspace groups panes and tabs; a pane can contain terminals, browsers or doc
 
 Settings → Agent integration configures instructions, status hooks and optional plugins on this computer, with consent. Host integration is separate: run remotea hooks status on the host. Working, Needs you and Idle describe activity, not task acceptance. Prompt history records supported captured input, not system instructions. Resume continues a supported provider conversation in a new process.
 
+Chat replies also have an unread state, independent of agent activity. Use the terminal status bar or tab menu to mark a chat unread or set a server reminder. See [chat attention and reminders](chat-attention.md).
+
 ## Inspect Eridani work
 
 <a id="eridani"></a>

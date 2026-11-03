@@ -254,7 +254,7 @@ export class Registry {
     const tombTtl = this.opts.tombstoneRetentionMs ?? 30 * DAY;
     const dropped: RemoteSurfaceId[] = [];
     for (const s of Object.values(this.data.sessions)) {
-      if (s.state === 'exited' && s.exitedAt && now - s.exitedAt > exitedTtl) {
+      if (s.state === 'exited' && s.exitedAt && now - s.exitedAt > exitedTtl && (!s.chatReminder || (!!s.chatReminder.firedAt && s.chatAttention?.seenBy[s.chatReminder.createdBy] === s.chatAttention?.revision))) {
         this.closeSession(s.id, 'server', 'closed');
         dropped.push(s.id);
       }
