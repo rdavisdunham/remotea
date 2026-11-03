@@ -62,23 +62,76 @@ export function isCodexCli(pid: number): boolean {
   }
 }
 
-/** Codex appends to its rollout file while it runs: the open file names the thread exactly. */
-export function codexThreadFromFds(pid: number): string | null {
+interface CodexSessionMeta {
+  id: string;
+  child: boolean;
+  parent: string | null;
+}
+
+/** Read a bounded prefix and parse only the metadata header. */
+function readCodexSessionMeta(file: string, id: string): CodexSessionMeta | null {
+  let fd: number | undefined;
+  try {
+    // A stale/corrupt index must not hang the server by pointing at a FIFO.
+    fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+    if (!fs.fstatSync(fd).isFile()) return null;
+    const chunks: Buffer[] = [];
+    for (let offset = 0; offset < 1024 * 1024; offset += 8192) {
+      const chunk = Buffer.alloc(8192);
+      const size = fs.readSync(fd, chunk, 0, chunk.length, offset);
+      if (!size) return null; // An unfinished header is not evidence of a root thread.
+      const end = chunk.subarray(0, size).indexOf(10);
+      chunks.push(chunk.subarray(0, end < 0 ? size : end));
+      if (end < 0) continue;
+      const row = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const meta = row?.payload;
+      if (row?.type !== 'session_meta' || meta?.id !== id) return null;
+      const source = meta.source;
+      const child = !!meta.parent_thread_id || (source && typeof source === 'object' && 'subagent' in source)
+        || (typeof source === 'string' && source.includes('subagent'));
+      if (!child && (typeof source !== 'string' || !source)) return null;
+      return {
+        id,
+        child: !!child,
+        parent: typeof meta.parent_thread_id === 'string' && SESSION_ID_RE.test(meta.parent_thread_id) ? meta.parent_thread_id : null,
+      };
+    }
+  } catch {
+    // Codex's private format may change, or the file may close during a probe.
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+  return null;
+}
+
+/**
+ * A Codex process can hold root, Guardian and worker rollouts at once. Only
+ * one verified root is usable, irrespective of descriptor order. Undefined
+ * means no rollout was open; null means ambiguous/unreadable/child-only, so
+ * the weaker cwd/time fallback must not override that evidence.
+ */
+export function codexThreadFromFds(pid: number): string | null | undefined {
   let fds: string[];
   try {
     fds = fs.readdirSync(`/proc/${pid}/fd`);
   } catch {
-    return null;
+    return undefined;
   }
+  let found = false;
+  const roots = new Set<string>();
   for (const fd of fds) {
     try {
-      const id = codexThreadFromPath(fs.readlinkSync(`/proc/${pid}/fd/${fd}`));
-      if (id) return id;
+      const file = fs.readlinkSync(`/proc/${pid}/fd/${fd}`);
+      const id = codexThreadFromPath(file);
+      if (!id) continue;
+      found = true;
+      const meta = readCodexSessionMeta(file, id);
+      if (meta && !meta.child) roots.add(meta.id);
     } catch {
       /* closed meanwhile */
     }
   }
-  return null;
+  return roots.size === 1 ? [...roots][0] : found ? null : undefined;
 }
 
 /** Process start time in epoch ms (from /proc, clock ticks since boot). */
@@ -101,27 +154,65 @@ interface ThreadRow {
 }
 export type CodexThreadQuery = (cwd: string, sinceMs: number) => ThreadRow[] | null;
 
+interface CodexStateDb {
+  prepare(sql: string): { all(...args: unknown[]): unknown[]; get(...args: unknown[]): unknown };
+  close(): void;
+}
+
 /**
  * Codex's own thread index, opened READ-ONLY. node:sqlite is loaded lazily:
- * it is only needed when the rollout-file route found nothing.
+ * needed only for fallback discovery and saved-session recovery.
  */
-export function codexStateQuery(home = os.homedir()): CodexThreadQuery {
-  return (cwd, sinceMs) => {
-    const file = path.join(home, '.codex', 'state_5.sqlite');
-    if (!fs.existsSync(file)) return null;
+function withCodexState<T>(home: string, read: (db: CodexStateDb) => T): T | undefined {
+  const file = path.join(home, '.codex', 'state_5.sqlite');
+  if (!fs.existsSync(file)) return undefined;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { DatabaseSync } = require('node:sqlite') as { DatabaseSync: new (f: string, o: { readOnly: boolean }) => CodexStateDb };
+    const db = new DatabaseSync(file, { readOnly: true });
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { DatabaseSync } = require('node:sqlite') as { DatabaseSync: new (f: string, o: { readOnly: boolean }) => { prepare(sql: string): { all(...a: unknown[]): unknown[] }; close(): void } };
-      const db = new DatabaseSync(file, { readOnly: true });
-      try {
-        return db.prepare('SELECT id, created_at_ms FROM threads WHERE cwd = ? AND created_at_ms >= ? ORDER BY created_at_ms LIMIT 5').all(cwd, sinceMs) as ThreadRow[];
-      } finally {
-        db.close();
-      }
-    } catch {
-      return null;
+      return read(db);
+    } finally {
+      db.close();
     }
-  };
+  } catch {
+    return undefined;
+  }
+}
+
+export function codexStateQuery(home = os.homedir()): CodexThreadQuery {
+  return (cwd, sinceMs) => withCodexState(home, (db) => db.prepare(
+    "SELECT id, created_at_ms FROM threads WHERE cwd = ? AND created_at_ms >= ? AND source NOT LIKE '%subagent%' ORDER BY created_at_ms LIMIT 5",
+  ).all(cwd, sinceMs) as ThreadRow[]) ?? null;
+}
+
+/**
+ * Repair IDs saved by older probes. Follow only explicit parent links, never
+ * cwd/time guesses. Unknown IDs keep their existing resume behavior; a known
+ * child with an unverifiable parent returns null and must not be auto-resumed.
+ */
+export function resolveCodexResumeThread(id: string, home = os.homedir()): string | null {
+  if (!SESSION_ID_RE.test(id)) return null;
+  let childFound = false;
+  const resolved = withCodexState(home, (db) => {
+    const seen = new Set<string>();
+    let current = id;
+    while (seen.size < 16 && !seen.has(current)) {
+      seen.add(current);
+      const row = db.prepare('SELECT rollout_path, source FROM threads WHERE id = ?').get(current) as { rollout_path?: unknown; source?: unknown } | undefined;
+      if (!row) return childFound ? null : id;
+      const indexedChild = typeof row.source === 'string' && row.source.includes('subagent');
+      childFound ||= indexedChild;
+      const meta = typeof row.rollout_path === 'string' ? readCodexSessionMeta(row.rollout_path, current) : null;
+      if (!meta) return childFound ? null : id;
+      if (!meta.child && !indexedChild) return current;
+      childFound = true;
+      if (!meta.parent) return null;
+      current = meta.parent;
+    }
+    return null; // Cycle or an implausibly deep internal thread chain.
+  });
+  return resolved === undefined ? childFound ? null : id : resolved;
 }
 
 /**
@@ -157,7 +248,7 @@ export function probeSession(
   for (const pid of tree) {
     if (!isCodexCli(pid)) continue;
     let thread = codexThreadFromFds(pid);
-    if (!thread) {
+    if (thread === undefined) {
       const cwd = readCwd(pid);
       const start = processStartMs(pid);
       if (cwd && start) thread = codexThreadFromState(cwd, start, opts.codexQuery ?? codexStateQuery(opts.home));
