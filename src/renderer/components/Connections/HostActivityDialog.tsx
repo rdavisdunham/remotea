@@ -34,6 +34,7 @@ export default function HostActivityDialog({ onClose, onSettings }: {
   const views = useRemoteRegistry((s) => s.views);
   const [now, setNow] = useState(Date.now);
   const [phone, setPhone] = useState<RemoteConsoleStatus | null>(null);
+  const [handoff, setHandoff] = useState<Record<string, { busy: boolean; error?: string }>>({});
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const changes = pendingChanges(hosts, status, views, t);
@@ -85,6 +86,16 @@ export default function HostActivityDialog({ onClose, onSettings }: {
   }, []);
 
   const settings = (tab: SettingsTab) => { onClose(); onSettings(tab); };
+  const takeover = async (hostId: string, sessionId: string) => {
+    const key = hostId + ':' + sessionId;
+    setHandoff(current => ({ ...current, [key]: { busy: true } }));
+    try {
+      const result = await window.wmux.remoteSessions.takeover(hostId, sessionId);
+      setHandoff(current => ({ ...current, [key]: { busy: false, error: result.ok ? undefined : result.error || t('activity.takeoverFailed') } }));
+    } catch {
+      setHandoff(current => ({ ...current, [key]: { busy: false, error: t('activity.takeoverFailed') } }));
+    }
+  };
   return (
     <div className="host-activity__overlay" onClick={onClose}>
       <section ref={dialogRef} className="host-activity" role="dialog" aria-modal="true" aria-labelledby="host-activity-title" onClick={(e) => e.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
@@ -142,6 +153,17 @@ export default function HostActivityDialog({ onClose, onSettings }: {
                   {linked.map(({ session, link }) => <div key={session.id} className="host-activity__actions">
                     <span>{session.eridani?.target} · {link.taskTitle || link.taskId || t('activity.standalone')} · {link.runId.slice(0, 8)}</span>
                     <button onClick={() => void window.wmux?.system?.openExternal?.(link.url)}>{t('activity.openRun')}</button>
+                    {session.eridani?.execution === 'managed' && <>
+                      <span>{t(session.eridani.controller === 'terminal' ? 'activity.terminalControl' : 'activity.managedControl')}</span>
+                      {session.eridani.controller !== 'terminal' && <button
+                        disabled={status[host.id]?.state !== 'ready' || handoff[host.id + ':' + session.id]?.busy}
+                        title={t('activity.takeoverHint')}
+                        onClick={() => void takeover(host.id, session.id)}>
+                        {t(handoff[host.id + ':' + session.id]?.busy ? 'activity.takingOver' : 'activity.takeover')}
+                      </button>}
+                      {session.eridani.controller !== 'terminal' && handoff[host.id + ':' + session.id]?.error &&
+                        <span role="alert">{handoff[host.id + ':' + session.id].error}</span>}
+                    </>}
                   </div>)}
                 </div>}
               </section>

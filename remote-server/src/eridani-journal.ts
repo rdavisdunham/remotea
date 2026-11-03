@@ -50,6 +50,7 @@ export interface JournalRecord {
   /** First seen, epoch ms. */
   at: number;
   updatedAt: number;
+  durable?: boolean;
 }
 
 export const FINAL_STATES: ReadonlySet<JournalState> = new Set(['executed', 'failed', 'rejected', 'uncertain']);
@@ -101,7 +102,7 @@ export class Journal {
     now?: () => number;
     log?: (m: string) => void;
     /** Settle an op found `executing` after a restart; null leaves it `uncertain`. */
-    recover?: (rec: JournalRecord) => { state: 'executed' | 'failed' | 'rejected'; detail?: string; outcome?: unknown } | null;
+    recover?: (rec: JournalRecord) => { state: 'executed' | 'failed' | 'rejected' | 'uncertain'; detail?: string; outcome?: unknown } | null;
   }) {
     this.now = opts.now ?? Date.now;
     this.load();
@@ -142,10 +143,10 @@ export class Journal {
    * Throws `JournalUnavailableError` when it could not be made durable;
    * memory is then unchanged.
    */
-  record(op: string, patch: { digest: string; t: string; state: JournalState; detail?: string; outcome?: unknown; body?: Record<string, unknown> }): JournalRecord {
+  record(op: string, patch: { digest: string; t: string; state: JournalState; detail?: string; outcome?: unknown; body?: Record<string, unknown>; durable?: boolean }): JournalRecord {
     const prev = this.recs.get(op);
     const now = this.now();
-    const rec: JournalRecord = { op_id: op, at: prev?.at ?? now, updatedAt: now, ...patch };
+    const rec: JournalRecord = { op_id: op, at: prev?.at ?? now, updatedAt: now, ...(prev?.durable ? { durable: true } : {}), ...patch };
     if (this.opts.file) {
       this.ensureWritable();
       this.append(rec);
@@ -172,7 +173,7 @@ export class Journal {
   compact(): void {
     const file = this.opts.file;
     const cutoff = this.now() - this.opts.horizonMs;
-    const drop = new Set([...this.recs.values()].filter((r) => r.updatedAt < cutoff && FINAL_STATES.has(r.state)).map((r) => r.op_id));
+    const drop = new Set([...this.recs.values()].filter((r) => !r.durable && r.updatedAt < cutoff && FINAL_STATES.has(r.state)).map((r) => r.op_id));
     if (!file) {
       for (const op of drop) this.recs.delete(op);
       return;

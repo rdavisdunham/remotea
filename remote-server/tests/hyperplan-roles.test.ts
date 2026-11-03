@@ -99,12 +99,12 @@ const spawn = (over: Record<string, unknown> = {}) => ({
 const PLANNER = surfFor('run-1', 1, 1);
 const REVIEWER = surfFor('run-1', 1, 2);
 
-const CLAUDE_LISTS = `--allowedTools 'Read' 'Grep' 'Glob' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' 'mcp__eridani__*' --disallowedTools 'Edit' 'Write' 'NotebookEdit'`;
+const CLAUDE_LISTS = `--allowedTools 'Read' 'Grep' 'Glob' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' --disallowedTools 'Edit' 'Write' 'NotebookEdit'`;
 
 describe('hyperplan: read-only launch lines', () => {
   it('claude mode: review swaps auto for dontAsk with the allow and deny lists, before --model so the prompt is never a list value', () => {
     expect(MCP_SERVER_NAME).toBe('eridani');
-    expect(CLAUDE_READ_ONLY_TOOLS).toContain(`mcp__${MCP_SERVER_NAME}__*`);
+    expect(CLAUDE_READ_ONLY_TOOLS).not.toContain(`mcp__${MCP_SERVER_NAME}__*`);
     expect(CLAUDE_READ_ONLY_DENIED).toEqual(['Edit', 'Write', 'NotebookEdit']);
     expect(launchCommand('claude', 'sonnet', {}, true, [], 'review')).toBe(`'claude' ${CLAUDE_LISTS} --model 'sonnet' --permission-mode dontAsk "$ERIDANI_PROMPT"`);
     // With the MCP config and target args: the config stays right after the program, the extra args stay before the prompt.
@@ -127,6 +127,12 @@ describe('hyperplan: read-only launch lines', () => {
     const b = { harness: 'claude', model: 'sonnet' } as EridaniBinding;
     expect(resumeLine(b, undefined, 's-1')).toBe(`'claude' --resume 's-1' --model 'sonnet' --permission-mode auto`);
     expect(resumeLine({ ...b, harness: 'codex' }, undefined, 's-1')).toBe(`'codex' resume --disable daemon_auto_start -m 'sonnet' 's-1'`);
+  });
+
+  it('preserves precise managed MCP scope without replacing its allow list during native resume', () => {
+    const b = { harness: 'claude', model: 'sonnet', mode: 'review' } as EridaniBinding;
+    const line = resumeLine(b, undefined, 's-1', ['--allowedTools', 'Read', 'mcp__eridani__submit_plan_review', '--disallowedTools', 'Edit', 'Write', 'NotebookEdit', '--strict-mcp-config']);
+    expect(line).toContain('mcp__eridani__submit_plan_review'); expect(line!.match(/--allowedTools/g)).toHaveLength(1); expect(line).toContain('--permission-mode dontAsk');
   });
 
   it('a resume keeps the binding\'s mode: the conversation reopens read-only', () => {

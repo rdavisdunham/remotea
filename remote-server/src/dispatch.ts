@@ -100,6 +100,8 @@ import type { CommandContext, CommandHandler, CommandResult } from './eridani-li
 import type { JournalRecord } from './eridani-journal';
 import type { ExecutionTarget, LaunchSpec } from './eridani-targets';
 import { liveWriters, type EnsuredWorktree, type WorktreeManager } from './worktrees';
+import { ManagedSessions, type ManagedSpec } from './managed-sessions';
+import type { RunPauseCommand } from '../../src/shared/eridani-link-protocol';
 import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
@@ -167,7 +169,6 @@ export function freshnessNote(wt: Pick<EnsuredWorktree, 'branch' | 'base' | 'bas
 export const CLAUDE_READ_ONLY_TOOLS: readonly string[] = Object.freeze([
   'Read', 'Grep', 'Glob',
   'Bash(git status *)', 'Bash(git log *)', 'Bash(git diff *)', 'Bash(git show *)', 'Bash(ls *)', 'Bash(cat *)', 'Bash(rg *)',
-  `mcp__${MCP_SERVER_NAME}__*`,
 ]);
 export const CLAUDE_READ_ONLY_DENIED: readonly string[] = Object.freeze(['Edit', 'Write', 'NotebookEdit']);
 
@@ -219,8 +220,8 @@ export function resumeLine(b: EridaniBinding, spec: LaunchSpec | undefined, sess
   const mcp = mcpArgs.map(q);
   const ro = b.mode ? readOnlyFlags(b.harness) : null;
   if (b.mode && !ro) return null;
-  if (b.harness === 'claude') return [bin, '--resume', q(sessionId), ...mcp, ...(ro?.lists ?? []), '--model', q(b.model), ...(ro?.tail ?? ['--permission-mode', 'auto']), ...(spec?.args ?? []).map(q)].join(' ');
-  return [bin, 'resume', ...mcp, '--disable', 'daemon_auto_start', '-m', q(b.model), ...(ro?.tail ?? []), q(sessionId)].join(' ');
+  if (b.harness === 'claude') return [bin, '--resume', q(sessionId), ...mcp, ...(mcpArgs.includes('--allowedTools') ? [] : ro?.lists ?? []), '--model', q(b.model), ...(b.effort ? ['--effort', q(b.effort)] : []), ...(ro?.tail ?? ['--permission-mode', 'auto']), ...(spec?.args ?? []).map(q)].join(' ');
+  return [bin, 'resume', ...mcp, '--disable', 'daemon_auto_start', '-m', q(b.model), ...(b.effort ? ['-c', q(`model_reasoning_effort=${JSON.stringify(b.effort)}`)] : []), ...(ro?.tail ?? []), q(sessionId)].join(' ');
 }
 
 /** A client of the hub that is Eridani: it opens sessions and reads nothing back. */
@@ -303,6 +304,9 @@ export interface DispatchDeps {
   worktrees: WorktreeManager;
   targets: () => ExecutionTarget[];
   questions: QuestionBroker;
+  managedSupported?: (target: ExecutionTarget, harness: 'codex' | 'claude') => boolean;
+  managedFactory?: (spec: import('./managed-harness').HarnessSpec) => import('./managed-harness').RuntimeAdapter;
+  managedEmit?: (body: Record<string, unknown>) => void;
   /** Send an upward event (verify.result) through the link. */
   emit: (body: VerifyResultFields) => void;
   /** The set of worktrees or their activity changed (worktrees.report). */
@@ -352,6 +356,7 @@ export const DEFAULT_TIMING = {
 
 export class Dispatch {
   readonly conn: EridaniConn;
+  readonly managed: ManagedSessions;
   private readonly timers: DispatchTimers;
   private readonly now: () => number;
   private readonly log: (m: string) => void;
@@ -396,6 +401,10 @@ export class Dispatch {
     this.timing = { ...DEFAULT_TIMING, ...deps.timing };
     this.mcpDir = deps.mcpDir ?? (deps.dir ? path.join(deps.dir, ERIDANI_MCP_DIR) : path.join(os.tmpdir(), `remotea-eridani-mcp-${process.getuid?.() ?? 'user'}`));
     this.secrets = this.loadSecrets();
+    this.managed = new ManagedSessions({ dir: deps.dir, factory: deps.managedFactory, hook: (surf, params) => { deps.hub.relayRpc(surf, 'hook.event', params); }, emit: (body) => deps.managedEmit?.(body), changed: (surf, sessionId, paused, attention) => {
+      const rec = deps.registry.session(surf);
+      if (rec?.eridani) { const { attention: previousAttention, ...binding } = rec.eridani; const nextAttention = attention === undefined ? previousAttention : attention; deps.hub.updateRecord(surf, { eridani: { ...binding, paused, ...(nextAttention ? { attention: nextAttention } : {}) }, ...(sessionId ? { agent: { provider: rec.eridani.harness, sessionId, seenAt: Date.now() } } : {}) }); deps.registry.saveNow(); }
+    } });
     this.conn = new EridaniConn(deps.hub);
     this.attempts = new VerifyAttempts({
       session: (id) => deps.registry.session(id),
@@ -423,13 +432,17 @@ export class Dispatch {
       spawn: (c, ctx) => this.spawn(c as unknown as SpawnCommand, ctx),
       input: (c, ctx) => this.input(c as unknown as InputCommand, ctx),
       stop: (c, ctx) => this.stop(c as unknown as StopCommand, ctx),
-      answer: async (c, ctx) => this.deps.questions.answer(c as unknown as AnswerCommand, () => ctx.begin()),
+      answer: async (c, ctx) => this.managed.findQuestion((c as unknown as AnswerCommand).question_id) ? this.managed.answer(c as unknown as AnswerCommand, () => ctx.begin()) : this.deps.questions.answer(c as unknown as AnswerCommand, () => ctx.begin()),
+      'run.pause': (c, ctx) => this.pauseRun(c as unknown as RunPauseCommand, ctx),
+      'run.resume': (c, ctx) => this.pauseRun(c as unknown as RunPauseCommand, ctx),
       verify: (c, ctx) => this.verify(c as unknown as VerifyCommand, ctx),
     };
   }
 
   hubHooks(): HubEridaniHooks {
     return {
+      spawn: (rec) => this.managed.spawn(rec.id),
+      takeover: (id) => this.takeover(id),
       env: (id) => {
         const env = this.secrets[id]?.env;
         // Consumed by the launch it was prepared for (spawn or resume).
@@ -439,14 +452,15 @@ export class Dispatch {
       },
       resumeCommand: (rec) => this.resumeCommand(rec),
       exited: (id, code) => this.onExit(id, code),
-      turn: (t: TurnFields) => this.attempts.onTurn(t),
+      turn: (t: TurnFields) => { const binding = this.deps.registry.session(t.surf)?.eridani; if (!binding?.paused && binding?.controller !== 'terminal') this.attempts.onTurn(t); },
       hook: (id, params) => {
         this.noteHook(id, params);
         this.deps.questions.hook(id, params);
       },
       snapshot: (id): Partial<SnapshotSurface> => {
-        const qs = this.deps.questions.openIds(id);
-        return qs.length ? { questions: qs } : {};
+        const qs = [...this.deps.questions.openIds(id), ...this.managed.pending(id)];
+        const binding = this.deps.registry.session(id)?.eridani;
+        return { ...(qs.length ? { questions: qs } : {}), ...(binding?.execution === 'managed' ? { execution: 'managed', controller: binding.controller ?? 'eridani', paused: !!binding.paused, pause_reason: binding.attention?.kind ?? null, ...(binding.attention ? { attention: binding.attention } : {}) } : {}) };
       },
     };
   }
@@ -502,6 +516,8 @@ export class Dispatch {
         const t = this.target(c.target.id);
         if (!t) return `unknown execution target ${c.target.id}`;
         if (c.target.repo && path.resolve(c.target.repo) !== t.repo) return 'repo does not match the execution target';
+        if (c.execution === 'managed' && (process.platform !== 'linux' || this.deps.managedSupported && !this.deps.managedSupported(t, c.harness))) return 'managed harness protocol is not verified for this installed launcher';
+        if (c.execution === 'managed' && c.mode && c.permission_profile === 'workspace-write') return 'read-only role cannot request workspace-write';
         if (!t.launch[c.harness]) return `${c.harness} is not enabled on target ${t.id}`;
         if (c.prompt.trimStart().startsWith('-')) return 'a prompt may not start with "-"';
         if (this.deps.registry.sessionTombstone(surfFor(c.run_id, c.generation, c.attempt))) return 'that run attempt was closed';
@@ -510,12 +526,18 @@ export class Dispatch {
       }
       case 'input': {
         const c = cmd as unknown as InputCommand;
+        const currentPlan = this.deps.registry.session(c.surf)?.eridani?.planRevision ?? 0;
+        if (c.plan_revision !== undefined && c.plan_revision < currentPlan) return 'stale plan revision';
         return this.fence(c, c.mode === 'steer' ? 'steer' : 'input');
       }
+      case 'run.pause':
+      case 'run.resume':
+        return this.fence(cmd as unknown as StopCommand, 'stop');
       case 'stop':
         return this.fence(cmd as unknown as StopCommand, 'stop');
       case 'answer': {
         const c = cmd as unknown as AnswerCommand;
+        if (this.managed.findQuestion(c.question_id)) return this.managed.precheck(c);
         const pre = this.deps.questions.precheck(c);
         if (pre) return pre;
         // The answer is delivered to the hook that asked; that hook must belong to the run's agent.
@@ -527,6 +549,7 @@ export class Dispatch {
         const c = cmd as unknown as VerifyCommand;
         const rec = this.boundSession(c.run_id);
         if (!rec?.eridani) return 'unknown run';
+        if (rec.eridani.controller === 'terminal') return 'terminal has control';
         if (c.generation !== rec.eridani.generation) return 'stale generation';
         const t = this.target(rec.eridani.target);
         if (!t) return 'the run\'s execution target is gone';
@@ -547,6 +570,7 @@ export class Dispatch {
     if ((rec.incarnation ?? 0) !== c.incarnation) return 'stale incarnation';
     // A queued input belongs to the current generation; steer and stop advance it.
     if (kind === 'input' ? c.generation !== b.generation : c.generation < b.generation) return 'stale generation';
+    if (b.controller === 'terminal') return 'terminal has control';
     if (kind === 'stop') return null;
     if (b.stopRequested) return 'stopping';
     if (!this.deps.hub.isLive(c.surf)) return 'the process is not running';
@@ -561,6 +585,7 @@ export class Dispatch {
    */
   private agentPresent(rec: SessionRecord): string | null {
     const b = rec.eridani!;
+    if (b.execution === 'managed') return b.controller === 'terminal' ? 'terminal has control' : this.managed.has(rec.id) ? null : 'managed session unavailable';
     const launched = this.launchedWith.get(rec.id);
     if (!launched || launched.incarnation !== (rec.incarnation ?? 0)) return 'the run\'s agent was not launched in this incarnation';
     if (!launched.agentSeen || !rec.agent) return 'the agent has not reported its session yet';
@@ -655,6 +680,44 @@ export class Dispatch {
       default:
         return null; // input, answer: the bytes may or may not have reached the agent
     }
+  }
+
+  private async takeover(surf: string): Promise<{ ok: boolean; error?: string }> {
+    const rec = this.deps.registry.session(surf); const b = rec?.eridani;
+    if (!rec || !b || b.execution !== 'managed' || b.controller === 'terminal') return { ok: false, error: 'not an Eridani-controlled managed session' };
+    const launch = this.target(b.target)?.launch[b.harness];
+    if (!launch) return { ok: false, error: 'launcher unavailable' };
+    const mcp = this.prepareMcp(surf, this.target(b.target), b.harness);
+    try {
+      const sessionId = this.managed.sessionId(surf); const line = resumeLine(b, launch, sessionId, this.roleMcpArgs(b, mcp?.args ?? []));
+      if (!line) return { ok: false, error: 'conversation cannot be resumed' };
+      await this.managed.takeoverNative(surf, line, { ...this.secrets[surf]?.env, ...this.mcpEnv.get(surf) });
+      this.deps.hub.updateRecord(surf, { eridani: { ...b, controller: 'terminal', paused: true } }); this.deps.registry.saveNow();
+      this.deps.hub.agentState.report(surf, { awaitingHuman: true, runDepth: 0, reason: 'Terminal has control' });
+      return { ok: true };
+    } catch (e) { return { ok: false, error: (e as Error).message }; }
+  }
+
+  private roleMcpArgs(b: EridaniBinding, args: string[]): string[] {
+    const scope = b.role === 'reviewer' ? ['task_plan', 'submit_plan_review', 'session_link'] : b.role === 'worker' ? ['task_plan', 'task_step', 'session_link'] : ['task_plan', 'task_interview', 'submit_plan', 'session_link'];
+    let scoped = [...args];
+    if (b.harness === 'codex') scoped.push('-c', `mcp_servers.${MCP_SERVER_NAME}.enabled_tools=${JSON.stringify(scope)}`, '-c', `mcp_servers.${MCP_SERVER_NAME}.tool_timeout_sec=120`, ...scope.flatMap((tool) => ['-c', `mcp_servers.${MCP_SERVER_NAME}.tools.${tool}.approval_mode="auto"`]));
+    else {
+      scoped.push('--allowedTools', ...scope.map((tool) => `mcp__${MCP_SERVER_NAME}__${tool}`));
+      if (b.mode || b.permissionProfile === 'read-only') scoped.push('Read', 'Grep', 'Glob', ...CLAUDE_READ_ONLY_TOOLS.filter((t) => t.startsWith('Bash(')), '--disallowedTools', ...CLAUDE_READ_ONLY_DENIED);
+      scoped.push('--strict-mcp-config');
+    }
+    return scoped;
+  }
+
+  private prepareManaged(surf: string, b: EridaniBinding, launch: LaunchSpec, prompt: string, operationId: string, args: string[], env: Record<string, string>, incarnation = 1): void {
+    const scoped = this.roleMcpArgs(b, args);
+    this.managed.prepare({ surf, runId: b.runId, generation: b.generation, incarnation, prompt, operationId, harness: b.harness, bin: launch.bin ?? b.harness, args: [...scoped, ...(launch.args ?? [])], cwd: b.worktree, env: { ...env, ...(this.mcpEnv.get(surf) ?? {}) }, model: b.model, effort: b.effort, planRevision: b.planRevision ?? b.verify?.planRevision ?? 0, profile: b.permissionProfile ?? (b.mode ? 'read-only' : 'workspace-write') });
+  }
+
+  private async pauseRun(cmd: RunPauseCommand, ctx: CommandContext): Promise<CommandResult> {
+    if (!this.managed.has(cmd.surf)) return { state: 'rejected', detail: 'native sessions do not support managed pause' };
+    ctx.begin(); await this.managed.pause(cmd.surf, cmd.t === 'run.pause'); return { state: 'executed' };
   }
 
   // ── spawn ────────────────────────────────────────────────────────────────
@@ -799,6 +862,9 @@ export class Dispatch {
         target: target.id,
         harness: cmd.harness,
         model: cmd.model,
+        planRevision: cmd.plan_revision ?? cmd.verify?.plan_revision ?? 0,
+        ...(cmd.effort ? { effort: cmd.effort } : {}),
+        ...(cmd.execution ? { execution: cmd.execution, permissionProfile: cmd.permission_profile ?? (cmd.mode ? 'read-only' : 'workspace-write'), controller: 'eridani' as const } : {}),
         worktree: wt.path,
         branch: wt.branch,
         base: wt.base,
@@ -822,6 +888,7 @@ export class Dispatch {
       if (webUrl) binding.webUrl = webUrl;
       const mcp = this.prepareMcp(surf, target, cmd.harness);
       if (mcp) binding.mcp = mcp.status;
+      if (cmd.execution === 'managed') this.prepareManaged(surf, binding, launch, prompt, cmd.op_id, mcp?.args ?? [], env);
       const { groupId, group } = this.groupFor(cmd.group ?? 'Eridani');
       const res = this.conn.open(surf, {
         cmd: launchCommand(cmd.harness, cmd.model, launch, !!prompt, mcp?.args, cmd.mode),
@@ -840,6 +907,7 @@ export class Dispatch {
       const rec = this.deps.hub.updateRecord(surf, { eridani: binding });
       this.noteLaunched(surf, rec?.incarnation ?? 1);
       this.deps.registry.saveNow();
+      if (cmd.execution === 'managed') { try { await this.managed.ready(surf); } catch { return { state: 'uncertain', detail: 'managed provider startup or receipt failed; reconcile before retry', result: this.spawnFacts(rec!) }; } }
       this.deps.changed?.();
       this.log(`eridani: spawned ${cmd.harness}${cmd.role ? ` ${cmd.role}` : ''}${cmd.mode ? ` (read-only: ${cmd.mode})` : ''} for run ${cmd.run_id} g${cmd.generation} in ${wt.path} (${surf})${mcp ? `; Eridani MCP ${mcp.status.configured ? 'configured' : `not configured: ${mcp.status.reason}`}` : ''}`);
       return { state: 'executed', result: this.spawnFacts(rec!) };
@@ -1029,6 +1097,13 @@ export class Dispatch {
   }
 
   private async input(cmd: InputCommand, ctx: CommandContext): Promise<CommandResult> {
+    if (this.deps.registry.session(cmd.surf)?.eridani?.execution === 'managed') {
+      let rec = this.deps.registry.session(cmd.surf)!;
+      if (cmd.plan_revision !== undefined && cmd.plan_revision !== rec.eridani!.planRevision) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, planRevision: cmd.plan_revision } }); this.managed.planRevision(cmd.surf, cmd.plan_revision); rec = this.deps.registry.session(cmd.surf)!; }
+      if (cmd.generation > rec.eridani!.generation) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation } }); this.managed.generation(cmd.surf, cmd.generation); }
+      if (cmd.mode === 'steer') { ctx.begin(); await this.managed.interrupt(cmd.surf); }
+      return this.managed.send(cmd.surf, cmd.text, cmd.op_id, false, () => ctx.begin());
+    }
     if (cmd.mode === 'steer') return this.steer(cmd, ctx);
     return new Promise<CommandResult>((resolve) => {
       const list = this.queues.get(cmd.surf) ?? [];
@@ -1142,6 +1217,7 @@ export class Dispatch {
   }
 
   private async stop(cmd: StopCommand, ctx: CommandContext): Promise<CommandResult> {
+    if (this.deps.registry.session(cmd.surf)?.eridani?.execution === 'managed') { ctx.begin(); await this.managed.cancel(cmd.surf); return { state: 'executed', result: { surf: cmd.surf, exited: true } }; }
     this.markStop(cmd.surf, cmd.mode, cmd.op_id, cmd.generation);
     ctx.begin();
     if (!this.deps.hub.isLive(cmd.surf)) {
@@ -1206,6 +1282,7 @@ export class Dispatch {
       this.deps.hub.updateRecord(rec.id, { eridani: { ...b, verify: { verifyId: cmd.verify_id, planRevision: cmd.plan_revision } } });
       this.deps.registry.saveNow();
     }
+    if (cmd.plan_revision > (b.planRevision ?? 0)) { this.deps.hub.updateRecord(rec.id, { eridani: { ...this.deps.registry.session(rec.id)!.eridani!, planRevision: cmd.plan_revision } }); this.managed.planRevision(rec.id, cmd.plan_revision); this.deps.registry.saveNow(); }
     ctx.begin();
     const out = await this.attempts.command(rec.id, cmd);
     return out.state === 'executed' ? { state: 'executed', result: out.result } : { state: 'rejected', detail: out.detail };
@@ -1220,6 +1297,7 @@ export class Dispatch {
    */
   linkUp(): void {
     this.linkEpoch++;
+    this.managed.replay();
     for (const surf of [...this.writes.keys()]) this.cancelWrites(surf, 'the link to Eridani dropped and reconnected');
   }
 
@@ -1228,11 +1306,21 @@ export class Dispatch {
   private resumeCommand(rec: SessionRecord): string | null | undefined {
     const b = rec.eridani;
     if (!b) return undefined;
+    if (b.execution === 'managed' && b.controller !== 'terminal') {
+      const target = this.target(b.target);
+      if (process.platform !== 'linux' || !target || this.deps.managedSupported && !this.deps.managedSupported(target, b.harness)) return null;
+      if (b.stopRequested || this.deps.resumeAgents === false) return null;
+      const launch = target.launch[b.harness];
+      if (!launch) return null;
+      const mcp = this.prepareMcp(rec.id, target, b.harness);
+      this.prepareManaged(rec.id, b, launch, '', b.spawnOp, mcp?.args ?? [], this.secrets[rec.id]?.env ?? {}, (rec.incarnation ?? 0) + 1);
+      return '';
+    }
     if (b.stopRequested || this.deps.resumeAgents === false || !rec.agent) return null;
     const t = this.target(b.target);
     const mcp = this.prepareMcp(rec.id, t, b.harness);
     if (mcp && !mcp.status.configured) this.log(`eridani: resuming ${rec.id} without Eridani MCP: ${mcp.status.reason}`);
-    const line = resumeLine(b, t?.launch[b.harness], rec.agent.sessionId, mcp?.args);
+    const line = resumeLine(b, t?.launch[b.harness], rec.agent.sessionId, b.execution === 'managed' ? this.roleMcpArgs(b, mcp?.args ?? []) : mcp?.args);
     if (!line) this.dropMcp(rec.id);
     // The hub respawns with this line as the next incarnation.
     this.cancelWrites(rec.id, 'the process is being respawned');
@@ -1246,7 +1334,7 @@ export class Dispatch {
    * session whose stop was requested is not resumed; its process is gone,
    * so the stop is complete.
    */
-  resumeOnBoot(): void {
+  resumeOnBoot(options: { includeManaged?: boolean; onlyManaged?: boolean } = {}): void {
     for (const rec of this.deps.registry.sessions()) this.attempts.recover(rec);
     // S-Q5: a process the PTY keeper kept is the same incarnation: what vouched for it still does.
     const launched = this.loadLaunched();
@@ -1264,11 +1352,13 @@ export class Dispatch {
     if (this.launchedWith.size || Object.keys(launched).length) this.saveLaunched();
     for (const rec of this.deps.registry.sessions()) {
       if (!rec.eridani || rec.state !== 'lost') continue;
+      const managed = rec.eridani.execution === 'managed' && rec.eridani.controller !== 'terminal';
+      if (options.includeManaged === false && managed || options.onlyManaged && !managed) continue;
       if (rec.eridani.stopRequested) {
         this.finishLost(rec, 'stopped (the process ended with the server restart)');
         continue;
       }
-      if (!rec.agent || this.deps.resumeAgents === false) {
+      if ((!rec.agent && rec.eridani.execution !== 'managed') || this.deps.resumeAgents === false) {
         // D4: no conversation to resume is an ended run, never a bare shell.
         this.deps.hub.exitLost(rec.id, rec.agent ? 'resuming agents is turned off' : 'no conversation to resume');
         continue;
@@ -1299,22 +1389,27 @@ export class Dispatch {
         let b = rec.eridani!;
         if (r.generation > b.generation && rec.state !== 'exited') {
           b = { ...b, generation: r.generation };
+          this.managed.generation(rec.id, r.generation);
           this.deps.hub.updateRecord(rec.id, { eridani: b });
           this.deps.registry.saveNow();
           this.cancelWrites(rec.id, `superseded by generation ${r.generation} (runs.snapshot)`, (w) => w.generation < r.generation);
         }
+        if (r.plan_revision !== undefined && r.plan_revision > (b.planRevision ?? 0)) { b = { ...b, planRevision: r.plan_revision }; this.managed.planRevision(rec.id, r.plan_revision); this.deps.hub.updateRecord(rec.id, { eridani: b }); this.deps.registry.saveNow(); }
         if (r.verify !== undefined && rec.state !== 'exited') {
           const { verify: _old, ...rest } = b;
           b = r.verify ? { ...rest, verify: { verifyId: r.verify.verify_id, planRevision: r.verify.plan_revision } } : rest;
           this.deps.hub.updateRecord(rec.id, { eridani: b });
           this.deps.registry.saveNow();
         }
+        if (b.controller === 'terminal') continue;
+        if (this.managed.has(rec.id) && (r.desired === 'pause' || r.desired === 'continue')) void this.managed.pause(rec.id, r.desired === 'pause').catch((e) => this.log(`managed pause: ${String(e)}`));
         if (r.desired !== 'stop') continue;
         if (rec.state === 'lost') {
           this.finishLost({ ...rec, eridani: { ...b, stopRequested: { at: this.now(), mode: r.stop_mode ?? 'interrupt', op: null } } }, 'stopped by Eridani while lost');
         } else if (this.deps.hub.isLive(rec.id) && !b.stopRequested) {
           this.markStop(rec.id, r.stop_mode ?? 'interrupt', null, r.generation);
-          void this.terminate(rec.id, r.stop_mode ?? 'interrupt');
+          if (b.execution === 'managed') void this.managed.cancel(rec.id);
+          else void this.terminate(rec.id, r.stop_mode ?? 'interrupt');
         }
       }
     }

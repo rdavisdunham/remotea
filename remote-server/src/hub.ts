@@ -24,7 +24,7 @@ import {
 } from '../../src/shared/remote-host-protocol';
 import { Registry } from './registry';
 import { TermSession, type ConnLike, type Timers } from './session';
-import type { PtyLike, SpawnFn } from './pty-spawn';
+import type { PtyLike, SpawnFn, SpawnRequest } from './pty-spawn';
 import { DEFAULT_THEME, type ThemeColors } from './queries';
 import { probeSession, type ProbeResult } from './agent-probe';
 import type { FsRequest } from './remote-fs';
@@ -101,6 +101,10 @@ export interface HubDeps {
 
 /** What the Eridani side plugs into the hub (dispatch.ts); every member optional. */
 export interface HubEridaniHooks {
+  /** An integration-owned transcript process; ordinary terminals keep the native spawner. */
+  spawn?(rec: SessionRecord, req: SpawnRequest): PtyLike | undefined;
+  /** Hand a managed conversation to its native terminal after stopping the managed controller. */
+  takeover?(id: string): Promise<{ ok: boolean; error?: string }>;
   /** Extra environment for a session (a run's ERIDANI_* and token). Applied under the hook identity. */
   env?(id: string): Record<string, string> | undefined;
   /** The command that reopens a lost session, before the default `claude --resume <id>`. */
@@ -172,6 +176,7 @@ export class Hub {
           state: info.state,
           since: info.since,
           ...(info.reason ? { reason: info.reason } : {}),
+          ...(rec.eridani?.execution === 'managed' ? { execution: 'managed' as const, controller: rec.eridani.controller ?? 'eridani', paused: !!rec.eridani.paused, pause_reason: rec.eridani.attention?.kind ?? null, ...(rec.eridani.attention ? { attention: rec.eridani.attention } : {}) } : {}),
           ...(rec.agent ? { provider: rec.agent.provider, provider_session_id: rec.agent.sessionId } : {}),
           ...(this.permissionMode.has(surf) ? { effective_permission_mode: this.permissionMode.get(surf) } : {}),
         });
@@ -230,6 +235,8 @@ export class Hub {
         worktree: r.eridani.worktree,
         branch: r.eridani.branch,
         stop_requested: !!r.eridani.stopRequested,
+        plan_revision: r.eridani.planRevision ?? r.eridani.verify?.planRevision ?? 0,
+        ...(r.eridani.execution === 'managed' ? { execution: 'managed' as const, controller: r.eridani.controller ?? 'eridani', paused: !!r.eridani.paused, pause_reason: r.eridani.attention?.kind ?? null, ...(r.eridani.attention ? { attention: r.eridani.attention } : {}) } : {}),
       } : {}),
       ...this.eridani.snapshot?.(r.id),
     }));
@@ -269,9 +276,12 @@ export class Hub {
         for (const id of msg.ids) this.sessions.get(id)?.detach(conn.id);
         return;
       case 'close': return this.close(conn, msg.rid, msg.id);
+      case 'takeover': return void this.takeover(conn, msg);
       case 'resize': this.sessions.get(msg.id)?.resize(conn.id, msg.cols, msg.rows); return;
       case 'claim': this.sessions.get(msg.id)?.claim(conn.id); return;
-      case 'deliver': this.sessions.get(msg.id)?.deliver(msg.commands); return;
+      case 'deliver':
+        if (!this.managedControl(msg.id)) this.sessions.get(msg.id)?.deliver(msg.commands);
+        return;
       case 'probe': return this.probe(conn, msg);
       case 'groupUpsert': {
         const res = this.registry.upsertGroup(msg.group.id, msg.group, device);
@@ -306,7 +316,22 @@ export class Hub {
     if (this.deps.fs) f.push('fs');
     // This server may send `focus` (Eridani's terminal.focus) to apps whose hello listed it.
     f.push('focus');
+    if (this.eridani.takeover) f.push('managedSessions');
     return f;
+  }
+
+  private async takeover(conn: HubConn, msg: Extract<ClientMsg, { t: 'takeover' }>): Promise<void> {
+    const rec = this.registry.session(msg.id);
+    let result: { ok: boolean; error?: string };
+    if (!this.eridani.takeover) result = { ok: false, error: 'Update this host to manage agent sessions.' };
+    else if (!rec || rec.hiddenBy.includes(conn.device!.id) || rec.eridani?.execution !== 'managed') {
+      result = { ok: false, error: 'This is not an accessible managed session.' };
+    } else if (rec.eridani.controller === 'terminal') result = { ok: true };
+    else {
+      try { result = await this.eridani.takeover(msg.id); }
+      catch (error) { result = { ok: false, error: (error as Error).message }; }
+    }
+    conn.sendJson({ t: 'ack', rid: msg.rid, ...result });
   }
 
   private hookStatus(): HookAgentStatus[] | undefined {
@@ -525,7 +550,14 @@ export class Hub {
       scrollback: this.cfg.scrollback,
       snapshotScrollback: this.cfg.snapshotScrollback,
       ringBytes: this.cfg.ringBytes,
-      spawn,
+      spawn: spawn ? (req) => {
+        const managed = this.eridani.spawn?.(rec, req);
+        if (managed) return managed;
+        if (rec.eridani?.execution === 'managed' && rec.eridani.controller !== 'terminal') {
+          throw new Error('Managed session recovery is not ready; the saved conversation is preserved.');
+        }
+        return spawn(req);
+      } : null,
       spawnRequest: { cmd, cwd: rec.cwd, env: Object.keys(env).length ? env : undefined },
       startupCommands,
       theme: () => this.theme,
@@ -705,12 +737,17 @@ export class Hub {
   }
 
   handleInput(conn: HubConn, id: string, data: string): void {
-    if (!conn.device) return;
+    if (!conn.device || this.managedControl(id)) return;
     const s = this.sessions.get(id);
     if (s && s.hasSubscriber(conn.id)) {
       s.input(conn.id, data);
       this.agentState.humanInput(id, data);
     }
+  }
+
+  private managedControl(id: string): boolean {
+    const binding = this.registry.session(id)?.eridani;
+    return binding?.execution === 'managed' && binding.controller !== 'terminal';
   }
 
   // ── Periodic work ────────────────────────────────────────────────────────

@@ -191,6 +191,14 @@ export interface EridaniBinding {
   target: string;
   harness: 'claude' | 'codex';
   model: string;
+  /** Managed runs expose a transcript until the owner explicitly takes over. */
+  execution?: 'managed';
+  effort?: string;
+  permissionProfile?: 'read-only' | 'workspace-write';
+  planRevision?: number;
+  paused?: boolean;
+  controller?: 'eridani' | 'terminal';
+  attention?: import('./eridani-link-protocol').ManagedAttention;
   worktree: string;
   branch: string;
   base: string;
@@ -314,6 +322,7 @@ export type ClientMsg =
   | { t: 'open'; rid: number; id: RemoteSurfaceId; cols: number; rows: number; sinceSeq?: number; bootId?: string; create?: CreateSpec }
   | { t: 'detach'; ids: RemoteSurfaceId[] }
   | { t: 'close'; rid: number; id: RemoteSurfaceId }
+  | { t: 'takeover'; rid: number; id: RemoteSurfaceId }
   | { t: 'resize'; id: RemoteSurfaceId; cols: number; rows: number }
   | { t: 'claim'; id: RemoteSurfaceId }
   | { t: 'deliver'; id: RemoteSurfaceId; commands: string[] }
@@ -349,7 +358,7 @@ export interface DiagEvent {
 }
 
 /** Features a server announces in `welcome`; an app uses a feature only when listed. */
-export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus';
+export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions';
 
 /**
  * Features an app announces in `hello`. `focus`: it brings a session's tab to
@@ -574,6 +583,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
     case 'detach':
       return isSurfaceIdList(m.ids) ? (m as unknown as ClientMsg) : null;
     case 'close':
+    case 'takeover':
     case 'hide':
     case 'unhide':
       return isRid(m.rid) && isSurfaceId(m.id) ? (m as unknown as ClientMsg) : null;

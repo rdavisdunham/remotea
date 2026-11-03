@@ -121,6 +121,7 @@ contextBridge.exposeInMainWorld('wmux', {
     hide: (hostId: string, surfaceId: string) => ipcRenderer.send(IPC_CHANNELS.RSESS_HIDE, hostId, surfaceId),
     unhide: (hostId: string, surfaceId: string) => ipcRenderer.send(IPC_CHANNELS.RSESS_UNHIDE, hostId, surfaceId),
     close: (hostId: string, surfaceId: string) => ipcRenderer.send(IPC_CHANNELS.RSESS_CLOSE, hostId, surfaceId),
+    takeover: (hostId: string, surfaceId: string) => ipcRenderer.invoke(IPC_CHANNELS.RSESS_TAKEOVER, hostId, surfaceId) as Promise<{ ok: boolean; error?: string; uncertain?: boolean }>,
     groupUpsert: (hostId: string, group: { id: string; name: string; color?: string }) => ipcRenderer.send(IPC_CHANNELS.RSESS_GROUP_UPSERT, hostId, group),
     groupClose: (hostId: string, groupId: string) => ipcRenderer.send(IPC_CHANNELS.RSESS_GROUP_CLOSE, hostId, groupId),
   },

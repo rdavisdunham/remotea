@@ -406,6 +406,12 @@ export class RemoteHosts {
     if (c && SURFACE_ID_RE.test(surfaceId)) c.intent({ t: 'unhide', id: surfaceId });
   }
 
+  takeover(hostId: string, surfaceId: string) {
+    const client = this.clients.get(hostId);
+    if (!client || !SURFACE_ID_RE.test(surfaceId)) return Promise.resolve({ ok: false, error: 'Invalid host or session.' });
+    return client.takeover(surfaceId);
+  }
+
   groupUpsert(hostId: string, group: { id: string; name: string; color?: string }): void {
     const c = this.clients.get(hostId);
     if (!c || !GROUP_ID_RE.test(group?.id ?? '') || typeof group.name !== 'string') return;

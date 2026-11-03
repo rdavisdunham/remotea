@@ -629,6 +629,19 @@ describe('EridaniLink: stage C commands', () => {
     const input = (over: Record<string, unknown> = {}) => ({ t: 'input', op_id: `op-${Math.random()}`, surf: 'surf-1', incarnation: 1, run_id: 'r', generation: 1, mode: 'queue', text: 'go on', ...over });
     const signed = (cmd: Record<string, unknown>) => ({ ...cmd, digest: digestOf(cmd) });
 
+    it('retains indefinite managed spawn IDs only with negotiated durable managed execution', async () => {
+      let launched = 0; const { eri, link } = await setup({ handlers: { spawn: async (_command, context) => { context.begin(); launched++; return { state: 'executed' }; } } });
+      eri.welcomeCaps = ['commands.durable', 'managed.sessions']; link.start(); await until(() => link.ready);
+      const base = { t: 'spawn', op_id: 'durable-managed-spawn', run_id: 'run', generation: 1, attempt: 1, harness: 'codex', model: 'actual', target: { id: 'repo', branch: 'task/test' }, prompt: 'work', execution: 'managed', expires_at: 0 };
+      const ws = eri.sockets[0]; eri.send(ws, { ...signed(base), id: 'spawn-1' });
+      await until(() => eri.of('command.outcome').some((frame: any) => frame.command_id === base.op_id));
+      expect(launched).toBe(1); expect(link.journal.get(base.op_id)).toMatchObject({ state: 'executed', durable: true });
+      eri.send(ws, { ...signed(base), id: 'spawn-duplicate' }); await until(() => eri.of('ack').some((frame: any) => frame.acked_id === 'spawn-duplicate')); expect(launched).toBe(1);
+      eri.send(ws, { ...signed({ ...base, op_id: 'legacy-zero-expiry', execution: undefined }), id: 'spawn-legacy' });
+      await until(() => eri.of('command.outcome').some((frame: any) => frame.command_id === 'legacy-zero-expiry'));
+      expect(eri.of('command.outcome').find((frame: any) => frame.command_id === 'legacy-zero-expiry')).toMatchObject({ state: 'rejected', detail: 'expired' }); expect(launched).toBe(1);
+    });
+
     it('every effectful command needs expires_at within the replay horizon (L11)', async () => {
       let runs = 0;
       const executed = async () => (runs++, { state: 'executed' as const });
