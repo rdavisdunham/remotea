@@ -508,8 +508,10 @@ export interface PromptBody extends OpFields {
   at: number;
 }
 
+export interface ManagedAttention { kind: 'permission_denied' | 'receipt_uncertain'; reason: string; tool?: string; question_id?: string; action?: Record<string, unknown> }
+
 export interface StatusBody extends OpFields {
-  execution?: 'managed'; controller?: 'eridani' | 'terminal';
+  execution?: 'managed'; controller?: 'eridani' | 'terminal'; paused?: boolean; pause_reason?: ManagedAttention['kind'] | null; attention?: ManagedAttention;
   t: 'status';
   /** Coalescing key: `status:${surf}`. */
   entity: string;
@@ -537,7 +539,8 @@ export interface ExitBody extends OpFields {
 }
 
 export interface SnapshotSurface {
-  execution?: 'managed'; controller?: 'eridani' | 'terminal';
+  plan_revision?: number;
+  execution?: 'managed'; controller?: 'eridani' | 'terminal'; paused?: boolean; pause_reason?: ManagedAttention['kind'] | null; attention?: ManagedAttention;
   surf: string;
   incarnation: number;
   /** The terminal: live here, lost in a restart, or exited. */
@@ -620,6 +623,7 @@ export interface QuestionItem {
 
 /** An agent asked something that can be answered remotely (Claude AskUserQuestion, Codex PermissionRequest). */
 export interface QuestionBody extends OpFields {
+  plan_revision?: number;
   t: 'question';
   question_id: string;
   surf: string;
@@ -788,6 +792,7 @@ export interface ContextResponseBody {
 export type Harness = 'claude' | 'codex';
 
 export interface SpawnCommand extends OpFields {
+  plan_revision?: number;
   execution?: 'managed';
   effort?: string;
   permission_profile?: 'read-only' | 'workspace-write';
@@ -867,6 +872,7 @@ export interface RunVerifyConfig {
 }
 
 export interface InputCommand extends OpFields {
+  plan_revision?: number;
   t: 'input';
   surf: string;
   incarnation: number;
@@ -958,6 +964,7 @@ export const SESSION_TOOLS: ReadonlySet<string> = new Set<SessionTool>(['claude_
 
 /** Eridani's answer to sessions.snapshot: what each run should be doing. */
 export interface RunsSnapshotEntry {
+  plan_revision?: number;
   run_id: string;
   generation: number;
   desired: 'continue' | 'stop' | 'none' | 'pause';
@@ -1204,6 +1211,7 @@ export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input'
  */
 export function commandShapeError(m: Record<string, unknown>): string | null {
   if (!isExpiry(m.expires_at)) return 'bad expires_at';
+  if (m.plan_revision !== undefined && !isInt(m.plan_revision)) return 'bad plan_revision';
   switch (m.t) {
     case 'spawn': {
       if (!isStr(m.run_id, 128) || !RUN_ID_RE.test(m.run_id)) return 'bad run_id';

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import os from 'os';
@@ -18,10 +18,10 @@ class Adapter extends EventEmitter implements RuntimeAdapter {
 const spec: ManagedSpec = { surf: 'surface', runId: 'run', generation: 3, incarnation: 1, prompt: '', operationId: 'spawn-op', harness: 'codex', bin: 'codex', args: [], cwd: '/tmp', env: {}, model: 'actual-model', effort: 'ultra', profile: 'workspace-write' };
 const approval = (id: string | number, command = 'npm test') => ({ id, method: 'item/commandExecution/requestApproval', params: { threadId: 'conversation', turnId: 'turn', itemId: 'tool', command, cwd: '/tmp', additionalPermissions: { network: { enabled: true } } } });
 const temps: string[] = [];
-afterEach(() => { for (const d of temps.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
-function fixture(dir: string | null = null) {
+afterEach(() => { vi.useRealTimers(); for (const d of temps.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
+function fixture(dir: string | null = null, decisionReceiptMs?: number) {
   const adapter = new Adapter(); const events: any[] = [];
-  const manager = new ManagedSessions({ dir, factory: () => adapter, emit: (e) => events.push(e), changed: () => {} });
+  const manager = new ManagedSessions({ dir, decisionReceiptMs, factory: () => adapter, emit: (e) => events.push(e), changed: () => {} });
   manager.prepare({ ...spec }); const terminal = manager.spawn(spec.surf)!;
   return { adapter, events, manager, terminal };
 }
@@ -121,6 +121,52 @@ describe('managed durable ownership', () => {
     adapter.emit('event', { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'deferred-tool', content: 'A' }] } });
     expect(events.find((e) => e.t === 'question.resolved')).toMatchObject({ outcome: 'accepted' });
   });
+  it('bounds only submitted-decision receipts and accepts a late exact confirmation without replay', async () => {
+    vi.useFakeTimers(); const { manager, adapter, events } = fixture(null, 25); await manager.ready(spec.surf);
+    adapter.emit('event', approval(1)); const q = events.find((e) => e.t === 'question');
+    await vi.advanceTimersByTimeAsync(1_000_000); expect(manager.precheck(answer(q))).toBe(null);
+    await manager.answer(answer(q), () => {}); await vi.advanceTimersByTimeAsync(25);
+    expect(events.filter((e) => e.t === 'question').at(-1)).toMatchObject({ question_id: q.question_id, recovery: 'attention_required' });
+    expect(adapter.responses).toHaveLength(1); expect(manager.precheck(answer(q))).toContain('paused');
+    adapter.emit('event', { method: 'serverRequest/resolved', params: { requestId: 'wrong-callback' } }); expect(events.some((e) => e.t === 'question.resolved')).toBe(false);
+    adapter.emit('event', { method: 'serverRequest/resolved', params: { requestId: 1 } });
+    expect(events.find((e) => e.t === 'question.resolved')).toMatchObject({ outcome: 'accepted', provider_request_id: '1' }); expect(adapter.responses).toHaveLength(1);
+  });
+  it('retains an operator pause when a late exact permission receipt is confirmed', async () => {
+    vi.useFakeTimers(); const { manager, adapter, events } = fixture(null, 25); await manager.ready(spec.surf); adapter.emit('event', approval(1)); const q = events.find((e) => e.t === 'question');
+    await manager.answer(answer(q), () => {}); await vi.advanceTimersByTimeAsync(25); await manager.pause(spec.surf, true);
+    adapter.emit('event', { method: 'serverRequest/resolved', params: { requestId: 1 } });
+    expect(events.find((e) => e.t === 'question.resolved')).toMatchObject({ outcome: 'accepted' }); expect(manager.precheck(answer(q))).toBe('run paused');
+  });
+
+  it('never lets a reused provider callback ID confirm an uncertain decision from a previous process', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-callback-epoch-')); temps.push(dir);
+    const first = fixture(dir); await first.manager.ready(spec.surf); first.adapter.emit('event', approval(1)); const old = first.events.find((e) => e.t === 'question'); await first.manager.answer(answer(old), () => {});
+    const second = fixture(dir); await second.manager.ready(spec.surf); second.adapter.emit('event', approval(1, 'different reviewed action')); const fresh = second.events.filter((e) => e.t === 'question').at(-1);
+    expect(fresh.question_id).not.toBe(old.question_id); await second.manager.answer(answer(fresh), () => {});
+    second.adapter.emit('event', { method: 'serverRequest/resolved', params: { requestId: 1 } });
+    expect(second.events.filter((e) => e.t === 'question.resolved')).toMatchObject([{ question_id: fresh.question_id, outcome: 'accepted' }]);
+    expect(second.manager.precheck(answer(old))).toContain('reconciliation');
+  });
+
+  it('persists auto-denied action attention and refuses automatic retry or Resume override', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-denied-')); temps.push(dir);
+    const first = fixture(dir); await first.manager.ready(spec.surf);
+    first.adapter.emit('event', { type: 'remotea/permission-denied', input: { tool_name: 'Bash', tool_input: { command: 'blocked-action' }, reason: 'Classifier unavailable', cwd: '/tmp' } });
+    await expect(first.manager.pause(spec.surf, false)).rejects.toThrow('terminal takeover'); expect(first.adapter.sent).toEqual([]); expect(first.adapter.responses).toEqual([]);
+    const second = fixture(dir); await second.manager.ready(spec.surf);
+    expect(second.events.filter((e) => e.t === 'activity').at(-1)).toMatchObject({ kind: 'waiting', label: 'Automatic review denied Bash: Classifier unavailable' });
+    await expect(second.manager.pause(spec.surf, false)).rejects.toThrow('terminal takeover');
+  });
+  it('fences permission answers to independent plan revisions even when verification is disabled', async () => {
+    const { manager, adapter, events } = fixture(); await manager.ready(spec.surf); manager.planRevision(spec.surf, 1); adapter.emit('event', approval(1));
+    const q = events.find((e) => e.t === 'question'); expect(q.plan_revision).toBe(1);
+    expect(manager.precheck({ ...answer(q), plan_revision: 1, request_digest: q.request_digest })).toBe(null);
+    expect(manager.precheck({ ...answer(q), plan_revision: 0 })).toContain('expected 1, got 0');
+    manager.planRevision(spec.surf, 2); expect(manager.precheck({ ...answer(q), plan_revision: 2 })).toContain('stale plan');
+    adapter.emit('event', approval(2)); const updated = events.filter((e) => e.t === 'question').at(-1); expect(updated.question_id).not.toBe(q.question_id); expect(updated.plan_revision).toBe(2);
+  });
+
   it('never emits private reasoning text and orders actual activity changes', async () => {
     const { manager, adapter, events } = fixture(); await manager.ready(spec.surf);
     adapter.emit('event', { method: 'item/reasoning/textDelta', params: { delta: 'private thought' } });

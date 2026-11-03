@@ -176,7 +176,7 @@ export class Hub {
           state: info.state,
           since: info.since,
           ...(info.reason ? { reason: info.reason } : {}),
-          ...(rec.eridani?.execution === 'managed' ? { execution: 'managed' as const, controller: rec.eridani.controller ?? 'eridani' } : {}),
+          ...(rec.eridani?.execution === 'managed' ? { execution: 'managed' as const, controller: rec.eridani.controller ?? 'eridani', paused: !!rec.eridani.paused, pause_reason: rec.eridani.attention?.kind ?? null, ...(rec.eridani.attention ? { attention: rec.eridani.attention } : {}) } : {}),
           ...(rec.agent ? { provider: rec.agent.provider, provider_session_id: rec.agent.sessionId } : {}),
           ...(this.permissionMode.has(surf) ? { effective_permission_mode: this.permissionMode.get(surf) } : {}),
         });
@@ -235,7 +235,8 @@ export class Hub {
         worktree: r.eridani.worktree,
         branch: r.eridani.branch,
         stop_requested: !!r.eridani.stopRequested,
-        ...(r.eridani.execution === 'managed' ? { execution: 'managed' as const, controller: r.eridani.controller ?? 'eridani' } : {}),
+        plan_revision: r.eridani.planRevision ?? r.eridani.verify?.planRevision ?? 0,
+        ...(r.eridani.execution === 'managed' ? { execution: 'managed' as const, controller: r.eridani.controller ?? 'eridani', paused: !!r.eridani.paused, pause_reason: r.eridani.attention?.kind ?? null, ...(r.eridani.attention ? { attention: r.eridani.attention } : {}) } : {}),
       } : {}),
       ...this.eridani.snapshot?.(r.id),
     }));

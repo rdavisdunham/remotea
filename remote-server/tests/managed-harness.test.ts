@@ -20,6 +20,7 @@ rl.on('line',line=>{const m=JSON.parse(line);
  if(m.type==='control_request'&&m.request.subtype==='initialize')send({type:'control_response',response:{subtype:'success',request_id:m.request_id,response:{models:[{value:'model',supportedEffortLevels:['low']}]}}});
  if(m.type==='control_request'&&m.request.subtype==='initialize'&&process.env.REMOTEA_TEST_DEFERRED)send({type:'control_request',request_id:'hook-test',request:{subtype:'hook_callback',callback_id:'remotea-defer-ask',input:{tool_name:'AskUserQuestion',tool_use_id:'deferred-id',tool_input:{questions:[{question:'Which?',options:[{label:'A'}]}]}}}});
  if(m.type==='control_response'&&m.response.request_id==='hook-test')send({type:'test/deferred',output:m.response.response});
+ if(m.type==='control_request'&&m.request.subtype==='initialize'&&process.env.REMOTEA_TEST_DENIED)send({type:'control_request',request_id:'denial-hook',request:{subtype:'hook_callback',callback_id:'remotea-permission-denied',input:{hook_event_name:'PermissionDenied',tool_name:'Bash',tool_input:{command:'blocked-action'},tool_use_id:'denied-id',reason:'Classifier unavailable'}}});
  if(m.type==='user'){send(m);send({type:'control_request',request_id:'permission',request:{subtype:'can_use_tool',tool_name:'Bash',input:{command:'npm test'},tool_use_id:'tool'}});}
  if(m.id===42||m.type==='control_response')send({type:'test/decision',response:m.result??m.response.response});
 });
@@ -65,6 +66,13 @@ describe('structured provider subprocess transports', () => {
   it('reads authoritative default and efforts with model/list without creating a thread or inference turn', async () => {
     const spec = fixture('codex'); const catalog = await codexModelCatalog(spec.bin);
     expect(catalog).toMatchObject([{ model: 'actual-sol', default: true, efforts: ['low', 'ultra'], default_effort: 'low' }]);
+  });
+  it('reports Claude auto denials with documented retry:false and never changes permissions', async () => {
+    const spec = fixture('claude'); spec.env.REMOTEA_TEST_DENIED = '1'; const adapter = new ClaudeRuntimeAdapter(spec, 1000); const events: any[] = []; adapter.on('event', (e) => events.push(e));
+    try { await adapter.start(); await eventually(() => events.some((e) => e.type === 'test/decision'));
+      expect(events.find((e) => e.type === 'test/decision').response).toEqual({ hookSpecificOutput: { hookEventName: 'PermissionDenied', retry: false } });
+      expect(events.find((e) => e.type === 'remotea/permission-denied').input).toMatchObject({ tool_name: 'Bash', reason: 'Classifier unavailable' });
+    } finally { await adapter.stop(); }
   });
   it('bounds stalled receipts and never retries the effect', async () => {
     const adapter = new CodexRuntimeAdapter(fixture('codex'), 1000);

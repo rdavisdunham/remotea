@@ -10,16 +10,17 @@ import { writePrivate } from './eridani-mcp';
 import { canonicalJson } from '../../src/shared/eridani-link-protocol';
 import { redact } from './collector/redact';
 import { buildAnswers, toItems, redactItem } from './questions-claude';
-import type { AnswerCommand, QuestionBody, QuestionItem, ActivityBody } from '../../src/shared/eridani-link-protocol';
+import type { AnswerCommand, QuestionBody, QuestionItem, ActivityBody, ManagedAttention } from '../../src/shared/eridani-link-protocol';
 import type { CommandResult } from './eridani-link';
 
 type Up = Omit<QuestionBody | ActivityBody, 'op_id' | 'digest'> | Record<string, unknown>;
 export interface ManagedSpec extends HarnessSpec { surf: string; runId: string; generation: number; incarnation: number; prompt: string; operationId: string; planRevision?: number | null }
-interface Decision { id: string; digest: string; request: HarnessRequest; items: QuestionItem[]; kind: 'ask' | 'approval'; state: 'pending' | 'submitted' | 'uncertain' | 'resolved'; sessionId: string; turnId: string | null; generation: number; response?: unknown; action?: QuestionBody['action'] }
-interface Saved { initialization?: 'executing' | 'ready'; sessionId: string; turnId: string | null; sequence: number; paused: boolean; active: boolean; decisions: Decision[]; operations: Record<string, 'queued' | 'executing' | 'delivered' | 'uncertain'>; queue: Array<{ text: string; op: string; generation: number }> }
-interface Entry { spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
+interface Decision { planRevision?: number; id: string; digest: string; request: HarnessRequest; items: QuestionItem[]; kind: 'ask' | 'approval'; state: 'pending' | 'submitted' | 'uncertain' | 'resolved'; sessionId: string; turnId: string | null; generation: number; response?: unknown; action?: QuestionBody['action'] }
+interface Saved { attention?: ManagedAttention; pausedBy?: 'operator' | 'attention'; initialization?: 'executing' | 'ready'; sessionId: string; turnId: string | null; sequence: number; paused: boolean; active: boolean; decisions: Decision[]; operations: Record<string, 'queued' | 'executing' | 'delivered' | 'uncertain'>; queue: Array<{ text: string; op: string; generation: number }> }
+interface Entry { spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; receiptTimers: Map<string, NodeJS.Timeout>; receiptRequests: Map<string, HarnessRequest>; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
 export interface ManagedDeps {
-  dir: string | null; emit(body: Up): void; changed(surf: string, sessionId: string, paused: boolean): void;
+  dir: string | null; emit(body: Up): void; changed(surf: string, sessionId: string, paused: boolean, attention?: ManagedAttention | null): void;
+  decisionReceiptMs?: number;
   factory?: (spec: HarnessSpec) => RuntimeAdapter;
   hook?: (surf: string, params: Record<string, unknown>) => void;
 }
@@ -65,7 +66,7 @@ export class ManagedSessions {
     state.active = false;
     const adapter = this.deps.factory?.({ ...spec, sessionId: state.sessionId || undefined }) ?? (spec.harness === 'codex' ? new CodexRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }) : new ClaudeRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }));
     const terminal = new ManagedTerminal();
-    const e: Entry = { spec, state, adapter, terminal, ready: Promise.resolve(), liveRequests: new Map(), busy: false, items: new Map(), waiters: new Map() };
+    const e: Entry = { spec, state, adapter, terminal, ready: Promise.resolve(), liveRequests: new Map(), busy: false, receiptTimers: new Map(), receiptRequests: new Map(), items: new Map(), waiters: new Map() };
     this.entries.set(surf, e);
     for (const q of state.decisions) if (q.state === 'submitted') q.state = 'uncertain';
     for (const [op, status] of Object.entries(state.operations)) if (status === 'executing') state.operations[op] = 'uncertain';
@@ -81,11 +82,12 @@ export class ManagedSessions {
       state.initialization = 'executing'; this.save(e);
       const id = recovered ? await adapter.resume() : await adapter.start();
       if (id) state.sessionId = id; state.initialization = 'ready';
-      this.save(e); this.deps.changed(surf, state.sessionId, state.paused); e.started = true;
+      this.save(e); this.deps.changed(surf, state.sessionId, state.paused, state.attention); e.started = true;
       this.hook(e, 'SessionStart');
       if (recovered) {
         for (const q of state.decisions) if (q.state !== 'resolved') this.publish(e, q, true);
-        if (interruptedTurn || Object.values(state.operations).includes('uncertain')) this.attention(e, 'Recovered conversation; previous action needs reconciliation before continuing');
+        if (state.attention) this.attention(e, state.attention.reason);
+        else if (interruptedTurn || Object.values(state.operations).includes('uncertain')) this.attention(e, 'Recovered conversation; previous action needs reconciliation before continuing');
         else this.activity(e, 'idle');
         await this.recreatePending(e);
       } else if (spec.prompt) await this.send(surf, spec.prompt, spec.operationId, true);
@@ -100,24 +102,29 @@ export class ManagedSessions {
   }
   private attention(e: Entry, label: string): void { e.terminal.output(`\n[${label}]\n`); try { this.activity(e, 'waiting', label); } catch { e.terminal.output('[Managed persistence unavailable; execution is blocked]\n'); } }
   private publish(e: Entry, q: Decision, recovering = false): void {
-    this.deps.emit({ t: 'question', question_id: q.id, surf: e.spec.surf, incarnation: e.spec.incarnation, run_id: e.spec.runId, generation: q.generation, provider: e.spec.harness, provider_session_id: q.sessionId, provider_request_id: String(q.request.id), provider_turn_id: q.turnId, kind: q.kind, group_id: q.id, items: q.items.map(redactItem), hold_until: 0, durable: true, request_digest: q.digest, ...(q.action ? { action: q.action } : {}), recovery: recovering || q.state !== 'pending' ? 'attention_required' : 'pending' });
+    this.deps.emit({ t: 'question', question_id: q.id, surf: e.spec.surf, incarnation: e.spec.incarnation, run_id: e.spec.runId, generation: q.generation, plan_revision: q.planRevision ?? 0, provider: e.spec.harness, provider_session_id: q.sessionId, provider_request_id: String(q.request.id), provider_turn_id: q.turnId, kind: q.kind, group_id: q.id, items: q.items.map(redactItem), hold_until: 0, durable: true, request_digest: q.digest, ...(q.action ? { action: q.action } : {}), recovery: recovering || q.state !== 'pending' ? 'attention_required' : 'pending' });
   }
   private request(e: Entry, req: HarnessRequest, items: QuestionItem[], kind: Decision['kind']): void {
     // Match the entire provider action and original conversation context. A new request ID alone never grants consent.
     if (kind === 'approval' && Buffer.byteLength(canonicalJson(req.params)) > 120 * 1024) { this.attention(e, 'Unsupported approval action exceeds 128KiB protocol bound; action remains blocked'); return; }
     const contextParams = { ...req.params }; delete contextParams.turnId; delete contextParams.startedAtMs; delete contextParams.itemId; delete contextParams.approvalId;
-    const hash = digest({ method: req.method, params: contextParams, sessionId: e.state.sessionId, generation: e.spec.generation, runId: e.spec.runId, profile: e.spec.profile, cwd: e.spec.cwd, model: e.spec.model, effort: e.spec.effort ?? null, planRevision: e.spec.planRevision ?? null });
+    const hash = digest({ method: req.method, params: contextParams, sessionId: e.state.sessionId, generation: e.spec.generation, runId: e.spec.runId, profile: e.spec.profile, cwd: e.spec.cwd, model: e.spec.model, effort: e.spec.effort ?? null, planRevision: e.spec.planRevision ?? 0 });
     let q = e.state.decisions.find((d) => d.digest === hash && d.state !== 'resolved');
     if (!q && e.recovering) {
-      for (const previous of e.state.decisions) if (previous.state === 'pending') { previous.state = 'resolved'; this.deps.emit({ t: 'question.resolved', question_id: previous.id, surf: e.spec.surf, generation: previous.generation, provider_request_id: String(previous.request.id), incarnation: e.spec.incarnation, request_digest: previous.digest, plan_revision: e.spec.planRevision ?? 0, outcome: 'canceled', still_open: false, detail: 'Provider recreated a changed action after restart; fresh review required', at: Date.now() }); }
+      for (const previous of e.state.decisions) if (previous.state === 'pending') { previous.state = 'resolved'; this.deps.emit({ t: 'question.resolved', question_id: previous.id, surf: e.spec.surf, generation: previous.generation, provider_request_id: String(previous.request.id), incarnation: e.spec.incarnation, request_digest: previous.digest, plan_revision: previous.planRevision ?? 0, outcome: 'canceled', still_open: false, detail: 'Provider recreated a changed action after restart; fresh review required', at: Date.now() }); }
     }
-    if (!q) { q = { id: `managed-${crypto.randomUUID()}`, digest: hash, request: req, items, kind, state: 'pending', sessionId: e.state.sessionId, turnId: e.state.turnId, generation: e.spec.generation }; e.state.decisions.push(q); }
+    if (!q) { q = { id: `managed-${crypto.randomUUID()}`, digest: hash, request: req, items, kind, state: 'pending', sessionId: e.state.sessionId, turnId: e.state.turnId, generation: e.spec.generation, planRevision: e.spec.planRevision ?? 0 }; e.state.decisions.push(q); }
     if (kind === 'approval') q.action = { tool: req.method === 'claude/permission' ? String(req.params.tool_name) : req.method, input: JSON.parse(redact(JSON.stringify(req.params))), cwd: e.spec.cwd, digest: hash, ...(req.params.permissions ? { permissions: JSON.parse(redact(JSON.stringify(req.params.permissions))) } : {}) };
     if (e.recovering) e.recovering = false;
     q.request = req; e.liveRequests.set(q.id, req); this.save(e); this.publish(e, q); this.activity(e, 'waiting');
   }
   private event(e: Entry, m: any): void {
     const p = m.params ?? {};
+    if (m.type === 'remotea/permission-denied') {
+      const input = m.input ?? {}, tool = String(input.tool_name ?? 'tool');
+      const action = { tool, input: input.tool_input, cwd: input.cwd ?? e.spec.cwd };
+      this.setAttention(e, { kind: 'permission_denied', tool, reason: redact(`Automatic review denied ${tool}: ${String(input.reason ?? 'Review the action in Remotea before continuing')}`).slice(0, 300), ...(Buffer.byteLength(JSON.stringify(action)) <= 120 * 1024 ? { action: JSON.parse(redact(JSON.stringify(action))) } : {}) }); void e.adapter.interrupt().catch(() => this.attention(e, 'Automatic review denied the action; provider interrupt unconfirmed')); return;
+    }
     if (m.method && m.id !== undefined) {
       if (m.method === 'item/tool/requestUserInput') {
         const items = toItems(p.questions?.map((q: any) => ({ question: q.question, header: q.header, options: q.options }))) ?? [];
@@ -207,7 +214,9 @@ export class ManagedSessions {
   precheck(cmd: AnswerCommand): string | null {
     const found = this.findQuestion(cmd.question_id); if (!found) return 'unknown managed question';
     const { entry: e, question: q } = found;
-    if (cmd.request_digest !== undefined && cmd.request_digest !== q.digest || cmd.plan_revision !== undefined && cmd.plan_revision !== (e.spec.planRevision ?? 0)) return 'stale action context';
+    if (cmd.request_digest !== undefined && cmd.request_digest !== q.digest) return 'stale action digest';
+    if ((q.planRevision ?? 0) !== (e.spec.planRevision ?? 0)) return 'question belongs to a stale plan revision';
+    if (cmd.plan_revision !== undefined && cmd.plan_revision !== (q.planRevision ?? 0)) return `stale plan revision (expected ${q.planRevision ?? 0}, got ${cmd.plan_revision})`;
     if (cmd.surf !== undefined && cmd.surf !== e.spec.surf || cmd.run_id !== undefined && cmd.run_id !== e.spec.runId || cmd.incarnation !== undefined && cmd.incarnation !== e.spec.incarnation || cmd.generation !== undefined && cmd.generation !== e.spec.generation) return 'stale answer fence';
     if (e.persistenceError) return 'managed persistence unavailable';
     if (e.handingOff) return 'terminal has control';
@@ -226,14 +235,34 @@ export class ManagedSessions {
     let response: unknown;
     if (q.kind === 'approval') { const allow = cmd.answers[0].choice_ids![0] === 'allow_once'; response = e.spec.harness === 'codex' ? request.method === 'item/permissions/requestApproval' ? { permissions: allow ? Object.fromEntries(Object.entries(request.params.permissions ?? {}).filter(([, value]) => value !== null)) : {}, scope: 'turn', strictAutoReview: true } : { decision: allow ? 'accept' : 'decline' } : allow ? { behavior: 'allow', updatedInput: request.params.input } : { behavior: 'deny', message: 'Denied by user' }; }
     else { const answers = buildAnswers(q.items, cmd.answers); if ('error' in answers) return { state: 'rejected', detail: answers.error }; response = e.spec.harness === 'codex' ? { answers: Object.fromEntries(q.items.map((it) => [it.id, { answers: [answers.answers[it.text]] }])) } : { behavior: 'allow', updatedInput: { ...request.params.input, answers: answers.answers } }; }
-    begin(); q.response = response; q.state = 'submitted'; this.save(e);
-    try { await e.adapter.respond(request, response); this.save(e); this.activity(e, 'thinking'); return { state: 'executed', result: { decision: 'submitted', provider_confirmation: 'pending' } }; }
-    catch { q.state = 'uncertain'; try { this.save(e); } catch { /* uncertain consent is never retried */ } return { state: 'uncertain', detail: 'decision delivery uncertain; consent will not be replayed' }; }
+    begin(); q.response = response; q.state = 'submitted'; this.save(e); e.receiptRequests.set(q.id, request);
+    try { await e.adapter.respond(request, response); this.save(e); if (q.state === 'submitted') this.watchReceipt(e, q); this.activity(e, 'thinking'); return { state: 'executed', result: { decision: 'submitted', provider_confirmation: 'pending' } }; }
+    catch { if (this.findQuestion(q.id)?.question.state === 'resolved') return { state: 'executed', result: { decision: 'consumed' } }; q.state = 'uncertain'; try { this.setAttention(e, { kind: 'receipt_uncertain', question_id: q.id, tool: q.request.method, reason: 'Decision delivery is uncertain; reconcile its receipt before retry' }); this.publish(e, q, true); } catch { this.attention(e, 'Decision delivery is uncertain and persistence is unavailable'); } return { state: 'uncertain', detail: 'decision delivery uncertain; consent will not be replayed' }; }
+  }
+  private setAttention(e: Entry, attention: ManagedAttention): void {
+    if (e.state.attention?.kind === 'permission_denied' && attention.kind === 'receipt_uncertain') attention = e.state.attention;
+    e.state.attention = attention; if (!e.state.paused) e.state.pausedBy = 'attention'; e.state.paused = true;
+    this.save(e); this.deps.changed(e.spec.surf, e.state.sessionId, true, attention); this.attention(e, attention.reason);
+  }
+  private watchReceipt(e: Entry, q: Decision): void {
+    const timer = setTimeout(() => {
+      e.receiptTimers.delete(q.id); if (q.state !== 'submitted') return;
+      q.state = 'uncertain';
+      try { this.setAttention(e, { kind: 'receipt_uncertain', tool: q.request.method, question_id: q.id, reason: 'Provider did not confirm the submitted decision; reconcile its receipt before retry' }); this.publish(e, q, true); }
+      catch { this.attention(e, 'Decision receipt is uncertain and persistence is unavailable'); }
+    }, this.deps.decisionReceiptMs ?? 30_000); timer.unref?.(); e.receiptTimers.set(q.id, timer);
   }
   private confirm(e: Entry, id: string, tool = false): void {
-    const q = e.state.decisions.find((q) => q.state === 'submitted' && String(tool ? q.request.params.tool_use_id : q.request.id) === id);
-    if (!q) return; q.state = 'resolved'; this.save(e); e.liveRequests.delete(q.id);
-    this.deps.emit({ t: 'question.resolved', question_id: q.id, surf: e.spec.surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: e.spec.planRevision ?? 0, outcome: 'accepted', still_open: false, at: Date.now() });
+    const q = e.state.decisions.find((q) => { const submitted = e.receiptRequests.get(q.id); return !!submitted && String(submitted.id) === String(q.request.id) && (q.state === 'submitted' || q.state === 'uncertain') && q.response !== undefined && String(tool ? submitted.params.tool_use_id : submitted.id) === id; });
+    if (!q) return; const timer = e.receiptTimers.get(q.id); if (timer) clearTimeout(timer); e.receiptTimers.delete(q.id);
+    q.state = 'resolved'; e.receiptRequests.delete(q.id);
+    if (e.state.attention?.kind === 'receipt_uncertain' && e.state.attention.question_id === q.id) {
+      delete e.state.attention; if (e.state.pausedBy === 'attention') { e.state.paused = false; delete e.state.pausedBy; }
+      this.save(e); this.deps.changed(e.spec.surf, e.state.sessionId, e.state.paused, null);
+    }
+    this.save(e); e.liveRequests.delete(q.id);
+    this.deps.emit({ t: 'question.resolved', question_id: q.id, surf: e.spec.surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: q.planRevision ?? 0, outcome: 'accepted', still_open: false, at: Date.now() });
+    this.activity(e, e.state.paused ? 'waiting' : e.state.active ? 'thinking' : 'idle');
   }
   private async recreatePending(e: Entry): Promise<void> {
     const pending = e.state.decisions.filter((q) => q.state === 'pending' && q.generation === e.spec.generation && q.request.method !== 'claude/deferred' && !e.liveRequests.has(q.id));
@@ -243,7 +272,8 @@ export class ManagedSessions {
   }
   async pause(surf: string, paused: boolean): Promise<void> {
     const e = this.entries.get(surf); if (!e) throw new Error('unknown managed session');
-    e.state.paused = paused; this.save(e); this.deps.changed(surf, e.state.sessionId, paused);
+    if (!paused && e.state.attention?.kind === 'permission_denied') throw new Error('Automatic review denied the action; review it through explicit terminal takeover');
+    e.state.paused = paused; e.state.pausedBy = paused ? 'operator' : undefined; this.save(e); this.deps.changed(surf, e.state.sessionId, paused);
     if (paused && e.state.active && !this.pending(surf).length) await e.adapter.interrupt();
     if (!paused) { await this.recreatePending(e); void this.pump(e); }
     this.activity(e, paused ? 'waiting' : 'idle', paused ? 'Paused' : undefined);
@@ -251,23 +281,24 @@ export class ManagedSessions {
   async interrupt(surf: string): Promise<void> { await this.entries.get(surf)?.adapter.interrupt(); }
   async cancel(surf: string): Promise<void> {
     const e = this.entries.get(surf); if (!e) return;
-    e.state.paused = true; this.save(e); await e.adapter.stop();
-    for (const q of e.state.decisions) if (q.state !== 'resolved') { q.state = 'resolved'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: e.spec.planRevision ?? 0, outcome: 'canceled', still_open: false, at: Date.now() }); }
+    e.state.paused = true; for (const timer of e.receiptTimers.values()) clearTimeout(timer); e.receiptTimers.clear(); this.save(e); await e.adapter.stop();
+    for (const q of e.state.decisions) if (q.state !== 'resolved') { q.state = 'resolved'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: q.planRevision ?? 0, outcome: 'canceled', still_open: false, at: Date.now() }); }
     e.state.queue = []; this.save(e); for (const waiter of e.waiters.values()) waiter.resolve({ state: 'rejected', detail: 'run canceled' }); e.waiters.clear();
   }
   async stop(surf: string): Promise<void> { await this.entries.get(surf)?.adapter.stop(); }
   async takeoverNative(surf: string, cmd: string, env: Record<string, string>): Promise<void> {
     const e = this.entries.get(surf); if (!e || e.handingOff) throw new Error('takeover already in progress or unavailable');
-    e.handingOff = true; e.state.paused = true; this.save(e);
+    e.handingOff = true; e.state.paused = true; for (const timer of e.receiptTimers.values()) clearTimeout(timer); e.receiptTimers.clear(); this.save(e);
     try { await e.adapter.interrupt(); await e.adapter.stop();
       const native = spawnPty({ sessionId: surf, cmd, cwd: e.spec.cwd, env, cols: 120, rows: 32 });
       e.terminal.adoptNative(native);
     } catch (error) { e.handingOff = false; this.attention(e, 'Takeover failed; run remains paused'); throw error; }
   }
   async takeover(surf: string): Promise<string> { const e = this.entries.get(surf); if (!e?.state.sessionId) throw new Error('provider conversation is not ready'); await e.adapter.interrupt(); await e.adapter.stop(); return e.state.sessionId; }
+  planRevision(surf: string, revision: number): void { const e = this.entries.get(surf); if (e && revision > (e.spec.planRevision ?? 0)) { e.spec.planRevision = revision; this.save(e); } }
   generation(surf: string, generation: number): void {
     const e = this.entries.get(surf); if (!e || generation <= e.spec.generation) return; e.spec.generation = generation;
-    for (const q of e.state.decisions) if (q.generation < generation && q.state !== 'resolved') { q.state = q.state === 'pending' ? 'resolved' : 'uncertain'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: e.spec.planRevision ?? 0, outcome: 'canceled', still_open: false, at: Date.now() }); }
+    for (const q of e.state.decisions) if (q.generation < generation && q.state !== 'resolved') { q.state = q.state === 'pending' ? 'resolved' : 'uncertain'; this.deps.emit({ t: 'question.resolved', question_id: q.id, surf, generation: q.generation, provider_request_id: String(q.request.id), incarnation: e.spec.incarnation, request_digest: q.digest, plan_revision: q.planRevision ?? 0, outcome: 'canceled', still_open: false, at: Date.now() }); }
     this.save(e);
   }
   replay(): void { for (const e of this.entries.values()) for (const q of e.state.decisions) if (q.state !== 'resolved') this.publish(e, q, !e.liveRequests.has(q.id)); }

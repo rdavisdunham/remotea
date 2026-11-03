@@ -195,8 +195,10 @@ export interface EridaniBinding {
   execution?: 'managed';
   effort?: string;
   permissionProfile?: 'read-only' | 'workspace-write';
+  planRevision?: number;
   paused?: boolean;
   controller?: 'eridani' | 'terminal';
+  attention?: import('./eridani-link-protocol').ManagedAttention;
   worktree: string;
   branch: string;
   base: string;

@@ -155,6 +155,17 @@ describe('dispatch: managed integration', () => {
     expect(adapter.inputs).toHaveLength(2);
   });
 
+  it('tracks independent plan revision through spawn, input and reconciliation with no verify configuration', async () => {
+    const { run, dispatch, adapter, registry, emitted } = managedSetup();
+    await run({ ...managedSpawn(), plan_revision: 1 }); const surf = surfFor('run-1', 1, 1);
+    expect(registry.session(surf)?.eridani).toMatchObject({ planRevision: 1 }); expect(registry.session(surf)?.eridani?.verify).toBeUndefined();
+    adapter.complete(); await run({ ...input('next-plan', 'Read the new plan context'), plan_revision: 2 }); expect(registry.session(surf)?.eridani?.planRevision).toBe(2);
+    adapter.complete(); dispatch.applyRunsSnapshot([{ run_id: 'run-1', generation: 1, desired: 'continue', surf, plan_revision: 3 }]);
+    adapter.emit('event', { id: 'plan-context-approval', method: 'item/commandExecution/requestApproval', params: { threadId: 'managed-provider-session', turnId: 'turn-managed', itemId: 'tool-plan', command: 'npm test', cwd: '/repo' } });
+    const question = emitted.filter((event) => event.t === 'question').at(-1)!; expect(question.plan_revision).toBe(3);
+    expect((await run({ t: 'answer', op_id: 'answer-plan-context', digest: 'd', question_id: question.question_id, provider_request_id: question.provider_request_id, surf, incarnation: 1, run_id: 'run-1', generation: 1, plan_revision: 3, request_digest: question.request_digest, answers: [{ item_id: 'approval', choice_ids: ['deny'] }], expires_at: 0 })).state).toBe('executed');
+  });
+
   it('keeps queued follow-ups until a busy managed agent finishes', async () => {
     const { run, dispatch, adapter } = managedSetup();
     await run(managedSpawn());

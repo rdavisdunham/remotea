@@ -1045,7 +1045,7 @@ export class EridaniLink {
     const shape = commandShapeError(cmd as unknown as Record<string, unknown>);
     if (shape) return shape;
     const expires = typeof cmd.expires_at === 'number' ? cmd.expires_at : typeof cmd.expires_at === 'string' ? Date.parse(cmd.expires_at) : NaN;
-    const durable = expires === 0 && this.peerHas('commands.durable') && ['input', 'answer', 'run.pause', 'run.resume'].includes(cmd.t);
+    const durable = expires === 0 && this.peerHas('commands.durable') && (['input', 'answer', 'run.pause', 'run.resume'].includes(cmd.t) || cmd.t === 'spawn' && cmd.execution === 'managed' && this.peerHas('managed.sessions'));
     if (Number.isFinite(expires) && !durable) {
       if (expires < this.now()) return 'expired';
       // An op must not outlive the memory of its id, or a late duplicate could run twice.

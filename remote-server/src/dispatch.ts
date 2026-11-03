@@ -401,9 +401,9 @@ export class Dispatch {
     this.timing = { ...DEFAULT_TIMING, ...deps.timing };
     this.mcpDir = deps.mcpDir ?? (deps.dir ? path.join(deps.dir, ERIDANI_MCP_DIR) : path.join(os.tmpdir(), `remotea-eridani-mcp-${process.getuid?.() ?? 'user'}`));
     this.secrets = this.loadSecrets();
-    this.managed = new ManagedSessions({ dir: deps.dir, factory: deps.managedFactory, hook: (surf, params) => { deps.hub.relayRpc(surf, 'hook.event', params); }, emit: (body) => deps.managedEmit?.(body), changed: (surf, sessionId, paused) => {
+    this.managed = new ManagedSessions({ dir: deps.dir, factory: deps.managedFactory, hook: (surf, params) => { deps.hub.relayRpc(surf, 'hook.event', params); }, emit: (body) => deps.managedEmit?.(body), changed: (surf, sessionId, paused, attention) => {
       const rec = deps.registry.session(surf);
-      if (rec?.eridani) { deps.hub.updateRecord(surf, { eridani: { ...rec.eridani, paused }, ...(sessionId ? { agent: { provider: rec.eridani.harness, sessionId, seenAt: Date.now() } } : {}) }); deps.registry.saveNow(); }
+      if (rec?.eridani) { const { attention: previousAttention, ...binding } = rec.eridani; const nextAttention = attention === undefined ? previousAttention : attention; deps.hub.updateRecord(surf, { eridani: { ...binding, paused, ...(nextAttention ? { attention: nextAttention } : {}) }, ...(sessionId ? { agent: { provider: rec.eridani.harness, sessionId, seenAt: Date.now() } } : {}) }); deps.registry.saveNow(); }
     } });
     this.conn = new EridaniConn(deps.hub);
     this.attempts = new VerifyAttempts({
@@ -460,7 +460,7 @@ export class Dispatch {
       snapshot: (id): Partial<SnapshotSurface> => {
         const qs = [...this.deps.questions.openIds(id), ...this.managed.pending(id)];
         const binding = this.deps.registry.session(id)?.eridani;
-        return { ...(qs.length ? { questions: qs } : {}), ...(binding?.execution === 'managed' ? { execution: 'managed', controller: binding.controller ?? 'eridani' } : {}) };
+        return { ...(qs.length ? { questions: qs } : {}), ...(binding?.execution === 'managed' ? { execution: 'managed', controller: binding.controller ?? 'eridani', paused: !!binding.paused, pause_reason: binding.attention?.kind ?? null, ...(binding.attention ? { attention: binding.attention } : {}) } : {}) };
       },
     };
   }
@@ -526,6 +526,8 @@ export class Dispatch {
       }
       case 'input': {
         const c = cmd as unknown as InputCommand;
+        const currentPlan = this.deps.registry.session(c.surf)?.eridani?.planRevision ?? 0;
+        if (c.plan_revision !== undefined && c.plan_revision < currentPlan) return 'stale plan revision';
         return this.fence(c, c.mode === 'steer' ? 'steer' : 'input');
       }
       case 'run.pause':
@@ -710,7 +712,7 @@ export class Dispatch {
 
   private prepareManaged(surf: string, b: EridaniBinding, launch: LaunchSpec, prompt: string, operationId: string, args: string[], env: Record<string, string>, incarnation = 1): void {
     const scoped = this.roleMcpArgs(b, args);
-    this.managed.prepare({ surf, runId: b.runId, generation: b.generation, incarnation, prompt, operationId, harness: b.harness, bin: launch.bin ?? b.harness, args: [...scoped, ...(launch.args ?? [])], cwd: b.worktree, env: { ...env, ...(this.mcpEnv.get(surf) ?? {}) }, model: b.model, effort: b.effort, planRevision: b.verify?.planRevision ?? null, profile: b.permissionProfile ?? (b.mode ? 'read-only' : 'workspace-write') });
+    this.managed.prepare({ surf, runId: b.runId, generation: b.generation, incarnation, prompt, operationId, harness: b.harness, bin: launch.bin ?? b.harness, args: [...scoped, ...(launch.args ?? [])], cwd: b.worktree, env: { ...env, ...(this.mcpEnv.get(surf) ?? {}) }, model: b.model, effort: b.effort, planRevision: b.planRevision ?? b.verify?.planRevision ?? 0, profile: b.permissionProfile ?? (b.mode ? 'read-only' : 'workspace-write') });
   }
 
   private async pauseRun(cmd: RunPauseCommand, ctx: CommandContext): Promise<CommandResult> {
@@ -860,6 +862,7 @@ export class Dispatch {
         target: target.id,
         harness: cmd.harness,
         model: cmd.model,
+        planRevision: cmd.plan_revision ?? cmd.verify?.plan_revision ?? 0,
         ...(cmd.effort ? { effort: cmd.effort } : {}),
         ...(cmd.execution ? { execution: cmd.execution, permissionProfile: cmd.permission_profile ?? (cmd.mode ? 'read-only' : 'workspace-write'), controller: 'eridani' as const } : {}),
         worktree: wt.path,
@@ -1095,7 +1098,8 @@ export class Dispatch {
 
   private async input(cmd: InputCommand, ctx: CommandContext): Promise<CommandResult> {
     if (this.deps.registry.session(cmd.surf)?.eridani?.execution === 'managed') {
-      const rec = this.deps.registry.session(cmd.surf)!;
+      let rec = this.deps.registry.session(cmd.surf)!;
+      if (cmd.plan_revision !== undefined && cmd.plan_revision !== rec.eridani!.planRevision) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, planRevision: cmd.plan_revision } }); this.managed.planRevision(cmd.surf, cmd.plan_revision); rec = this.deps.registry.session(cmd.surf)!; }
       if (cmd.generation > rec.eridani!.generation) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation } }); this.managed.generation(cmd.surf, cmd.generation); }
       if (cmd.mode === 'steer') { ctx.begin(); await this.managed.interrupt(cmd.surf); }
       return this.managed.send(cmd.surf, cmd.text, cmd.op_id, false, () => ctx.begin());
@@ -1278,6 +1282,7 @@ export class Dispatch {
       this.deps.hub.updateRecord(rec.id, { eridani: { ...b, verify: { verifyId: cmd.verify_id, planRevision: cmd.plan_revision } } });
       this.deps.registry.saveNow();
     }
+    if (cmd.plan_revision > (b.planRevision ?? 0)) { this.deps.hub.updateRecord(rec.id, { eridani: { ...this.deps.registry.session(rec.id)!.eridani!, planRevision: cmd.plan_revision } }); this.managed.planRevision(rec.id, cmd.plan_revision); this.deps.registry.saveNow(); }
     ctx.begin();
     const out = await this.attempts.command(rec.id, cmd);
     return out.state === 'executed' ? { state: 'executed', result: out.result } : { state: 'rejected', detail: out.detail };
@@ -1389,6 +1394,7 @@ export class Dispatch {
           this.deps.registry.saveNow();
           this.cancelWrites(rec.id, `superseded by generation ${r.generation} (runs.snapshot)`, (w) => w.generation < r.generation);
         }
+        if (r.plan_revision !== undefined && r.plan_revision > (b.planRevision ?? 0)) { b = { ...b, planRevision: r.plan_revision }; this.managed.planRevision(rec.id, r.plan_revision); this.deps.hub.updateRecord(rec.id, { eridani: b }); this.deps.registry.saveNow(); }
         if (r.verify !== undefined && rec.state !== 'exited') {
           const { verify: _old, ...rest } = b;
           b = r.verify ? { ...rest, verify: { verifyId: r.verify.verify_id, planRevision: r.verify.plan_revision } } : rest;

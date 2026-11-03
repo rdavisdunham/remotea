@@ -33,6 +33,7 @@ export class HarnessProcess extends EventEmitter {
   protected launch(args: string[]): void {
     const command = [this.spec.bin, ...args].map(quote).join(' ');
     this.child = spawn(loginShell(), ['-l', '-i', '-c', `exec ${command}`], { cwd: this.spec.cwd, env: buildEnv(this.spec.env.REMOTEA_SESSION ?? 'managed', this.spec.env), stdio: 'pipe', detached: process.platform === 'linux' });
+    this.child.stdin.on('error', (error) => this.emit('fault', error));
     this.child.stdout.on('data', (chunk: Buffer) => {
       this.buffer += chunk.toString('utf8');
       if (this.buffer.length > 4 * 1024 * 1024) { this.emit('fault', new Error('provider JSON frame exceeded limit')); void this.stop(); return; }
@@ -119,6 +120,10 @@ export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapt
   private recoveryGate = false;
   private deferredAnswer: { input: unknown; id: string; response: any } | null = null;
   protected override receive(message: any): void {
+    if (message.type === 'control_request' && message.request?.subtype === 'hook_callback' && message.request?.callback_id === 'remotea-permission-denied') {
+      this.write({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response: { hookSpecificOutput: { hookEventName: 'PermissionDenied', retry: false } } } });
+      this.emit('event', { type: 'remotea/permission-denied', input: message.request.input }); return;
+    }
     if (message.type === 'control_request' && message.request?.subtype === 'hook_callback' && message.request?.callback_id === 'remotea-defer-ask') {
       const input = message.request.input;
       if (input.tool_name !== 'AskUserQuestion') { this.write({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response: this.recoveryGate ? { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask' } } : {} } }); return; }
@@ -134,7 +139,7 @@ export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapt
   async start(): Promise<string> {
     this.sessionId = this.spec.sessionId ?? randomUUID();
     this.launch(['-p', '--verbose', '--input-format', 'stream-json', '--output-format', 'stream-json', '--include-partial-messages', '--replay-user-messages', '--permission-prompts', 'host', '--settings', JSON.stringify({ env: { MCP_TIMEOUT: '20000', MCP_TOOL_TIMEOUT: '120000', ...(this.spec.effort ? { CLAUDE_CODE_EFFORT_LEVEL: this.spec.effort } : {}) } }), '--permission-mode', this.spec.profile === 'read-only' ? 'plan' : 'auto', '--model', this.spec.model, ...(this.spec.effort ? ['--effort', this.spec.effort] : []), ...(this.spec.sessionId ? ['--resume', this.spec.sessionId] : ['--session-id', this.sessionId]), ...this.spec.args]);
-    const initialized = await this.call('control:initialize', { hooks: { PreToolUse: [{ matcher: '*', hookCallbackIds: ['remotea-defer-ask'] }] } }); this.emit('catalog', initialized.models ?? []); return this.sessionId;
+    const initialized = await this.call('control:initialize', { hooks: { PreToolUse: [{ matcher: '*', hookCallbackIds: ['remotea-defer-ask'] }], PermissionDenied: [{ matcher: '*', hookCallbackIds: ['remotea-permission-denied'] }] } }); this.emit('catalog', initialized.models ?? []); return this.sessionId;
   }
   async resume(): Promise<string> { return this.start(); }
   async send(text: string, operationId: string): Promise<void> {
