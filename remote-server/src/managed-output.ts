@@ -28,13 +28,17 @@ export class ManagedOutput {
     // A token can cross snapshot boundaries. Mask recognizable unfinished credential prefixes before publishing any suffix.
     return message.complete ? text : text.replace(/(?:sk-(?:proj-|ant-)?[A-Za-z0-9_-]*|gh[pousr]_[A-Za-z0-9]*|github_pat_[A-Za-z0-9_]*|AKIA[0-9A-Z]*|xox[abpr]-[A-Za-z0-9-]*|eri_bot_[A-Za-z0-9_-]*|lin_api_[A-Za-z0-9]*|[Bb]earer\s+\S*|(?:[Pp]assword|[Ss]ecret|[Tt]oken|[Aa]pi_[Kk]ey)\s*[=:]\s*\S*)$/g, '[redacted]');
   }
-  flush(): void {
+  flush(publish = true): void {
     if (this.timer) clearTimeout(this.timer); this.timer = undefined;
     const messages = this.state.messages.filter(message => this.dirty.has(message.id)); if (!messages.length) return;
     for (const message of messages) { message.sequence = ++this.state.sequence; message.at = Date.now(); }
-    this.persist(); this.dirty.clear(); for (const message of messages) this.emit(this.snapshot(message));
+    this.persist(); this.dirty.clear(); if (publish) for (const message of messages) this.emit(this.snapshot(message));
   }
-  replay(): void { this.flush(); for (const message of this.state.messages) if (message.sequence) this.emit(this.snapshot(message)); }
+  replay(): void {
+    // Persist dirty snapshots first, then replay every retained message in session sequence order.
+    this.flush(false);
+    for (const message of [...this.state.messages].sort((a, b) => a.sequence - b.sequence)) if (message.sequence) this.emit(this.snapshot(message));
+  }
   event(message: Record<string, any>): void {
     const p = message.params ?? {}, item = p.item;
     if (message.method === 'item/started' && item?.type === 'agentMessage') { this.state.codex = item.id; this.update(item.id, undefined, false, false, item.phase === 'commentary' ? 'commentary' : 'response'); }
