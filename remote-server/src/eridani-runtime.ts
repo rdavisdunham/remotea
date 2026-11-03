@@ -42,6 +42,8 @@
  */
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { hostModelCatalog, claudeModelCatalog, managedVersionSupported } from './managed-models';
 import {
   ERIDANI_CAPS_VERSION,
   ERIDANI_LIMITS,
@@ -182,6 +184,7 @@ export function stageBCaps(versions: { claude: string | null; codex: string | nu
 
 export class EridaniRuntime {
   private link: EridaniLink | null = null;
+  private claudeModels: import('../../src/shared/eridani-link-protocol').ModelCatalogEntry[] = [];
   /** S-Q5: draining for a restart (`remotea upgrade`); a link made meanwhile drains too. */
   private draining: string | null = null;
   private stamp = '';
@@ -221,9 +224,10 @@ export class EridaniRuntime {
   constructor(private readonly deps: EridaniRuntimeDeps) {
     const { hub, registry } = deps;
     this.build = deps.build ?? loadBuildInfo();
+    if (process.platform === 'linux' && !deps.probe) void claudeModelCatalog().then((models) => { this.claudeModels = models; });
     this.questions = new QuestionBroker({
       session: (id) => registry.session(id),
-      canHold: (id) => !!this.link?.ready && !!registry.session(id)?.eridani,
+      canHold: (id) => !!this.link?.ready && !!registry.session(id)?.eridani && registry.session(id)?.eridani?.execution !== 'managed',
       // Only what hello advertises is ever held: an adapter not verified on this version leaves the prompt in the terminal.
       capable: (provider, kind) => !!this.harnesses()[provider]?.question_kinds?.includes(kind),
       // No entity: a question and its resolution are separate facts, never coalesced.
@@ -244,6 +248,16 @@ export class EridaniRuntime {
       checkTarget: (t) => templateStatus(t, { env: deps.verifyEnv }),
       prepare: (t, wt, force) => runPrepare(t, wt, { force, env: deps.verifyEnv }),
       questions: this.questions,
+      managedSupported: (target, harness) => { const launch = target.launch[harness]; const p = this.probes.get(probeKey(harness, launch?.bin ?? harness)); return !!p?.ok && managedVersionSupported(harness, p.version); },
+      managedEmit: (body) => {
+        if (body.t === 'activity') {
+          hub.agentState.report(String(body.surf), { awaitingHuman: body.kind === 'waiting', runDepth: ['waiting', 'idle', 'unknown'].includes(String(body.kind)) ? 0 : 1, reason: body.kind === 'waiting' ? String(body.label ?? 'Waiting for a decision') : null });
+          if (!this.link?.peerHas('activity')) return;
+          void this.link.enqueue(body, 1, `activity:${String(body.surf)}`, Number(body.sequence)); return;
+        }
+        if (body.t === 'question' && !this.link?.peerHas('decisions.durable')) return;
+        void this.link?.enqueue(body, 0);
+      },
       emit: (body) => void this.link?.enqueue(body as unknown as Record<string, unknown>, 0),
       changed: () => void this.reportWorktrees(),
       linkReady: () => !!this.link?.ready,
@@ -392,7 +406,8 @@ export class EridaniRuntime {
         ? { state: 'failed', detail: 'interrupted by a server restart' }
         : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
-      caps: () => linkCaps(mode),
+      caps: () => !Object.values(this.harnesses()).some((h) => h?.managed) ? linkCaps(mode) : [...linkCaps(mode), 'managed.sessions', 'decisions.durable', 'commands.durable', 'role.options', 'run.pause', 'activity', 'model_catalog'],
+      modelCatalog: () => [...hostModelCatalog(path.join(os.homedir(), '.codex', 'models_cache.json')), ...this.claudeModels],
       targets: () => this.helloTargets(),
       doctor: () => this.doctor,
       collectorStatus: () => this.collectorStatus(),
@@ -451,7 +466,9 @@ export class EridaniRuntime {
 
   /** The host-wide harness matrix from the latest probes (launch-caps.ts). */
   harnesses(): CapabilityMatrix {
-    return harnessMatrix(this.probes, loadTargets(this.deps.dir), (this.deps.adapterHooks ?? (() => adapterHooks()))());
+    const matrix = harnessMatrix(this.probes, loadTargets(this.deps.dir), (this.deps.adapterHooks ?? (() => adapterHooks()))());
+    for (const [name, caps] of Object.entries(matrix)) if (caps) { caps.managed = !!caps.installed && managedVersionSupported(name, caps.version); caps.managed_questions = caps.managed ? ['ask', 'approval'] : []; }
+    return matrix;
   }
 
   /** Execution targets for hello: ids, repos, permission, probed launchers and verify readiness; never argv or env. */
@@ -461,6 +478,7 @@ export class EridaniRuntime {
     const hello = helloTargets(targets, this.probes, { env: this.deps.verifyEnv }).map((h) => {
       const t = targets.find((x) => x.id === h.id);
       if (!t) return h;
+      if (h.launch) for (const [name, launch] of Object.entries(h.launch)) if (launch) launch.managed = launch.ready && managedVersionSupported(name, launch.version);
       // S-N4: whether each verify entry would run sandboxed (verify-sandbox.ts).
       const verify_status = h.verify_status ? withIsolation(h.verify_status, t.verify, this.deps.verifyEnv) : undefined;
       return { ...h, ...(verify_status ? { verify_status } : {}), mcp: mcpStatus(resolveMcp(this.deps.dir, t)) };

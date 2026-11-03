@@ -99,12 +99,12 @@ const spawn = (over: Record<string, unknown> = {}) => ({
 const PLANNER = surfFor('run-1', 1, 1);
 const REVIEWER = surfFor('run-1', 1, 2);
 
-const CLAUDE_LISTS = `--allowedTools 'Read' 'Grep' 'Glob' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' 'mcp__eridani__*' --disallowedTools 'Edit' 'Write' 'NotebookEdit'`;
+const CLAUDE_LISTS = `--allowedTools 'Read' 'Grep' 'Glob' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' --disallowedTools 'Edit' 'Write' 'NotebookEdit'`;
 
 describe('hyperplan: read-only launch lines', () => {
   it('claude mode: review swaps auto for dontAsk with the allow and deny lists, before --model so the prompt is never a list value', () => {
     expect(MCP_SERVER_NAME).toBe('eridani');
-    expect(CLAUDE_READ_ONLY_TOOLS).toContain(`mcp__${MCP_SERVER_NAME}__*`);
+    expect(CLAUDE_READ_ONLY_TOOLS).not.toContain(`mcp__${MCP_SERVER_NAME}__*`);
     expect(CLAUDE_READ_ONLY_DENIED).toEqual(['Edit', 'Write', 'NotebookEdit']);
     expect(launchCommand('claude', 'sonnet', {}, true, [], 'review')).toBe(`'claude' ${CLAUDE_LISTS} --model 'sonnet' --permission-mode dontAsk "$ERIDANI_PROMPT"`);
     // With the MCP config and target args: the config stays right after the program, the extra args stay before the prompt.

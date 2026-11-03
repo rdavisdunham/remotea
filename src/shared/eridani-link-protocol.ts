@@ -118,7 +118,7 @@ export type LinkCap =
   // Hyperplan: `spawn` takes `role` and `mode` (read-only sessions beside the run's
   // writer), `runs.snapshot` entries may name one surface, and `verify` never
   // lands on a reviewer. Eridani refuses hyperplan / split-worker starts without it.
-  | 'spawn.roles';
+  | 'spawn.roles' | 'managed.sessions' | 'decisions.durable' | 'commands.durable' | 'role.options' | 'run.pause' | 'activity' | 'model_catalog';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -150,6 +150,8 @@ export const ERIDANI_CAPS_VERSION = 2;
 
 /** What one harness can do on this host (the capability matrix, C15). Advertise only what is verified. */
 export interface HarnessCaps {
+  managed?: boolean;
+  managed_questions?: QuestionKind[];
   /** `claude --version` / `codex --version`, or null when not installed. */
   version: string | null;
   /**
@@ -231,7 +233,18 @@ export interface Part {
 
 // ── remotea → Eridani ──────────────────────────────────────────────────────
 
+export interface ModelCatalogEntry {
+  harness: Harness; model: string; label?: string; default?: boolean; efforts: string[]; default_effort?: string; permission_profiles: string[];
+}
+
+export interface ActivityBody extends OpFields {
+  t: 'activity'; run_id: string; generation: number; surf: string; incarnation: number;
+  session_id: string; turn_id: string | null; sequence: number; at: number;
+  kind: 'thinking' | 'tool' | 'searching' | 'editing' | 'testing' | 'waiting' | 'idle' | 'unknown'; label?: string;
+}
+
 export interface HelloBody {
+  model_catalog?: ModelCatalogEntry[];
   t: 'hello';
   server_id: string;
   boot_id: string;
@@ -321,6 +334,7 @@ export interface DoctorBody extends DoctorSummary {
 
 /** One launcher on one target, as probed (caps_version 2). */
 export interface HelloLaunch {
+  managed?: boolean;
   /** `<bin> --version` answered through the login shell. */
   ready: boolean;
   version: string | null;
@@ -622,6 +636,11 @@ export interface QuestionBody extends OpFields {
   items: QuestionItem[];
   /** remotea stops holding at this time (epoch ms) and the question falls back to the terminal. */
   hold_until: number;
+  /** Managed requests have no human deadline; hold_until is zero. */
+  durable?: boolean;
+  request_digest?: string;
+  action?: { tool: string; input: Record<string, unknown>; cwd: string; permissions?: unknown; digest: string };
+  recovery?: 'pending' | 'attention_required';
 }
 
 /**
@@ -766,6 +785,9 @@ export interface ContextResponseBody {
 export type Harness = 'claude' | 'codex';
 
 export interface SpawnCommand extends OpFields {
+  execution?: 'managed';
+  effort?: string;
+  permission_profile?: 'read-only' | 'workspace-write';
   t: 'spawn';
   run_id: string;
   generation: number;
@@ -860,11 +882,16 @@ export interface AnswerItem {
 }
 
 export interface AnswerCommand extends OpFields {
+  surf?: string; incarnation?: number; run_id?: string; generation?: number;
   t: 'answer';
   question_id: string;
   provider_request_id: string;
   answers: AnswerItem[];
   expires_at?: number | string;
+}
+
+export interface RunPauseCommand extends OpFields {
+  t: 'run.pause' | 'run.resume'; run_id: string; generation: number; surf: string; incarnation: number; expires_at: number | string;
 }
 
 export interface StopCommand extends OpFields {
@@ -929,7 +956,7 @@ export const SESSION_TOOLS: ReadonlySet<string> = new Set<SessionTool>(['claude_
 export interface RunsSnapshotEntry {
   run_id: string;
   generation: number;
-  desired: 'continue' | 'stop' | 'none';
+  desired: 'continue' | 'stop' | 'none' | 'pause';
   stop_mode?: 'interrupt' | 'kill';
   /** Stage D: the run's current verify config (null: none; absent: unchanged). */
   verify?: RunVerifyConfig | null;
@@ -1004,6 +1031,7 @@ export type UpBody =
   | SessionsSnapshotBody
   | ContextRequestBody
   | CommandOutcomeBody
+  | ActivityBody
   | QuestionBody
   | QuestionResolvedBody
   | VerifyResultBody
@@ -1102,6 +1130,8 @@ export function parseUpFrame(raw: unknown): UpFrame | null {
       return isStr(m.req_id, 200) && isStr(m.surf, 120) && isNum(m.incarnation) && isNum(m.generation) ? (m as unknown as UpFrame) : null;
     case 'command.outcome':
       return op && isStr(m.command_id, 200) && ['executed', 'failed', 'rejected', 'uncertain'].includes(m.state as string) ? (m as unknown as UpFrame) : null;
+    case 'activity':
+      return op && isStr(m.run_id, 128) && isStr(m.surf, 120) && isNum(m.generation) && isNum(m.incarnation) && isNum(m.sequence) && isNum(m.at) && isStr(m.session_id, 200) && (m.turn_id === null || isStr(m.turn_id, 200)) && ['thinking', 'tool', 'searching', 'editing', 'testing', 'waiting', 'idle', 'unknown'].includes(m.kind as string) ? (m as unknown as UpFrame) : null;
     case 'question':
       return op && isStr(m.question_id, 200) && isStr(m.surf, 120) && isNum(m.generation) && isStr(m.provider_request_id, 200)
         && isStr(m.group_id, 200) && Array.isArray(m.items) && m.items.length > 0 && (m.items as unknown[]).every(isQuestionItem) ? (m as unknown as UpFrame) : null;
@@ -1129,7 +1159,7 @@ function isQuestionItem(v: unknown): boolean {
 }
 
 function isRunsEntry(v: unknown): boolean {
-  return isObj(v) && isStr(v.run_id, 200) && isNum(v.generation) && ['continue', 'stop', 'none'].includes(v.desired as string)
+  return isObj(v) && isStr(v.run_id, 200) && isNum(v.generation) && ['continue', 'stop', 'none', 'pause'].includes(v.desired as string)
     && (v.stop_mode === undefined || v.stop_mode === 'interrupt' || v.stop_mode === 'kill')
     && (v.verify === undefined || v.verify === null || isVerifyConfig(v.verify))
     && (v.surf === undefined || isStr(v.surf, 120))
@@ -1161,7 +1191,7 @@ const noControl = (s: string) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f
 export const isPasteSafe = (s: string) => !/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/.test(s);
 
 /** Effectful commands: each must carry `expires_at` within the replay horizon (L11, stage F). */
-export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify']);
+export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify', 'run.pause', 'run.resume']);
 
 /**
  * Validate a stage C command's body. Returns null when it is well formed,
@@ -1189,6 +1219,9 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
         const mg = m.migration;
         if (!isObj(mg) || !isInt(mg.number, 1) || !isStr(mg.dir, 200) || !noControl(mg.dir) || /[\r\n]/.test(mg.dir)) return 'bad migration';
       }
+      if (m.execution !== undefined && m.execution !== 'managed') return 'bad execution';
+      if (m.effort !== undefined && !['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'].includes(m.effort as string)) return 'bad effort';
+      if (m.permission_profile !== undefined && !['read-only', 'workspace-write'].includes(m.permission_profile as string)) return 'bad permission_profile';
       if (m.share !== undefined && typeof m.share !== 'boolean') return 'bad share';
       if (m.role !== undefined && !RUN_ROLES.includes(m.role as RunRole)) return 'bad role';
       if (m.mode !== undefined && !SPAWN_MODES.includes(m.mode as SpawnMode)) return 'bad mode';
@@ -1219,6 +1252,9 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
         if (!a.choice_ids?.length && !(typeof a.text === 'string' && a.text.trim())) return 'empty answer';
       }
       return null;
+    case 'run.pause':
+    case 'run.resume':
+      return isStr(m.surf, 120) && isInt(m.incarnation) && isStr(m.run_id, 128) && isInt(m.generation) ? null : 'bad fence';
     case 'stop':
       if (!isStr(m.surf, 120) || !isInt(m.incarnation) || !isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
       return m.mode === 'interrupt' || m.mode === 'kill' ? null : 'bad mode';

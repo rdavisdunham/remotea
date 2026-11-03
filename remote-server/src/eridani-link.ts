@@ -98,7 +98,7 @@ const realSocket: LinkSocketFactory = (url, headers) =>
   }) as unknown as LinkSocket;
 
 export interface CommandResult {
-  state: 'executed' | 'failed' | 'rejected';
+  state: 'executed' | 'failed' | 'rejected' | 'uncertain';
   detail?: string;
   /** Kind-specific facts, recorded in the journal and sent as `command.outcome.result`. */
   result?: Record<string, unknown>;
@@ -224,11 +224,12 @@ export interface EridaniLinkDeps {
    */
   precheck?: (cmd: CommandBody) => string | null;
   /** Settle a command found `executing` after a restart (see eridani-journal.ts). */
-  recover?: (rec: JournalRecord) => { state: 'executed' | 'failed' | 'rejected'; detail?: string; outcome?: unknown } | null;
+  recover?: (rec: JournalRecord) => { state: 'executed' | 'failed' | 'rejected' | 'uncertain'; detail?: string; outcome?: unknown } | null;
   /** Facts the ack of an accepted command carries (a spawn: its surf and incarnation). */
   acceptFacts?: (cmd: CommandBody) => Record<string, unknown>;
   /** Execution targets listed in hello (stage C). */
   targets?: () => HelloTarget[];
+  modelCatalog?: () => import('../../src/shared/eridani-link-protocol').ModelCatalogEntry[];
   /** Capabilities advertised in hello (defaults to stage B's). */
   caps?: () => readonly LinkCap[];
   /** S-Q1: the latest doctor summary (doctor.ts), sent in hello when there is one; null: none yet. */
@@ -433,6 +434,7 @@ export class EridaniLink {
       }),
       caps: [...(this.deps.caps?.() ?? STAGE_B_CAPS)],
       harnesses: this.deps.harnesses?.() ?? {},
+      ...(this.deps.modelCatalog ? { model_catalog: this.deps.modelCatalog() } : {}),
       ...(this.deps.targets ? { targets: this.deps.targets() } : {}),
     };
   }
@@ -930,15 +932,15 @@ export class EridaniLink {
     }
     const reject = this.admit(cmd);
     if (reject) {
-      if (!this.journalWrite(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject })) return this.refuseUnjournaled(cmd);
-      this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: 'rejected', detail: reject } });
+      if (!this.journalWrite(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject, ...(cmd.expires_at === 0 && this.peerHas('commands.durable') ? { durable: true } : {}) })) return this.refuseUnjournaled(cmd);
+      this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: 'rejected', detail: reject, ...(cmd.expires_at === 0 && this.peerHas('commands.durable') ? { durable: true } : {}) } });
       this.outcome(cmd.op_id, 'rejected', reject, cmd.t);
       return;
     }
     const body: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(cmd)) if (!['v', 'id', 'conn_epoch', 'at', 'op_id', 'digest'].includes(k)) body[k] = v;
     // Never ack an acceptance that is not on disk.
-    if (!this.journalWrite(cmd.op_id, { digest, t: cmd.t, state: 'accepted', body })) return this.refuseUnjournaled(cmd);
+    if (!this.journalWrite(cmd.op_id, { digest, t: cmd.t, state: 'accepted', body, ...(cmd.expires_at === 0 ? { durable: true } : {}) })) return this.refuseUnjournaled(cmd);
     this.sendFrame({ t: 'ack', acked_id: cmd.id, op_id: cmd.op_id, ok: true, outcome: { state: 'accepted', ...this.acceptFacts(cmd) } });
     if (this.draining) {
       // S-Q5: accepted and on disk; the next server runs it (replayAccepted), with its fences checked then.
@@ -1043,11 +1045,12 @@ export class EridaniLink {
     const shape = commandShapeError(cmd as unknown as Record<string, unknown>);
     if (shape) return shape;
     const expires = typeof cmd.expires_at === 'number' ? cmd.expires_at : typeof cmd.expires_at === 'string' ? Date.parse(cmd.expires_at) : NaN;
-    if (Number.isFinite(expires)) {
+    const durable = expires === 0 && this.peerHas('commands.durable') && ['input', 'answer', 'run.pause', 'run.resume'].includes(cmd.t);
+    if (Number.isFinite(expires) && !durable) {
       if (expires < this.now()) return 'expired';
       // An op must not outlive the memory of its id, or a late duplicate could run twice.
       if (expires > this.now() + ERIDANI_LIMITS.replayHorizonMs) return 'expires beyond the replay horizon';
-    } else if (EFFECTFUL_COMMANDS.has(cmd.t)) return 'expires_at required';
+    } else if (!durable && EFFECTFUL_COMMANDS.has(cmd.t)) return 'expires_at required';
     return this.deps.precheck?.(cmd) ?? null;
   }
 
@@ -1066,7 +1069,7 @@ export class EridaniLink {
       // Accepted before a restart: everything is checked again against what is true now.
       const reject = this.admit(cmd);
       if (reject) {
-        this.settle(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject });
+        this.settle(cmd.op_id, { digest, t: cmd.t, state: 'rejected', detail: reject, ...(cmd.expires_at === 0 && this.peerHas('commands.durable') ? { durable: true } : {}) });
         return;
       }
     }
