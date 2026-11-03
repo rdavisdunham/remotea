@@ -220,7 +220,7 @@ export function resumeLine(b: EridaniBinding, spec: LaunchSpec | undefined, sess
   const mcp = mcpArgs.map(q);
   const ro = b.mode ? readOnlyFlags(b.harness) : null;
   if (b.mode && !ro) return null;
-  if (b.harness === 'claude') return [bin, '--resume', q(sessionId), ...mcp, ...(ro?.lists ?? []), '--model', q(b.model), ...(b.effort ? ['--effort', q(b.effort)] : []), ...(ro?.tail ?? ['--permission-mode', 'auto']), ...(spec?.args ?? []).map(q)].join(' ');
+  if (b.harness === 'claude') return [bin, '--resume', q(sessionId), ...mcp, ...(mcpArgs.includes('--allowedTools') ? [] : ro?.lists ?? []), '--model', q(b.model), ...(b.effort ? ['--effort', q(b.effort)] : []), ...(ro?.tail ?? ['--permission-mode', 'auto']), ...(spec?.args ?? []).map(q)].join(' ');
   return [bin, 'resume', ...mcp, '--disable', 'daemon_auto_start', '-m', q(b.model), ...(b.effort ? ['-c', q(`model_reasoning_effort=${JSON.stringify(b.effort)}`)] : []), ...(ro?.tail ?? []), q(sessionId)].join(' ');
 }
 
@@ -459,7 +459,8 @@ export class Dispatch {
       },
       snapshot: (id): Partial<SnapshotSurface> => {
         const qs = [...this.deps.questions.openIds(id), ...this.managed.pending(id)];
-        return qs.length ? { questions: qs } : {};
+        const binding = this.deps.registry.session(id)?.eridani;
+        return { ...(qs.length ? { questions: qs } : {}), ...(binding?.execution === 'managed' ? { execution: 'managed', controller: binding.controller ?? 'eridani' } : {}) };
       },
     };
   }
@@ -546,6 +547,7 @@ export class Dispatch {
         const c = cmd as unknown as VerifyCommand;
         const rec = this.boundSession(c.run_id);
         if (!rec?.eridani) return 'unknown run';
+        if (rec.eridani.controller === 'terminal') return 'terminal has control';
         if (c.generation !== rec.eridani.generation) return 'stale generation';
         const t = this.target(rec.eridani.target);
         if (!t) return 'the run\'s execution target is gone';
@@ -689,6 +691,7 @@ export class Dispatch {
       if (!line) return { ok: false, error: 'conversation cannot be resumed' };
       await this.managed.takeoverNative(surf, line, { ...this.secrets[surf]?.env, ...this.mcpEnv.get(surf) });
       this.deps.hub.updateRecord(surf, { eridani: { ...b, controller: 'terminal', paused: true } }); this.deps.registry.saveNow();
+      this.deps.hub.agentState.report(surf, { awaitingHuman: true, runDepth: 0, reason: 'Terminal has control' });
       return { ok: true };
     } catch (e) { return { ok: false, error: (e as Error).message }; }
   }

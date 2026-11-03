@@ -129,6 +129,12 @@ describe('hyperplan: read-only launch lines', () => {
     expect(resumeLine({ ...b, harness: 'codex' }, undefined, 's-1')).toBe(`'codex' resume --disable daemon_auto_start -m 'sonnet' 's-1'`);
   });
 
+  it('preserves precise managed MCP scope without replacing its allow list during native resume', () => {
+    const b = { harness: 'claude', model: 'sonnet', mode: 'review' } as EridaniBinding;
+    const line = resumeLine(b, undefined, 's-1', ['--allowedTools', 'Read', 'mcp__eridani__submit_plan_review', '--disallowedTools', 'Edit', 'Write', 'NotebookEdit', '--strict-mcp-config']);
+    expect(line).toContain('mcp__eridani__submit_plan_review'); expect(line!.match(/--allowedTools/g)).toHaveLength(1); expect(line).toContain('--permission-mode dontAsk');
+  });
+
   it('a resume keeps the binding\'s mode: the conversation reopens read-only', () => {
     const b = { harness: 'claude', model: 'sonnet', mode: 'review' } as EridaniBinding;
     expect(resumeLine(b, undefined, 's-1', ['--mcp-config', '/c/x.json'])).toBe(`'claude' --resume 's-1' '--mcp-config' '/c/x.json' ${CLAUDE_LISTS} --model 'sonnet' --permission-mode dontAsk`);

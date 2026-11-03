@@ -60,6 +60,9 @@ export class ManagedSessions {
     this.staged.delete(surf);
     const state = this.load(surf);
     const recovered = !!state.sessionId;
+    const interruptedTurn = state.active;
+    // This is a new provider process. A completed input receipt may be resumed with a new safe continuation; unknown operation IDs remain tombstoned.
+    state.active = false;
     const adapter = this.deps.factory?.({ ...spec, sessionId: state.sessionId || undefined }) ?? (spec.harness === 'codex' ? new CodexRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }) : new ClaudeRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }));
     const terminal = new ManagedTerminal();
     const e: Entry = { spec, state, adapter, terminal, ready: Promise.resolve(), liveRequests: new Map(), busy: false, items: new Map(), waiters: new Map() };
@@ -82,7 +85,7 @@ export class ManagedSessions {
       this.hook(e, 'SessionStart');
       if (recovered) {
         for (const q of state.decisions) if (q.state !== 'resolved') this.publish(e, q, true);
-        if (state.active || Object.values(state.operations).includes('uncertain')) this.attention(e, 'Recovered conversation; previous action needs reconciliation before continuing');
+        if (interruptedTurn || Object.values(state.operations).includes('uncertain')) this.attention(e, 'Recovered conversation; previous action needs reconciliation before continuing');
         else this.activity(e, 'idle');
         await this.recreatePending(e);
       } else if (spec.prompt) await this.send(surf, spec.prompt, spec.operationId, true);
@@ -97,7 +100,7 @@ export class ManagedSessions {
   }
   private attention(e: Entry, label: string): void { e.terminal.output(`\n[${label}]\n`); try { this.activity(e, 'waiting', label); } catch { e.terminal.output('[Managed persistence unavailable; execution is blocked]\n'); } }
   private publish(e: Entry, q: Decision, recovering = false): void {
-    this.deps.emit({ t: 'question', question_id: q.id, surf: e.spec.surf, incarnation: e.spec.incarnation, run_id: e.spec.runId, generation: q.generation, provider: e.spec.harness, provider_session_id: q.sessionId, provider_request_id: String(q.request.id), provider_turn_id: q.turnId, kind: q.kind, group_id: q.id, items: q.items.map(redactItem), hold_until: 0, durable: true, request_digest: q.digest, ...(q.action ? { action: q.action } : {}), recovery: recovering ? 'attention_required' : 'pending' });
+    this.deps.emit({ t: 'question', question_id: q.id, surf: e.spec.surf, incarnation: e.spec.incarnation, run_id: e.spec.runId, generation: q.generation, provider: e.spec.harness, provider_session_id: q.sessionId, provider_request_id: String(q.request.id), provider_turn_id: q.turnId, kind: q.kind, group_id: q.id, items: q.items.map(redactItem), hold_until: 0, durable: true, request_digest: q.digest, ...(q.action ? { action: q.action } : {}), recovery: recovering || q.state !== 'pending' ? 'attention_required' : 'pending' });
   }
   private request(e: Entry, req: HarnessRequest, items: QuestionItem[], kind: Decision['kind']): void {
     // Match the entire provider action and original conversation context. A new request ID alone never grants consent.
@@ -204,6 +207,7 @@ export class ManagedSessions {
   precheck(cmd: AnswerCommand): string | null {
     const found = this.findQuestion(cmd.question_id); if (!found) return 'unknown managed question';
     const { entry: e, question: q } = found;
+    if (cmd.request_digest !== undefined && cmd.request_digest !== q.digest || cmd.plan_revision !== undefined && cmd.plan_revision !== (e.spec.planRevision ?? 0)) return 'stale action context';
     if (cmd.surf !== undefined && cmd.surf !== e.spec.surf || cmd.run_id !== undefined && cmd.run_id !== e.spec.runId || cmd.incarnation !== undefined && cmd.incarnation !== e.spec.incarnation || cmd.generation !== undefined && cmd.generation !== e.spec.generation) return 'stale answer fence';
     if (e.persistenceError) return 'managed persistence unavailable';
     if (e.handingOff) return 'terminal has control';

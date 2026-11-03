@@ -509,6 +509,7 @@ export interface PromptBody extends OpFields {
 }
 
 export interface StatusBody extends OpFields {
+  execution?: 'managed'; controller?: 'eridani' | 'terminal';
   t: 'status';
   /** Coalescing key: `status:${surf}`. */
   entity: string;
@@ -536,6 +537,7 @@ export interface ExitBody extends OpFields {
 }
 
 export interface SnapshotSurface {
+  execution?: 'managed'; controller?: 'eridani' | 'terminal';
   surf: string;
   incarnation: number;
   /** The terminal: live here, lost in a restart, or exited. */
@@ -883,6 +885,7 @@ export interface AnswerItem {
 
 export interface AnswerCommand extends OpFields {
   surf?: string; incarnation?: number; run_id?: string; generation?: number;
+  request_digest?: string; plan_revision?: number;
   t: 'answer';
   question_id: string;
   provider_request_id: string;

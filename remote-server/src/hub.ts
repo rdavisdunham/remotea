@@ -176,6 +176,7 @@ export class Hub {
           state: info.state,
           since: info.since,
           ...(info.reason ? { reason: info.reason } : {}),
+          ...(rec.eridani?.execution === 'managed' ? { execution: 'managed' as const, controller: rec.eridani.controller ?? 'eridani' } : {}),
           ...(rec.agent ? { provider: rec.agent.provider, provider_session_id: rec.agent.sessionId } : {}),
           ...(this.permissionMode.has(surf) ? { effective_permission_mode: this.permissionMode.get(surf) } : {}),
         });
@@ -234,6 +235,7 @@ export class Hub {
         worktree: r.eridani.worktree,
         branch: r.eridani.branch,
         stop_requested: !!r.eridani.stopRequested,
+        ...(r.eridani.execution === 'managed' ? { execution: 'managed' as const, controller: r.eridani.controller ?? 'eridani' } : {}),
       } : {}),
       ...this.eridani.snapshot?.(r.id),
     }));

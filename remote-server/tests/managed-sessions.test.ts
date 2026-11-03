@@ -69,6 +69,22 @@ describe('managed durable ownership', () => {
     const q = events.filter((e) => e.t === 'question').at(-1); expect(q.provider_request_id).toBe('recreated-callback');
     expect(await manager.answer(answer(q), () => {})).toMatchObject({ state: 'executed' }); expect(adapter.responses).toEqual([{ decision: 'accept' }]);
   });
+  it('accepts a distinct safe continuation after restart without replaying the interrupted input', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-active-')); temps.push(dir);
+    const first = fixture(dir); await first.manager.ready(spec.surf); await first.manager.send(spec.surf, 'work', 'original-input');
+    const second = fixture(dir); await second.manager.ready(spec.surf);
+    expect(await second.manager.send(spec.surf, 'First reconcile interrupted effects, then continue safely', 'safe-continuation')).toMatchObject({ state: 'executed' });
+    expect(second.adapter.sent).toEqual([['First reconcile interrupted effects, then continue safely', 'safe-continuation']]);
+    expect(await second.manager.send(spec.surf, 'work', 'original-input')).toMatchObject({ state: 'executed' }); expect(second.adapter.sent).toHaveLength(1);
+  });
+  it('never labels a naturally recreated uncertain consent as safe pending delivery', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-uncertain-')); temps.push(dir);
+    const first = fixture(dir); await first.manager.ready(spec.surf); first.adapter.emit('event', approval(1));
+    await first.manager.answer(answer(first.events.find((e) => e.t === 'question')), () => {});
+    const second = fixture(dir); await second.manager.ready(spec.surf); second.adapter.emit('event', approval(2));
+    const q = second.events.filter((e) => e.t === 'question').at(-1); expect(q.recovery).toBe('attention_required');
+    expect(second.manager.precheck(answer(q))).toContain('reconciliation');
+  });
   it('never reuses a request or consent after its action/context changed', async () => {
     const { manager, adapter, events } = fixture(); await manager.ready(spec.surf);
     adapter.emit('event', approval(1)); const original = events.find((e) => e.t === 'question');

@@ -62,6 +62,17 @@ describe('managed sessions in the desktop hub', () => {
     expect(takeover).toHaveBeenCalledTimes(1);
   });
 
+  it('reports persistent terminal ownership in status and reconnect snapshots', () => {
+    const { hub, owner, registry } = setup();
+    const statuses: unknown[] = [];
+    hub.setSink({ status: (status) => statuses.push(status), turn: () => {}, exit: () => {} });
+    hub.handle(owner, { t: 'open', id: 'surf-managed', rid: 1, cols: 80, rows: 24, create: {} });
+    registry.updateSession('surf-managed', { eridani: { ...binding, controller: 'terminal', paused: true } });
+    hub.agentState.report('surf-managed', { awaitingHuman: true, runDepth: 0, reason: 'Terminal has control' });
+    expect(statuses.at(-1)).toMatchObject({ execution: 'managed', controller: 'terminal', state: 'needs_you', reason: 'Terminal has control' });
+    expect(hub.snapshot().find((surface) => surface.surf === 'surf-managed')).toMatchObject({ execution: 'managed', controller: 'terminal' });
+  });
+
   it('refuses hidden or ordinary sessions and surfaces a failed handoff', async () => {
     const { hub, owner, registry, native } = setup();
     const takeover = vi.fn(async () => { throw new Error('managed process did not stop'); });
