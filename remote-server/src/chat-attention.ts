@@ -35,7 +35,10 @@ export class ChatAttentionService {
         if (action.dueAt <= now || action.dueAt > now + 366 * 86400000) return { ok: false, error: 'Choose a reminder within the next year.' };
         rec.chatReminder = { dueAt: action.dueAt, createdBy: device, ...(action.note?.trim() ? { note: action.note.trim() } : {}) };
         break;
-      case 'cancelReminder': rec.chatReminder = null; break;
+      case 'cancelReminder':
+        rec.chatReminder = null;
+        if (rec.chatAttention?.kind === 'reminder') rec.chatAttention.kind = 'unread';
+        break;
     }
     // Persist before confirming. Requests are explicit and never blindly retried.
     try { this.registry.saveNow(); } catch {

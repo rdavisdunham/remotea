@@ -76,6 +76,8 @@ describe('durable chat attention', () => {
     advance(5000); service.tick(); service.tick();
     expect(publish).toHaveBeenCalledTimes(1);
     expect(registry.session(id)).toMatchObject({ agentState: { state: 'working' }, chatReminder: { firedAt: now(), note: 'Review the results' }, chatAttention: { kind: 'reminder', revision: 1 } });
+    service.apply(id, device, { action: 'cancelReminder' });
+    expect(registry.session(id)).toMatchObject({ chatReminder: null, chatAttention: { kind: 'unread', revision: 1, seenBy: {} } });
   });
 
   it('persists future reminders and fires overdue reminders once after restart', () => {
