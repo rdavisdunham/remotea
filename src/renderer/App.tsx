@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useState, useCallback, useRef } from
 import { setFocusedPaneReader, markRemoteLayoutReady } from './remote-sessions/sync';
 import { remoteSessionsWillPopulate } from './remote-sessions/startup';
 import { startGpuProbe } from './utils/gpu-watchdog';
-import { installWheelZoom, nextPaneZoom } from './utils/wheel-zoom';
+import { installWheelZoom, nextPaneZoom, paneIdAt } from './utils/wheel-zoom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
 import type { NotificationSlice } from './store/notification-slice';
@@ -555,11 +555,16 @@ export function tryReplaceTabSpawn(event: any, ws: WorkspaceInfo, setAgentMeta: 
 
 export default function App() {
   const [paneZooms, setPaneZooms] = useState<Record<string, number>>({});
+  // Per-pane zoom, like Windows Terminal's per-pane font size (#420): Ctrl+wheel
+  // and the font-size shortcuts change one pane, and a deltaY of 0 resets it.
+  // Not persisted, also like Windows Terminal.
   const adjustPaneZoom = useCallback((paneId: PaneId, deltaY: number) => {
-    setPaneZooms((previous) => ({
-      ...previous,
-      [paneId]: nextPaneZoom(previous[paneId] ?? 1, deltaY),
-    }));
+    setPaneZooms((previous) => {
+      const next = { ...previous };
+      if (deltaY === 0) delete next[paneId];
+      else next[paneId] = nextPaneZoom(previous[paneId] ?? 1, deltaY);
+      return next;
+    });
   }, []);
   // Field-scoped store subscription. A bare `useStore()` subscribes App to the
   // WHOLE store, so every set() anywhere — one pane's OSC 9;4 progress, an
@@ -622,7 +627,12 @@ export default function App() {
   useEffect(() => setFocusedPaneReader(() => focusedPaneIdRef.current), []);
   useEffect(() => installWheelZoom(
     document,
-    (deltaY) => { if (focusedPaneId) adjustPaneZoom(focusedPaneId, deltaY); },
+    // The pane under the pointer, as in Windows Terminal; the focused one when
+    // the wheel is over no pane.
+    (deltaY, target) => {
+      const paneId = (paneIdAt(target) as PaneId | null) ?? focusedPaneId;
+      if (paneId) adjustPaneZoom(paneId, deltaY);
+    },
     (deltaY) => window.wmux?.system?.zoom?.(deltaY),
   ), [adjustPaneZoom, focusedPaneId]);
   const [zoomedPaneId, setZoomedPaneId] = useState<PaneId | null>(null);
@@ -1730,7 +1740,7 @@ export default function App() {
     if (!paneIds.includes(zoomedPaneId)) setZoomedPaneId(null);
   }, [zoomedPaneId, activeWorkspace]);
 
-  useKeyboardShortcuts(focusedPaneId, setSettingsOpenFromShortcut, () => setBrowserOpen(o => !o), handleToggleNotifPanel, setFocusedPaneId, handleToggleZoom, () => handleToggleExplorer());
+  useKeyboardShortcuts(focusedPaneId, setSettingsOpenFromShortcut, () => setBrowserOpen(o => !o), handleToggleNotifPanel, setFocusedPaneId, handleToggleZoom, () => handleToggleExplorer(), adjustPaneZoom);
 
   // Derive a title for the titlebar: active workspace title or blank
   const titlebarText = (activeWorkspace && workspaceNames.get(activeWorkspace.id)) ?? '';

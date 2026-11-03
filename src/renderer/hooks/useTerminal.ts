@@ -12,6 +12,7 @@ import { useT } from '../i18n';
 import type { Translator } from '../i18n/core';
 import { collectActiveTerminalSurfaceIds, findSurfaceOwner } from '../store/split-utils';
 import { fireNotification } from '../utils/notifications';
+import { paneFontSize } from '../utils/wheel-zoom';
 import { SplitNode, SurfaceId, ThemeConfig, type InsertionResult } from '../../shared/types';
 import { UserColorScheme } from '../store/settings-slice';
 import { normalizeOscTitle, isConsoleDefaultTitle } from '../store/osc-title-slice';
@@ -100,6 +101,8 @@ interface UseTerminalOptions {
    * the DOM blurred its textarea — so this re-runs the show path below.
    */
   attachGeneration?: number;
+  /** The pane's zoom (#420): scales the font, so the terminal refits and reflows. */
+  fontZoom?: number;
   /** Per-surface color scheme override — takes priority over terminalPrefs.theme. */
   colorScheme?: string;
   /** Quick-launch profile commands, run once after the PTY is first created (issue #32). */
@@ -933,7 +936,7 @@ export async function fetchTheme(name: string): Promise<ThemeConfig> {
   }
 }
 
-export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = true, attachGeneration, colorScheme, startupCommands, env, claudeSessionId, codexSessionId, opencodeSessionId, agySessionId, qwenSessionId, ompSessionId }: UseTerminalOptions = {}): UseTerminalResult {
+export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = true, attachGeneration, fontZoom = 1, colorScheme, startupCommands, env, claudeSessionId, codexSessionId, opencodeSessionId, agySessionId, qwenSessionId, ompSessionId }: UseTerminalOptions = {}): UseTerminalResult {
   const t = useT();
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -1137,7 +1140,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         selectionForeground: '#fdfff1',
       },
       fontFamily: prefs.fontFamily || "'Cascadia Mono', 'Consolas', monospace",
-      fontSize: prefs.fontSize || 13,
+      fontSize: paneFontSize(prefs.fontSize || 13, fontZoom),
       cursorBlink: prefs.cursorBlink ?? true,
       cursorStyle: prefs.cursorStyle || 'block',
       // A transparent glyph atlas loses subpixel text AA even when the window
@@ -2381,7 +2384,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     });
     // Font + cursor + scrollback can be applied synchronously.
     term.options.fontFamily = prefs.fontFamily || term.options.fontFamily;
-    term.options.fontSize = prefs.fontSize || term.options.fontSize;
+    term.options.fontSize = paneFontSize(prefs.fontSize || 13, fontZoom);
     term.options.cursorStyle = prefs.cursorStyle || term.options.cursorStyle;
     term.options.cursorBlink = prefs.cursorBlink ?? term.options.cursorBlink;
     term.options.scrollback = prefs.scrollbackLines || term.options.scrollback;
@@ -2406,7 +2409,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       cancelled = true;
       if (raf !== null) cancelAnimationFrame(raf);
     };
-  }, [schemeName, userScheme, bgAlpha, prefs.fontFamily, prefs.fontSize, prefs.cursorStyle, prefs.cursorBlink, prefs.scrollbackLines, visible]);
+  }, [schemeName, userScheme, bgAlpha, prefs.fontFamily, prefs.fontSize, fontZoom, prefs.cursorStyle, prefs.cursorBlink, prefs.scrollbackLines, visible]);
 
   // Refit + force-repaint when terminal becomes visible again (tab/workspace switch).
   // A canvas inside a visibility:hidden ancestor skips paint frames; on return we
