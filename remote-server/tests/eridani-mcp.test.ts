@@ -201,7 +201,7 @@ describe('dispatch: spawn with Eridani MCP', () => {
     expect(cfgFile.startsWith(req.cwd!)).toBe(false);
     expect(fs.statSync(cfgFile).mode & 0o777).toBe(0o600);
     const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
-    expect(cfg).toEqual({ mcpServers: { eridani: { type: 'http', url: MCP_URL, headers: { Authorization: `Bearer ${MCP_KEY}` } } } });
+    expect(cfg).toEqual({ mcpServers: { eridani: { type: 'http', url: MCP_URL, headers: { Authorization: `Bearer ${MCP_KEY}`, "X-Eridani-Run-Token": "tok-123" } } } });
     expect(fs.readFileSync(cfgFile, 'utf8')).not.toContain(LINK_KEY);
     // The key is in no argv, env, log, result, record or other file.
     expect(req.cmd).not.toContain(MCP_KEY);
@@ -234,7 +234,7 @@ describe('dispatch: spawn with Eridani MCP', () => {
     const res = await run(spawnCmd({ harness: 'codex', model: 'gpt-5' }));
     expect(res).toMatchObject({ state: 'executed', result: { mcp: { configured: true } } });
     const req = sp.last().req;
-    expect(req.cmd).toBe(`'/opt/codex' '-c' 'mcp_servers.eridani.url="${MCP_URL}"' '-c' 'mcp_servers.eridani.bearer_token_env_var="${MCP_TOKEN_ENV}"' --disable daemon_auto_start -m 'gpt-5' "$ERIDANI_PROMPT"`);
+    expect(req.cmd).toBe(`'/opt/codex' '-c' 'mcp_servers.eridani.url="${MCP_URL}"' '-c' 'mcp_servers.eridani.bearer_token_env_var="${MCP_TOKEN_ENV}"' '-c' 'mcp_servers.eridani.env_http_headers={"X-Eridani-Run-Token"="ERIDANI_RUN_TOKEN"}' --disable daemon_auto_start -m 'gpt-5' "$ERIDANI_PROMPT"`);
     expect(req.cmd).not.toContain(MCP_KEY);
     expect(req.env).toMatchObject({ [MCP_TOKEN_ENV]: MCP_KEY, ERIDANI_RUN_TOKEN: 'tok-123' });
     expect(fs.readFileSync(path.join(dir, RUNS_FILE), 'utf8')).not.toContain(MCP_KEY);
@@ -384,4 +384,11 @@ describe('context: the agent is told whether it has the Eridani tools', () => {
     const out = await svc(undefined).sessionStart('s', { sessionId: 'abc', source: 'startup' });
     expect(out).not.toMatch(/MCP/);
   });
+});
+
+it('binds Codex run identity through environment headers without putting the credential in argv', () => {
+  const args = codexMcpArgs('https://app.eridani.app/api/v1/external/mcp/', true).join(' ');
+  expect(args).toContain('env_http_headers');
+  expect(args).toContain('X-Eridani-Run-Token');
+  expect(args).toContain('ERIDANI_RUN_TOKEN');
 });

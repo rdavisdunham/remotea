@@ -141,13 +141,13 @@ export function mcpStatus(r: McpResolution): McpStatus {
 }
 
 /** The Claude Code `--mcp-config` file's contents. */
-export function claudeMcpConfig(url: string, key: string): string {
-  return JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { type: 'http', url, headers: { Authorization: `Bearer ${key}` } } } }, null, 2) + '\n';
+export function claudeMcpConfig(url: string, key: string, runToken?: string | null): string {
+  return JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { type: 'http', url, headers: { Authorization: `Bearer ${key}`, ...(runToken ? { "X-Eridani-Run-Token": runToken } : {}) } } } }, null, 2) + '\n';
 }
 
 /** Codex `-c` overrides (the key is read from MCP_TOKEN_ENV, never put on the command line). */
-export function codexMcpArgs(url: string): string[] {
-  return ['-c', `mcp_servers.${MCP_SERVER_NAME}.url=${JSON.stringify(url)}`, '-c', `mcp_servers.${MCP_SERVER_NAME}.bearer_token_env_var=${JSON.stringify(MCP_TOKEN_ENV)}`];
+export function codexMcpArgs(url: string, bound = false): string[] {
+  return ['-c', `mcp_servers.${MCP_SERVER_NAME}.url=${JSON.stringify(url)}`, '-c', `mcp_servers.${MCP_SERVER_NAME}.bearer_token_env_var=${JSON.stringify(MCP_TOKEN_ENV)}`, ...(bound ? ['-c', `mcp_servers.${MCP_SERVER_NAME}.env_http_headers={"X-Eridani-Run-Token"="ERIDANI_RUN_TOKEN"}`] : [])];
 }
 
 /** Write a file only its owner can read, atomically. */

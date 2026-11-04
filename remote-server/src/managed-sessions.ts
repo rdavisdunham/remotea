@@ -164,11 +164,11 @@ export class ManagedSessions {
     if (m.type === 'user' && typeof m.uuid === 'string' && e.state.inputs[m.uuid] && (!m.session_id || m.session_id === e.state.sessionId)) this.inputAcknowledged(e, m.uuid);
     if (m.type === 'user' && m.uuid === e.prompt?.op) this.promptAccepted(e);
     if (m.type === 'assistant') { e.finalText = (m.message?.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(''); }
-    if (m.type === 'user') for (const block of m.message?.content ?? []) if (block.type === 'tool_result') { this.confirm(e, String(block.tool_use_id), true); if (block.is_error && String(e.items.get(block.tool_use_id)?.name ?? '').startsWith('mcp__eridani__')) this.toolFailed(e); }
+    if (m.type === 'user') for (const block of m.message?.content ?? []) if (block.type === 'tool_result') { this.confirm(e, String(block.tool_use_id), true); if (block.is_error && String(e.items.get(block.tool_use_id)?.name ?? '').startsWith('mcp__eridani__')) this.toolFailed(e, { ...block, id: block.tool_use_id, name: e.items.get(block.tool_use_id)?.name }); }
     if (m.method === 'turn/started') { this.promptAccepted(e); e.state.active = true; this.activity(e, 'thinking'); }
     if (m.method?.startsWith('item/reasoning/')) this.activity(e, 'thinking');
     if (m.method === 'item/agentMessage/delta') { e.finalText = (e.finalText ?? '') + String(p.delta ?? ''); }
-    if (m.method === 'item/completed' && p.item?.type === 'mcpToolCall' && (p.item.status === 'failed' || p.item.error)) this.toolFailed(e);
+    if (m.method === 'item/completed' && p.item?.type === 'mcpToolCall' && (p.item.status === 'failed' || p.item.error)) this.toolFailed(e, p.item);
     if (m.method === 'item/completed' && p.item?.type === 'agentMessage' && typeof p.item.text === 'string') e.finalText = p.item.text;
     if (m.method === 'item/started' && p.item?.id) e.items.set(p.item.id, p.item);
     if (m.method === 'item/started') this.toolActivity(e, p.item?.type ?? '', p.item?.command ?? '');
@@ -180,9 +180,25 @@ export class ManagedSessions {
     }
     if (m.type === 'assistant') for (const b of m.message?.content ?? []) if (b.type === 'tool_use') { e.items.set(b.id, b); this.toolActivity(e, b.name, b.input?.command ?? ''); }
   }
-  private toolFailed(e: Entry): void {
-    e.state.paused = true; this.save(e); this.deps.changed(e.spec.surf, e.state.sessionId, true);
-    this.attention(e, 'Coordination tool failed or timed out; reconcile its receipt before retry');
+  private toolFailed(e: Entry, item: any): void {
+    const raw = JSON.stringify(item);
+    // Only a structured domain rejection proves nothing was saved. Transport errors remain uncertain.
+    let code: string | undefined;
+    const inspect = (value: any): void => {
+      if (!value || code) return;
+      if (typeof value === 'string') { try { inspect(JSON.parse(value)); } catch { /* not JSON */ } }
+      else if (Array.isArray(value)) value.forEach(inspect);
+      else if (typeof value === 'object') {
+        if (typeof value.error?.code === 'string' && ['RUN_TOKEN_REQUIRED', 'RUN_NOT_BOUND'].includes(value.error.code)) code = value.error.code;
+        else Object.values(value).forEach(inspect);
+      }
+    };
+    inspect({ error: item.error, result: item.result, content: item.content });
+    const tool = String(item.tool ?? item.name ?? 'planning tool');
+    const reason = code ? `Planning submission rejected (${code}); no interview or plan was saved.` : 'Coordination tool failed or timed out; reconcile its receipt before retry';
+    this.setAttention(e, { kind: 'receipt_uncertain', reason, tool,
+      action: { coordination: { code: code ?? 'DELIVERY_UNCONFIRMED', outcome: code ? 'rejected' : 'uncertain', tool,
+        request_id: String(item.id ?? crypto.createHash('sha256').update(raw).digest('hex')), binding: !!e.spec.env.ERIDANI_RUN_TOKEN } } });
     void e.adapter.interrupt().catch(() => this.attention(e, 'Provider interrupt unconfirmed; execution remains paused'));
   }
   private toolActivity(e: Entry, tool: string, command: string): void {
@@ -373,7 +389,8 @@ export class ManagedSessions {
   async pause(surf: string, paused: boolean): Promise<void> {
     const e = this.entries.get(surf); if (!e) throw new Error('unknown managed session');
     if (!paused && e.state.attention?.kind === 'permission_denied') throw new Error('Automatic review denied the action; review it through explicit terminal takeover');
-    e.state.paused = paused; e.state.pausedBy = paused ? 'operator' : undefined; this.save(e); this.deps.changed(surf, e.state.sessionId, paused);
+    if (!paused && e.state.attention?.action?.coordination) e.state.attention = undefined;
+    e.state.paused = paused; e.state.pausedBy = paused ? 'operator' : undefined; this.save(e); this.deps.changed(surf, e.state.sessionId, paused, e.state.attention ?? null);
     if (paused && e.state.active && !this.pending(surf).length) await e.adapter.interrupt();
     if (!paused) { await this.recreatePending(e); void this.pump(e); }
     this.activity(e, paused ? 'waiting' : 'idle', paused ? 'Paused' : undefined);
