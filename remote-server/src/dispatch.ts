@@ -857,10 +857,10 @@ export class Dispatch {
     }
     if (harness === 'codex') {
       this.mcpEnv.set(surf, { [MCP_TOKEN_ENV]: r.key });
-      return { status: { configured: true }, args: codexMcpArgs(r.url) };
+      return { status: { configured: true }, args: codexMcpArgs(r.url, !!this.runToken(surf)) };
     }
     try {
-      writePrivate(file, claudeMcpConfig(r.url, r.key));
+      writePrivate(file, claudeMcpConfig(r.url, r.key, this.runToken(surf)));
     } catch (err) {
       return { status: { configured: false, reason: `cannot write the MCP config (${(err as NodeJS.ErrnoException).code ?? 'error'})` }, args: [] };
     }

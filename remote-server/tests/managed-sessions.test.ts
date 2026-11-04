@@ -190,3 +190,14 @@ describe('managed durable ownership', () => {
     expect(JSON.stringify(events)).not.toContain('private thought');
   });
 });
+
+it('retains a structured rejected coordination failure across restart and clears it only on resume', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-context-')); temps.push(dir);
+  const { adapter, manager, events } = fixture(dir); await manager.ready(spec.surf);
+  adapter.emit('event', { method: 'item/completed', params: { item: { id: 'failed-interview', type: 'mcpToolCall', tool: 'task_interview', status: 'failed', error: { code: 'RUN_TOKEN_REQUIRED' } } } });
+  const saved = JSON.parse(fs.readFileSync(fs.readdirSync(path.join(dir, 'managed')).map(f => path.join(dir, 'managed', f))[0], 'utf8'));
+  expect(saved.attention.action.coordination).toMatchObject({ code: 'RUN_TOKEN_REQUIRED', outcome: 'rejected', request_id: 'failed-interview' });
+  expect(saved.paused).toBe(true);
+  await manager.pause(spec.surf, false);
+  expect(events.some(e => e.kind === 'waiting')).toBe(true);
+});
