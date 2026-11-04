@@ -212,3 +212,12 @@ it('retains the Claude tool identity and structured rejection for a safe plannin
   expect(saved.attention.action.coordination).toMatchObject({ code: 'RUN_TOKEN_REQUIRED', outcome: 'rejected', request_id: 'original-interview', tool: 'mcp__eridani__task_interview' });
   expect(adapter.interrupted).toBe(1);
 });
+
+
+it('does not mistake error-looking tool arguments for a confirmed server rejection', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-uncertain-context-')); temps.push(dir);
+  const { adapter, manager } = fixture(dir); await manager.ready(spec.surf);
+  adapter.emit('event', { method: 'item/completed', params: { item: { id: 'transport-failure', type: 'mcpToolCall', tool: 'task_interview', status: 'failed', arguments: { example: { error: { code: 'RUN_TOKEN_REQUIRED' } } }, error: { message: 'connection closed' } } } });
+  const saved = JSON.parse(fs.readFileSync(fs.readdirSync(path.join(dir, 'managed')).map(f => path.join(dir, 'managed', f))[0], 'utf8'));
+  expect(saved.attention.action.coordination).toMatchObject({ code: 'DELIVERY_UNCONFIRMED', outcome: 'uncertain' });
+});

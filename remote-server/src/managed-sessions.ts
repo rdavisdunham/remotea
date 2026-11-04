@@ -193,7 +193,7 @@ export class ManagedSessions {
         else Object.values(value).forEach(inspect);
       }
     };
-    inspect(item);
+    inspect({ error: item.error, result: item.result, content: item.content });
     const tool = String(item.tool ?? item.name ?? 'planning tool');
     const reason = code ? `Planning submission rejected (${code}); no interview or plan was saved.` : 'Coordination tool failed or timed out; reconcile its receipt before retry';
     this.setAttention(e, { kind: 'receipt_uncertain', reason, tool,
