@@ -307,6 +307,8 @@ export interface DispatchDeps {
   targets: () => ExecutionTarget[];
   questions: QuestionBroker;
   managedSupported?: (target: ExecutionTarget, harness: 'codex' | 'claude') => boolean;
+  /** A managed launcher probe is still pending: keep lost sessions resumable until it finishes. */
+  managedResumePending?: (target: ExecutionTarget, harness: 'codex' | 'claude') => boolean;
   managedFactory?: (spec: import('./managed-harness').HarnessSpec) => import('./managed-harness').RuntimeAdapter;
   managedEmit?: (body: Record<string, unknown>) => void;
   /** Send an upward event (verify.result) through the link. */
@@ -1410,13 +1412,14 @@ export class Dispatch {
 
   // ── Recovery ─────────────────────────────────────────────────────────────
 
-  private resumeCommand(rec: SessionRecord): string | null | undefined {
+  private resumeCommand(rec: SessionRecord): ReturnType<NonNullable<HubEridaniHooks['resumeCommand']>> {
     const b = rec.eridani;
     if (!b) return undefined;
     if (b.execution === 'managed' && b.controller !== 'terminal') {
       const target = this.target(b.target);
-      if (process.platform !== 'linux' || !target || this.deps.managedSupported && !this.deps.managedSupported(target, b.harness)) return null;
-      if (b.stopRequested || this.deps.resumeAgents === false) return null;
+      if (b.stopRequested || this.deps.resumeAgents === false || process.platform !== 'linux' || !target) return null;
+      if (this.deps.managedResumePending?.(target, b.harness)) return { pending: 'The managed agent launcher is still being verified; its saved conversation will resume when ready.' };
+      if (this.deps.managedSupported && !this.deps.managedSupported(target, b.harness)) return null;
       const launch = target.launch[b.harness];
       if (!launch) return null;
       const mcp = this.prepareMcp(rec.id, target, b.harness);

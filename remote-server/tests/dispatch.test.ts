@@ -13,7 +13,7 @@ import type { ExecutionTarget } from '../src/eridani-targets';
 import type { WorktreeManager } from '../src/worktrees';
 import type { CommandBody } from '../../src/shared/eridani-link-protocol';
 import { commandShapeError } from '../../src/shared/eridani-link-protocol';
-import { FakePty, fakeSpawner, ManualTimers } from './helpers';
+import { FakeConn, FakePty, fakeSpawner, ManualTimers } from './helpers';
 
 const cleanups: Array<() => unknown> = [];
 afterEach(() => {
@@ -45,7 +45,7 @@ const TARGET: ExecutionTarget = {
 
 const FAST = { queuePollMs: 2, pasteEnterMs: 1, steerDelayMs: 1, ctrlCGapMs: 1, ctrlCRetryMs: 5, stopWaitMs: 60, killWaitMs: 60 };
 
-function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean; wt?: Record<string, unknown>; managedFactory?: DispatchDeps['managedFactory']; managedSupported?: DispatchDeps['managedSupported'] } = {}) {
+function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boolean; bootId?: string; silentAgent?: boolean; wt?: Record<string, unknown>; managedFactory?: DispatchDeps['managedFactory']; managedSupported?: DispatchDeps['managedSupported']; managedResumePending?: DispatchDeps['managedResumePending'] } = {}) {
   const registry = opts.registry ?? Registry.load({ file: null, bootId: 'boot-1' });
   const sp = fakeSpawner();
   const hub = new Hub({ registry, spawn: sp.spawn, bootId: opts.bootId ?? 'boot-1', serverId: 'srv', hostname: 'box', timers: new ManualTimers(), probe: () => ({}) });
@@ -74,6 +74,7 @@ function setup(opts: { registry?: Registry; dir?: string | null; linkReady?: boo
     questions,
     managedFactory: opts.managedFactory,
     managedSupported: opts.managedSupported,
+    managedResumePending: opts.managedResumePending,
     managedEmit: (body) => emitted.push(body),
     emit: (b) => verified.push(b as unknown as Record<string, unknown>),
     linkReady: () => ready,
@@ -426,6 +427,28 @@ describe('dispatch: stop', () => {
 });
 
 describe('dispatch: recovery', () => {
+  it('keeps a managed session resumable when the desktop opens it before launcher probes finish', async () => {
+    const dir = tmpDir(), file = path.join(dir, 'registry.json');
+    const first = setup({ registry: Registry.load({ file, bootId: 'boot-1' }), dir, silentAgent: true, managedFactory: () => new FakeManagedAdapter() });
+    await first.run(spawnCmd({ execution: 'managed', harness: 'codex' })); first.registry.saveNow();
+    let pending = true, factories = 0;
+    const second = setup({ registry: Registry.load({ file, bootId: 'boot-2' }), dir, bootId: 'boot-2', managedResumePending: () => pending, managedSupported: () => !pending, managedFactory: () => { factories++; return new FakeManagedAdapter(); } });
+    const surf = surfFor('run-1', 1, 1);
+    const desktop = new FakeConn(100);
+    second.hub.connect(desktop);
+    second.hub.handle(desktop, { t: 'hello', proto: 1, device: { id: 'fast-desktop', name: 'Fast desktop' }, app: { name: 'test', version: '1' } });
+    second.hub.handle(desktop, { t: 'open', rid: 1, id: surf, cols: 80, rows: 24, create: {} });
+    expect(second.registry.session(surf)!.state).toBe('lost');
+    expect(desktop.json('openError')[0].message).toContain('still being verified');
+    expect(factories).toBe(0); expect(second.sp.ptys).toHaveLength(0);
+    pending = false;
+    second.dispatch.resumeOnBoot({ onlyManaged: true });
+    expect(second.registry.session(surf)!.state).toBe('live');
+    expect(second.registry.session(surf)!.incarnation).toBe(2);
+    expect(second.registry.session(surf)!.eridani!.runId).toBe('run-1');
+    expect(second.sp.ptys).toHaveLength(0);
+  });
+
   it('defers managed boot recovery until readiness and refuses an unverified launcher without native fallback', async () => {
     const dir = tmpDir(), file = path.join(dir, 'registry.json');
     const first = setup({ registry: Registry.load({ file, bootId: 'boot-1' }), dir, silentAgent: true, managedFactory: () => new FakeManagedAdapter() });
