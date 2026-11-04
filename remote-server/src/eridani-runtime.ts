@@ -251,6 +251,7 @@ export class EridaniRuntime {
       checkTarget: (t) => templateStatus(t, { env: deps.verifyEnv }),
       prepare: (t, wt, force) => runPrepare(t, wt, { force, env: deps.verifyEnv }),
       questions: this.questions,
+      managedResumePending: (target, harness) => !this.probes.has(probeKey(harness, target.launch[harness]?.bin ?? harness)),
       managedSupported: (target, harness) => { const launch = target.launch[harness]; const p = this.probes.get(probeKey(harness, launch?.bin ?? harness)); return !!p?.ok && managedVersionSupported(harness, p.version); },
       managedEmit: (body) => {
         if (body.t === 'output.live') { if (this.link?.peerHas('output.live')) void this.link.enqueue(body, 1, `output:${body.surf}:${body.session_id}:${body.turn_id}:${body.message_id}`, Number(body.sequence)); return; }

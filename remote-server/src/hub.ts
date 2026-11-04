@@ -111,7 +111,7 @@ export interface HubEridaniHooks {
   /** Extra environment for a session (a run's ERIDANI_* and token). Applied under the hook identity. */
   env?(id: string): Record<string, string> | undefined;
   /** The command that reopens a lost session, before the default `claude --resume <id>`. */
-  resumeCommand?(rec: SessionRecord): string | null | undefined;
+  resumeCommand?(rec: SessionRecord): string | null | undefined | { pending: string };
   /** A session's process ended (also during shutdown is NOT reported). */
   exited?(id: string, code: number): void;
   /** A hook event was relayed for a live session. */
@@ -535,6 +535,12 @@ export class Hub {
     // `null` from the Eridani hook means "do not resume": the run is left
     // exited (above), never the original command (it would start the run over).
     const custom = wasLost && rec ? this.eridani.resumeCommand?.(rec) : undefined;
+    if (typeof custom === 'object' && custom !== null) {
+      // Readiness probes can still be running when the desktop reconnects. Keep the saved session lost
+      // so boot recovery can resume it after verification; never turn a temporary wait into an exit.
+      conn.sendJson({ t: 'openError', rid: msg.rid, id: msg.id, code: 'spawn-failed', message: custom.pending });
+      return;
+    }
     if (wasLost && rec?.eridani && custom === null) {
       // D4 (stage F): a run that cannot be resumed stays exited. A bare shell
       // carrying the run binding would type Eridani's next input as a command.
