@@ -164,7 +164,7 @@ export class ManagedSessions {
     if (m.type === 'user' && typeof m.uuid === 'string' && e.state.inputs[m.uuid] && (!m.session_id || m.session_id === e.state.sessionId)) this.inputAcknowledged(e, m.uuid);
     if (m.type === 'user' && m.uuid === e.prompt?.op) this.promptAccepted(e);
     if (m.type === 'assistant') { e.finalText = (m.message?.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(''); }
-    if (m.type === 'user') for (const block of m.message?.content ?? []) if (block.type === 'tool_result') { this.confirm(e, String(block.tool_use_id), true); if (block.is_error && String(e.items.get(block.tool_use_id)?.name ?? '').startsWith('mcp__eridani__')) this.toolFailed(e, block); }
+    if (m.type === 'user') for (const block of m.message?.content ?? []) if (block.type === 'tool_result') { this.confirm(e, String(block.tool_use_id), true); if (block.is_error && String(e.items.get(block.tool_use_id)?.name ?? '').startsWith('mcp__eridani__')) this.toolFailed(e, { ...block, id: block.tool_use_id, name: e.items.get(block.tool_use_id)?.name }); }
     if (m.method === 'turn/started') { this.promptAccepted(e); e.state.active = true; this.activity(e, 'thinking'); }
     if (m.method?.startsWith('item/reasoning/')) this.activity(e, 'thinking');
     if (m.method === 'item/agentMessage/delta') { e.finalText = (e.finalText ?? '') + String(p.delta ?? ''); }

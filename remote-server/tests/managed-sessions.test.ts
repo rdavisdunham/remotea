@@ -201,3 +201,14 @@ it('retains a structured rejected coordination failure across restart and clears
   await manager.pause(spec.surf, false);
   expect(events.some(e => e.kind === 'waiting')).toBe(true);
 });
+
+
+it('retains the Claude tool identity and structured rejection for a safe planning retry', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-claude-context-')); temps.push(dir);
+  const { adapter, manager } = fixture(dir); await manager.ready(spec.surf);
+  adapter.emit('event', { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'original-interview', name: 'mcp__eridani__task_interview', input: {} }] } });
+  adapter.emit('event', { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'original-interview', is_error: true, content: [{ type: 'text', text: JSON.stringify({ error: { code: 'RUN_TOKEN_REQUIRED' } }) }] }] } });
+  const saved = JSON.parse(fs.readFileSync(fs.readdirSync(path.join(dir, 'managed')).map(f => path.join(dir, 'managed', f))[0], 'utf8'));
+  expect(saved.attention.action.coordination).toMatchObject({ code: 'RUN_TOKEN_REQUIRED', outcome: 'rejected', request_id: 'original-interview', tool: 'mcp__eridani__task_interview' });
+  expect(adapter.interrupted).toBe(1);
+});
