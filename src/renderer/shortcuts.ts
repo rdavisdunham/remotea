@@ -84,6 +84,7 @@ export const SHORTCUT_TABLE: Record<ShortcutAction, ShortcutEntry> = {
   fontSizeIncrease: { label: 'Increase font size', category: 'Terminal' },
   fontSizeDecrease: { label: 'Decrease font size', category: 'Terminal' },
   fontSizeReset: { label: 'Reset font size', category: 'Terminal' },
+  clearTerminalBuffer: { label: 'Clear terminal buffer', category: 'Terminal' },
   resetTerminal: { label: 'Reset terminal state', category: 'Terminal' },
   // Issue #207. Terminal rather than View: all three act on one pane's
   // scrollback, not on the window's chrome.

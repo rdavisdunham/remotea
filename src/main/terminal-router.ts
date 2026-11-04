@@ -98,6 +98,14 @@ export class TerminalRouter {
     else this.local.resize(id, cols, rows);
   }
 
+  /**
+   * Drop ConPTY's copy of the screen to match a renderer-side clear (#434).
+   * Local only: a remote session has no ConPTY on this machine.
+   */
+  clear(id: SurfaceId): void {
+    if (!this.remote.clientOwning(id)) this.local.clear(id);
+  }
+
   /** The user is looking at this terminal: on a remote one, take control of its size. */
   claim(id: SurfaceId): void {
     this.remote.clientOwning(id)?.claim(id);

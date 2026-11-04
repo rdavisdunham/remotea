@@ -31,6 +31,7 @@ import { attachVisibleRenderer, rebuildVisibleRenderer, RendererHandle } from '.
 import { WidthChangeRebuild } from '../utils/renderer-rebuild';
 import { terminalNeedsTransparency } from '../utils/terminal-theme';
 import { resetTerminalModes } from '../utils/terminal-reset';
+import { clearTerminalBuffer } from '../utils/terminal-clear';
 import { trackScreenEvents } from '../utils/screen-report';
 import {
   applyManualReset,
@@ -133,6 +134,8 @@ interface UseTerminalResult {
   fit: () => void;
   xtermRef: React.RefObject<Terminal | null>;
   searchAddonRef: React.RefObject<SearchAddon | null>;
+  /** The live PTY's id once attached; null before the first attach. */
+  ptyIdRef: React.RefObject<string | null>;
 }
 
 function treeHasSurface(node: SplitNode, surfaceId: string): boolean {
@@ -2274,6 +2277,20 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     return () => document.removeEventListener('wmux:paste-terminal', handler);
   }, [surfaceId]);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!surfaceId || detail?.surfaceId !== surfaceId) return;
+      const term = xtermRef.current;
+      if (!term || replayHoldRef.current.isHolding) return;
+      // The prompt list stays; its markers and anchor go, a prompt in progress
+      // is re-based, and ConPTY is cleared before xterm (utils/terminal-clear.ts).
+      clearTerminalBuffer(term, surfaceId, ptyIdRef.current, window.wmux?.pty?.clear);
+    };
+    document.addEventListener('wmux:clear-terminal-buffer', handler);
+    return () => document.removeEventListener('wmux:clear-terminal-buffer', handler);
+  }, [surfaceId]);
+
   // Manual pane recovery (issue #175). The PTY-exit path above handles the case
   // where wmux can see the application die; this handles the one where it
   // cannot — a TUI that crashed *inside* a still-running shell. wmux has no
@@ -2490,5 +2507,5 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     return () => window.removeEventListener('focus', claim);
   }, [visible, focused, attachGeneration]);
 
-  return { terminalRef, fit, xtermRef, searchAddonRef };
+  return { terminalRef, fit, xtermRef, searchAddonRef, ptyIdRef };
 }

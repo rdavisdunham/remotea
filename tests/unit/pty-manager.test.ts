@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as nodePty from 'node-pty';
 import { EventEmitter } from 'events';
+import { Terminal } from '@xterm/xterm';
 import { PtyManager, parseShellSpec, resolveSpawnCwd, resolveShell, resolveShellForCwd, resolveExistingShellPath, comparePackageVersion, appExecAliasTarget, shellEnv, shellProbe, resetShellPathCache, buildShellArgs } from '../../src/main/pty-manager';
 import { workspaceFallbackCwd } from '../../src/shared/paths';
 import type { SurfaceId } from '../../src/shared/types';
@@ -107,6 +108,50 @@ describe('PtyManager', { timeout: 60_000 }, () => {
       spawn.mockRestore();
       hasWsl.mockRestore();
     }
+  });
+
+  it('clear() re-bases ConPTY so input typed after a frontend clear echoes on the kept row', async () => {
+    const manager = makeManager();
+    const terminal = new Terminal({ cols: 80, rows: 12, allowProposedApi: true });
+    const { id } = manager.create({
+      shell: TEST_SHELL, cwd: process.env.USERPROFILE || 'C:\\', env: TEST_ENV, cols: 80, rows: 12,
+    });
+    const unsubscribe = manager.onData(id, (data) => terminal.write(data));
+    const viewport = () => Array.from({ length: terminal.rows }, (_, y) =>
+      terminal.buffer.active.getLine(terminal.buffer.active.baseY + y)?.translateToString(true) ?? '');
+    try {
+      await firstData(manager, id);
+      manager.write(id, 'for /L %i in (1,1,30) do @echo FILL%i\r');
+      // The screen is full and the prompt is back on the bottom row.
+      await vi.waitFor(() => {
+        const rows = viewport();
+        expect(rows).toContain('FILL30');
+        expect(rows.at(-1)).toMatch(/>$/);
+      }, { timeout: 10_000 });
+      // Let ConPTY settle before the clear, as a human pressing the key would.
+      await new Promise((r) => setTimeout(r, 300));
+      await new Promise<void>((resolve) => terminal.write('', resolve));
+
+      manager.clear(id);
+      terminal.clear();
+      manager.write(id, 'AFTERCLEAR');
+      await vi.waitFor(() => expect(viewport().join('\n')).toContain('AFTERCLEAR'), { timeout: 10_000 });
+      await new Promise((r) => setTimeout(r, 300));
+      await new Promise<void>((resolve) => terminal.write('', resolve));
+      const rows = viewport();
+      expect(rows.findIndex((row) => row.includes('AFTERCLEAR'))).toBe(0);
+    } finally {
+      unsubscribe();
+      terminal.dispose();
+    }
+  });
+
+  it('clear() is a no-op for an unknown or killed surface', () => {
+    const manager = makeManager();
+    expect(() => manager.clear('surf-missing' as SurfaceId)).not.toThrow();
+    const { id } = manager.create({ shell: TEST_SHELL, cwd: process.env.USERPROFILE || 'C:\\', env: TEST_ENV });
+    manager.kill(id);
+    expect(() => manager.clear(id)).not.toThrow();
   });
 
   it('has() returns true after create and false after kill', () => {

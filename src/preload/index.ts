@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('wmux', {
       ipcRenderer.send(IPC_CHANNELS.PTY_WRITE, id, data),
     resize: (id: string, cols: number, rows: number) =>
       ipcRenderer.send(IPC_CHANNELS.PTY_RESIZE, id, cols, rows),
+    // ConPTY's own screen copy, cleared alongside xterm's (#434).
+    clear: (id: string) =>
+      ipcRenderer.send(IPC_CHANNELS.PTY_CLEAR, id),
     // `shellSpec` lets a remote surface that was never mounted here still be
     // closed on its server (remotea).
     kill: (id: string, shellSpec?: string) =>
