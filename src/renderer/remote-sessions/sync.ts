@@ -44,6 +44,7 @@ let applyQueued = false;
 let reportTimer: ReturnType<typeof setTimeout> | null = null;
 let lastReport = '';
 let applyingMetadata = false;
+let metadataTimer: ReturnType<typeof setTimeout> | null = null;
 const agreedTitles = new Map<string, string | undefined>();
 const pendingTitles = new Map<string, { title: string | null; at: number; sent: boolean }>();
 /** hostId + groupId -> the name/colour we pushed and are waiting to see echoed. */
@@ -201,6 +202,7 @@ function runSync(): void {
         pending.sent = true;
         pending.at = now;
         bridge()?.sessionUpdate(view.hostId, id, { title: pending.title });
+        scheduleMetadataReconcile();
       }
       if ((session && (session.title || null) === pending.title) || (pending.sent && now - pending.at > PENDING_META_MS)) pendingTitles.delete(key);
       else titles[id] = pending.title;
@@ -255,10 +257,20 @@ function rememberMetadata(local: LocalIndex = buildLocalIndex()): void {
   for (const surface of local.surfaces) agreedTitles.set(metadataKey(surface.hostId, surface.id), surface.customTitle || undefined);
 }
 
+/** Expire the renderer-to-main handoff even when no further registry event arrives. */
+function scheduleMetadataReconcile(): void {
+  if (metadataTimer) clearTimeout(metadataTimer);
+  metadataTimer = setTimeout(() => {
+    metadataTimer = null;
+    queueSync();
+  }, PENDING_META_MS + 1);
+}
+
 function sendWorkspaceName(host: string, groupId: string, name: string, color?: string): void {
   const metadata = { name: name.slice(0, LIMITS.maxName), color };
   pendingMeta.set(metadataKey(host, groupId), { ...metadata, at: Date.now() });
   bridge()?.groupUpsert(host, { id: groupId, ...metadata });
+  scheduleMetadataReconcile();
 }
 
 function sendTerminalName(host: string, id: string, title: string | undefined): void {
@@ -266,6 +278,7 @@ function sendTerminalName(host: string, id: string, title: string | undefined): 
   const known = latest?.views.some(view => view.hostId === host && view.sessions.some(session => session.id === id)) ?? false;
   pendingTitles.set(metadataKey(host, id), { title: value, at: Date.now(), sent: known });
   if (known) bridge()?.sessionUpdate(host, id, { title: value });
+  scheduleMetadataReconcile();
 }
 
 /** Preserve explicit names saved by app versions that only stored terminal/task names locally. */

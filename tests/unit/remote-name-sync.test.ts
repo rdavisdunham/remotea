@@ -83,6 +83,21 @@ describe('shared workspace and terminal names through renderer sync', () => {
     expect(names().terminal).toBeUndefined();
   });
 
+  it('settles a competing server rename after the IPC handoff without needing another registry push', async () => {
+    await receive(view());
+    useStore.getState().renameWorkspace(workspaceId, 'First edit');
+    useStore.getState().renameSurface(workspaceId, paneId, surfaceId, 'First terminal edit');
+    const newer = view();
+    newer.groups[0].name = 'Last server edit';
+    newer.sessions[0] = { ...newer.sessions[0], title: 'Last terminal edit', titleUpdatedAt: 3 };
+    await receive(newer);
+    vi.advanceTimersByTime(8_001);
+    await Promise.resolve();
+    expect(names()).toEqual({ workspace: 'Last server edit', terminal: 'Last terminal edit' });
+    expect(groupUpsert).toHaveBeenCalledTimes(1);
+    expect(sessionUpdate).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps durable offline edits over a stale welcome after the renderer handoff expires', async () => {
     await receive(view());
     useStore.getState().renameWorkspace(workspaceId, 'Offline workspace');
