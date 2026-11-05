@@ -22,6 +22,16 @@ it('advertises only verified Linux provider versions and actual model-specific e
   expect(managedVersionSupported('codex', '0.166.0', 'linux')).toBe(true);
   expect(managedVersionSupported('claude', '2.1.317', 'linux')).toBe(true);
   expect(managedVersionSupported('claude', '2.1.1', 'linux')).toBe(false);
+  expect(managedVersionSupported('claude', '2.1.318', 'linux', {})).toBe(true);
+  expect(managedVersionSupported('claude', '2.1.319', 'linux', {})).toBe(false);
+  expect(managedVersionSupported('claude', '2.1.311', 'linux', {})).toBe(false);
+  expect(managedVersionSupported('claude', '2.2.0', 'linux', {})).toBe(false);
+  // REMOTEA_MANAGED_CLAUDE_MAX raises the ceiling without a release; it never lowers the floor.
+  expect(managedVersionSupported('claude', '2.1.321', 'linux', { REMOTEA_MANAGED_CLAUDE_MAX: '2.1.321' })).toBe(true);
+  expect(managedVersionSupported('claude', '2.1.322', 'linux', { REMOTEA_MANAGED_CLAUDE_MAX: '321' })).toBe(false);
+  expect(managedVersionSupported('claude', '2.1.311', 'linux', { REMOTEA_MANAGED_CLAUDE_MAX: '300' })).toBe(false);
+  expect(managedVersionSupported('claude', '2.1.312', 'linux', { REMOTEA_MANAGED_CLAUDE_MAX: '300' })).toBe(true);
+  expect(managedVersionSupported('claude', '2.1.319', 'linux', { REMOTEA_MANAGED_CLAUDE_MAX: 'latest' })).toBe(false);
   expect(managedVersionSupported('codex', '0.167.0', 'linux')).toBe(false);
   expect(managedVersionSupported('codex', '0.166.0', 'win32')).toBe(false);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-models-')); const file = path.join(dir, 'models.json');

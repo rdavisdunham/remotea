@@ -500,6 +500,7 @@ This section lists all ServerConfig defaults and summarizes related Eridani targ
 | Area | Current fields / operations | Ownership and distinction |
 |---|---|---|
 | Service network | `port` 7717; `bind` loopback + tailscale0; `hookPort` 7718 (zero disables) | `~/.config/remotea` or `REMOTEA_CONFIG_DIR`; different from desktop connection URL. |
+| Managed Claude runs | Claude Code 2.1.312–2.1.318 on Linux; env `REMOTEA_MANAGED_CLAUDE_MAX` (`320` or `2.1.320`) raises the ceiling | Claude Code auto-updates past the verified range and managed runs turn off (Eridani: MANAGED_UNAVAILABLE). Check `claude --help` and a short managed run, then set it in the unit (`systemctl --user edit remotea`, `Environment=REMOTEA_MANAGED_CLAUDE_MAX=2.1.320`) and restart. The floor stays 2.1.312. |
 | Recovery/lifetime | `resumeAgents` true; `ptyKeeper` false by default; `ptyKeeperIdleMinutes` 10 | Server behavior; restart persistence is optional, not universal. |
 | Terminal history/retention | `scrollback` and `snapshotScrollback` 5000; `ringBytes` 1 MiB; `exitedRetentionDays` 7; `tombstoneDays` 30 | Server storage/replay, distinct from renderer preferences. |
 | Upload retention | `uploadBudgetMiB` 2048; `uploadMaxAgeDays` 7 | Host storage, distinct from SSH upload toggles. |
