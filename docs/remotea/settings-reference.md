@@ -144,6 +144,7 @@ Persisted `sidebarPrefs`, except Sidebar mode in `appearancePrefs`. All apply li
 |---|---|---|---|
 | Wrap long workspace titles | `wrapTitles=false` | on/off | Sidebar:14 |
 | Give workspace titles the full row width | `fullWidthTitles=false` | on/off; moves status to separate row | Sidebar:24 |
+| Eridani runs expanded | `sidebarPrefs.eridaniRunsExpanded=false` | Expand/collapse control at the bottom of the desktop sidebar. Saved in settings.json across restarts | Sidebar header |
 | Show git branch | `showGitBranch=true` | on/off | Sidebar:40 |
 | Show working directory | `showWorkingDir=true` | on/off | Sidebar:50 |
 | Show PR status | `showPR=true` | on/off | Sidebar:60 |
@@ -180,7 +181,7 @@ Persisted `sidebarPrefs`, except Sidebar mode in `appearancePrefs`. All apply li
 | Keep display awake | main `wmux-keep-awake.preventDisplaySleep=false` | on/off; always editable even mode off, takes effect when keep-awake engages | Workspace:435–446 |
 | Execution location and Shell / Command | `defaultShell=''` | Separate location picker (This computer or a configured host) and free-text local shell / host command. Local suggestions: powershell.exe, pwsh.exe, cmd.exe, bash.exe, wsl.exe. Explicit local system shell uses `local:`; host selection retains `remote:<host> [command]` | Workspace:454–468 |
 | Starting directory | `defaultCwd=''` | Text on selected location; local ~ and %VARIABLES% expansion. Browse… is a local folder picker disabled for host launches. Host paths must begin / or ~/ (or be ~); incompatible saved paths warn and are rejected on launch. Splits/explicit cwd/restores keep own cwd | Workspace:473–489 |
-| Terminal panes | `newWorkspacePanes=3` | 1–8 rounded/clamped on input; affects new default workspace | Workspace:503–518 |
+| Terminal panes | `newWorkspacePanes=1` | 1–8 rounded/clamped on input. Legacy three-pane grid defaults migrate once to one pane. Saved layouts and subsequent explicit choices apply to new workspaces | Workspace:503–518 |
 | Arrangement | `newWorkspaceLayout='grid'` | Grid (balanced rows) / Columns (side by side) / Rows (stacked) / Main pane left, rest stacked right / Main pane top, rest across the bottom; disabled for <=1 pane | Workspace:524–538 |
 
 Local shell suggestions remain a fixed Windows list rather than runtime discovery, and the text field permits custom commands. Location is now chosen separately. Missing/malformed host specifications fail rather than launching locally; a failed host-list read shows uncertain configuration rather than claiming the host was removed. Native Mac shell discovery remains future work.
@@ -202,7 +203,7 @@ Default `savedLayouts=[]`; each `{id,name,splitTree,createdAt}` persists under `
 | + Save current layout as preset | Creates new preset via requestLayoutSave; default name Layout N | [UI/Workspace:145–148,626](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/WorkspaceSettings.tsx#L145) |
 | Restore app default | Sets defaultLayoutId null | Only when a default is set, [UI/Workspace:630](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/WorkspaceSettings.tsx#L630) |
 
-Additional fields stored in workspacePrefs but shown under **Remote hosts**: `groupEridaniRuns=true`, “Group Eridani runs by repository and task”; `recoverySkipClean=true`, “Skip the recovery dialog when everything restores cleanly”. The Remote hosts section below gives exact behavior and storage.
+Additional fields stored in workspacePrefs but shown under **Remote hosts**: `groupEridaniRuns=true`, “Group Eridani runs by repository”; `recoverySkipClean=true`, “Skip the recovery dialog when everything restores cleanly”. The Remote hosts section below gives exact behavior and storage.
 
 ## Terminal
 
@@ -420,7 +421,7 @@ Host records live in `getAppDataDir()/remote-hosts.json`, separate from `setting
 | Enabled / `enabled` | On for new host | Applied on Save; enables/disables the connection, not the server or its sessions | **Connect to this host** |
 | I understand this connection is unencrypted on this network / `acknowledgeUnencrypted` | Off in new draft | Only for plain ws outside approved loopback/Tailscale classification. Test and Save disabled until acknowledged. Stored as acknowledgment of this exact URL, not a universal trust preference | Preserve explicit transport acknowledgment |
 | New terminals open here by default | Off unless `workspacePrefs.defaultShell` names this host; global default initially empty/system shell | Immediate change to `wmux-workspace-prefs.defaultShell = remote:<id>`; unchecking clears to system default, not the previously selected local shell. Existing tabs do not move | **Default execution location for new terminals** once location/shell are separated |
-| Group Eridani runs by repository and task / `workspacePrefs.groupEridaniRuns` | On | Immediate desktop placement/display preference. Per-task workspace under execution target; off uses the host's Eridani workspace. Manual sessions remain in place | Keep; explain that it changes organization, not execution |
+| Group Eridani runs by repository / `workspacePrefs.groupEridaniRuns` | On | Repository headings inside the separate Eridani runs section. Off displays a flat list inside that section | Display preference |
 | Skip the recovery dialog when everything restores cleanly / `workspacePrefs.recoverySkipClean` | On | Affects startup/reconnect recovery presentation; exceptions still need attention | **Show recovery only when a decision is needed** |
 
 Sources: [form/defaults/actions](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/RemoteHostsSettings.tsx#L65), [host storage/validation](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/main/remote-hosts/host-config.ts#L26), [save behavior](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/main/remote-hosts/host-config.ts#L115), [storage paths](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/main/remote-hosts/index.ts#L48), [transport acknowledgment](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/shared/host-url.ts#L29), [Eridani/recovery preferences](https://github.com/rdavisdunham/remotea/blob/b31f92c4a78b064b64f467200da3be2ac8f48b9c/src/renderer/components/Settings/RemoteHostsSettings.tsx#L294).

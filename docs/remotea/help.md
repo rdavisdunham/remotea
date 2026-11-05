@@ -9,7 +9,7 @@ Remotea organizes terminals, coding agents and project tools on this computer an
 
 <a id="start"></a>
 
-Create a workspace and select a local shell in Settings → Workspace. Local Windows terminals and installed coding agents work without a host or Eridani. Closing their owning window ends local processes.
+Create a workspace and select a local shell in Settings → Workspace. New workspaces start with one terminal. Settings → Workspace and saved layout presets can specify a different arrangement. Local Windows terminals and installed coding agents work without a host or Eridani. Closing their owning window ends local processes.
 
 ## Connect a host
 
@@ -76,3 +76,10 @@ The desktop package exposes remotea and injects working wmux compatibility shims
 <a id="customize"></a>
 
 Settings search finds controls and their scope. User TOML configuration can override UI preferences after reload; custom locale files fall back to English. F1 shows live shortcuts; Settings → Shortcuts and the command palette reflect rebinding. TRACE, agent navigator/office, prompt outline, browser engines and snapshots remain available. Legacy local orchestration is wmux-orchestrator compatibility, separate from OpenCode integration and Eridani. Report desktop/host versions and redacted diagnostics; never include tokens. Windows desktop and Linux/WSL host are current support boundaries.
+
+
+### Eridani runs in the desktop sidebar
+
+Manual workspaces appear in the main list. Eridani task workspaces appear in the collapsible **Eridani runs** section above the sidebar footer. The section starts collapsed and remembers expansion across app restarts. Expand it to select a task workspace and read its run status. Settings → Remote hosts can group these rows under repository headings.
+
+Host registry updates separate Eridani-originated tabs from manual workspaces using their saved run binding. Tab identities and live host sessions carry through the layout move. Manual workspace reordering and **Close others** operate within the manual section, with the corresponding behavior inside the Eridani section.

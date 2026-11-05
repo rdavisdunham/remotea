@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useId } from 'react';
 import { WorkspaceInfo, WorkspaceId, PaneId } from '../../../shared/types';
 import WorkspaceRow from './WorkspaceRow';
 import SidebarResizeHandle from './SidebarResizeHandle';
@@ -90,6 +90,13 @@ export default function Sidebar({
   const [sessionMenuMode, setSessionMenuMode] = useState<'load' | 'save' | null>(null);
   const [showWorktreeModal, setShowWorktreeModal] = useState(false);
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const manualWorkspaces = workspaces.filter((workspace) => !workspace.eridaniTask);
+  const eridaniWorkspaces = workspaces.filter((workspace) => workspace.eridaniTask);
+  const sectionWorkspaces = (id: WorkspaceId) => (
+    workspaces.find((workspace) => workspace.id === id)?.eridaniTask ? eridaniWorkspaces : manualWorkspaces
+  );
+  const eridaniExpanded = useStore((state) => state.sidebarPrefs.eridaniRunsExpanded === true);
+  const eridaniSectionId = useId();
 
   // ── Orchestration IPC subscription ──────────────────────────────────────
   // Main process pushes wmux-orchestrator state.json updates; we mirror them
@@ -136,6 +143,7 @@ export default function Sidebar({
   // see ./reorder.ts for why the direction-derived version was wrong downwards
   // (issue #124).
   const handleDragOver = useCallback((e: React.DragEvent, id: WorkspaceId) => {
+    if (!draggedId || !sectionWorkspaces(draggedId).some((workspace) => workspace.id === id)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (id === draggedId) {
@@ -144,19 +152,18 @@ export default function Sidebar({
     }
     const edge = edgeForPointer(e.clientY, e.currentTarget.getBoundingClientRect());
     setDropTarget((prev) => (prev?.id === id && prev.edge === edge ? prev : { id, edge }));
-  }, [draggedId]);
+  }, [draggedId, workspaces]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent, targetId: WorkspaceId) => {
+      if (!draggedId || !sectionWorkspaces(draggedId).some((workspace) => workspace.id === targetId)) return;
       e.preventDefault();
       const edge = dropTarget?.id === targetId
         ? dropTarget.edge
         : edgeForPointer(e.clientY, e.currentTarget.getBoundingClientRect());
 
-      if (draggedId) {
-        const reordered = reorderByDrop(workspaces.map((w) => w.id), draggedId, targetId, edge);
-        if (reordered) onReorder(reordered);
-      }
+      const reordered = reorderByDrop(workspaces.map((w) => w.id), draggedId, targetId, edge);
+      if (reordered) onReorder(reordered);
 
       setDraggedId(null);
       setDropTarget(null);
@@ -175,12 +182,15 @@ export default function Sidebar({
   // that handled the event has already called preventDefault, so this only acts
   // on what fell through, and maps it onto the nearest row edge.
   const listDropTarget = useCallback((e: React.DragEvent): { id: WorkspaceId; edge: DropEdge } | null => {
-    const rows = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[data-workspace-id]')).map((el) => {
-      const r = el.getBoundingClientRect();
-      return { id: el.dataset.workspaceId as WorkspaceId, top: r.top, height: r.height };
-    });
+    const allowedIds = new Set(draggedId ? sectionWorkspaces(draggedId).map((workspace) => workspace.id) : []);
+    const rows = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[data-workspace-id]'))
+      .filter((element) => allowedIds.has(element.dataset.workspaceId as WorkspaceId))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { id: element.dataset.workspaceId as WorkspaceId, top: rect.top, height: rect.height };
+      });
     return edgeForListPointer(e.clientY, rows);
-  }, []);
+  }, [draggedId, workspaces]);
 
   const handleListDragOver = useCallback((e: React.DragEvent) => {
     if (e.defaultPrevented || !draggedId) return;
@@ -212,7 +222,7 @@ export default function Sidebar({
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTarget(null);
   }, []);
 
-  // ── remotea: Eridani task workspaces grouped by target (0ec167e4) ────────
+  // Repository headings are optional within the separate delegated-run section.
   const groupEridani = useStore((s) => s.workspacePrefs?.groupEridaniRuns !== false);
   const registryViews = useRemoteRegistry((s) => s.views);
 
@@ -288,35 +298,33 @@ export default function Sidebar({
   // ── Move helpers ─────────────────────────────────────────────────────────
   const handleMoveUp = useCallback(
     (id: WorkspaceId) => {
-      const ids = workspaces.map((w) => w.id);
+      const ids = sectionWorkspaces(id).map((w) => w.id);
       const idx = ids.indexOf(id);
       if (idx <= 0) return;
-      const reordered = [...ids];
-      [reordered[idx - 1], reordered[idx]] = [reordered[idx], reordered[idx - 1]];
-      onReorder(reordered);
+      const reordered = reorderByDrop(workspaces.map((workspace) => workspace.id), id, ids[idx - 1], 'above');
+      if (reordered) onReorder(reordered);
     },
     [workspaces, onReorder],
   );
 
   const handleMoveDown = useCallback(
     (id: WorkspaceId) => {
-      const ids = workspaces.map((w) => w.id);
+      const ids = sectionWorkspaces(id).map((w) => w.id);
       const idx = ids.indexOf(id);
       if (idx === -1 || idx >= ids.length - 1) return;
-      const reordered = [...ids];
-      [reordered[idx], reordered[idx + 1]] = [reordered[idx + 1], reordered[idx]];
-      onReorder(reordered);
+      const reordered = reorderByDrop(workspaces.map((workspace) => workspace.id), id, ids[idx + 1], 'below');
+      if (reordered) onReorder(reordered);
     },
     [workspaces, onReorder],
   );
 
   const handleMoveToTop = useCallback(
     (id: WorkspaceId) => {
-      const ids = workspaces.map((w) => w.id);
+      const ids = sectionWorkspaces(id).map((w) => w.id);
       const idx = ids.indexOf(id);
       if (idx <= 0) return;
-      const reordered = [id, ...ids.filter((i) => i !== id)];
-      onReorder(reordered);
+      const reordered = reorderByDrop(workspaces.map((workspace) => workspace.id), id, ids[0], 'above');
+      if (reordered) onReorder(reordered);
     },
     [workspaces, onReorder],
   );
@@ -342,7 +350,7 @@ export default function Sidebar({
   // ── Close other workspaces ───────────────────────────────────────────────
   const handleCloseOthers = useCallback(
     (id: WorkspaceId) => {
-      workspaces
+      sectionWorkspaces(id)
         .filter((w) => w.id !== id)
         .forEach((w) => onClose(w.id));
     },
@@ -379,18 +387,46 @@ export default function Sidebar({
           if (e.button === 0 && e.target === e.currentTarget && !draggedId) onCreate();
         }}
       >
-        {groupSidebarWorkspaces(workspaces, groupEridani).map((item) => (item.kind === 'workspace'
-          ? renderRow(item.workspace)
-          : (
-            <div key={`target:${item.key}`} className="sidebar__task-group" data-target={item.target}>
-              <div className="sidebar__task-group-head" title={`Eridani runs on ${item.target} (${item.hostId})`}>
-                <span className="sidebar__task-group-label">{item.label}</span>
-                <span className="sidebar__task-group-count">{item.workspaces.length}</span>
-              </div>
-              {item.workspaces.map((ws) => renderRow(ws, <TaskRunChip run={taskRunHealth(ws, registryViews, t)} />))}
-            </div>
-          )))}
+        {manualWorkspaces.map((workspace) => renderRow(workspace))}
       </div>
+
+      {eridaniWorkspaces.length > 0 && (
+        <section className="sidebar__eridani" aria-label={t('sidebar.eridaniRuns')}>
+          <button
+            type="button"
+            className="sidebar__eridani-toggle"
+            aria-expanded={eridaniExpanded}
+            aria-controls={eridaniSectionId}
+            onClick={() => useStore.getState().setSidebarPrefs({ eridaniRunsExpanded: !eridaniExpanded })}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d={eridaniExpanded ? 'M4 6l4 4 4-4' : 'M6 4l4 4-4 4'} />
+            </svg>
+            <span>{t('sidebar.eridaniRuns')}</span>
+            <span className="sidebar__task-group-count">{eridaniWorkspaces.length}</span>
+          </button>
+          <div
+            id={eridaniSectionId}
+            className="sidebar__eridani-list"
+            hidden={!eridaniExpanded}
+            onDragOver={handleListDragOver}
+            onDrop={handleListDrop}
+            onDragLeave={handleListDragLeave}
+          >
+            {groupSidebarWorkspaces(eridaniWorkspaces, groupEridani).map((item) => (item.kind === 'workspace'
+              ? renderRow(item.workspace, <TaskRunChip run={taskRunHealth(item.workspace, registryViews, t)} />)
+              : (
+                <div key={`target:${item.key}`} className="sidebar__task-group" data-target={item.target}>
+                  <div className="sidebar__task-group-head" title={`Eridani runs on ${item.target} (${item.hostId})`}>
+                    <span className="sidebar__task-group-label">{item.label}</span>
+                    <span className="sidebar__task-group-count">{item.workspaces.length}</span>
+                  </div>
+                  {item.workspaces.map((workspace) => renderRow(workspace, <TaskRunChip run={taskRunHealth(workspace, registryViews, t)} />))}
+                </div>
+              )))}
+          </div>
+        </section>
+      )}
 
       <div className="sidebar__footer">
         <button

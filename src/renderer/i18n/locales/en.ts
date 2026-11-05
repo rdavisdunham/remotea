@@ -154,8 +154,9 @@ export const en = {
   "remote.host.lifetime": "Host terminals run on that machine’s Remotea server and can continue while the desktop is disconnected, if the host and service stay available. WSL on this same PC is still a host; PC sleep or shutdown can stop it. Disconnected process status is unknown. Devices share host sessions; each keeps its own arrangement.",
   "remote.host.default": "New terminals open here by default",
   "remote.host.eridani": "Eridani runs and recovery",
-  "remote.host.group": "Group Eridani runs by repository and task",
-  "remote.host.groupHint": "A desktop grouping per task (or standalone run), under its execution target. This organizes existing host terminals; it does not start tasks. Activity and process exit do not establish verification or approval. Off: runs share the host’s Eridani workspace. Manual sessions are not moved.",
+  "remote.host.group": "Group Eridani runs by repository",
+  "remote.host.groupHint": "Show repository headings inside the Eridani runs section. Each task keeps its own workspace in that section.",
+  "sidebar.eridaniRuns": "Eridani runs",
   "remote.host.skipRecovery": "Skip the recovery dialog when everything restores cleanly",
   "remote.host.skipRecoveryHint": "After start or reconnect, ask only about exited or closed terminals and worktrees with unmerged work. Restoring a view or resuming a conversation does not revive an ended process.",
 

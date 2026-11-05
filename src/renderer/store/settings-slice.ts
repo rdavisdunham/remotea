@@ -447,6 +447,8 @@ export interface SidebarPrefs {
    * shipped look.
    */
   fullWidthTitles: boolean;
+  /** Persist the delegated-run section independently from the manual workspace list. */
+  eridaniRunsExpanded: boolean;
 }
 
 export const SIDEBAR_TEXT_SCALE_MIN = 90;
@@ -475,6 +477,7 @@ export const DEFAULT_SIDEBAR_PREFS: SidebarPrefs = {
   textScale: 100,
   wrapTitles: false,
   fullWidthTitles: false,
+  eridaniRunsExpanded: false,
 };
 
 // ─── Workspace settings ───────────────────────────────────────────────────────
@@ -545,15 +548,8 @@ export interface WorkspacePrefs {
    */
   detectAgentScreens: boolean;
   /**
-   * Which `savedLayouts` entry (by id) new workspaces start with — Ctrl+N, the
-   * sidebar "+" button, CLI `wmux new-workspace`, "Open folder as workspace",
-   * and the first-launch/empty-session workspace all read this. `null` (the
-   * default) means each entry point falls back to its OWN pre-existing
-   * baseline, unchanged from before saved layouts existed: a single plain pane
-   * for Ctrl+N/CLI/"Open folder", or wmux's classic 3-pane layout for the
-   * sidebar "+" button and first launch. Dangling ids (the saved layout was
-   * deleted) are treated the same as `null` by the one place that resolves
-   * this (`resolveDefaultSplitTree` in workspace-slice.ts).
+   * Saved layout used for ordinary new workspaces. Null or a deleted layout
+   * uses the configured pane count and arrangement.
    */
   defaultLayoutId: string | null;
   /**
@@ -587,33 +583,12 @@ export interface WorkspacePrefs {
    * Off by default — every such pane starts an agent at once.
    */
   restoreOmpSessions: boolean;
-  /**
-   * How many terminal panes a new workspace opens with, and how they sit
-   * (issue #212).
-   *
-   * These exist because the answer used to be hard-coded in two places that
-   * disagreed: the sidebar `+` built a three-pane T, `wmux new-workspace` built
-   * one pane, and nothing in Settings or config.toml could change either. A
-   * user who wanted a different arrangement rebuilt it by hand every time.
-   *
-   * Ranked BELOW `defaultLayoutId`, not beside it: a saved layout carries each
-   * pane's shell, cwd and startup commands, so it is a strictly richer answer
-   * to the same question. These two only decide what a workspace looks like
-   * when no layout is marked default — which is every install by default.
-   *
-   * `3` / `grid` is the T that has always shipped, so nobody's sidebar `+`
-   * changes. `wmux new-workspace` does change, from one pane to three, which is
-   * the consistency #212 asked for; `--panes 1` restores the old CLI behaviour
-   * for a script that depends on it.
-   */
+  /** Default pane count and arrangement when a saved layout is not selected. */
   newWorkspacePanes: number;
   newWorkspaceLayout: WorkspaceLayout;
-  /**
-   * remotea: sessions Eridani starts land in one workspace per task (one per
-   * run when it has no task), shown in the sidebar under their execution
-   * target with the run's state, instead of all sharing the server's
-   * "Eridani" group workspace. Manual sessions are untouched. On by default.
-   */
+  /** Version of the one-time promotion from the legacy three-pane grid default. */
+  newWorkspaceDefaultsRev?: number;
+  /** Show repository headings inside the dedicated Eridani runs section. */
   groupEridaniRuns: boolean;
   /**
    * remotea: after a start or a reconnect, show the recovery inventory only
@@ -658,7 +633,8 @@ export const DEFAULT_WORKSPACE_PREFS: WorkspacePrefs = {
   restoreQwenSessions: false,
   restoreOmpSessions: false,
   detectAgentScreens: true,
-  newWorkspacePanes: 3,
+  newWorkspacePanes: 1,
+  newWorkspaceDefaultsRev: 1,
   newWorkspaceLayout: 'grid',
   groupEridaniRuns: true,
   recoverySkipClean: true,
@@ -666,6 +642,20 @@ export const DEFAULT_WORKSPACE_PREFS: WorkspacePrefs = {
   // a click does, and this only writes a file the user never has to look at.
   sessionSnapshotMinutes: 5,
 };
+
+/** Load saved workspace preferences and promote the former shipped pane default once. */
+export function loadWorkspacePrefs(): WorkspacePrefs {
+  const saved = loadPersisted<WorkspacePrefs>(STORAGE_KEYS.workspacePrefs);
+  const prefs = { ...DEFAULT_WORKSPACE_PREFS, ...saved };
+  if ((saved.newWorkspaceDefaultsRev ?? 0) < 1) {
+    if (saved.newWorkspacePanes === 3 && (saved.newWorkspaceLayout ?? 'grid') === 'grid') {
+      prefs.newWorkspacePanes = 1;
+    }
+    prefs.newWorkspaceDefaultsRev = 1;
+    persist(STORAGE_KEYS.workspacePrefs, prefs);
+  }
+  return prefs;
+}
 
 // ─── Terminal settings ────────────────────────────────────────────────────────
 
@@ -1435,7 +1425,7 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
   shortcuts:         loadShortcuts(),
   sidebarVisible:    true,
   sidebarPrefs:      { ...DEFAULT_SIDEBAR_PREFS,      ...loadPersisted<SidebarPrefs>(STORAGE_KEYS.sidebarPrefs) },
-  workspacePrefs:    { ...DEFAULT_WORKSPACE_PREFS,    ...loadPersisted<WorkspacePrefs>(STORAGE_KEYS.workspacePrefs) },
+  workspacePrefs:    loadWorkspacePrefs(),
   terminalPrefs:     { ...DEFAULT_TERMINAL_PREFS,     ...loadPersisted<TerminalPrefs>(STORAGE_KEYS.terminalPrefs) },
   notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS, ...loadPersisted<NotificationPrefs>(STORAGE_KEYS.notificationPrefs) },
   browserPrefs:      { ...DEFAULT_BROWSER_PREFS,      ...loadPersisted<BrowserPrefs>(STORAGE_KEYS.browserPrefs) },

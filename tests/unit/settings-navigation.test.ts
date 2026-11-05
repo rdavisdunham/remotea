@@ -25,7 +25,7 @@ describe('settings navigation compatibility and discovery', () => {
       for (const field of fields) expect(searchSettings(field).length).toBeGreaterThan(0);
       count += fields.length;
     }
-    expect(count).toBe(86);
+    expect(count).toBe(88);
   });
   it('finds all shortcuts by shared action ID and human label', () => {
     expect(Object.keys(SHORTCUT_TABLE)).toHaveLength(61);

@@ -4,7 +4,7 @@ The current Linux/WSL **server** is the Node process under `remotea.service` (`r
 
 ## Requested roadmap work — 2026-11-05
 
-The following four items are captured for the backlog. Installation and native hosting are future milestones after the core workflows stabilize.
+The following four requests are tracked here and in Eridani. Checked entries are implemented. Installation and native hosting are future milestones after the core workflows stabilize.
 
 ### Easy installation and updates
 
@@ -32,23 +32,23 @@ This is future platform work to plan alongside installation once the core workfl
 
 ### Separate Eridani runs in the desktop sidebar
 
-- [ ] Separate Eridani runs from manual sessions in Remotea's sidebar.
+- [x] Separate Eridani runs from manual sessions in Remotea's sidebar.
 
 Eridani backlog task `dbc8deae-11a3-4748-8fdc-f95c7a69d52d`.
 
 Keep manual workspaces and sessions as the main selectable items in Remotea's left sidebar. Put all Eridani-originated runs in a dedicated collapsible section at the bottom, collapsed by default so delegated work stays unobtrusive.
 
-Expand the section to see the task/run names and current states, then select a run to inspect its conversation. Keep Eridani runs in this section even when their repository matches an existing manual workspace. The final requested design is separation by run origin. Preserve that identity through reloads, reconnects, and run lifecycle changes. Collapsing the section only changes visibility.
+Expand the section to see the task/run names and current states, then select a run to inspect its conversation. Keep Eridani runs in this section even when their repository matches an existing manual workspace. The final requested design is separation by run origin. Preserve that identity through reloads, reconnects, and run lifecycle changes. Collapsing the section only changes visibility. Implemented with saved expansion state, existing-tab separation through registry sync, and workspace controls scoped to each section.
 
 ### One terminal per new workspace
 
-- [ ] Default new Remotea workspaces to one terminal.
+- [x] Default new Remotea workspaces to one terminal.
 
 Eridani backlog task `0f01ad45-e247-459e-ba1c-1720cb0442fc`.
 
 Create one terminal when opening a new Remotea workspace. Let the user add further terminals or split panes through the existing controls.
 
-Apply the one-terminal default consistently across the normal workspace-creation entry points. Repeatedly creating new workspaces should produce one initial terminal in each.
+Apply the one-terminal default consistently across the normal workspace-creation entry points. Repeatedly creating new workspaces produces one initial terminal in each. The former three-pane grid default migrates once to one terminal. Saved layouts, custom arrangements, and subsequent explicit pane-count choices take precedence.
 
 ## Update pathway: `remotea update` and an Update button (2026-10-28)
 

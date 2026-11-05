@@ -68,7 +68,7 @@ function resolveDefaultLayout(get: () => unknown): { splitTree: SplitNode; layou
   // on its own) still gets the shipped shape rather than a crash.
   return {
     splitTree: buildWorkspaceTree(
-      settings.workspacePrefs?.newWorkspacePanes ?? 3,
+      settings.workspacePrefs?.newWorkspacePanes ?? 1,
       settings.workspacePrefs?.newWorkspaceLayout ?? 'grid',
     ),
   };

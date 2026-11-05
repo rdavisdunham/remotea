@@ -28,7 +28,7 @@ function shapeOf(node: SplitNode): any {
 }
 
 describe('buildWorkspaceTree', () => {
-  it('reproduces the shipped 3-pane T exactly, so nobody\'s sidebar + changes', () => {
+  it('preserves the explicit three-pane T preset', () => {
     // The property that lets this replace buildDefaultSplitTree outright.
     expect(shapeOf(buildWorkspaceTree(3, 'grid'))).toEqual(shapeOf(buildDefaultSplitTree()));
     expect(shapeOf(buildWorkspaceTree(3, 'grid'))).toEqual({
@@ -120,12 +120,12 @@ describe('resolveDefaultSplitTree — one answer for every entry point', () => {
     const id = store.getState().createWorkspace({ title: 'via CLI' });
     const ws = store.getState().workspaces.find((w) => w.id === id)!;
     expect(getAllPaneIds(ws.splitTree)).toHaveLength(DEFAULT_WORKSPACE_PREFS.newWorkspacePanes);
-    expect(shapeOf(ws.splitTree)).toEqual(shapeOf(buildDefaultSplitTree()));
+    expect(getAllPaneIds(ws.splitTree)).toHaveLength(1);
   });
 
   it('falls back to the shipped shape when there is no settings slice at all', () => {
     const bare = create<WorkspaceSlice>()((...args) => ({ ...createWorkspaceSlice(...args) }));
-    expect(shapeOf(resolveDefaultSplitTree(bare.getState))).toEqual(shapeOf(buildDefaultSplitTree()));
+    expect(getAllPaneIds(resolveDefaultSplitTree(bare.getState))).toHaveLength(1);
   });
 });
 
@@ -170,8 +170,7 @@ describe('createWorkspace — the title of an untitled workspace', () => {
     store.getState().workspaces.find((w) => w.id === id)!.title;
 
   it('numbers a workspace whose tabs have nothing to name it after', () => {
-    // The standard shape with no cwd or shell is three bare terminals, and
-    // `Terminal + Terminal + Terminal` on every row would tell nothing apart.
+    // Bare terminals retain numbered workspace names.
     const store = storeWith();
     store.getState().createWorkspace();
     const id = store.getState().createWorkspace();
@@ -181,7 +180,7 @@ describe('createWorkspace — the title of an untitled workspace', () => {
   it('names it after its tabs when they carry a name', () => {
     const store = storeWith();
     const id = store.getState().createWorkspace({ cwd: 'C:\\src\\api' });
-    expect(titleOf(store, id)).toBe('api + api + api');
+    expect(titleOf(store, id)).toBe('api');
   });
 
   it('keeps an explicit title, including an empty one', () => {
