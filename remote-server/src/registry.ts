@@ -174,10 +174,13 @@ export class Registry {
   /** The group a new or moved session should land in: its own, else the inbox. */
   resolveGroup(id: GroupId | null | undefined, meta: { name: string; color?: string } | undefined, by: DeviceId): { groupId: GroupId; created?: GroupRecord } {
     if (id && id !== INBOX_GROUP_ID) {
-      const res = this.upsertGroup(id, meta ?? { name: this.data.groups[id]?.name ?? 'Workspace' }, by);
+      const existing = this.data.groups[id];
+      if (existing && !this.groupTombstone(id)) return { groupId: id };
+      const res = this.upsertGroup(id, meta ?? { name: 'Workspace' }, by);
       if (res) return { groupId: id, created: res.changed ? res.group : undefined };
     }
-    const inbox = this.upsertGroup(INBOX_GROUP_ID, { name: this.data.groups[INBOX_GROUP_ID]?.name ?? 'Inbox' }, by)!;
+    const existingInbox = this.data.groups[INBOX_GROUP_ID];
+    const inbox = this.upsertGroup(INBOX_GROUP_ID, existingInbox ?? { name: 'Inbox' }, by)!;
     return { groupId: INBOX_GROUP_ID, created: inbox.changed ? inbox.group : undefined };
   }
 

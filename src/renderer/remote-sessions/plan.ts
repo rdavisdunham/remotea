@@ -5,6 +5,7 @@
  * Origin separation moves Eridani tabs into task workspaces using their existing
  * surface identities. Each task workspace is independent from the shared host group.
  */
+import { v5 as uuidv5 } from 'uuid';
 import { INBOX_GROUP_ID, type EridaniBinding, type SessionRecord } from '../../shared/remote-host-protocol';
 import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
 import { remoteShellSpec } from '../../shared/remote-shell-spec';
@@ -13,6 +14,7 @@ import type { EridaniTaskRef } from '../../shared/types';
 export interface LocalWorkspace {
   id: string;
   title: string;
+  titleIsDefault?: boolean;
   color?: string;
   remoteGroups?: Record<string, string>;
   /** Pane ids in tree order. */
@@ -28,6 +30,8 @@ export interface LocalSurface {
   id: string;
   hostId: string;
   workspaceId: string;
+  paneId?: string;
+  customTitle?: string;
 }
 
 export interface LocalIndex {
@@ -46,8 +50,9 @@ export type SyncAction =
   | { kind: 'drop'; surfaceIds: string[] }
   | { kind: 'insert'; workspaceId: string; paneId: string; surfaces: SeedSurface[] }
   | { kind: 'create-workspace'; hostId: string; groupId: string; title: string; color?: string; surfaces: SeedSurface[] }
-  | { kind: 'create-task-workspace'; task: EridaniTaskRef; title: string; surfaces: SeedSurface[] }
+  | { kind: 'create-task-workspace'; task: EridaniTaskRef; title: string; color?: string; surfaces: SeedSurface[] }
   | { kind: 'bind'; workspaceId: string; hostId: string; groupId: string }
+  | { kind: 'surface-title'; workspaceId: string; paneId: string; surfaceId: string; title?: string }
   | { kind: 'workspace-meta'; workspaceId: string; title: string; color?: string };
 
 export interface PlanInput {
@@ -69,6 +74,30 @@ export function sameEridaniTask(w: EridaniTaskRef, hostId: string, b: Pick<Erida
   return b.taskId ? w.taskId === b.taskId : !w.taskId && w.runId === b.runId;
 }
 
+/** A task's shared label is independent of the host-wide group that owns its terminals. */
+export function taskMetadataGroup(task: Pick<EridaniTaskRef, 'target' | 'taskId' | 'runId'>): string {
+  return `grp-${uuidv5(JSON.stringify(['remotea-eridani', task.target, task.taskId ? 'task' : 'run', task.taskId ?? task.runId]), uuidv5.URL)}`;
+}
+
+export function workspaceMetadataGroups(ws: Pick<LocalWorkspace, 'remoteGroups' | 'eridaniTask'>): Record<string, string> {
+  const groups = { ...ws.remoteGroups };
+  if (ws.eridaniTask) groups[ws.eridaniTask.hostId] = taskMetadataGroup(ws.eridaniTask);
+  return groups;
+}
+
+export function metadataKey(hostId: string, id: string): string {
+  return `${hostId}\u0000${id}`;
+}
+
+function groupMetadata(view: RemoteRegistryView, id: string) {
+  return view.pendingGroups?.[id] ?? view.groups.find(g => g.id === id);
+}
+
+function sessionTitle(view: RemoteRegistryView, session: SessionRecord): string | undefined {
+  if (view.pendingTitles && Object.hasOwn(view.pendingTitles, session.id)) return view.pendingTitles[session.id] || undefined;
+  return session.title || undefined;
+}
+
 function taskKey(b: EridaniBinding): string {
   return `${b.target}\u0000${b.taskId ? `task:${b.taskId}` : `run:${b.runId}`}`;
 }
@@ -81,15 +110,16 @@ function targetPane(ws: LocalWorkspace): string {
 /** A task workspace's title, from its earliest session: Eridani spawns with the task title as the session title. */
 function taskTitle(first: SessionRecord): string {
   const b = first.eridani!;
-  return first.title || `${b.harness} · ${b.branch}`;
+  return b.taskTitle || first.title || `${b.harness} · ${b.branch}`;
 }
 
-function seedFor(hostId: string, s: SessionRecord): SeedSurface {
+function seedFor(hostId: string, s: SessionRecord, view?: RemoteRegistryView): SeedSurface {
+  const title = view ? sessionTitle(view, s) : s.title;
   return {
     id: s.id,
     shell: remoteShellSpec(hostId),
     cwd: s.lastCwd ?? s.cwd,
-    ...(s.title ? { customTitle: s.title } : {}),
+    ...(title ? { customTitle: title } : {}),
   };
 }
 
@@ -126,6 +156,10 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
         drops.push(surf.id);
         continue;
       }
+      const title = sessionTitle(view, rec);
+      if (surf.paneId && (surf.customTitle || undefined) !== title) {
+        actions.push({ kind: 'surface-title', workspaceId: surf.workspaceId, paneId: surf.paneId, surfaceId: surf.id, title });
+      }
       const ws = wsById.get(surf.workspaceId);
       const groupId = rec.groupId ?? INBOX_GROUP_ID;
       // A task workspace stands for a task, not for the server group its sessions share.
@@ -138,9 +172,10 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
     }
 
     // 2. Shared workspace names and colours (server wins, unless our edit is in flight).
-    for (const [groupId, ws] of boundWs) {
-      if (input.pendingMeta.has(groupId)) continue;
-      const g = view.groups.find((x) => x.id === groupId);
+    for (const ws of input.local.workspaces) {
+      const groupId = workspaceMetadataGroups(ws)[host];
+      if (!groupId || input.pendingMeta.has(groupId) || input.pendingMeta.has(metadataKey(host, groupId))) continue;
+      const g = groupMetadata(view, groupId);
       if (!g) continue;
       if (g.name !== ws.title || (g.color ?? undefined) !== (ws.color ?? undefined)) {
         actions.push({ kind: 'workspace-meta', workspaceId: ws.id, title: g.name, color: g.color });
@@ -168,13 +203,13 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
     }
     for (const [groupId, list] of byGroup) {
       list.sort((a, b) => a.createdAt - b.createdAt);
-      const seeds = list.map((s) => seedFor(host, s));
+      const seeds = list.map((s) => seedFor(host, s, view));
       const ws = boundWs.get(groupId);
       if (ws && ws.paneIds.length) {
         actions.push({ kind: 'insert', workspaceId: ws.id, paneId: targetPane(ws), surfaces: seeds });
         continue;
       }
-      const g = view.groups.find((x) => x.id === groupId);
+      const g = groupMetadata(view, groupId);
       actions.push({
         kind: 'create-workspace',
         hostId: host,
@@ -187,7 +222,7 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
     for (const list of byTask.values()) {
       list.sort((a, b) => a.createdAt - b.createdAt);
       const b = list[0].eridani!;
-      const seeds = list.map((s) => seedFor(host, s));
+      const seeds = list.map((s) => seedFor(host, s, view));
       const ws = input.local.workspaces.find((w) => w.eridaniTask && w.paneIds.length && sameEridaniTask(w.eridaniTask, host, b));
       if (ws) {
         actions.push({ kind: 'insert', workspaceId: ws.id, paneId: targetPane(ws), surfaces: seeds });
@@ -196,7 +231,8 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
       actions.push({
         kind: 'create-task-workspace',
         task: { hostId: host, target: b.target, taskId: b.taskId, runId: b.runId },
-        title: taskTitle(list[0]),
+        title: groupMetadata(view, taskMetadataGroup(b))?.name ?? taskTitle(list[0]),
+        color: groupMetadata(view, taskMetadataGroup(b))?.color,
         surfaces: seeds,
       });
     }

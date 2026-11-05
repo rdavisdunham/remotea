@@ -152,6 +152,9 @@ export interface RemoteRegistryView {
   bootId: string | null;
   groups: GroupRecord[];
   sessions: SessionRecord[];
+  /** Durable local renames still awaiting server confirmation, including uncertain delivery. */
+  pendingTitles?: Record<string, string | null>;
+  pendingGroups?: Record<string, { name: string; color?: string }>;
   /** Sessions closed while this device could not hear about it (from probes). */
   closedIds: string[];
   lost: Record<string, LostInfo>;

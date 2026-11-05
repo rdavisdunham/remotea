@@ -311,6 +311,12 @@ export class RemoteHosts {
     const me = this.device.id;
     return [...this.clients.values()].map((c) => {
       const o = c.outboxOverlay();
+      const pendingTitles: NonNullable<RemoteRegistryView['pendingTitles']> = {};
+      const pendingGroups: NonNullable<RemoteRegistryView['pendingGroups']> = {};
+      for (const { intent } of this.intents.unsettled(c.hostId)) {
+        if (intent.t === 'sessionUpdate' && intent.title !== undefined) pendingTitles[intent.id] = intent.title;
+        if (intent.t === 'groupUpsert') pendingGroups[intent.id] = { name: intent.name, color: intent.color };
+      }
       const closedIds = new Set(c.closedIds);
       const sessions = [];
       for (const s of c.sessions.values()) {
@@ -334,6 +340,8 @@ export class RemoteHosts {
         closedIds: [...closedIds],
         lost: {},
         restoring: c.restoringIds(),
+        pendingTitles,
+        pendingGroups,
       };
     });
   }
@@ -416,6 +424,12 @@ export class RemoteHosts {
     const client = this.clients.get(hostId);
     if (!client || !SURFACE_ID_RE.test(surfaceId)) return Promise.resolve({ ok: false, error: 'Invalid host or session.' });
     return client.chatAttention(surfaceId, action);
+  }
+
+  sessionUpdate(hostId: string, surfaceId: string, update: { title: string | null }): void {
+    const c = this.clients.get(hostId);
+    if (!c || !SURFACE_ID_RE.test(surfaceId) || (update.title !== null && typeof update.title !== 'string')) return;
+    c.intent({ t: 'sessionUpdate', id: surfaceId, title: update.title?.slice(0, LIMITS.maxTitle) || null });
   }
 
   groupUpsert(hostId: string, group: { id: string; name: string; color?: string }): void {

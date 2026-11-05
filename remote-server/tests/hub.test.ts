@@ -59,6 +59,32 @@ describe('Hub', () => {
     expect(b.json('opened')[0]).toMatchObject({ rid: 7, created: false, owner: false });
   });
 
+  it('broadcasts shared names to both apps and preserves explicit resets when a terminal respawns', async () => {
+    const { hub, connect, registry } = setup();
+    const a = connect(DEV_A);
+    const b = connect(DEV_B);
+    send(hub, a, { t: 'open', rid: 1, id: 'surf-1', cols: 80, rows: 24, create: { groupId: 'grp-w', group: { name: 'Work' } } });
+    send(hub, a, { t: 'groupUpsert', rid: 2, group: { id: 'grp-w', name: 'abc' } });
+    send(hub, a, { t: 'sessionUpdate', rid: 3, id: 'surf-1', title: 'andi fix' });
+    for (const app of [a, b]) {
+      expect(app.json('groupUpserted').at(-1)?.group.name).toBe('abc');
+      expect(app.json('sessionUpdated').at(-1)?.session).toMatchObject({ title: 'andi fix', titleUpdatedAt: expect.any(Number) });
+    }
+    send(hub, b, { t: 'sessionUpdate', rid: 4, id: 'surf-1', title: null });
+    const resetAt = registry.session('surf-1')!.titleUpdatedAt;
+    await hub.shutdown();
+    const restarted = setup(registry, 'boot-2');
+    registry.updateSession('surf-1', { state: 'lost' });
+    const c = restarted.connect(DEV_A);
+    send(restarted.hub, c, { t: 'open', rid: 5, id: 'surf-1', cols: 80, rows: 24,
+      create: { title: 'Stale local name', groupId: 'grp-w', group: { name: 'Stale workspace name' } } });
+    await waitFor(() => c.json('opened').length > 0);
+    expect(registry.session('surf-1')?.title).toBeUndefined();
+    expect(registry.session('surf-1')?.titleUpdatedAt).toBe(resetAt);
+    expect(registry.groups().find(g => g.id === 'grp-w')?.name).toBe('abc');
+    await restarted.hub.shutdown();
+  });
+
   it('input claims the size; a non-owner resize is only remembered', () => {
     const { hub, sp, connect } = setup();
     const a = connect(DEV_A);

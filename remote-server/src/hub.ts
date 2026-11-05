@@ -510,7 +510,8 @@ export class Hub {
     const record: SessionRecord = {
       id: msg.id,
       groupId,
-      title: rec?.title ?? spec.title,
+      title: rec?.titleUpdatedAt !== undefined ? rec.title : rec?.title ?? spec.title,
+      titleUpdatedAt: rec?.titleUpdatedAt,
       cwd: rec ? rec.lastCwd ?? rec.cwd : spec.cwd ?? '~',
       lastCwd: undefined,
       cmd: rec ? rec.cmd : spec.cmd,
@@ -726,7 +727,10 @@ export class Hub {
       if (created) this.broadcast({ t: 'groupUpserted', group: created });
       patch.groupId = groupId;
     }
-    if (msg.title !== undefined) patch.title = msg.title ?? undefined;
+    if (msg.title !== undefined) {
+      patch.title = msg.title ?? undefined;
+      patch.titleUpdatedAt = this.now();
+    }
     const updated = this.registry.updateSession(msg.id, patch)!;
     this.broadcast({ t: 'sessionUpdated', session: updated });
     conn.sendJson({ t: 'ack', rid: msg.rid, ok: true });

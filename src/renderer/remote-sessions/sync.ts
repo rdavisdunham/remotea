@@ -16,8 +16,8 @@ import { useStore } from '../store';
 import type { SplitNode, SurfaceRef, WorkspaceId, PaneId, SurfaceId } from '../../shared/types';
 import type { RegistryPayload, RemoteRegistryView } from '../../shared/remote-hosts-types';
 import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
-import { INBOX_GROUP_ID } from '../../shared/remote-host-protocol';
-import { planEridaniSeparation, planRemoteSync, type LocalIndex, type SyncAction } from './plan';
+import { LIMITS } from '../../shared/remote-host-protocol';
+import { planEridaniSeparation, planRemoteSync, workspaceMetadataGroups, metadataKey, type LocalIndex, type SyncAction } from './plan';
 import { setLatestRemoteViews } from './registry-cache';
 import { noteRegistryForRecovery } from './recovery-runtime';
 import { notifyChatReminders } from './chat-reminder-notifications';
@@ -29,6 +29,7 @@ type Bridge = {
   hide(hostId: string, surfaceId: string): void;
   unhide(hostId: string, surfaceId: string): void;
   close(hostId: string, surfaceId: string): void;
+  sessionUpdate(hostId: string, surfaceId: string, update: { title: string | null }): void;
   groupUpsert(hostId: string, group: { id: string; name: string; color?: string }): void;
   groupClose(hostId: string, groupId: string): void;
 };
@@ -42,7 +43,11 @@ let latest: RegistryPayload | null = null;
 let applyQueued = false;
 let reportTimer: ReturnType<typeof setTimeout> | null = null;
 let lastReport = '';
-/** groupId -> the name/colour we pushed and are waiting to see echoed. */
+let applyingMetadata = false;
+let metadataTimer: ReturnType<typeof setTimeout> | null = null;
+const agreedTitles = new Map<string, string | undefined>();
+const pendingTitles = new Map<string, { title: string | null; at: number; sent: boolean }>();
+/** hostId + groupId -> the name/colour we pushed and are waiting to see echoed. */
 const pendingMeta = new Map<string, { name: string; color?: string; at: number }>();
 /** workspaceId|hostId -> the name/colour last agreed with the server. */
 const agreedMeta = new Map<string, { name: string; color?: string }>();
@@ -79,12 +84,13 @@ export function buildLocalIndex(): LocalIndex {
       paneIds.push(leaf.paneId);
       for (const s of leaf.surfaces) {
         const host = surfaceHost(s, ws.shell, defaultShell);
-        if (host) index.surfaces.push({ id: s.id, hostId: host, workspaceId: ws.id });
+        if (host) index.surfaces.push({ id: s.id, hostId: host, workspaceId: ws.id, paneId: leaf.paneId, customTitle: s.customTitle });
       }
     });
     index.workspaces.push({
       id: ws.id,
       title: ws.title,
+      titleIsDefault: ws.titleIsDefault,
       color: ws.customColor,
       remoteGroups: ws.remoteGroups ? { ...ws.remoteGroups } : undefined,
       paneIds,
@@ -140,7 +146,7 @@ export function applySyncActions(actions: SyncAction[]): void {
         }));
         // Like create-workspace, one pane holding exactly the placed sessions;
         // unlike it, bound to no server group (see plan.ts).
-        st.createWorkspace({ title: a.title, titleIsDefault: false, splitTree: leafNode(surfaces), eridaniTask: a.task });
+        st.createWorkspace({ title: a.title, titleIsDefault: false, customColor: a.color, splitTree: leafNode(surfaces), eridaniTask: a.task });
         break;
       }
       case 'bind': {
@@ -149,6 +155,9 @@ export function applySyncActions(actions: SyncAction[]): void {
         useStore.getState().updateWorkspaceMetadata(ws.id, { remoteGroups: { ...(ws.remoteGroups ?? {}), [a.hostId]: a.groupId } });
         break;
       }
+      case 'surface-title':
+        useStore.getState().updateSurface(a.workspaceId as WorkspaceId, a.paneId as PaneId, a.surfaceId as SurfaceId, { customTitle: a.title });
+        break;
       case 'workspace-meta': {
         useStore.getState().updateWorkspaceMetadata(a.workspaceId as WorkspaceId, { title: a.title, titleIsDefault: false, customColor: a.color });
         const ws = useStore.getState().workspaces.find((w) => w.id === a.workspaceId);
@@ -171,23 +180,51 @@ export function migrateEridaniTabs(views: RemoteRegistryView[]): void {
 function runSync(): void {
   applyQueued = false;
   if (!ready || !latest) return;
+  // Keep optimistic local choices until IPC has persisted them in the main outbox.
+  // Main supplies durable overlays across reconnects and renderer restarts.
+  seedLegacyNames(latest.views);
   const now = Date.now();
-  for (const [g, p] of pendingMeta) {
-    const confirmed = latest.views.some((v) => v.groups.some((x) => x.id === g && x.name === p.name && (x.color ?? undefined) === (p.color ?? undefined)));
-    if (confirmed || now - p.at > PENDING_META_MS) pendingMeta.delete(g);
-  }
-  // What happened while away, offered before sync drops anything (recovery-runtime.ts).
-  noteRegistryForRecovery(latest.views);
-  migrateEridaniTabs(latest.views);
-  const actions = planRemoteSync({
-    views: latest.views,
-    local: buildLocalIndex(),
-    placer: latest.placer,
-    elsewhere: new Set(latest.elsewhere),
-    pendingMeta: new Set(pendingMeta.keys()),
-    groupEridani: true,
+  const views = latest.views.map(view => {
+    const pendingGroups = { ...view.pendingGroups };
+    const titles = { ...view.pendingTitles };
+    for (const [key, pending] of pendingMeta) {
+      const group = view.groups.find(g => metadataKey(view.hostId, g.id) === key);
+      if (!key.startsWith(`${view.hostId}\u0000`)) continue;
+      if ((group?.name === pending.name && group.color === pending.color) || now - pending.at > PENDING_META_MS) pendingMeta.delete(key);
+      else pendingGroups[key.slice(view.hostId.length + 1)] = { name: pending.name, color: pending.color };
+    }
+    for (const [key, pending] of pendingTitles) {
+      if (!key.startsWith(`${view.hostId}\u0000`)) continue;
+      const id = key.slice(view.hostId.length + 1);
+      const session = view.sessions.find(s => s.id === id);
+      // A rename can precede the terminal's first open. Send it once the host knows the session.
+      if (!pending.sent && session) {
+        pending.sent = true;
+        pending.at = now;
+        bridge()?.sessionUpdate(view.hostId, id, { title: pending.title });
+        scheduleMetadataReconcile();
+      }
+      if ((session && (session.title || null) === pending.title) || (pending.sent && now - pending.at > PENDING_META_MS)) pendingTitles.delete(key);
+      else titles[id] = pending.title;
+    }
+    return { ...view, pendingGroups, pendingTitles: titles };
   });
-  if (actions.length) applySyncActions(actions);
+  noteRegistryForRecovery(views);
+  applyingMetadata = true;
+  try {
+    migrateEridaniTabs(views);
+    applySyncActions(planRemoteSync({
+      views,
+      local: buildLocalIndex(),
+      placer: latest.placer,
+      elsewhere: new Set(latest.elsewhere),
+      pendingMeta: new Set(),
+      groupEridani: true,
+    }));
+  } finally {
+    rememberMetadata();
+    applyingMetadata = false;
+  }
   if (latest.placer) notifyChatReminders(latest.views);
 }
 
@@ -210,25 +247,82 @@ function scheduleReport(): void {
   }, 150);
 }
 
-/** Push renames/recolours of bound workspaces to their groups. */
-function pushLocalMeta(): void {
-  if (!ready) return;
-  for (const ws of useStore.getState().workspaces) {
-    for (const [host, groupId] of Object.entries(ws.remoteGroups ?? {})) {
-      const key = `${ws.id}|${host}`;
-      const agreed = agreedMeta.get(key);
-      const mine = { name: ws.title, color: ws.customColor };
-      if (!agreed) {
-        agreedMeta.set(key, mine);
-        continue;
+/** Baselines distinguish user edits from incoming registry changes. */
+function rememberMetadata(local: LocalIndex = buildLocalIndex()): void {
+  agreedMeta.clear();
+  agreedTitles.clear();
+  for (const ws of local.workspaces) {
+    for (const host of Object.keys(workspaceMetadataGroups(ws))) agreedMeta.set(`${ws.id}|${host}`, { name: ws.title, color: ws.color });
+  }
+  for (const surface of local.surfaces) agreedTitles.set(metadataKey(surface.hostId, surface.id), surface.customTitle || undefined);
+}
+
+/** Expire the renderer-to-main handoff even when no further registry event arrives. */
+function scheduleMetadataReconcile(): void {
+  if (metadataTimer) clearTimeout(metadataTimer);
+  metadataTimer = setTimeout(() => {
+    metadataTimer = null;
+    queueSync();
+  }, PENDING_META_MS + 1);
+}
+
+function sendWorkspaceName(host: string, groupId: string, name: string, color?: string): void {
+  const metadata = { name: name.slice(0, LIMITS.maxName), color };
+  pendingMeta.set(metadataKey(host, groupId), { ...metadata, at: Date.now() });
+  bridge()?.groupUpsert(host, { id: groupId, ...metadata });
+  scheduleMetadataReconcile();
+}
+
+function sendTerminalName(host: string, id: string, title: string | undefined): void {
+  const value = title?.slice(0, LIMITS.maxTitle) || null;
+  const known = latest?.views.some(view => view.hostId === host && view.sessions.some(session => session.id === id)) ?? false;
+  pendingTitles.set(metadataKey(host, id), { title: value, at: Date.now(), sent: known });
+  if (known) bridge()?.sessionUpdate(host, id, { title: value });
+  scheduleMetadataReconcile();
+}
+
+/** Preserve explicit names saved by app versions that only stored terminal/task names locally. */
+function seedLegacyNames(views: RemoteRegistryView[]): void {
+  const local = buildLocalIndex();
+  for (const view of views) {
+    if (!view.connected) continue;
+    for (const surface of local.surfaces) {
+      if (surface.hostId !== view.hostId || !surface.customTitle) continue;
+      const session = view.sessions.find(s => s.id === surface.id);
+      const key = metadataKey(view.hostId, surface.id);
+      if (session && session.titleUpdatedAt === undefined && surface.customTitle !== session.title &&
+          !pendingTitles.has(key) && !Object.hasOwn(view.pendingTitles ?? {}, surface.id)) {
+        sendTerminalName(view.hostId, surface.id, surface.customTitle);
       }
-      if (agreed.name === mine.name && (agreed.color ?? undefined) === (mine.color ?? undefined)) continue;
-      agreedMeta.set(key, mine);
-      if (groupId === INBOX_GROUP_ID && mine.name !== agreed.name) continue; // the inbox keeps its name
-      pendingMeta.set(groupId, { ...mine, at: Date.now() });
-      bridge()?.groupUpsert(host, { id: groupId, name: mine.name, color: mine.color });
+    }
+    for (const ws of local.workspaces) {
+      if (ws.eridaniTask?.hostId !== view.hostId || ws.titleIsDefault !== undefined) continue;
+      const groupId = workspaceMetadataGroups(ws)[view.hostId];
+      if (!view.groups.some(g => g.id === groupId) && !view.pendingGroups?.[groupId] && !pendingMeta.has(metadataKey(view.hostId, groupId))) {
+        sendWorkspaceName(view.hostId, groupId, ws.title, ws.color);
+      }
     }
   }
+}
+
+/** Push only local edits. Server-driven store updates run with applyingMetadata set. */
+function pushLocalMeta(): void {
+  if (!ready || applyingMetadata) return;
+  const local = buildLocalIndex();
+  for (const ws of local.workspaces) {
+    for (const [host, groupId] of Object.entries(workspaceMetadataGroups(ws))) {
+      const agreed = agreedMeta.get(`${ws.id}|${host}`);
+      if (!agreed || (agreed.name === ws.title && agreed.color === ws.color)) continue;
+      sendWorkspaceName(host, groupId, ws.title, ws.color);
+    }
+  }
+  for (const surface of local.surfaces) {
+    const key = metadataKey(surface.hostId, surface.id);
+    if (agreedTitles.has(key) && agreedTitles.get(key) !== (surface.customTitle || undefined)) {
+      sendTerminalName(surface.hostId, surface.id, surface.customTitle);
+    }
+  }
+  rememberMetadata(local);
 }
 
 /**
@@ -238,12 +332,14 @@ export function markRemoteLayoutReady(): void {
   const b = bridge();
   if (ready || !b) return;
   ready = true;
+  rememberMetadata();
   b.onRegistry((payload) => {
     latest = payload;
     setLatestRemoteViews(payload.views);
     queueSync();
   });
-  useStore.subscribe(() => {
+  useStore.subscribe((state, previous) => {
+    if (state.workspaces === previous.workspaces && state.workspacePrefs.defaultShell === previous.workspacePrefs.defaultShell) return;
     scheduleReport();
     pushLocalMeta();
   });
