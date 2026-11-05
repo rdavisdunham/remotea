@@ -53,6 +53,10 @@ export interface LauncherProbe {
   ok: boolean;
   version: string | null;
   error?: string;
+  /** The executable the login shell runs (`command -v`, symlinks resolved); absent when it could not be named. */
+  path?: string | null;
+  /** Its mtime: with the version and path, what identifies the binary a conformance probe ran against. */
+  mtime_ms?: number | null;
 }
 
 /** Probes one launcher: `bin` is a bare name or an absolute path, as in LaunchSpec. */
@@ -82,6 +86,8 @@ export function launchersToProbe(targets: ExecutionTarget[]): Array<{ harness: P
 }
 
 const MARKER = '__remotea_probe_7c1e__';
+/** Between `command -v` and `--version`: a path can contain digits that look like a version. */
+const MARKER_VERSION = '__remotea_probe_version_7c1e__';
 const PROBE_MS = 20_000;
 const VERSION_RE = /\d+\.\d+(?:\.\d+)?[\w.-]*/;
 const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
@@ -103,7 +109,7 @@ export interface ProbeOptions {
  */
 export function probeLauncher(bin: string, o: ProbeOptions = {}): Promise<LauncherProbe> {
   return new Promise((resolve) => {
-    const cmd = `printf '\\n%s\\n' ${MARKER}; ${q(bin)} --version`;
+    const cmd = `printf '\\n%s\\n' ${MARKER}; command -v ${q(bin)}; printf '\\n%s\\n' ${MARKER_VERSION}; ${q(bin)} --version`;
     const env = o.env ?? buildEnv('probe', undefined);
     // Not a session: nothing the probe starts may report as one.
     delete env.REMOTEA_SESSION;
@@ -143,16 +149,29 @@ export function probeLauncher(bin: string, o: ProbeOptions = {}): Promise<Launch
     child.on('error', (err) => done({ ok: false, version: null, error: `cannot start the login shell: ${err.message}` }));
     child.on('close', (code) => {
       const at = out.lastIndexOf(MARKER);
-      const after = at >= 0 ? out.slice(at + MARKER.length) : '';
+      const vat = out.lastIndexOf(MARKER_VERSION);
+      const after = vat >= 0 ? out.slice(vat + MARKER_VERSION.length) : '';
       const m = after.match(VERSION_RE);
       const version = m ? m[0].slice(0, 40) : null;
-      if (code === 0) done({ ok: true, version });
+      if (code === 0) done({ ok: true, version, ...binaryIdentity(at >= 0 && vat > at ? out.slice(at + MARKER.length, vat) : '') });
       else if (at < 0) done({ ok: false, version: null, error: `the login shell failed before running \`${bin}\` (exit ${code})` });
       else if (code === 127) done({ ok: false, version: null, error: path.isAbsolute(bin) ? `\`${bin}\` does not exist` : `\`${bin}\` is not on the login shell's PATH` });
       else if (code === 126) done({ ok: false, version: null, error: `\`${bin}\` is not executable` });
       else done({ ok: false, version: null, error: `\`${bin} --version\` exited ${code}` });
     });
   });
+}
+
+/** `command -v` printed an absolute path (not an alias or a function): resolve it and read its mtime. */
+function binaryIdentity(commandV: string): { path: string; mtime_ms: number } | Record<string, never> {
+  const line = commandV.split('\n').map((l) => l.trim()).find((l) => l.startsWith('/'));
+  if (!line) return {};
+  try {
+    const real = fs.realpathSync(line);
+    return { path: real, mtime_ms: Math.round(fs.statSync(real).mtimeMs) };
+  } catch {
+    return {};
+  }
 }
 
 export const defaultProbe: ProbeFn = (_harness, bin) => probeLauncher(bin);

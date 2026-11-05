@@ -46,7 +46,9 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { hostModelCatalog, claudeModelCatalog, codexModelCatalog, managedVersionSupported } from './managed-models';
+import { hostModelCatalog, claudeModelCatalog, codexModelCatalog } from './managed-models';
+import { LauncherConformance, MANAGED_HARNESSES, type Admission, type ConformanceRunner, type ManagedHarness } from './launcher-conformance';
+import { defaultConformanceRunner } from './launcher-conformance-probe';
 import {
   ERIDANI_CAPS_VERSION,
   ERIDANI_LIMITS,
@@ -132,6 +134,13 @@ export interface EridaniRuntimeDeps {
   contextMs?: number;
   /** Tests: how a launcher is probed (default: `<bin> --version` through the login shell). */
   probe?: ProbeFn;
+  /**
+   * Tests: the managed-run conformance probe (default: the real one, launcher-conformance-probe.ts; with an
+   * injected `probe` and no runner, every probe fails, so a test never starts a real harness).
+   */
+  conformanceRunner?: ConformanceRunner;
+  /** Tests: the environment REMOTEA_MANAGED_<HARNESS>_FORCE / _BLOCK are read from (default process.env). */
+  conformanceEnv?: NodeJS.ProcessEnv;
   /** Tests: whether each question adapter's hook is wired (default: read the agents' settings, hooks-install.ts). */
   adapterHooks?: () => AdapterHooks;
   /** The build hello reports (default: dist/build-info.json). */
@@ -208,6 +217,10 @@ export class EridaniRuntime {
   /** Probes in flight by probeKey: a second request for one waits for it instead of starting another. */
   private readonly probing = new Map<string, Promise<void>>();
   private probedAt = 0;
+  /** Which launchers may run managed sessions (launcher-conformance.ts). */
+  readonly conformance: LauncherConformance;
+  /** start()'s probes have settled (and its catalog read began): a later change re-reads the catalog itself. */
+  private bootSettled = false;
   private readonly build: BuildInfo;
   private replayTimer: NodeJS.Timeout | null = null;
   private outputDirty = false;
@@ -235,6 +248,14 @@ export class EridaniRuntime {
   constructor(private readonly deps: EridaniRuntimeDeps) {
     const { hub, registry } = deps;
     this.build = deps.build ?? loadBuildInfo();
+    this.conformance = new LauncherConformance({
+      dir: deps.dir,
+      run: deps.conformanceRunner ?? (deps.probe ? async () => [{ id: 'probe', status: 'fail', ms: 0, message: 'no conformance runner in this test' }] : defaultConformanceRunner),
+      log: deps.log,
+      env: deps.conformanceEnv,
+      onSettled: () => this.conformanceChanged('a launcher conformance probe finished'),
+    });
+    if ((deps.conformanceEnv ?? process.env).REMOTEA_MANAGED_CLAUDE_MAX) deps.log('launcher conformance: REMOTEA_MANAGED_CLAUDE_MAX is no longer read; versions above the floor are probed (use REMOTEA_MANAGED_CLAUDE_FORCE=<version> to admit one without a probe)');
     this.questions = new QuestionBroker({
       session: (id) => registry.session(id),
       canHold: (id) => !!this.link?.ready && !!registry.session(id)?.eridani && registry.session(id)?.eridani?.execution !== 'managed',
@@ -258,8 +279,8 @@ export class EridaniRuntime {
       checkTarget: (t) => templateStatus(t, { env: deps.verifyEnv }),
       prepare: (t, wt, force) => runPrepare(t, wt, { force, env: deps.verifyEnv }),
       questions: this.questions,
-      managedResumePending: (target, harness) => !this.probes.has(probeKey(harness, target.launch[harness]?.bin ?? harness)),
-      managedSupported: (target, harness) => { const launch = target.launch[harness]; const p = this.probes.get(probeKey(harness, launch?.bin ?? harness)); return !!p?.ok && managedVersionSupported(harness, p.version); },
+      managedResumePending: (target, harness) => { const bin = target.launch[harness]?.bin ?? harness; return !this.probes.has(probeKey(harness, bin)) || this.conformance.probing(harness, bin); },
+      managedSupported: (target, harness) => this.admission(harness, target.launch[harness]?.bin ?? harness).managed,
       managedEmit: (body) => {
         if (body.t === 'output.live') { if (this.link?.peerHas('output.live')) void this.link.enqueue(body, 1, `output:${body.surf}:${body.session_id}:${body.turn_id}:${body.message_id}`, Number(body.sequence)); return; }
         if (body.t === 'input.receipt') { if (this.link?.peerHas('input.direct')) void this.link.enqueue(body, 1, `input:${body.surf}:${body.input_id}`, body.stage === 'provider_acknowledged' ? 3 : body.stage === 'uncertain' ? 2 : 1); return; }
@@ -294,9 +315,11 @@ export class EridaniRuntime {
   start(): void {
     this.started = true;
     this.dispatch.resumeOnBoot({ includeManaged: false });
-    const versions = this.probeAll(launchersToProbe(loadTargets(this.deps.dir)));
+    const launchers = launchersToProbe(loadTargets(this.deps.dir));
+    // Managed runs resume, and the model catalog is read, once each launcher's conformance is settled.
+    const versions = this.probeAll(launchers).then(() => this.conformanceSettled(launchers));
     this.catalogReady = versions.then(async () => { if (this.started && process.platform === 'linux' && !this.deps.probe) await this.refreshCatalog(); });
-    void versions.then(() => { if (this.started) this.dispatch.resumeOnBoot({ onlyManaged: true }); });
+    void versions.then(() => { this.bootSettled = true; if (this.started) this.dispatch.resumeOnBoot({ onlyManaged: true }); });
     this.check();
     this.checkTimer = setInterval(() => this.check(), this.deps.checkMs ?? CHECK_MS);
     this.checkTimer.unref?.();
@@ -338,6 +361,8 @@ export class EridaniRuntime {
     }
     if (this.outputDirty && this.link?.ready && this.link.spool.fill < MAX_FILL_FOR_SCAN) { this.outputDirty = false; this.dispatch.replayOutput(); }
     if (this.link) this.refreshProbes();
+    // `remotea launcher probe` wrote new results.
+    if (this.conformance.reload()) this.conformanceChanged('launcher conformance results changed on disk');
     if (this.link && Date.now() - this.doctorAt >= (this.deps.doctorMs ?? DOCTOR_MS)) void this.runDoctor();
     const req = path.join(this.deps.dir, ERIDANI_COLLECT_REQUEST);
     if (fs.existsSync(req)) {
@@ -489,7 +514,7 @@ export class EridaniRuntime {
     const targets = loadTargets(this.deps.dir);
     const supportedBin = (harness: 'claude' | 'codex'): string | undefined => {
       const bins = [...targets.flatMap((target) => target.launch[harness] ? [target.launch[harness]!.bin ?? harness] : []), harness];
-      return bins.find((bin) => { const probe = this.probes.get(probeKey(harness, bin)); return !!probe?.ok && managedVersionSupported(harness, probe.version); });
+      return bins.find((bin) => this.admission(harness, bin).managed);
     };
     const claude = supportedBin('claude'), codex = supportedBin('codex');
     [this.claudeModels, this.codexModels] = await Promise.all([claude ? claudeModelCatalog(claude) : Promise.resolve([]), codex ? codexModelCatalog(codex) : Promise.resolve([])]);
@@ -498,8 +523,37 @@ export class EridaniRuntime {
   /** The host-wide harness matrix from the latest probes (launch-caps.ts). */
   harnesses(): CapabilityMatrix {
     const matrix = harnessMatrix(this.probes, loadTargets(this.deps.dir), (this.deps.adapterHooks ?? (() => adapterHooks()))());
-    for (const [name, caps] of Object.entries(matrix)) if (caps) { caps.managed = [...this.probes.entries()].some(([key, probe]) => key.startsWith(`${name}\0`) && probe.ok && managedVersionSupported(name, probe.version)); caps.managed_questions = caps.managed ? ['ask', 'approval'] : []; }
+    for (const harness of MANAGED_HARNESSES) {
+      const caps = matrix[harness];
+      if (!caps) continue;
+      // The bare name's launcher speaks for the harness, unless another launcher of it is admitted and it is not.
+      const all = [...this.probes.keys()].filter((key) => key.startsWith(`${harness}\0`)).map((key) => this.admission(harness, key.slice(harness.length + 1)));
+      const bare = this.admission(harness, harness);
+      const best = bare.managed ? bare : all.find((a) => a.managed) ?? bare;
+      Object.assign(caps, admissionFields(best));
+      caps.managed_questions = caps.managed ? ['ask', 'approval'] : [];
+    }
     return matrix;
+  }
+
+  /** Whether this launcher may run managed sessions now, and why (hello's conformance fields). */
+  admission(harness: ManagedHarness, bin: string): Admission {
+    return this.conformance.admission(harness, bin, this.probes.get(probeKey(harness, bin)));
+  }
+
+  /** Every managed launcher's conformance, once settled (an unchanged, recorded binary settles at once). */
+  private conformanceSettled(launchers: Array<{ harness: ProbeHarness; bin: string }>): Promise<unknown> {
+    return Promise.all(launchers.filter((l): l is { harness: ManagedHarness; bin: string } => (MANAGED_HARNESSES as readonly string[]).includes(l.harness)).map(({ harness, bin }) => {
+      const probe = this.probes.get(probeKey(harness, bin));
+      return probe ? this.conformance.ensure(harness, bin, probe).catch(() => undefined) : undefined;
+    }));
+  }
+
+  /** What hello advertises about managed runs may have changed: refresh the catalog and send a new hello. */
+  private conformanceChanged(reason: string): void {
+    if (!this.started) return;
+    if (this.bootSettled && process.platform === 'linux' && !this.deps.probe) void this.refreshCatalog().catch((err) => this.deps.log(`eridani: model catalog: ${(err as Error).message}`));
+    this.link?.rehello(reason);
   }
 
   /** Execution targets for hello: ids, repos, permission, probed launchers and verify readiness; never argv or env. */
@@ -509,7 +563,7 @@ export class EridaniRuntime {
     const hello = helloTargets(targets, this.probes, { env: this.deps.verifyEnv }).map((h) => {
       const t = targets.find((x) => x.id === h.id);
       if (!t) return h;
-      if (h.launch) for (const [name, launch] of Object.entries(h.launch)) if (launch) launch.managed = launch.ready && managedVersionSupported(name, launch.version);
+      if (h.launch) for (const [name, launch] of Object.entries(h.launch)) if (launch) Object.assign(launch, admissionFields(this.admission(name as ManagedHarness, t.launch[name as ManagedHarness]?.bin ?? name)));
       // S-N4: whether each verify entry would run sandboxed (verify-sandbox.ts).
       const verify_status = h.verify_status ? withIsolation(h.verify_status, t.verify, this.deps.verifyEnv) : undefined;
       return { ...h, ...(verify_status ? { verify_status } : {}), mcp: mcpStatus(resolveMcp(this.deps.dir, t)) };
@@ -552,6 +606,8 @@ export class EridaniRuntime {
         const was = this.probes.get(key);
         this.probes.set(key, r);
         if (!was || was.ok !== r.ok) this.deps.log(`eridani: ${harness} launcher \`${bin}\`: ${r.ok ? `ready${r.version ? ` (${r.version})` : ''}` : `not ready: ${r.error ?? 'failed'}`}`);
+        // A new or changed binary is probed for managed runs in the background; hello says `probing` meanwhile.
+        if ((MANAGED_HARNESSES as readonly string[]).includes(harness) && r.ok) void this.conformance.ensure(harness as ManagedHarness, bin, r).catch(() => undefined);
       })().finally(() => this.probing.delete(key));
       this.probing.set(key, p);
       return p;
@@ -835,4 +891,16 @@ export function serverVersion(): string {
     }
   }
   return '0.0.0';
+}
+
+/** An admission as hello carries it (HarnessCaps and HelloLaunch); absent fields are left out. */
+function admissionFields(a: Admission): Pick<Admission, 'managed' | 'conformance' | 'launcher_version'> & Partial<Admission> {
+  return {
+    managed: a.managed,
+    conformance: a.conformance,
+    launcher_version: a.launcher_version,
+    ...(a.conformance_step ? { conformance_step: a.conformance_step } : {}),
+    ...(a.conformance_message ? { conformance_message: a.conformance_message.slice(0, 300) } : {}),
+    ...(a.conformance_at ? { conformance_at: a.conformance_at } : {}),
+  };
 }

@@ -26,6 +26,8 @@
  *   remotea screen <surf-id>       print what a session's screen shows right now
  *   remotea eridani connect|status|disconnect|collect|collector|targets|worktrees
  *                                  the link to Eridani (see eridani-cli.ts)
+ *   remotea launcher probe [claude|codex] [--bin <path>] [--no-turns] [--json] | status [--json]
+ *                                  the managed-run conformance probe of the installed launchers (launcher-cli.ts)
  *
  * `status --json` is a stable contract for other tools (STATUS_VERSION below).
  * Additions are backwards compatible; a breaking change bumps the version.
@@ -55,6 +57,7 @@ import { ERIDANI_CAPS_VERSION, ERIDANI_PROTO } from '../../src/shared/eridani-li
 import type { RegistryData } from './registry';
 import { eridaniCommand, statusBlock } from './eridani-cli';
 import { doctorCommand } from './doctor';
+import { launcherCommand } from './launcher-cli';
 import { fmtKeeper, observeKeeperStatus, type KeeperObservation } from './pty-backend';
 import { upgrade } from './upgrade';
 import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord, type VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
@@ -570,7 +573,10 @@ usage:
   remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]
   remotea eridani collector [parity|authoritative]              show or switch the collector mode (prints the cutover checklist)
   remotea eridani targets list [--json] | add … | remove <id>     where Eridani may start work
-  remotea eridani worktrees [--json]                            managed worktrees and unmerged work (never removes)`;
+  remotea eridani worktrees [--json]                            managed worktrees and unmerged work (never removes)
+  remotea launcher probe [claude|codex] [--bin <path>] [--no-turns] [--json]
+                                                                probe the launchers for managed runs now (re-probes unchanged binaries)
+  remotea launcher status [--json]                              the recorded conformance probes`;
 
 export async function main(argv: string[]): Promise<number> {
   const dir = configDir();
@@ -644,6 +650,8 @@ export async function main(argv: string[]): Promise<number> {
     }
     case 'eridani':
       return eridaniCommand(dir, rest, () => healthy(loadConfig(dir).port));
+    case 'launcher':
+      return launcherCommand(dir, rest);
     case 'rotate-token':
       process.stdout.write(rotateToken(dir) + '\n');
       process.stderr.write('token rotated: the old token is revoked and apps using it are disconnected (sessions keep running).\nUpdate it in every app\'s Settings → Remote hosts to reconnect.\n');

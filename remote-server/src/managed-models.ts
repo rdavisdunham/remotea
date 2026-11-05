@@ -19,27 +19,6 @@ export async function claudeModelCatalog(bin = 'claude'): Promise<ModelCatalogEn
   try { await adapter.start(); return catalog; } catch { return []; } finally { await adapter.stop().catch(() => {}); }
 }
 
-/** Claude Code 2.1.x patch levels verified for managed runs. 2.1.312 is the stage A spike floor (structured
- * questions); 318: CLI flags and the initialize / set_permission_mode / interrupt control responses match 317. */
-export const CLAUDE_MANAGED_MIN = 312;
-export const CLAUDE_MANAGED_MAX = 318;
-
-/** The highest Claude Code 2.1.x patch managed runs accept: REMOTEA_MANAGED_CLAUDE_MAX (`320` or `2.1.320`) lets
- * the owner accept an auto-updated launcher without a release; it never goes below CLAUDE_MANAGED_MIN. Anything
- * unparseable keeps the built-in bound. */
-export function claudeManagedMax(env: NodeJS.ProcessEnv = process.env): number {
-  const match = /^(?:2\.1\.)?(\d{1,5})$/.exec(env.REMOTEA_MANAGED_CLAUDE_MAX?.trim() ?? '');
-  return match ? Math.max(Number(match[1]), CLAUDE_MANAGED_MIN) : CLAUDE_MANAGED_MAX;
-}
-
-/** Verified structured transports; a newer untested protocol never silently becomes a native PTY. */
-export function managedVersionSupported(harness: string, version: string | null, platform = process.platform, env: NodeJS.ProcessEnv = process.env): boolean {
-  if (platform !== 'linux' || !version) return false;
-  if (harness === 'codex') return /^0\.166\.\d+$/.test(version);
-  const match = /^2\.1\.(\d+)$/.exec(version);
-  return harness === 'claude' && !!match && Number(match[1]) >= CLAUDE_MANAGED_MIN && Number(match[1]) <= claudeManagedMax(env);
-}
-
 /** model/list performs no inference and reports the provider's authoritative default and supported efforts. */
 export async function codexModelCatalog(bin = 'codex'): Promise<ModelCatalogEntry[]> {
   const adapter = new CodexRuntimeAdapter({ harness: 'codex', bin, args: [], cwd: process.cwd(), env: {}, model: '', profile: 'read-only' }, 10_000);

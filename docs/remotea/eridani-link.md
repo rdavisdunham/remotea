@@ -545,6 +545,7 @@ hello keeps these facts apart (S-S1); `caps_version: 2` says a host does
 | Template (S-Q3, additive) | `targets[].template: {ready, problems?: [{check, level, reason}]}`; `targets[].prepare?: string[]` | The whole target checked before it is advertised ([Target templates](#target-templates-s-q3)). `ready: false` empties `harnesses`. |
 | Verification timeout (additive) | `verify_status[].timeout_s: number` | The entry's configured `timeout` in seconds, which verify-runner.ts enforces (a timeout is required in every entry, so it is always present from this build on). Eridani's verify deadline follows it (`run_coordinator.verify_deadline`: `timeout_s` plus a grace, never under its 11-minute default, which it also uses when a host does not send the field). |
 | Verification soft threshold (additive) | `verify_status[].notify_after_s?: number` | The entry's `notifyAfter` in seconds, sent only when set. Eridani's per-entry "still running" notice; verification keeps going until `timeout_s`. |
+| Managed runs (additive) | `harnesses.<h>.managed: boolean` and `targets[].launch.<h>.managed: boolean`, each with `conformance`, `launcher_version`, `conformance_step?`, `conformance_message?`, `conformance_at?` | Whether that launcher may run managed (structured-transport) sessions, from its conformance probe ([Launcher conformance](#launcher-conformance)). Show the target row's `launch.<h>` fields: they describe that target's own launcher; `harnesses.<h>` describes the bare name's (or another admitted launcher's). |
 | Verification isolation (S-N4, additive) | `verify_status[].isolated: boolean`, `isolation: "bwrap" \| "none"`, `isolation_reason?: string` | Whether a run of the entry now would be sandboxed ([Verify isolation](#verify-isolation)): `bwrap` is on the service PATH and a probe sandbox works. Not being isolated does not make an entry unready (`ready` stays true, the reason is in `isolation_reason`, e.g. "bwrap (bubblewrap) is not installed on the service PATH"), except for an entry that demands `isolation: "bwrap"`: it would be refused, so it reports `ready: false` with that reason. |
 
 Probes run before the link first starts, so the first hello is already
@@ -554,6 +555,81 @@ every launcher is probed again every 10 minutes, and a new target's on the
 next check. hello is sent once per connect, so a change shows from the next
 connect on. A probe failure is logged once per change
 (`eridani: codex launcher \`codex\`: not ready: …`).
+
+### Launcher conformance
+
+Managed runs drive Claude Code and Codex through their structured transports
+(managed-harness.ts), which change between versions. Instead of a version
+allowlist (Claude Code updates itself about twice a day), every installed
+launcher at or above the adapter's floor is probed once per binary
+(launcher-conformance.ts, launcher-conformance-probe.ts):
+
+- **Floor.** Claude Code 2.1.312 (the first version whose PreToolUse hook can
+  `defer` a tool and report `tool_deferred`, which managed questions rely on);
+  Codex 0.166.0 (the app-server protocol the adapter was generated and
+  verified against: `turn/steer` with `expectedTurnId`, `clientUserMessageId`,
+  `approvalsReviewer`, `model/list`). Below it: `below_floor`, never probed.
+- **Probe.** When the server starts and whenever a launcher's `--version`,
+  resolved path or mtime changes (launchers are re-read every 10 minutes),
+  the real binary is started by the real adapter, through the login shell,
+  against a scratch config folder and a local fake model API. No account, no
+  paid model call, nothing in `~/.claude` or `~/.codex` read or written; each
+  turn is checked to have reached the fake. Steps (20 s each, 90 s in all;
+  about 2 s each on the installed versions):
+  - Claude: `help` (every flag the adapter passes, and the `--permission-mode`
+    choices `plan`, `auto`, `manual`), `initialize` (model list with
+    `supportedEffortLevels` and `supportsAutoMode`; started in `auto`),
+    `permission_mode` (`manual`, `auto`), `user_echo` (the user message is
+    replayed with its uuid), `hook_callback` (PreToolUse reaches the host with
+    `hook_event_name`, `tool_name`, `tool_input`, `tool_use_id`),
+    `approval_allow` / `approval_deny` (`can_use_tool` reaches the host and
+    the answer is obeyed), `question_defer` (AskUserQuestion is deferred,
+    the adapter resumes with `--resume` and the model receives the answer),
+    `interrupt` (a turn in flight ends).
+  - Codex: `help` (`app-server --stdio`), `initialize`, `model_catalog`
+    (`model/list` with `supportedReasoningEfforts` and `isDefault`),
+    `thread_start` (the adapter's sandbox, approval policy and reviewer),
+    `user_echo` (`clientUserMessageId` comes back as the user item's
+    `clientId`, then an agent message), `approval_allow` / `approval_deny`
+    (`item/commandExecution/requestApproval` answered `accept` / `decline`),
+    `steer` (`turn/steer` on the active turn), `interrupt` (the turn ends
+    `interrupted`), `steer_idle` (steering a finished turn is rejected with
+    the message the adapter recognises), `resume` (`thread/resume`).
+  After a failure the remaining steps are `skipped`.
+  `REMOTEA_LAUNCHER_PROBE_TURNS=off` skips the steps that drive a turn; they
+  are reported `skipped` ("not probed") and do not fail the probe.
+- **Result.** `<config dir>/launcher-conformance.json` keeps, per launcher,
+  the version, resolved path and mtime it ran against, every step with
+  `pass`/`fail`/`skipped`, its time and message, and when. A pass admits that
+  binary until it changes; a failure is retried after an hour, or at once
+  with `remotea launcher probe`. When a probe settles (or the CLI writes a
+  new result, read within 30 s), the server reconnects so Eridani gets a new
+  hello; at startup the first hello waits for the probes.
+- **Overrides** (the service environment): `REMOTEA_MANAGED_CLAUDE_FORCE` /
+  `REMOTEA_MANAGED_CODEX_FORCE` (`conformance: "forced"`, admitted without a
+  probe, logged) and `REMOTEA_MANAGED_CLAUDE_BLOCK` /
+  `REMOTEA_MANAGED_CODEX_BLOCK` (`"blocked"`, wins over FORCE). Both take a
+  comma-separated list of exact versions. `REMOTEA_MANAGED_CLAUDE_MAX` is no
+  longer read (a warning is logged when it is set).
+
+What hello says, per launcher (`targets[].launch.<h>`, and the same fields on
+`harnesses.<h>`):
+
+| `conformance` | `managed` | Meaning; what Eridani shows |
+|---|---|---|
+| `verified` | true | The probe of this exact binary passed (`conformance_at`). |
+| `forced` | true | Admitted by `REMOTEA_MANAGED_<H>_FORCE`, not probed. |
+| `probing` | false | The probe is running; a new hello follows when it settles. |
+| `failed` | false | `conformance_step` failed: "Claude 2.1.319 failed approval_allow: the command was decided without asking the host (no can_use_tool)". |
+| `unverified` | false | Not probed yet, or the launcher did not answer `--version` (`conformance_message`). |
+| `below_floor` | false | Older than the floor. |
+| `blocked` | false | On `REMOTEA_MANAGED_<H>_BLOCK`. |
+| `unsupported` | false | Not Linux, or no readable version. |
+
+`launcher_version` is the version the verdict applies to. A managed spawn
+for a launcher that is not admitted is rejected as before ("managed harness
+protocol is not verified for this installed launcher"); a managed run waiting
+to resume after a restart waits while its launcher is `probing`.
 
 Build identity (S-S5). `npm run build` runs `scripts/build-info.mjs` after
 tsc: it writes `dist/build-info.json` (`{name, sha, dirty, built_at}`, sha from

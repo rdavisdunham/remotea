@@ -105,9 +105,9 @@ export class CodexRuntimeAdapter extends HarnessProcess implements RuntimeAdapte
     super.receive(message);
   }
   private async initializeTransport(): Promise<void> {
-    this.launch(['app-server', '--stdio', ...this.spec.args]);
-    await this.call('initialize', { clientInfo: { name: 'remotea', version: '0.1.0' }, capabilities: { experimentalApi: true } });
-    this.write({ method: 'initialized' });
+    this.launch([...CODEX_APP_SERVER_ARGS, ...this.spec.args]);
+    const initialized = await this.call('initialize', { clientInfo: { name: 'remotea', version: '0.1.0' }, capabilities: { experimentalApi: true } });
+    this.write({ method: 'initialized' }); this.emit('initialized', initialized);
   }
   async modelCatalog(): Promise<any[]> {
     await this.initializeTransport(); const models: any[] = []; let cursor: string | null = null;
@@ -148,6 +148,26 @@ export class CodexRuntimeAdapter extends HarnessProcess implements RuntimeAdapte
   async respond(request: HarnessRequest, response: unknown): Promise<void> { this.write({ id: request.id, result: response }); }
 }
 
+/** The app-server transport the Codex adapter speaks (the conformance probe checks `app-server --help` for each flag). */
+export const CODEX_APP_SERVER_ARGS: readonly string[] = ['app-server', '--stdio'];
+
+/** The hooks the Claude adapter registers in `initialize`; receive() answers both callback ids. */
+export const CLAUDE_INITIALIZE = { hooks: { PreToolUse: [{ matcher: '*', hookCallbackIds: ['remotea-defer-ask'] }], PermissionDenied: [{ matcher: '*', hookCallbackIds: ['remotea-permission-denied'] }] } };
+
+/**
+ * The Claude adapter's command line. `--permission-prompt-tool stdio` is what makes Claude Code send
+ * `can_use_tool` (approvals, AskUserQuestion) to this host; `--permission-prompts host` alone leaves
+ * prompts unanswered and denied locally, and AskUserQuestion disabled (checked on 2.1.316–2.1.318).
+ */
+export function claudeLaunchArgs(spec: HarnessSpec, sessionId: string): string[] {
+  return ['-p', '--verbose', '--input-format', 'stream-json', '--output-format', 'stream-json', '--include-partial-messages', '--replay-user-messages', '--permission-prompts', 'host', '--permission-prompt-tool', 'stdio', '--settings', JSON.stringify({ env: { MCP_TIMEOUT: '20000', MCP_TOOL_TIMEOUT: '120000', ...(spec.effort ? { CLAUDE_CODE_EFFORT_LEVEL: spec.effort } : {}) } }), '--permission-mode', spec.profile === 'read-only' ? 'plan' : 'auto', '--model', spec.model, ...(spec.effort ? ['--effort', spec.effort] : []), ...(spec.sessionId ? ['--resume', spec.sessionId] : ['--session-id', sessionId]), ...spec.args];
+}
+
+/** Every `--flag` an argv uses (the conformance probe's `--help` check). */
+export function flagsOf(args: readonly string[]): string[] {
+  return [...new Set(args.filter((a) => /^--[a-z][a-z0-9-]*$/.test(a)))];
+}
+
 export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapter {
   sessionId = '';
   private recoveryGate = false;
@@ -171,8 +191,8 @@ export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapt
   }
   async start(): Promise<string> {
     this.sessionId = this.spec.sessionId ?? randomUUID();
-    this.launch(['-p', '--verbose', '--input-format', 'stream-json', '--output-format', 'stream-json', '--include-partial-messages', '--replay-user-messages', '--permission-prompts', 'host', '--settings', JSON.stringify({ env: { MCP_TIMEOUT: '20000', MCP_TOOL_TIMEOUT: '120000', ...(this.spec.effort ? { CLAUDE_CODE_EFFORT_LEVEL: this.spec.effort } : {}) } }), '--permission-mode', this.spec.profile === 'read-only' ? 'plan' : 'auto', '--model', this.spec.model, ...(this.spec.effort ? ['--effort', this.spec.effort] : []), ...(this.spec.sessionId ? ['--resume', this.spec.sessionId] : ['--session-id', this.sessionId]), ...this.spec.args]);
-    const initialized = await this.call('control:initialize', { hooks: { PreToolUse: [{ matcher: '*', hookCallbackIds: ['remotea-defer-ask'] }], PermissionDenied: [{ matcher: '*', hookCallbackIds: ['remotea-permission-denied'] }] } }); this.emit('catalog', initialized.models ?? []); return this.sessionId;
+    this.launch(claudeLaunchArgs(this.spec, this.sessionId));
+    const initialized = await this.call('control:initialize', CLAUDE_INITIALIZE); this.emit('initialized', initialized); this.emit('catalog', initialized.models ?? []); return this.sessionId;
   }
   async resume(): Promise<string> { return this.start(); }
   async send(text: string, operationId: string): Promise<void> {
