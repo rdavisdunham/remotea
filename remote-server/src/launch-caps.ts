@@ -236,10 +236,10 @@ function executable(p: string): boolean {
 
 /**
  * Would verify-runner find this entry's program and folder? Checked against the repository. Carries the entry's
- * timeout (`timeout_s`), which Eridani's verify deadline follows.
+ * timeout (`timeout_s`), which Eridani's verify deadline follows, and its soft threshold (`notify_after_s`, when set).
  */
 export function verifyStatus(repo: string, spec: VerifySpec, o: VerifyCheckOptions = {}): HelloVerifyStatus {
-  return { ...verifyReadiness(repo, spec, o), timeout_s: spec.timeout };
+  return { ...verifyReadiness(repo, spec, o), timeout_s: spec.timeout, ...(spec.notifyAfter !== undefined ? { notify_after_s: spec.notifyAfter } : {}) };
 }
 
 function verifyReadiness(repo: string, spec: VerifySpec, o: VerifyCheckOptions): HelloVerifyStatus {

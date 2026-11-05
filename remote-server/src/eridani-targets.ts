@@ -61,6 +61,12 @@ export interface VerifySpec {
   cwd?: string;
   /** Seconds. */
   timeout: number;
+  /**
+   * Seconds (optional, < timeout): Eridani's soft threshold for this entry. A verification still running this
+   * long sends the owner one "still running" notice and keeps going up to `timeout`. hello sends it as
+   * `notify_after_s`; absent, Eridani uses its own default (30 min).
+   */
+  notifyAfter?: number;
   /** Extra environment for the run (stage F): the base is minimal, so a test that needs a variable names it here. */
   env?: Record<string, string>;
   /**
@@ -188,6 +194,7 @@ export function targetError(t: unknown): string | null {
     const cmdErr = commandError(`verify ${vo.id}`, vo, 6 * 3600, '6 h');
     if (cmdErr) return cmdErr;
     if (vo.isolation !== undefined && vo.isolation !== 'bwrap' && vo.isolation !== 'none') return `verify ${vo.id}: isolation is "bwrap" or "none"`;
+    if (vo.notifyAfter !== undefined && !(typeof vo.notifyAfter === 'number' && Number.isInteger(vo.notifyAfter) && vo.notifyAfter >= 60 && vo.notifyAfter < (vo.timeout as number))) return `verify ${vo.id}: notifyAfter in seconds (≥ 60, under its timeout)`;
     if (vo.network !== undefined && typeof vo.network !== 'boolean' && vo.network !== 'loopback') return `verify ${vo.id}: network is true, false or "loopback"`;
     if (vo.network === 'loopback') {
       if (!Array.isArray(vo.ports) || !vo.ports.length || vo.ports.length > 16 || !vo.ports.every((p) => Number.isInteger(p) && (p as number) >= 1 && (p as number) <= 65535)) return `verify ${vo.id}: network "loopback" needs ports (1 to 16 port numbers)`;
@@ -250,6 +257,7 @@ function normalize(t: Record<string, unknown>): ExecutionTarget {
       argv: [...v.argv],
       ...(v.cwd ? { cwd: v.cwd } : {}),
       timeout: v.timeout,
+      ...(v.notifyAfter !== undefined ? { notifyAfter: v.notifyAfter } : {}),
       ...(v.env ? { env: { ...v.env } } : {}),
       ...(v.isolation ? { isolation: v.isolation } : {}),
       ...(v.network !== undefined ? { network: v.network } : {}),

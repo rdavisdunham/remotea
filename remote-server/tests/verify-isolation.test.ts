@@ -318,6 +318,13 @@ describe('verify isolation: the trust choice and its fallback (fake bwrap, fake 
     expect(t({ mounts: ['/'] })).toMatch(/mounts/);
   });
 
+  it('validates notifyAfter: whole seconds, at least 60, under the timeout', () => {
+    const t = (v: Record<string, unknown>) =>
+      targetError({ id: 'x', repo: '/r', worktreeRoot: '/w', base: 'main', launch: { claude: {} }, verify: [{ id: 'v', argv: ['npm', 'test'], timeout: 7200, ...v }] });
+    expect(t({ notifyAfter: 1800 })).toBeNull();
+    for (const bad of [30, 7200, 9000, 90.5, '1800']) expect(t({ notifyAfter: bad })).toMatch(/notifyAfter/);
+  });
+
   it('hello verify_status reports whether each entry would run isolated', () => {
     const fake = fakeBwrapDir(RECORDING);
     const specs: VerifySpec[] = [

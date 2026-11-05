@@ -58,7 +58,7 @@ import { templateStatus } from './target-template';
 import { WorktreeManager, cleanupCommands, writersByPath } from './worktrees';
 import { defaultHookPaths } from './hooks-install';
 import { defaultProbe, launchersToProbe, probeKey, type LauncherProbe } from './launch-caps';
-import { fmtReadiness, fmtWiring, localReadiness, mcpWiring, parseSetupArgs, readSecret, runSetup, serviceEnv, SETUP_USAGE, stdinLinesOnce, ttyPrompter, noPrompter } from './eridani-setup';
+import { DEFAULT_VERIFY_TIMEOUT, fmtReadiness, fmtWiring, localReadiness, mcpWiring, parseSetupArgs, readSecret, runSetup, serviceEnv, SETUP_USAGE, stdinLinesOnce, ttyPrompter, noPrompter } from './eridani-setup';
 
 export interface EridaniSummary {
   enabled: boolean;
@@ -487,7 +487,7 @@ function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream)
         const repo = flag(rest, '--repo');
         const root = flag(rest, '--worktree-root');
         if (!id || !repo || !root) throw new Error('targets add needs --id, --repo and --worktree-root (or --json)');
-        const timeout = Number(flag(rest, '--verify-timeout') ?? 600);
+        const timeout = Number(flag(rest, '--verify-timeout') ?? DEFAULT_VERIFY_TIMEOUT);
         const verify: VerifySpec[] = flags(rest, '--verify').map((v) => {
           const eq = v.indexOf('=');
           if (eq < 1) throw new Error(`--verify ${v}: <id>=<command>`);

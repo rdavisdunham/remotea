@@ -151,6 +151,8 @@ describe('helloTargets: permission, launch and verify readiness per target', () 
     expect(v('abs-missing', ['/nonexistent/uv'])).toMatchObject({ ready: false, reason: expect.stringMatching(/does not exist/) });
     expect(v('own-path', ['node', '-e', '0'], { env: { PATH: nodeDir } })).toEqual({ id: 'own-path', ready: true, timeout_s: 60 });
     expect(verifyStatus(repo, { id: 'svc', argv: ['node'], timeout: 900 }, { env: { PATH: nodeDir } })).toEqual({ id: 'svc', ready: true, timeout_s: 900 });
+    // The per-entry soft threshold Eridani's "still running" notice follows.
+    expect(verifyStatus(repo, { id: 'full', argv: ['node'], timeout: 7200, notifyAfter: 1800 }, { env: { PATH: nodeDir } })).toEqual({ id: 'full', ready: true, timeout_s: 7200, notify_after_s: 1800 });
     expect(v('rel', ['./verify.sh'])).toEqual({ id: 'rel', ready: true, timeout_s: 60 });
     expect(v('rel-missing', ['./nope.sh'])).toMatchObject({ ready: false });
     expect(v('cwd', [process.execPath], { cwd: 'remote-server' })).toEqual({ id: 'cwd', ready: true, timeout_s: 60 });
