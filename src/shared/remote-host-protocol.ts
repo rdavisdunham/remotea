@@ -101,6 +101,8 @@ export interface SessionRecord {
   id: RemoteSurfaceId;
   groupId: GroupId | null;
   title?: string;
+  /** Last explicit rename or reset, including a reset to no custom title. */
+  titleUpdatedAt?: number;
   /** Directory the session was created in. */
   cwd: string;
   /** Last foreground cwd the server observed. */

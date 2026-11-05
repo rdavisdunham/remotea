@@ -38,6 +38,30 @@ describe('Registry', () => {
     expect(r.resolveGroup('grp-a', { name: 'A' }, 'dev-aaaaaaaa').groupId).toBe('grp-inbox');
   });
 
+  it('preserves shared group names and inbox colour when attaching with stale metadata', () => {
+    const r = Registry.load({ file: null, bootId: 'b' });
+    r.upsertGroup('grp-a', { name: 'abc', color: '#123456' }, 'dev-aaaaaaaa');
+    expect(r.resolveGroup('grp-a', { name: 'Old name' }, 'dev-bbbbbbbb')).toEqual({ groupId: 'grp-a' });
+    expect(r.groups().find(g => g.id === 'grp-a')).toMatchObject({ name: 'abc', color: '#123456' });
+    r.upsertGroup('grp-inbox', { name: 'Inbox', color: '#abcdef' }, 'dev-aaaaaaaa');
+    r.resolveGroup(null, undefined, 'dev-bbbbbbbb');
+    expect(r.groups().find(g => g.id === 'grp-inbox')?.color).toBe('#abcdef');
+  });
+
+  it('persists shared labels and an explicit terminal title reset across server restarts', () => {
+    const file = tmpFile();
+    const r = Registry.load({ file, bootId: 'boot-1' });
+    r.upsertGroup('grp-a', { name: 'abc' }, 'dev-aaaaaaaa');
+    r.addSession(rec('surf-1', { title: 'andi fix', titleUpdatedAt: 5 }));
+    r.addSession(rec('surf-2', { titleUpdatedAt: 6 }));
+    r.saveNow();
+    const restored = Registry.load({ file, bootId: 'boot-2' });
+    expect(restored.groups().find(g => g.id === 'grp-a')?.name).toBe('abc');
+    expect(restored.session('surf-1')).toMatchObject({ title: 'andi fix', titleUpdatedAt: 5 });
+    expect(restored.session('surf-2')?.titleUpdatedAt).toBe(6);
+    expect(restored.session('surf-2')?.title).toBeUndefined();
+  });
+
   it('marks the previous boot\'s live sessions lost, keeping what a respawn needs', () => {
     const file = tmpFile();
     const r1 = Registry.load({ file, bootId: 'boot-1' });

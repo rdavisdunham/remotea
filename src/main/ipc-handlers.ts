@@ -843,6 +843,11 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
       ptyManager.kill(id as SurfaceId, remoteShellSpec(hostId));
     }
   });
+  ipcMain.on(IPC_CHANNELS.RSESS_SESSION_UPDATE, (_e, hostId: unknown, id: unknown, update: { title?: unknown }) => {
+    if (typeof hostId === 'string' && typeof id === 'string' && update && (update.title === null || typeof update.title === 'string')) {
+      remoteHosts.sessionUpdate(hostId, id, { title: update.title });
+    }
+  });
   ipcMain.on(IPC_CHANNELS.RSESS_GROUP_UPSERT, (_e, hostId: unknown, group: { id: string; name: string; color?: string }) => {
     if (typeof hostId === 'string' && group && typeof group === 'object') remoteHosts.groupUpsert(hostId, group);
   });

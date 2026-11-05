@@ -571,6 +571,34 @@ describe('intent outbox: what reconcile sees', () => {
     decryptString: (b) => b.toString().replace(/^enc:/, ''),
   };
 
+  it('exposes durable queued workspace and terminal names without changing the factual mirror', () => {
+    const host = new FakeHost();
+    host.addSession('surf-a');
+    const dir = tmpDir();
+    const make = () => new RemoteHosts({ dataDir: dir, box, appVersion: 'test', broadcast: () => {}, socket: host.factory });
+    const first = make();
+    first.save({ name: 'Desk', url: 'ws://desk.tail1234.ts.net:7717', token: 'tok' });
+    host.socket.drop();
+    first.sessionUpdate(HOST, 'surf-a', { title: 'andi fix' });
+    first.groupUpsert(HOST, { id: 'grp-work', name: 'abc' });
+    expect(first.views()[0]).toMatchObject({ pendingTitles: { 'surf-a': 'andi fix' }, pendingGroups: { 'grp-work': { name: 'abc' } } });
+    first.detachAllNow();
+    host.fault = 'hold'; host.sticky = true;
+    const second = make();
+    second.save({ id: HOST, name: 'Desk', url: 'ws://desk.tail1234.ts.net:7717' });
+    host.socket.open();
+    const snapshot = second.views()[0];
+    expect(snapshot.pendingTitles).toEqual({ 'surf-a': 'andi fix' });
+    expect(snapshot.pendingGroups).toEqual({ 'grp-work': { name: 'abc', color: undefined } });
+    expect(snapshot.sessions[0].title).not.toBe('andi fix');
+    host.sticky = false; host.fault = 'none'; host.release();
+    expect(second.views()[0].sessions[0].title).toBe('andi fix');
+    expect(second.views()[0].pendingTitles).toEqual({});
+    second.sessionUpdate(HOST, 'surf-a', { title: null });
+    expect(second.views()[0].sessions[0].title).toBeUndefined();
+    second.detachAllNow();
+  });
+
   it('a close or hide still in the outbox keeps the tab out of the registry views', () => {
     const host = new FakeHost();
     host.addSession('surf-a');
