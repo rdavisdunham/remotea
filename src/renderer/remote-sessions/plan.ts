@@ -1,25 +1,9 @@
 /**
- * remotea: what this window must change so its layout agrees with the
- * remote session registries — computed purely, applied by sync.ts.
- *
- * The registry decides WHAT exists (sessions, and the workspace group each
- * belongs to); this device decides WHERE it is shown (splits, panes, tab
- * order, windows). So the plan only ever:
- *   - drops a tab whose session was closed elsewhere or hidden on this device;
- *   - adds a tab for a session this device does not show yet (placer window
- *     only), into the local workspace bound to its group — or a new one;
- *   - binds a workspace to the group its sessions already belong to;
- *   - takes the group's name and colour (server wins, except while one of
- *     our own edits is still on its way there).
- * It never rearranges anything that already exists.
- *
- * With `groupEridani` (task 0ec167e4) a session Eridani started (one that
- * carries an `eridani` binding) is not placed by its server group (they all
- * share "Eridani") but into a local workspace per task on its execution
- * target — per run when it has no task — created on first need and marked
- * with `eridaniTask`. Such a workspace is never bound to a server group, so
- * a rename does not rename the shared group and closing it closes only its
- * own tabs.
+ * Reconcile this window's tabs with the remote host registries. The host owns
+ * session identity and lifecycle, while the device owns pane and tab placement.
+ * Regular sync reconciles closed or hidden tabs, new sessions, and group metadata.
+ * Origin separation moves Eridani tabs into task workspaces using their existing
+ * surface identities. Each task workspace is independent from the shared host group.
  */
 import { INBOX_GROUP_ID, type EridaniBinding, type SessionRecord } from '../../shared/remote-host-protocol';
 import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
@@ -223,32 +207,16 @@ export function planRemoteSync(input: PlanInput): SyncAction[] {
 }
 
 /** One move of the Eridani tab migration: into an existing task workspace's pane, or a new task workspace. */
-export type EridaniMigrationMove =
+export type EridaniSeparationMove =
   | { surfaceIds: string[]; workspaceId: string; paneId: string }
   | { surfaceIds: string[]; task: EridaniTaskRef; title: string };
 
-export interface EridaniMigrationPlan {
-  moves: EridaniMigrationMove[];
-  /** Eridani tabs this push decided about (moved or left where they are): never looked at again. */
-  decided: string[];
+export interface EridaniSeparationPlan {
+  moves: EridaniSeparationMove[];
 }
 
-/**
- * The one-time move of Eridani tabs that predate task workspaces (task
- * 0ec167e4 placed only NEW sessions per task; tabs already shown sat on in
- * the shared "Eridani" workspace). A tab of a session with an `eridani`
- * binding that sits in its server group's workspace (bound to that group on
- * the host, or not bound there yet) moves to its task workspace, joining one
- * that exists or creating it as placement would. A tab already in a task
- * workspace, or one the user put in a workspace of another group, stays.
- *
- * Pure. `done` holds tabs decided before (the caller persists `decided`), so
- * each tab is considered once: a tab the user later drags back out of its
- * task workspace stays where they put it. Only connected hosts, and never a
- * tab whose session was closed or hidden (sync drops those).
- */
-export function planEridaniMigration(views: RemoteRegistryView[], local: LocalIndex, done: ReadonlySet<string>): EridaniMigrationPlan {
-  const decided: string[] = [];
+/** Keep Eridani-originated tabs in their task workspaces, including tabs in legacy mixed layouts. */
+export function planEridaniSeparation(views: RemoteRegistryView[], local: LocalIndex): EridaniSeparationPlan {
   const wsById = new Map(local.workspaces.map((w) => [w.id, w]));
   const groups = new Map<string, { host: string; recs: SessionRecord[] }>();
   for (const view of views) {
@@ -257,21 +225,19 @@ export function planEridaniMigration(views: RemoteRegistryView[], local: LocalIn
     const sessions = new Map<string, SessionRecord>(view.sessions.map((s) => [s.id, s]));
     const closed = new Set(view.closedIds);
     for (const surf of local.surfaces) {
-      if (surf.hostId !== host || done.has(surf.id) || closed.has(surf.id)) continue;
+      if (surf.hostId !== host || closed.has(surf.id)) continue;
       const rec = sessions.get(surf.id);
       if (!rec?.eridani || rec.hiddenBy.includes(view.deviceId)) continue;
       const ws = wsById.get(surf.workspaceId);
       if (!ws) continue;
-      decided.push(surf.id);
-      const bound = ws.remoteGroups?.[host];
-      if (ws.eridaniTask || (bound && bound !== (rec.groupId ?? INBOX_GROUP_ID))) continue;
+      if (ws.eridaniTask && sameEridaniTask(ws.eridaniTask, host, rec.eridani)) continue;
       const k = `${host}\u0000${taskKey(rec.eridani)}`;
       const g = groups.get(k) ?? { host, recs: [] };
       g.recs.push(rec);
       groups.set(k, g);
     }
   }
-  const moves: EridaniMigrationMove[] = [];
+  const moves: EridaniSeparationMove[] = [];
   for (const { host, recs } of groups.values()) {
     recs.sort((a, b) => a.createdAt - b.createdAt);
     const b = recs[0].eridani!;
@@ -280,5 +246,5 @@ export function planEridaniMigration(views: RemoteRegistryView[], local: LocalIn
     if (ws) moves.push({ surfaceIds, workspaceId: ws.id, paneId: targetPane(ws) });
     else moves.push({ surfaceIds, task: { hostId: host, target: b.target, taskId: b.taskId, runId: b.runId }, title: taskTitle(recs[0]) });
   }
-  return { moves, decided };
+  return { moves };
 }

@@ -25,7 +25,7 @@
 | Host attention row (sidebar, top): per host, the Eridani runs that need you, terminals that exited non-zero, unconfirmed actions and the connection state; click goes to the first such tab | **done**: helper + render tests |
 | One shortcut table (`src/renderer/shortcuts.ts`): the F1 overlay, Settings → Keyboard, the command palette and every tooltip read their labels and live bindings from it; a test fails when a registered accelerator has no entry, or a tooltip hard-codes a combination | **done**: unit tests. The overlay now also lists the Agents category |
 | Recovery dialog ("While this device was away"): on start or reconnect, tabs that exited or were closed elsewhere while away, tabs restoring after a host restart, and ended Eridani runs with unmerged work (`SessionRecord.worktreeState`, see eridani-link.md), each with Reopen / Keep closed / Open worktree in a new terminal / Copy branch name. Reopen of a Claude or Codex session that reported its conversation (`SessionRecord.agent`) starts the new tab with `claude --resume <id>` / `codex resume <id>`, the same command a lost session respawns with (`agentResumeCommand`, shared with hub.ts); other sessions reopen as a shell. Offered once each; clean restores alone skip the dialog (Settings → Remote hosts → "Skip the recovery dialog when everything restores cleanly", on by default) | **done**: inventory, trigger and render tests; needs a click-through on Windows |
-| Eridani task grouping: Eridani-spawned sessions open in one workspace per task (titled with the task), shown in the sidebar under their target with a run-state chip; manual sessions stay where they are. Setting: Settings → Remote hosts → "Group Eridani runs by repository and task" | **done**: planner, grouping and render tests. Tabs placed before this change are moved once to their task workspace on the first registry push with the setting on (`planEridaniMigration`, `moveSurfacesLocal`). Only tabs in their server group's workspace move, and only tabs move: no terminal or session is closed. Each tab is decided once (localStorage `remotea-eridani-task-migration`), so a tab dragged back out stays. The shared workspace is discarded locally when it empties. Needs a click-through on Windows |
+| Eridani task grouping | **done**. Manual workspaces occupy the main sidebar list. Eridani task workspaces live in a separate collapsible bottom section with saved expansion state and run chips. Settings → Remote hosts controls repository headings within the section. Registry sync separates mixed legacy tabs by run origin using `planEridaniSeparation` and `moveSurfacesLocal`, preserving host session identities. |
 
 ---
 
@@ -343,7 +343,7 @@ None of these call `pty.kill`.
 - `hideSurface`
 - `ensureRemoteGroup`
 - `discardWorkspaceLocal`
-- `createWorkspaceFromGroup`: builds a **single leaf** holding only the placed surfaces. It must never use the default 3-pane layout, which would spawn sessions.
+- `createWorkspaceFromGroup`: builds a **single leaf** holding only the placed surfaces. It must never use the configured default layout, which would spawn sessions.
 
 ### Race safety
 

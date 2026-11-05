@@ -329,11 +329,11 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "remote.host.group",
-      "label": "Group Eridani runs by repository and task"
+      "label": "Group Eridani runs by repository"
     },
     {
       "key": "remote.host.groupHint",
-      "label": "A desktop grouping per task (or standalone run), under its execution target. This organizes existing host terminals; it does not start tasks. Activity and process exit do not establish verification or approval. Off: runs share the host’s Eridani workspace. Manual sessions are not moved."
+      "label": "Show repository headings inside the Eridani runs section. Each task keeps its own workspace in that section."
     },
     {
       "key": "remote.host.skipRecovery",
@@ -2225,7 +2225,8 @@ export const PREFERENCE_FIELDS = {
     "backgroundOpacity",
     "textScale",
     "wrapTitles",
-    "fullWidthTitles"
+    "fullWidthTitles",
+    "eridaniRunsExpanded"
   ],
   "WorkspacePrefs": [
     "newWorkspacePlacement",
@@ -2247,6 +2248,7 @@ export const PREFERENCE_FIELDS = {
     "restoreOmpSessions",
     "newWorkspacePanes",
     "newWorkspaceLayout",
+    "newWorkspaceDefaultsRev",
     "groupEridaniRuns",
     "recoverySkipClean",
     "sessionSnapshotMinutes"

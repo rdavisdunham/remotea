@@ -9,8 +9,8 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { planEridaniMigration, planRemoteSync, type LocalIndex, type PlanInput } from '../../src/renderer/remote-sessions/plan';
-import { migrateEridaniTabs } from '../../src/renderer/remote-sessions/sync';
+import { planEridaniSeparation, planRemoteSync, type LocalIndex, type PlanInput } from '../../src/renderer/remote-sessions/plan';
+import { migrateEridaniTabs, markRemoteLayoutReady } from '../../src/renderer/remote-sessions/sync';
 import { useStore } from '../../src/renderer/store';
 import { groupSidebarWorkspaces, taskRunHealth } from '../../src/renderer/components/Sidebar/eridani-groups';
 import TaskRunChip from '../../src/renderer/components/Sidebar/TaskRunChip';
@@ -105,7 +105,7 @@ describe('placement: one workspace per Eridani task', () => {
   });
 });
 
-describe('migration: Eridani tabs from before task workspaces move once', () => {
+describe('separation: Eridani tabs stay outside manual workspaces', () => {
   // The old layout: everything Eridani started sits in the shared "Eridani" workspace, bound to its group.
   const oldLocal = (): LocalIndex => ({
     workspaces: [
@@ -127,7 +127,7 @@ describe('migration: Eridani tabs from before task workspaces move once', () => 
     eri('surf-a2', 'Fix login', { runId: 'run-a2', generation: 2 }, { createdAt: 4 }),
     // A shell the user opened in the Eridani workspace: no binding, stays.
     session('surf-shell', { groupId: ERI_GROUP as SessionRecord['groupId'] }),
-    // A run tab the user put in another group's workspace: their choice, stays.
+    // A run tab in a manual workspace is separated using its origin.
     eri('surf-moved-by-me', 'Other task', { taskId: 'task-3', runId: 'run-3' }),
     session('surf-manual'),
   ]);
@@ -135,23 +135,21 @@ describe('migration: Eridani tabs from before task workspaces move once', () => 
   it('moves each run tab of the shared workspace into its task workspace, creating or joining one', () => {
     const local = oldLocal();
     local.workspaces.push({ id: 'ws-search', title: 'Add search', paneIds: ['pane-s'], active: false, eridaniTask: { ...TASK1, taskId: 'task-2', runId: 'run-b0' } });
-    const { moves, decided } = planEridaniMigration([oldView()], local, new Set());
+    const { moves } = planEridaniSeparation([oldView()], local);
     expect(moves).toEqual([
       { surfaceIds: ['surf-a1', 'surf-a2'], task: TASK1, title: 'Fix login' },
       { surfaceIds: ['surf-b'], workspaceId: 'ws-search', paneId: 'pane-s' },
+      { surfaceIds: ['surf-moved-by-me'], task: { ...TASK1, taskId: 'task-3', runId: 'run-3' }, title: 'Other task' },
     ]);
-    expect(decided.sort()).toEqual(['surf-a1', 'surf-a2', 'surf-b', 'surf-moved-by-me']);
   });
 
-  it('is idempotent: decided tabs, task workspaces, closed or hidden sessions and offline hosts are left alone', () => {
+  it('leaves correctly placed tabs, closed or hidden sessions and offline hosts alone', () => {
     const local = oldLocal();
-    const first = planEridaniMigration([oldView()], local, new Set());
-    expect(planEridaniMigration([oldView()], local, new Set(first.decided))).toEqual({ moves: [], decided: [] });
     const inTask: LocalIndex = { workspaces: [{ id: 'ws-t', title: 'Fix login', paneIds: ['pane-t'], active: false, eridaniTask: TASK1 }], surfaces: [{ id: 'surf-a1', hostId: 'desk', workspaceId: 'ws-t' }] };
-    expect(planEridaniMigration([oldView()], inTask, new Set()).moves).toEqual([]);
-    expect(planEridaniMigration([{ ...oldView(), connected: false }], local, new Set())).toEqual({ moves: [], decided: [] });
+    expect(planEridaniSeparation([oldView()], inTask).moves).toEqual([]);
+    expect(planEridaniSeparation([{ ...oldView(), connected: false }], local)).toEqual({ moves: [] });
     const gone = { ...oldView(), closedIds: ['surf-a1'] as never, sessions: oldView().sessions.map((x) => (x.id === 'surf-b' ? { ...x, hiddenBy: [ME] as never } : x)) };
-    expect(planEridaniMigration([gone], local, new Set()).moves).toEqual([{ surfaceIds: ['surf-a2'], task: { ...TASK1, runId: 'run-a2' }, title: 'Fix login' }]);
+    expect(planEridaniSeparation([gone], local).moves).toEqual([{ surfaceIds: ['surf-a2'], task: { ...TASK1, runId: 'run-a2' }, title: 'Fix login' }, { surfaceIds: ['surf-moved-by-me'], task: { ...TASK1, taskId: 'task-3', runId: 'run-3' }, title: 'Other task' }]);
   });
 
   describe('applied to the store', () => {
@@ -163,7 +161,7 @@ describe('migration: Eridani tabs from before task workspaces move once', () => 
       useStore.setState({ workspaces: [], activeWorkspaceId: null });
     });
 
-    it('moves tabs without killing anything, once; an emptied shared workspace goes and a task one becomes active', () => {
+    it('separates tabs repeatedly while preserving their processes, identities, and manual tabs', () => {
       const killed: string[] = [];
       (window as unknown as { wmux?: unknown }).wmux = { pty: { kill: (id: string) => killed.push(id) } };
       const st = useStore.getState();
@@ -182,13 +180,16 @@ describe('migration: Eridani tabs from before task workspaces move once', () => 
       // The move that emptied it decides: surf-b's.
       expect(after.activeWorkspaceId).toBe(after.workspaces[2].id);
       expect(killed).toEqual([]);
-      // The user drags a run tab back into Work: the next push leaves it there.
+      const separated = after.workspaces;
+      migrateEridaniTabs([v]);
+      expect(useStore.getState().workspaces).toBe(separated);
+      // A later mixed layout is separated again using the same surface identities.
       const fix = after.workspaces[1];
       useStore.getState().moveSurfacesLocal(['surf-a2'], { workspaceId: workWs, paneId: 'pane-w' as PaneId });
       migrateEridaniTabs([v]);
       after = useStore.getState();
-      expect(ids(after.workspaces.find((w) => w.id === workWs)!.splitTree)).toEqual(['surf-manual', 'surf-a2']);
-      expect(ids(after.workspaces.find((w) => w.id === fix.id)!.splitTree)).toEqual(['surf-a1']);
+      expect(ids(after.workspaces.find((w) => w.id === workWs)!.splitTree)).toEqual(['surf-manual']);
+      expect(ids(after.workspaces.find((w) => w.id === fix.id)!.splitTree)).toEqual(['surf-a1', 'surf-a2']);
       expect(killed).toEqual([]);
       delete (window as unknown as { wmux?: unknown }).wmux;
     });
@@ -243,4 +244,31 @@ describe('sidebar: task workspaces under their target', () => {
     expect(taskRunHealth({ splitTree: tree }, [v])).toBeNull();
     expect(renderToStaticMarkup(createElement(TaskRunChip, { run: null }))).toBe('');
   });
+});
+
+
+it('separates existing and new runs through registry sync when repository headings are disabled', async () => {
+  useStore.setState({ workspaces: [], activeWorkspaceId: null,
+    workspacePrefs: { ...useStore.getState().workspacePrefs, groupEridaniRuns: false } });
+  let registryPush!: (payload: unknown) => void;
+  const close = () => { throw new Error('Presentation changes must preserve host sessions'); };
+  (window as unknown as { wmux: unknown }).wmux = { remoteSessions: {
+    onRegistry: (callback: typeof registryPush) => { registryPush = callback; return () => {}; },
+    report: () => {}, groupUpsert: () => {}, close, groupClose: close, hide: close,
+  } };
+  const manualId = useStore.getState().createWorkspace({ title: 'Manual project', shell: 'remote:desk',
+    splitTree: { type: 'leaf', paneId: 'pane-mixed' as PaneId, activeSurfaceIndex: 0,
+      surfaces: ['surf-manual', 'surf-existing-run'].map(id => ({ id: id as SurfaceId, type: 'terminal' as const })) } });
+  localStorage.setItem('remotea-eridani-task-migration', JSON.stringify(['surf-existing-run']));
+  markRemoteLayoutReady();
+  registryPush({ views: [view([session('surf-manual'), eri('surf-existing-run', 'Existing task'),
+    eri('surf-new-run', 'New task', { taskId: 'task-new', runId: 'run-new' })])], placer: true, elsewhere: [] });
+  await Promise.resolve();
+  const after = useStore.getState();
+  const manual = after.workspaces.find(workspace => workspace.id === manualId)!;
+  expect(manual.splitTree).toMatchObject({ type: 'leaf', surfaces: [{ id: 'surf-manual' }] });
+  if (manual.splitTree.type !== 'leaf') throw new Error('Expected one manual pane');
+  expect(manual.splitTree.surfaces).toHaveLength(1);
+  expect(after.workspaces.filter(workspace => workspace.eridaniTask).map(workspace => workspace.title)).toEqual(['Existing task', 'New task']);
+  delete (window as unknown as { wmux?: unknown }).wmux;
 });

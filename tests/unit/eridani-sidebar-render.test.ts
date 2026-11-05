@@ -22,7 +22,8 @@ const store = create(() => ({
   surfaceProgress: {},
   oscTitles: {},
   terminalPrefs: { oscTitleTabs: false },
-  sidebarPrefs: { activeTabIndicator: 'leftRail' },
+  sidebarPrefs: { activeTabIndicator: 'leftRail', eridaniRunsExpanded: false },
+  setSidebarPrefs: (prefs: Record<string, unknown>) => store.setState(state => ({ sidebarPrefs: { ...state.sidebarPrefs, ...prefs } })),
   appearancePrefs: { uiMode: 'classic' },
   workspacePrefs: { groupEridaniRuns: true, defaultShell: '' },
   shortcuts: {},
@@ -67,15 +68,15 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   setLatestRemoteViews(null);
-  store.setState({ workspacePrefs: { groupEridaniRuns: true, defaultShell: '' } });
+  store.setState({ workspacePrefs: { groupEridaniRuns: true, defaultShell: '' }, sidebarPrefs: { activeTabIndicator: 'leftRail', eridaniRunsExpanded: false } });
 });
 
-function render(): void {
+function render(overrides: Record<string, unknown> = {}): void {
   const noop = () => {};
   act(() => root.render(React.createElement(Sidebar, {
     workspaces, activeWorkspaceId: 'ws-plain' as WorkspaceId, sidebarWidth: 260,
     onWidthChange: noop, onSelect: noop, onClose: noop, onCreate: noop, onCreateFromLayout: noop, onManageLayouts: noop,
-    onRename: noop, onReorder: noop, onUpdateMetadata: noop,
+    onRename: noop, onReorder: noop, onUpdateMetadata: noop, ...overrides,
   })));
 }
 
@@ -114,10 +115,44 @@ describe('Sidebar with Eridani task workspaces', () => {
     expect(chip?.title).toContain('Verification does not imply task acceptance');
   });
 
-  it('grouping off: no heading, a flat list', () => {
+  it('grouping off keeps a flat delegated list inside the separate section', () => {
     store.setState({ workspacePrefs: { groupEridaniRuns: false, defaultShell: '' } });
     render();
     expect(container.querySelector('.sidebar__task-group')).toBeNull();
-    expect([...container.querySelectorAll<HTMLElement>('[data-workspace-id]')].map((r) => r.dataset.workspaceId)).toEqual(['ws-plain', 'ws-task']);
+    expect([...container.querySelectorAll<HTMLElement>('.sidebar__list [data-workspace-id]')].map((r) => r.dataset.workspaceId)).toEqual(['ws-plain']);
+    expect(container.querySelector('.sidebar__eridani [data-workspace-id]')?.getAttribute('data-workspace-id')).toBe('ws-task');
   });
+});
+
+
+it('keeps delegated work at the bottom, collapsed by default, and persists expansion through remount', () => {
+  const onSelect = vi.fn(), onClose = vi.fn(), onCreate = vi.fn();
+  render({ workspaces: [workspaces[1], workspaces[0]], onSelect, onClose, onCreate });
+  const section = container.querySelector<HTMLElement>('.sidebar__eridani')!;
+  const toggle = section.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect(section.querySelector<HTMLElement>('.sidebar__eridani-list')!.hidden).toBe(true);
+  expect(container.querySelector('.sidebar__list')!.textContent).toContain('Scratch');
+  expect(container.querySelector('.sidebar__list')!.textContent).not.toContain('Fix login');
+  expect(section.nextElementSibling?.classList.contains('sidebar__footer')).toBe(true);
+  act(() => toggle.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(section.querySelector<HTMLElement>('.sidebar__eridani-list')!.hidden).toBe(false);
+  act(() => section.querySelector<HTMLElement>('[data-workspace-id="ws-task"]')!.click());
+  expect(onSelect).toHaveBeenCalledWith('ws-task');
+  expect(onClose).not.toHaveBeenCalled(); expect(onCreate).not.toHaveBeenCalled();
+  act(() => root.unmount());
+  root = createRoot(container);
+  render();
+  expect(container.querySelector('.sidebar__eridani-toggle')!.getAttribute('aria-expanded')).toBe('true');
+});
+
+it('Close others in the manual section leaves delegated work available', () => {
+  const onClose = vi.fn();
+  render({ workspaces: [...workspaces, ws('ws-another', 'Another manual workspace', 'surf-another')], onClose });
+  act(() => container.querySelector<HTMLElement>('[data-workspace-id="ws-plain"]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })));
+  const closeOthers = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(button => button.textContent?.toLowerCase().includes('close other'));
+  expect(closeOthers).toBeDefined();
+  act(() => closeOthers!.click());
+  expect(onClose.mock.calls).toEqual([['ws-another']]);
 });
