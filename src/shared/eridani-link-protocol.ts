@@ -112,6 +112,8 @@ export type LinkCap =
   | 'worktrees.scan'
   // The host takes `terminal.focus`: bring the run's tab to the front in the connected desktop app(s).
   | 'terminal.focus'
+  // The host takes `ci.status`: GitHub CI's view of a run's pull request (gh pr view/checks, failed-job log tails).
+  | 'ci.status'
   | 'run.cleanup'
   | 'run.cleanup.handoff'
   | 'input.direct' | 'output.live'
@@ -139,7 +141,7 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
 /** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus` and the `doctor` summary. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff']);
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -372,6 +374,8 @@ export interface HelloVerifyStatus {
   isolation_reason?: string;
   /** Additive: the entry's timeout in seconds, as verify-runner applies it. Eridani's verify deadline follows it. */
   timeout_s?: number;
+  /** Additive: the entry's `notifyAfter` in seconds, Eridani's per-entry soft threshold ("still running" notice). */
+  notify_after_s?: number;
 }
 
 /** One execution target as hello lists it, for Eridani's target picker. */
@@ -972,6 +976,26 @@ export interface WorktreesScanCommand extends OpFields {
 }
 
 /**
+ * GitHub CI's view of the run's pull request, read with the host's logged-in
+ * `gh` in the branch's worktree (Eridani's "CI as the final verification"):
+ * `executed` with `result` = `{pr: {number, url, head_sha, state} | null,
+ * checks: [{name, state, bucket, link, workflow, startedAt?, completedAt?}],
+ * failed_logs: [{name, link, lines}], worktree_head}`. `log_lines` (0..200)
+ * asks for the last lines of each failed Actions job's `--log-failed`, secrets
+ * redacted. `failed` with the reason when `gh` is missing or logged out, or
+ * the worktree is gone. Read-only and short-lived: `expires_at` is required.
+ */
+export interface CiStatusCommand extends OpFields {
+  t: 'ci.status';
+  run_id: string;
+  generation: number;
+  branch: string;
+  turn_seq?: number | null;
+  log_lines?: number;
+  expires_at: number | string;
+}
+
+/**
  * Bring the run's terminal tab to the front in every connected desktop app
  * that understands it (Eridani's "Open terminal in remotea"). Not effectful
  * on the run; short-lived (Eridani gives it 30 s), so `expires_at` is
@@ -1331,6 +1355,14 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       // Not effectful on the run, but short-lived: a focus nobody waits for any more is refused.
       if (m.expires_at === undefined) return 'expires_at required';
       if (!isStr(m.surf, 120) || !isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
+      return null;
+    case 'ci.status':
+      // Read-only and short-lived: a poll nobody waits for any more is refused.
+      if (m.expires_at === undefined) return 'expires_at required';
+      if (!isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
+      if (!isStr(m.branch, 200) || !/^(?!-)[A-Za-z0-9._/-]+$/.test(m.branch) || m.branch.includes('..')) return 'bad branch';
+      if (m.turn_seq !== undefined && m.turn_seq !== null && !isInt(m.turn_seq)) return 'bad turn_seq';
+      if (m.log_lines !== undefined && !(isInt(m.log_lines) && m.log_lines >= 0 && m.log_lines <= 200)) return 'bad log_lines';
       return null;
     case 'worktrees.scan':
       // Not effectful, but short-lived (2 min): a scan nobody waits for any more is refused.

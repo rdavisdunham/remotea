@@ -167,7 +167,7 @@ describe('remotea eridani setup', () => {
     expect(loadEridaniConfig(w.dir)).toMatchObject({ enabled: true, url: LINK_URL, collector: 'parity' });
     expect(first.link).toMatchObject({ hostId: 'host-42', eridaniCaps: ['spawn', 'verify'], probed: true });
     // 2. Target with launch config and a verify entry.
-    expect(loadTargets(w.dir)).toEqual([expect.objectContaining({ id: 'proj', repo: w.repo, base: 'main', launch: { claude: {} }, verify: [{ id: 'test', argv: ['npm', 'test'], timeout: 600 }] })]);
+    expect(loadTargets(w.dir)).toEqual([expect.objectContaining({ id: 'proj', repo: w.repo, base: 'main', launch: { claude: {} }, verify: [{ id: 'test', argv: ['npm', 'test'], timeout: 7200 }] })]);
     // 3. The MCP key file, 0600, and the user-level entries of the installed harnesses only.
     const keyFile = path.join(w.dir, 'eridani-mcp-token');
     expect(fs.readFileSync(keyFile, 'utf8').trim()).toBe(MCP_KEY);
@@ -180,7 +180,7 @@ describe('remotea eridani setup', () => {
     expect(fs.existsSync(path.join(w.home, '.config', 'opencode'))).toBe(false);
     expect(first.skipped.join('\n')).toMatch(/opencode: not installed/);
     // The readiness table: what hello sends.
-    expect(first.readiness).toEqual([expect.objectContaining({ id: 'proj', enabled: ['claude'], harnesses: ['claude'], launch: { claude: { ready: true, version: '2.0.0' } }, verify_status: [{ id: 'test', ready: true, timeout_s: 600 }], mcp: { configured: true } })]);
+    expect(first.readiness).toEqual([expect.objectContaining({ id: 'proj', enabled: ['claude'], harnesses: ['claude'], launch: { claude: { ready: true, version: '2.0.0' } }, verify_status: [{ id: 'test', ready: true, timeout_s: 7200 }], mcp: { configured: true } })]);
     const text = w.out.text();
     expect(text).toMatch(/TARGET\s+CHECK\s+STATUS\s+DETAIL/);
     expect(text).toMatch(/proj\s+launch claude\s+ready\s+2\.0\.0/);
@@ -354,7 +354,7 @@ describe('remotea eridani setup', () => {
     expect(asked[0]).toMatch(/Setup code from Eridani/);
     expect(asked.some((q) => /Add .*proj as an execution target/.test(q))).toBe(true);
     expect(asked.some((q) => /Write it to .*config\.toml/.test(q))).toBe(true);
-    expect(loadTargets(w.dir)).toEqual([expect.objectContaining({ id: 'myproj', repo: w.repo, verify: [{ id: 'test', argv: ['npm', 'run', 'check'], timeout: 600 }] })]);
+    expect(loadTargets(w.dir)).toEqual([expect.objectContaining({ id: 'myproj', repo: w.repo, verify: [{ id: 'test', argv: ['npm', 'run', 'check'], timeout: 7200 }] })]);
     expect(fs.readFileSync(path.join(w.home, '.codex', 'config.toml'), 'utf8')).toContain('[mcp_servers.eridani]');
     expect(r.changed.length).toBeGreaterThan(3);
     if (process.env.SHOW_SETUP_OUTPUT) fs.writeFileSync(process.env.SHOW_SETUP_OUTPUT, w.out.text());

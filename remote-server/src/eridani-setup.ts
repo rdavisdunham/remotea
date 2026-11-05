@@ -99,9 +99,15 @@ export interface SetupOptions {
   json: boolean;
 }
 
+/**
+ * A verify entry's default timeout: 2 h. A full suite on a loaded machine has run past 30 min (Eridani run
+ * ad1a1c02 was killed at 1800 s at 94%), and Eridani announces a slow run instead of failing it.
+ */
+export const DEFAULT_VERIFY_TIMEOUT = 7200;
+
 export const SETUP_USAGE = `usage: remotea eridani setup [--code <code>|-] [--url <wss://…|https://…>] [--machine <name>]
          [--link-key <key>|-] [--mcp-key <key>|-] [--no-probe] [--wait <s>]
-         [--scan <dir>]… [--add-repo [<id>=]<path>]… [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>]
+         [--scan <dir>]… [--add-repo [<id>=]<path>]… [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s> (default 7200)]
          [--user-mcp | --no-user-mcp] [--replace] [--hooks] [--yes] [--dry-run] [--json]`;
 
 function takeFlag(args: string[], i: number, name: string): string {
@@ -112,7 +118,7 @@ function takeFlag(args: string[], i: number, name: string): string {
 
 export function parseSetupArgs(args: string[]): SetupOptions {
   const o: SetupOptions = {
-    noProbe: false, wait: 0, scan: [], addRepo: [], harnesses: [], verify: [], verifyTimeout: 600,
+    noProbe: false, wait: 0, scan: [], addRepo: [], harnesses: [], verify: [], verifyTimeout: DEFAULT_VERIFY_TIMEOUT,
     userMcp: false, noUserMcp: false, replace: false, hooks: false, yes: false, dryRun: false, json: false,
   };
   for (let i = 0; i < args.length; i++) {
@@ -818,7 +824,7 @@ export function findRepos(roots: string[], skip: (p: string) => boolean = () => 
 }
 
 /** A verify entry from what the repository has, or null. */
-export function detectVerify(repo: string, timeout = 600): VerifySpec | null {
+export function detectVerify(repo: string, timeout = DEFAULT_VERIFY_TIMEOUT): VerifySpec | null {
   const has = (f: string) => fs.existsSync(path.join(repo, f));
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')) as { scripts?: Record<string, string> };

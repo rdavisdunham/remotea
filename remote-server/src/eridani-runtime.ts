@@ -30,6 +30,9 @@
  *     and the named session's session.report, both sent even when nothing
  *     changed, then `executed`. Journaled like every command; its fence is
  *     informational (a stale scan is harmless), only `expires_at` is enforced.
+ *   - `ci.status` (GitHub CI as the run's final verification): `gh pr view`,
+ *     `gh pr checks` and failed-job log tails (redacted) for the run's branch,
+ *     plus the worktree's HEAD, read with this host's `gh` (ci-status.ts).
  *   - `terminal.focus` (Eridani's "Open terminal in remotea"): the hub asks
  *     every connected app that understands `focus` to bring the run's tab to
  *     the front. `executed` when at least one app was told, `rejected`
@@ -58,6 +61,7 @@ import {
   type TerminalFocusCommand,
   type WorktreeReport,
   type WorktreesScanCommand,
+  type CiStatusCommand,
 } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
@@ -80,6 +84,7 @@ import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
 import { sameWorktreeState, WorktreeManager, worktreeStateOf, writersByPath } from './worktrees';
 import { loadTargets } from './eridani-targets';
+import { ciFolder, ciStatus, CiStatusError, type Exec } from './ci-status';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
 import { runPrepare, templateStatus, withTemplate } from './target-template';
@@ -135,6 +140,8 @@ export interface EridaniRuntimeDeps {
   hookPaths?: { cliDir: string; sourceDir: string };
   /** The service environment verify readiness is checked against (default: process.env). */
   verifyEnv?: NodeJS.ProcessEnv;
+  /** Tests: how `ci.status` runs `gh` and `git` (default: execFile, no shell). */
+  ciExec?: Exec;
   /**
    * S-Q1: the doctor run while the link is up (doctor.ts), every DOCTOR_MS;
    * its summary goes out in hello and `doctor` frames. `false` turns it off;
@@ -411,10 +418,11 @@ export class EridaniRuntime {
         ...this.dispatch.handlers(),
         'worktrees.scan': (c, ctx) => this.scanCommand(c, ctx),
         'terminal.focus': async (c, ctx) => this.focusCommand(c, ctx),
+        'ci.status': (c, ctx) => this.ciCommand(c, ctx),
       },
       precheck: (cmd) => this.dispatch.precheck(cmd),
       // A scan (or a focus) cut off by a restart already did whatever it did; Eridani's wait bounds it.
-      recover: (rec) => (rec.t === 'worktrees.scan' || rec.t === 'terminal.focus'
+      recover: (rec) => (rec.t === 'worktrees.scan' || rec.t === 'terminal.focus' || rec.t === 'ci.status'
         ? { state: 'failed', detail: 'interrupted by a server restart' }
         : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
@@ -665,6 +673,27 @@ export class EridaniRuntime {
       }
     }
     return { state: 'executed', result };
+  }
+
+  /**
+   * `ci.status`: GitHub CI's view of the run's pull request, read with this
+   * host's `gh` in the branch's worktree (a target's `<worktreeRoot>/<branch>`,
+   * else the live folder of a session bound to the run). Read-only; `failed`
+   * with the reason when `gh` is missing or logged out or there is no folder.
+   */
+  private async ciCommand(cmd: CommandBody, ctx: CommandContext): Promise<CommandResult> {
+    const c = cmd as unknown as CiStatusCommand;
+    const bound = this.deps.registry.sessions().find((s) => s.eridani?.runId === c.run_id && s.state !== 'exited');
+    const cwd = ciFolder(loadTargets(this.deps.dir), c.branch, bound ? (bound.lastCwd ?? bound.cwd) : null);
+    if (!cwd) return { state: 'failed', detail: `no worktree for ${c.branch} on this host` };
+    ctx.begin();
+    try {
+      const result = await ciStatus({ cwd, branch: c.branch, logLines: c.log_lines ?? 0, exec: this.deps.ciExec });
+      return { state: 'executed', result: result as unknown as Record<string, unknown> };
+    } catch (err) {
+      const msg = err instanceof CiStatusError ? err.message : `ci status failed: ${(err as Error)?.message ?? String(err)}`;
+      return { state: 'failed', detail: msg.slice(0, ERIDANI_LIMITS.reasonChars) };
+    }
   }
 
   /**
