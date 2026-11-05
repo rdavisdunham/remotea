@@ -388,6 +388,19 @@ export class EridaniLink {
     return this.fsm.state === 'ready';
   }
 
+  /**
+   * What hello advertises changed (a launcher's conformance settled): reconnect
+   * so Eridani gets a new hello. Unacked events are sent again as on any
+   * reconnect. Nothing to do while no socket is open: the next hello has it.
+   */
+  rehello(reason: string): boolean {
+    if (this.stopped || !this.ws || (this.fsm.state !== 'ready' && this.fsm.state !== 'handshaking')) return false;
+    this.log(`eridani: sending a new hello (${reason})`);
+    this.dropSocket();
+    this.dispatch({ type: 'closed', error: `new hello: ${reason}` });
+    return true;
+  }
+
   /** Why the link is degraded (journal first, then outbox), or null. Sent in hello as `degraded_reason`. */
   degradedReason(): string | null {
     const j = this.journal.degraded;

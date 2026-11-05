@@ -17,6 +17,7 @@ import { saveTarget, type ExecutionTarget } from '../src/eridani-targets';
 import { EridaniRuntime } from '../src/eridani-runtime';
 import { readLinkStatus } from '../src/eridani-link';
 import { harnessMatrix, helloTargets, launchersToProbe, probeKey, probeLauncher, verifyStatus, type LauncherProbe, type ProbeHarness } from '../src/launch-caps';
+import { CONFORMANCE_FILE, writeRecord } from '../src/launcher-conformance';
 import { fileVersion, hookVersion, loadBuildInfo, readServerInfo, serverInfo, UNKNOWN_BUILD, writeServerInfo } from '../src/build-info';
 import { buildStatus, fmtBuild } from '../src/cli';
 import { fmtAdvertised } from '../src/eridani-cli';
@@ -77,7 +78,19 @@ describe('probeLauncher: `<bin> --version` the way a spawn runs it', () => {
     const bin = tmpDir();
     script(bin, 'fakeclaude', 'echo "2.1.3 (Claude Code)"');
     const r = await probeLauncher('fakeclaude', { ...sh, args: (cmd) => ['-c', `echo "nvm 0.39.7 loaded"; ${cmd}`], env: { PATH: `${bin}:/usr/bin:/bin` } });
-    expect(r).toEqual({ ok: true, version: '2.1.3' });
+    expect(r).toEqual({ ok: true, version: '2.1.3', path: fs.realpathSync(path.join(bin, 'fakeclaude')), mtime_ms: Math.round(fs.statSync(path.join(bin, 'fakeclaude')).mtimeMs) });
+  });
+
+  it('names the binary by its resolved path, never reading a version out of that path', async () => {
+    const dir = tmpDir();
+    const versions = path.join(dir, 'versions');
+    fs.mkdirSync(versions);
+    script(versions, '9.9.9', 'echo "2.1.3 (Claude Code)"');
+    const bin = tmpDir();
+    fs.symlinkSync(path.join(versions, '9.9.9'), path.join(bin, 'fakeclaude'));
+    const r = await probeLauncher('fakeclaude', { ...sh, env: { PATH: `${bin}:/usr/bin:/bin` } });
+    expect(r).toMatchObject({ ok: true, version: '2.1.3', path: fs.realpathSync(path.join(versions, '9.9.9')) });
+    expect(typeof r.mtime_ms).toBe('number');
   });
 
   it('a program not on the PATH, one that fails and one that hangs are not ready, and say why', async () => {
@@ -272,7 +285,7 @@ class FakeEridani {
 }
 
 describe('EridaniRuntime hello (caps_version 2)', () => {
-  async function runtime(probe: (h: ProbeHarness, bin: string) => Promise<LauncherProbe>) {
+  async function runtime(probe: (h: ProbeHarness, bin: string) => Promise<LauncherProbe>, extra: Partial<ConstructorParameters<typeof EridaniRuntime>[0]> = {}) {
     const eri = new FakeEridani();
     cleanups.push(() => eri.close());
     await new Promise((r) => eri.wss.once('listening', r));
@@ -296,6 +309,7 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
       hookPaths: { cliDir, sourceDir: tmpDir() },
       adapterHooks: () => ({ claudeAsk: true, codexApproval: true }),
       verifyEnv: { PATH: '/nonexistent-bin' },
+      ...extra,
     });
     cleanups.push(() => rt.stop());
     return { eri, dir, rt, logs, cliDir };
@@ -342,6 +356,37 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
     const text = fmtAdvertised(adv).join('\n');
     expect(text).toMatch(/codex not installed/);
     expect(text).toMatch(/target jarvis: claude ready; verify api NOT ready/);
+  });
+
+  it('managed runs: hello carries each launcher\'s conformance, and a new result on disk sends a new hello', async () => {
+    const ran: string[] = [];
+    const { eri, rt, dir } = await runtime(
+      async (h) => (h === 'claude' ? { ok: true, version: '2.1.400', path: '/opt/claude/2.1.400', mtime_ms: 1 } : h === 'codex' ? { ok: true, version: '0.170.0', path: '/opt/codex', mtime_ms: 1 } : { ok: false, version: null, error: 'no' }),
+      {
+        conformanceEnv: {},
+        conformanceRunner: async (h, bin) => {
+          ran.push(`${h}:${bin}`);
+          return h === 'claude'
+            ? [{ id: 'help', status: 'pass', ms: 1 }, { id: 'hook_callback', status: 'pass', ms: 1 }]
+            : [{ id: 'help', status: 'pass', ms: 1 }, { id: 'approval_allow', status: 'fail', ms: 3, message: 'the command was decided without asking the host (no requestApproval)' }, { id: 'resume', status: 'skipped', ms: 0, message: 'not run: approval_allow failed' }];
+        },
+      },
+    );
+    rt.start();
+    await until(() => eri.hellos().length === 1);
+    const hello = eri.hellos()[0];
+    expect(ran.sort()).toEqual(['claude:claude', 'codex:codex']);
+    expect(hello.harnesses.claude).toMatchObject({ managed: true, conformance: 'verified', launcher_version: '2.1.400', conformance_at: expect.any(String), managed_questions: ['ask', 'approval'] });
+    expect(hello.harnesses.codex).toMatchObject({ managed: false, conformance: 'failed', launcher_version: '0.170.0', conformance_step: 'approval_allow', conformance_message: expect.stringMatching(/requestApproval/) });
+    const remotea = (hello.targets ?? []).find((t) => t.id === 'remotea')!;
+    expect(remotea.launch).toMatchObject({ claude: { ready: true, managed: true, conformance: 'verified' }, codex: { ready: true, managed: false, conformance: 'failed', conformance_step: 'approval_allow' } });
+    expect(hello.caps).toContain('managed.sessions');
+    // `remotea launcher probe codex` passed it: the server reads the file on its next check and says so in a new hello.
+    writeRecord(path.join(dir, CONFORMANCE_FILE), { harness: 'codex', bin: 'codex', version: '0.170.0', path: '/opt/codex', mtime_ms: 1, outcome: 'pass', steps: [{ id: 'help', status: 'pass', ms: 1 }], at: new Date().toISOString(), duration_ms: 5, by: 'cli' });
+    rt.check();
+    await until(() => eri.hellos().length === 2);
+    expect(eri.hellos()[1].harnesses.codex).toMatchObject({ managed: true, conformance: 'verified' });
+    expect(ran).toHaveLength(2);
   });
 
   it('a later link start reuses the last probes and does not wait for the refresh', async () => {

@@ -153,8 +153,35 @@ export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...
  */
 export const ERIDANI_CAPS_VERSION = 2;
 
+/**
+ * Whether an installed launcher may run managed sessions (launcher-conformance.ts):
+ *   verified     a conformance probe of this exact binary passed (`managed: true`)
+ *   forced       admitted without a probe by REMOTEA_MANAGED_<HARNESS>_FORCE (`managed: true`)
+ *   probing      the probe is running now; hello is sent again when it settles
+ *   failed       the probe failed at `conformance_step`, `conformance_message` says why
+ *   unverified   not probed yet (or the launcher did not answer `--version`)
+ *   below_floor  older than the oldest version the adapter supports
+ *   blocked      on REMOTEA_MANAGED_<HARNESS>_BLOCK
+ *   unsupported  no managed runs here (not Linux, or no readable version)
+ */
+export type LaunchConformance = 'verified' | 'forced' | 'probing' | 'failed' | 'unverified' | 'below_floor' | 'blocked' | 'unsupported';
+
+/** Additive: the conformance of a launcher (HarnessCaps: the best launcher of the harness; HelloLaunch: the target's own). */
+export interface LaunchConformanceFields {
+  conformance?: LaunchConformance;
+  /** The version the conformance applies to (`--version`, as probed). */
+  launcher_version?: string | null;
+  /** `failed`: the probe step that failed (e.g. `approval_allow`). */
+  conformance_step?: string;
+  /** Why it failed or is not admitted, ≤ 300 characters; never provider output. */
+  conformance_message?: string;
+  /** ISO time the probe that decided it finished. */
+  conformance_at?: string;
+}
+
 /** What one harness can do on this host (the capability matrix, C15). Advertise only what is verified. */
-export interface HarnessCaps {
+export interface HarnessCaps extends LaunchConformanceFields {
+  /** Some launcher of this harness is admitted for managed runs (`conformance` verified or forced). */
   managed?: boolean;
   managed_questions?: QuestionKind[];
   /** `claude --version` / `codex --version`, or null when not installed. */
@@ -351,7 +378,8 @@ export interface DoctorBody extends DoctorSummary {
 }
 
 /** One launcher on one target, as probed (caps_version 2). */
-export interface HelloLaunch {
+export interface HelloLaunch extends LaunchConformanceFields {
+  /** This target's launcher is admitted for managed runs (see `conformance`). */
   managed?: boolean;
   /** `<bin> --version` answered through the login shell. */
   ready: boolean;
