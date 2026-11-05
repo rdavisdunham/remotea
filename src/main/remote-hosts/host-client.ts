@@ -173,6 +173,12 @@ interface Surf {
   openRid: number | null;
   /** A snapshot re-open was requested to heal a seq gap. */
   healing: boolean;
+  /**
+   * The server could not start the process (a managed launcher still being
+   * probed after a host restart). The open is sent again as soon as the
+   * server reports the session live: boot recovery resumes it on its own.
+   */
+  reopenOnLive: boolean;
   /** The terminal's size on the server, and whether this device sets it (last `size`/`opened`). */
   size?: RemoteSize;
   sizeCbs?: Set<(s: RemoteSize) => void>;
@@ -699,6 +705,7 @@ export class RemoteHostClient {
   private sendOpen(surf: Surf): void {
     const rid = this.nextRid++;
     surf.openRid = rid;
+    surf.reopenOnLive = false;
     const resume = surf.lastSeq !== null && surf.bootId === this.bootId && !surf.healing;
     diag('surf.open', { host: this.hostId, sinceSeq: resume ? surf.lastSeq : null, healing: surf.healing, waiters: surf.waiters.length }, surf.id);
     this.sendJson({
@@ -812,6 +819,7 @@ export class RemoteHostClient {
         this.sessions.set(msg.session.id, msg.session);
         this.closedIds.delete(msg.session.id);
         if (msg.session.hiddenBy.includes(this.deps.device.id)) this.markGone(msg.session.id, { reason: 'hidden' });
+        else this.reopenIfLive(msg.session);
         this.reconcileUncertain();
         this.deps.onRegistry?.();
         return;
@@ -936,8 +944,23 @@ export class RemoteHostClient {
       }
       return;
     }
-    this.log(`${this.hostId}: open ${msg.id} failed: ${msg.code} ${msg.message}`);
-    diag('surf.openError', { host: this.hostId, code: msg.code }, msg.id);
+    // The process could not be started now (a managed launcher is still being probed after a host
+    // restart). The tab stays wanted; the server's own boot recovery resumes the session once the
+    // probe passes and broadcasts it live, and that broadcast re-sends this open (reopenIfLive).
+    const retry = msg.code === 'spawn-failed' && surf.wanted && surf.state !== 'closed';
+    surf.reopenOnLive = retry;
+    this.log(`${this.hostId}: open ${msg.id} failed: ${msg.code} ${msg.message}${retry ? ' (will open again when the host reports it live)' : ''}`);
+    diag('surf.openError', { host: this.hostId, code: msg.code, retry }, msg.id);
+  }
+
+  /** A session the server refused to spawn is live again (resumed by boot recovery): open it now. */
+  private reopenIfLive(session: SessionRecord): void {
+    const surf = this.surfs.get(session.id);
+    if (!surf || !surf.reopenOnLive || !surf.wanted || surf.open || surf.openRid !== null || surf.state === 'closed') return;
+    if (session.state !== 'live' || !this.ready) return;
+    this.log(`${this.hostId}: ${session.id} is live again, opening it`);
+    diag('surf.reopen', { host: this.hostId }, session.id);
+    this.sendOpen(surf);
   }
 
   private onOutput(id: string, seq: number, data: string): void {
@@ -1024,7 +1047,7 @@ export class RemoteHostClient {
     const surf: Surf = existing ?? {
       id: opts.id, spec: opts.spec, cols: opts.cols, rows: opts.rows, wanted: true, open: false,
       lastSeq: null, bootId: null, state: 'live', data: new Set(), exit: new Set(), resync: new Set(),
-      held: [], pendingExit: null, waiters: [], openRid: null, healing: false,
+      held: [], pendingExit: null, waiters: [], openRid: null, healing: false, reopenOnLive: false,
     };
     surf.spec = opts.spec;
     surf.cols = opts.cols;
