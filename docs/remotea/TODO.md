@@ -4,7 +4,15 @@ The current Linux/WSL **server** is the Node process under `remotea.service` (`r
 
 ## Requested roadmap work — 2026-11-05
 
-The following four requests are tracked here and in Eridani. Checked entries are implemented. Installation and native hosting are future milestones after the core workflows stabilize.
+The following requests are tracked here and in Eridani. Checked entries are implemented. Installation and native hosting are future milestones after the core workflows stabilize.
+
+### Live terminal work summaries
+
+- [ ] Show concise live descriptions of what each terminal is working on overall.
+
+Eridani backlog task `20a8228c-cc1a-486a-9fb2-d78e26a451e5`.
+
+Start with the expandable terminal list in the workspace sidebar and consider a detail view. Reuse captured turns, task/run metadata and existing session summaries where possible. Define refresh triggers, freshness, server persistence and reconnect behaviour so connected apps show consistent summaries. Preserve user-chosen names and show generated summaries separately from live activity and status. This is a later feature expansion.
 
 ### Easy installation and updates
 

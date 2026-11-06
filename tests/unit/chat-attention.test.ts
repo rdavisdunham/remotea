@@ -9,7 +9,8 @@ describe('chat attention presentation', () => {
     expect(chatStatus('idle', false, 'finished', false).tone).toBe('ready');
     expect(chatStatus('needs_you', false).label).toBe('Needs you');
     expect(chatStatus('working', true, 'reminder').label).toBe('Reminder due');
-    expect(chatStatus(undefined, false).label).toBe('Status unavailable');
+    expect(chatStatus(undefined, false).label).toBe('No harness detected');
+    expect(chatStatus('unknown', false, undefined, false, true).label).toBe('Waiting for harness status');
   });
   it('does not let acknowledgements for older replies clear a new reply', () => {
     expect(chatIsUnread({ revision: 2, at: 1, kind: 'finished', seenBy: { a: 1, b: 2 } }, 'a')).toBe(true);

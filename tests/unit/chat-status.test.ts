@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T12:00:00Z'));
   chatAttention.mockReset().mockResolvedValue({ ok: true });
   window.wmux = { remoteSessions: { chatAttention } } as unknown as typeof window.wmux;
-  useStore.setState({ agentStates: {}, agentDetections: {} });
+  useStore.setState({ agentStates: {}, agentDetections: {}, agentIdentities: {} });
   useLocalChatAttention.setState({ entries: {} });
   setLatestRemoteViews(view());
   container = document.createElement('div'); container.className = 'terminal-pane'; document.body.append(container);
@@ -39,6 +39,16 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); setLatestRemoteViews(null); vi.useRealTimers(); });
 
 describe('chat status and reminders', () => {
+  it('distinguishes a plain shell from an identified harness still waiting for status', async () => {
+    setLatestRemoteViews(view({ agentState: undefined }));
+    await render();
+    expect(read()).toBe('No harness detected');
+    await act(async () => useStore.setState({ agentIdentities: { [id]: { kind: 'codex', source: 'probe' } } }));
+    expect(read()).toBe('Waiting for harness status');
+    await act(async () => setLatestRemoteViews(view({ state: 'lost', agentState: undefined })));
+    expect(read()).toBe('Session disconnected');
+  });
+
   it('shows green completion, then orange unread, without auto-reading a reply in the focused pane', async () => {
     await render(); expect(read()).toBe('Working on it…');
     await act(async () => setLatestRemoteViews(view(finish())));
