@@ -1655,7 +1655,7 @@
 .workspace-terminal:hover { background: var(--ui-bg-2); }
 .workspace-terminal__number {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: calc(10px * var(--sidebar-text-scale, 1));
   font-variant-numeric: tabular-nums;
   opacity: .7;
 }
@@ -1690,5 +1690,5 @@
 .workspace-terminal__unread { color: var(--ui-chat-unread); }
 .workspace-terminal__unread {
   flex-shrink: 0;
-  font-size: 9px;
+  font-size: calc(9px * var(--sidebar-text-scale, 1));
 }
