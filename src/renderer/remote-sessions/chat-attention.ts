@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { surfaceAgentState } from '../store/agent-rollup';
 import { useRemoteRegistry } from './registry-cache';
-import { chatIsUnread } from '../../shared/chat-attention';
+import { chatIsUnread, chatStatus } from '../../shared/chat-attention';
 import type { AgentStateName, ChatAttention, ChatAttentionAction, SessionRecord } from '../../shared/remote-host-protocol';
 
 const KEY = 'remotea-chat-attention-v1';
@@ -55,13 +55,27 @@ export function useChatAttention(surfaceId: string) {
   const session = host?.sessions.find(s => s.id === surfaceId);
   const declared = useStore(s => s.agentStates?.[surfaceId]);
   const detected = useStore(s => s.agentDetections?.[surfaceId]);
+  const identity = useStore(s => s.agentIdentities?.[surfaceId]);
   const fallback = surfaceAgentState(declared, detected)?.state;
   const state = chatActivityState(session, fallback);
   const local = useLocalChatAttention(s => s.entries[surfaceId]);
   useEffect(() => { if (!session) observeLocalChat(surfaceId, state); }, [surfaceId, state, !!session]);
   const attention = session ? session.chatAttention : local;
   const device = host?.deviceId ?? 'local';
-  return { host, session, state, attention, unread: chatIsUnread(attention, device) };
+  const unread = chatIsUnread(attention, device);
+  const hasHarness = !!(identity?.kind || detected?.agent || declared?.sessionId || declared?.sessionProvider || session?.agent || session?.eridani);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    if (attention?.kind !== 'finished') return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(4000, Math.max(0, attention.at + 4000 - Date.now())));
+    return () => clearTimeout(timer);
+  }, [attention?.at, attention?.kind]);
+  const justFinished = now >= (attention?.at ?? 0) && now - (attention?.at ?? 0) < 4000;
+  const status = session?.state === 'lost'
+    ? { tone: 'idle', label: 'Session disconnected' }
+    : chatStatus(state, unread, attention?.kind, justFinished, hasHarness);
+  return { host, session, state, attention, unread, status };
 }
 
 export async function actOnChat(surfaceId: string, action: ChatAttentionAction): Promise<{ ok: boolean; error?: string }> {

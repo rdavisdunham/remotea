@@ -497,6 +497,9 @@ export const en = {
   'workspaceRow.backgroundShellsMany': 'Background · {count} shells',
   'workspaceRow.claudeRunning': '{working}/{total} running',
   'workspaceRow.toolCallsTitle': '{count} tool calls in this workspace',
+  'workspaceRow.showTerminals': 'Show terminals ({count})',
+  'workspaceRow.hideTerminals': 'Hide terminals ({count})',
+  'workspaceRow.terminals': 'Terminals',
   'workspaceRow.closeWorkspace': 'Close workspace',
   'workspaceRow.working': 'Working…',
   // Sidebar chrome

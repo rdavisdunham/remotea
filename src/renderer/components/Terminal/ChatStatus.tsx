@@ -1,20 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { actOnChat, markChatRead, useChatAttention } from '../../remote-sessions/chat-attention';
-import { chatStatus } from '../../../shared/chat-attention';
 import ChatReminderDialog from './ChatReminderDialog';
 
 export default function ChatStatus({ surfaceId, active }: { surfaceId: string; active: boolean }) {
-  const { host, session, state, attention, unread } = useChatAttention(surfaceId);
+  const { host, session, attention, unread, status } = useChatAttention(surfaceId);
   const root = useRef<HTMLDivElement>(null);
   const [remind, setRemind] = useState(false);
   const [error, setError] = useState('');
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    setNow(Date.now());
-    if (attention?.kind !== 'finished') return;
-    const timer = setTimeout(() => setNow(Date.now()), Math.min(4000, Math.max(0, attention.at + 4000 - Date.now())));
-    return () => clearTimeout(timer);
-  }, [attention?.at]);
   // A new reply remains unread even in the focused pane until real interaction.
   // Focus switches acknowledge the newly visited chat, not its hidden siblings.
   useEffect(() => { if (active) markChatRead(surfaceId); }, [active, surfaceId]);
@@ -30,7 +22,6 @@ export default function ChatStatus({ surfaceId, active }: { surfaceId: string; a
     pane?.addEventListener('keydown', interact, true);
     return () => { pane?.removeEventListener('pointerdown', interact, true); pane?.removeEventListener('keydown', interact, true); };
   }, [active, surfaceId]);
-  const status = chatStatus(state, unread, attention?.kind, now >= (attention?.at ?? 0) && now - (attention?.at ?? 0) < 4000);
   const change = async () => {
     try {
       const result = await actOnChat(surfaceId, unread ? { action: 'read', revision: attention!.revision } : { action: 'unread' });

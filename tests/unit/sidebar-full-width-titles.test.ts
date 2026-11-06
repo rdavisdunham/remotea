@@ -78,7 +78,7 @@ describe('full-width workspace titles', () => {
     store.setState({ sidebarPrefs: { ...DEFAULT_SIDEBAR_PREFS, fullWidthTitles: true } });
     render();
     expect(classesOf(topLine()!))
-      .toEqual(['workspace-row__state-dot', 'workspace-row__via-ping', 'workspace-row__odometer', 'unread-badge', 'workspace-row__close']);
+      .toEqual(['workspace-row__terminal-toggle', 'workspace-row__state-dot', 'workspace-row__via-ping', 'workspace-row__odometer', 'unread-badge', 'workspace-row__close']);
     expect(topLine()!.querySelector('.workspace-row__odometer')?.textContent).toBe('42');
     expect(topLine()!.querySelector('.unread-badge')?.textContent).toBe('3');
     // The title and the status text each have a line to themselves.
@@ -101,6 +101,6 @@ describe('full-width workspace titles', () => {
       appearancePrefs: { uiMode: 'classic' },
     });
     render(0, {});
-    expect(classesOf(topLine()!)).toEqual(['workspace-row__state-dot', 'workspace-row__close']);
+    expect(classesOf(topLine()!)).toEqual(['workspace-row__terminal-toggle', 'workspace-row__state-dot', 'workspace-row__close']);
   });
 });

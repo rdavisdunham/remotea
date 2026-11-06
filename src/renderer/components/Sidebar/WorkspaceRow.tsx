@@ -12,6 +12,8 @@ import { useRemoteRegistry } from '../../remote-sessions/registry-cache';
 import { useLocalChatAttention } from '../../remote-sessions/chat-attention';
 import { chatIsUnread } from '../../../shared/chat-attention';
 import PrStatusIcon from './PrStatusIcon';
+import WorkspaceTerminals, { terminalSurfaces } from './WorkspaceTerminals';
+import { IconCaret } from '../SplitPane/icons';
 import { traceState, toolChannel } from './trace-signals';
 import { resolveStatusText, statusClassFor, stateDotClassFor, backgroundShellsText, type StatusTextInputs, type T } from './workspace-status';
 import { buildContextLine, sidebarDetails } from './context-line';
@@ -139,6 +141,9 @@ export default function WorkspaceRow({
     return chatIsUnread(host ? host.sessions.find(s => s.id === id)?.chatAttention : localAttention[id], host?.deviceId ?? 'local');
   }).length;
   const [isRenaming, setIsRenaming] = useState(false);
+  const [terminalsExpanded, setTerminalsExpanded] = useState(false);
+  const terminals = useMemo(() => terminalSurfaces(workspace.splitTree), [workspace.splitTree]);
+  const terminalsId = `workspace-terminals-${workspace.id}`;
   // What the row shows: the stored title, or the program's window title while
   // wmux picked the name. A rename starts from it, and counts as one only if
   // the field differs from where it started: the label can change while the
@@ -473,6 +478,26 @@ export default function WorkspaceRow({
     </>
   );
 
+  const terminalToggleLabel = t(
+    terminalsExpanded ? 'workspaceRow.hideTerminals' : 'workspaceRow.showTerminals',
+    terminalsExpanded ? 'Hide terminals ({count})' : 'Show terminals ({count})',
+  ).replace('{count}', String(terminals.length));
+  const terminalToggle = terminals.length > 0 && (
+    <button
+      type="button"
+      className="workspace-row__terminal-toggle"
+      aria-expanded={terminalsExpanded}
+      aria-controls={terminalsId}
+      aria-label={terminalToggleLabel}
+      title={terminalToggleLabel}
+      draggable={false}
+      onClick={(event) => {
+        event.stopPropagation();
+        setTerminalsExpanded(value => !value);
+      }}
+    ><IconCaret size={11} /></button>
+  );
+
   const closeButton = (
     <button
       className="workspace-row__close"
@@ -524,6 +549,7 @@ export default function WorkspaceRow({
 
       {sidebarPrefs.fullWidthTitles && (
         <div className="workspace-row__top-line">
+          {terminalToggle}
           {stateDot}
           {rowBadges}
           {closeButton}
@@ -532,6 +558,7 @@ export default function WorkspaceRow({
 
       {/* Line 1: Title */}
       <div className="workspace-row__header">
+        {!sidebarPrefs.fullWidthTitles && terminalToggle}
         {!sidebarPrefs.fullWidthTitles && stateDot}
         {isRenaming ? (
           <input
@@ -574,6 +601,8 @@ export default function WorkspaceRow({
       <div className={`workspace-row__status ${statusClass}`}>
         {statusText}
       </div>
+
+      {terminalsExpanded && terminals.length > 0 && <WorkspaceTerminals id={terminalsId} workspace={workspace} terminals={terminals} />}
 
       {/* Per-Claude-session sub-lines — one per pane running Claude Code,
           shown as soon as the workspace hosts 2+ sessions (click → focus pane) */}
