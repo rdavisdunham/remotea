@@ -612,7 +612,7 @@ rm -rf .asar-staging build-out /tmp/asar-verify ../wmux-release-staging
 - [ ] wmux-orchestrator plugin copied to release staging
 - [ ] cli-bin + cli-bin-ps copied to release staging (issue #154), and codex-bin + codex-bin-ps (#261)
 - [ ] opencode-plugin, pi-extension and omp-extension copied to release staging (issues #149, #231, PR #298) — `npm test` now derives this from `process.resourcesPath` usage in `src/main/`, so a new runtime resource that isn't in `extraResources` fails the release build
-- [ ] `resources/cli/` holds all eight files — `wmux.js`, `wmux-hook.js`, `transport-deadline.js`, `wsl-network.js`, `wmux-codex.js`, `codex-relay.js`, `codex-session-tracker.js`, `opencode-tui-install.js` — plus `node_modules/ws` (#261; `npm test` derives the package list from the CLI's bare imports too). The CLI is packaged file-by-file, so a shared module has to be listed on its own; `npm test` derives this from the relative imports in `src/cli/`
+- [ ] `resources/cli/` holds all nine files — `wmux.js`, `wmux-hook.js`, `transport-deadline.js`, `transport-retry.js`, `wsl-network.js`, `wmux-codex.js`, `codex-relay.js`, `codex-session-tracker.js`, `opencode-tui-install.js` — plus `node_modules/ws` (#261; `npm test` derives the package list from the CLI's bare imports too). The CLI is packaged file-by-file, so a shared module has to be listed on its own; `npm test` derives this from the relative imports in `src/cli/`
 - [ ] rcedit applied (icon + version metadata) — `{ rcedit }` destructured
 - [ ] `latest.yml` generated (sha512 + size of the final zip) and uploaded as a release asset — electron-updater 404s without it (issue #68)
 - [ ] Zip created and uploaded to GitHub release
