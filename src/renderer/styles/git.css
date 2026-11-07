@@ -335,7 +335,9 @@
 /* The hunks are code: back to the monospaced face the pane no longer sets. */
 .git-diff .diff-hunk { font-family: var(--ui-font-mono); font-size: 12px; }
 .git-diff__header .diff-pane__file-header-path { font-family: var(--ui-font-mono); }
-.git-diff > .diff-hunk { flex-shrink: 0; }
+/* The hunks box keeps its max-content width (diff.css, #441); a column flex item
+   must not shrink, or its rows would be squeezed vertically instead. */
+.git-diff > .diff-hunks { flex-shrink: 0; }
 .git-diff__header { position: sticky; top: 0; z-index: 1; display: flex; gap: 10px; align-items: baseline; }
 .git-diff__subtitle { color: var(--ui-text-muted); font-size: 11px; }
 
