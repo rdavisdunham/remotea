@@ -453,7 +453,7 @@ The host introduction and hidden-session help now distinguish ownership from liv
 
 ### Tea host settings
 
-Tea settings are on each host card under **Tea assistant**. The host persists them in private `tea-state.json` alongside conversation checkpoints and redacted evidence. All connected apps share these values. Saving uses a configuration revision and rejects conflicting edits from another device.
+Tea has a dedicated **Settings → Tea** tab with a host selector and visible provider controls. **Configure Tea** opens that tab for the host selected in the conversation panel. Host cards also expose the same settings under **Tea assistant**. The host persists them in private `tea-state.json` alongside conversation checkpoints and redacted evidence. All connected apps share these values. Saving uses a configuration revision and rejects conflicting edits from another device.
 
 | Setting | Default | Behavior |
 |---|---|---|

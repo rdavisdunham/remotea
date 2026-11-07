@@ -2,11 +2,12 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-const mounted = vi.hoisted(() => ({ integration: vi.fn(), phone: vi.fn(), changelog: vi.fn() }));
+const mounted = vi.hoisted(() => ({ integration: vi.fn(), phone: vi.fn(), changelog: vi.fn(), tea: vi.fn() }));
 vi.mock('../../src/renderer/components/Settings/AgentIntegrationSettings', () => ({ default: () => { mounted.integration(); return createElement('div', null, 'Integration controls'); } }));
 vi.mock('../../src/renderer/components/Settings/RemoteConsoleSettings', () => ({ default: () => { mounted.phone(); return createElement('div', null, 'Phone controls'); } }));
 vi.mock('../../src/renderer/components/Settings/ChangelogSettings', () => ({ default: () => { mounted.changelog(); return createElement('div', null, 'Release history'); } }));
 vi.mock('../../src/renderer/components/Settings/GeneralSettings', () => ({ default: () => createElement('div', null, 'Appearance controls') }));
+vi.mock('../../src/renderer/components/Settings/TeaAssistantSettings', () => ({default:(props:{initialHostId?:string})=>{mounted.tea(props);return createElement('div',null,'Tea API key controls')}}));
 import SettingsWindow from '../../src/renderer/components/Settings/SettingsWindow';
 let cleanup: (() => void) | undefined;
 afterEach(() => { cleanup?.(); cleanup = undefined; vi.clearAllMocks(); });
@@ -54,4 +55,15 @@ it('shows section-owned snapshots and separates host, phone and integration owne
   await act(async () => root.render(createElement(SettingsScope, { section: 'Agents' })));
   expect(container.querySelector('pre')).toBeNull();
   expect(container.textContent).toContain('immediately write or remove integration files');
+});
+
+it('opens the dedicated Tea tab and forwards its host deep link', async () => {
+  const container=document.createElement('div');document.body.append(container);
+  const root=createRoot(container);
+  cleanup=()=>{act(()=>root.unmount());container.remove();};
+  await act(async()=>root.render(createElement(SettingsWindow,{initialTab:'Tea',initialHostId:'selected-host',onClose:vi.fn()})));
+  expect(container.querySelector('.settings-tab--active')?.textContent).toBe('Tea');
+  expect(container.textContent).toContain('Tea API key controls');
+  expect(mounted.tea).toHaveBeenCalledWith(expect.objectContaining({initialHostId:'selected-host'}));
+  expect(mounted.integration).not.toHaveBeenCalled();
 });

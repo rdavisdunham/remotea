@@ -4,7 +4,7 @@ export const SETTINGS_GROUPS = [
   { label: 'General & appearance', sections: ['General', 'Sidebar'] },
   { label: 'Workspaces & launches', sections: ['Workspace', 'Profiles'] },
   { label: 'Terminal & input', sections: ['Terminal', 'Prompts'] },
-  { label: 'Agents & Eridani', sections: ['Agents'] },
+  { label: 'Agents & Eridani', sections: ['Agents', 'Tea'] },
   { label: 'Connections', sections: ['Hosts', 'Remote'] },
   { label: 'Browser & files', sections: ['Browser'] },
   { label: 'Notifications & attention', sections: ['Notifications'] },
@@ -23,7 +23,8 @@ const fieldSections: Record<keyof typeof PREFERENCE_FIELDS, SettingsSection> = {
   KeyboardPrefs: 'Shortcuts',
 };
 const aliases: Partial<Record<SettingsSection, string>> = {
-  Hosts: 'connection ssh server remote host eridani recovery activity tea assistant api provider model summary naming',
+  Hosts: 'connection ssh server remote host eridani recovery activity',
+  Tea: 'tea assistant api key provider connection base url anthropic openai model effort naming names summaries background',
   Remote: 'phone access remote console pairing mobile',
   Agents: 'eridani integration consent hooks detection readiness manual status agent',
   Profiles: 'quick launch profiles commands shell location',

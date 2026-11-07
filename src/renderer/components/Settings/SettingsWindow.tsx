@@ -12,6 +12,7 @@ import HelpSettings from './HelpSettings';
 import ChangelogSettings from './ChangelogSettings';
 import RemoteConsoleSettings from './RemoteConsoleSettings';
 import RemoteHostsSettings from './RemoteHostsSettings';
+import TeaAssistantSettings from './TeaAssistantSettings';
 import { useT, type TranslationKey } from '../../i18n';
 import '../../styles/settings.css';
 import AgentIntegrationSettings from './AgentIntegrationSettings';
@@ -19,11 +20,12 @@ import SettingsScope from './SettingsScope';
 import { SETTINGS_GROUPS, searchSettings } from './settings-navigation';
 
 // Historical section IDs remain valid for callers and deep links.
-const TABS = ['General', 'Hosts', 'Sidebar', 'Workspace', 'Terminal', 'Prompts', 'Notifications', 'Browser', 'Profiles', 'Shortcuts', 'Remote', 'Changelog', 'Help', 'Agents'] as const;
+const TABS = ['General', 'Hosts', 'Sidebar', 'Workspace', 'Terminal', 'Prompts', 'Notifications', 'Browser', 'Profiles', 'Shortcuts', 'Remote', 'Changelog', 'Help', 'Agents', 'Tea'] as const;
 
 // Map each tab to its i18n key (issue #56). Typed as TranslationKey, not
 // string: the lookup is what reaches t(), so the keys are checked here.
 const TAB_LABEL_KEYS: Record<typeof TABS[number], TranslationKey> = {
+  Tea: 'settings.tab.tea',
   Agents: 'settings.integration.section',
   General: 'settings.tab.general',
   Hosts: 'settings.tab.hosts',
@@ -46,9 +48,10 @@ interface SettingsWindowProps {
   onClose: () => void;
   /** The tab to open on. Read once, at mount; the user can switch away freely. */
   initialTab?: SettingsTab;
+  initialHostId?: string;
 }
 
-export default function SettingsWindow({ onClose, initialTab }: SettingsWindowProps) {
+export default function SettingsWindow({ onClose, initialTab, initialHostId }: SettingsWindowProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? 'Terminal');
   const t = useT();
   const [query, setQuery] = useState('');
@@ -115,6 +118,7 @@ export default function SettingsWindow({ onClose, initialTab }: SettingsWindowPr
             )}
             {activeTab === 'General' && <GeneralSettings />}
             {activeTab === 'Hosts' && <RemoteHostsSettings />}
+            {activeTab === 'Tea' && <TeaAssistantSettings initialHostId={initialHostId} onManageHosts={() => setActiveTab('Hosts')}/>}
             {activeTab === 'Sidebar' && <SidebarSettings />}
             {activeTab === 'Workspace' && <WorkspaceSettings />}
             {activeTab === 'Terminal' && <TerminalSettings />}

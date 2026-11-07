@@ -605,11 +605,12 @@ export default function App() {
   focusedPaneIdRef.current = focusedPaneId;
   useEffect(() => setFocusedPaneReader(() => focusedPaneIdRef.current), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Which tab Settings opens on. Only "Manage layouts…" sets one; every other
-  // opener clears it, so they keep opening on the default tab.
+  // Deep links choose a tab and optionally the host whose Tea settings to show.
   const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(undefined);
-  const openSettings = useCallback((tab?: SettingsTab) => {
+  const [settingsHostId, setSettingsHostId] = useState<string | undefined>(undefined);
+  const openSettings = useCallback((tab?: SettingsTab, hostId?: string) => {
     setSettingsTab(tab);
+    setSettingsHostId(hostId);
     setSettingsOpen(true);
   }, []);
   const setSettingsOpenFromShortcut = useCallback((open: boolean) => {
@@ -1710,7 +1711,7 @@ export default function App() {
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {tutorialOpen && <Tutorial onClose={handleTutorialClose} />}
       {hostActivityOpen && <HostActivityDialog onClose={closeHostActivity} onSettings={openSettings} />}
-      {settingsOpen && <SettingsWindow initialTab={settingsTab} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsWindow initialTab={settingsTab} initialHostId={settingsHostId} onClose={() => setSettingsOpen(false)} />}
       <Titlebar
         title={titlebarText}
         sidebarVisible={sidebarVisible}
@@ -1762,6 +1763,7 @@ export default function App() {
             onFocusAgent={focusAgent}
             onOpenAgentNavigator={() => setAgentNavigatorOpen(true)}
             onOpenHostSettings={() => setHostActivityOpen(true)}
+            onOpenTeaSettings={hostId => openSettings('Tea', hostId)}
           />
         ) : (
           <div

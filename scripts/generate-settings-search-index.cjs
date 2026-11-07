@@ -6,6 +6,7 @@ const directory = 'src/renderer/components/Settings/';
 const sections = {
   General: 'GeneralSettings',
   Hosts: 'RemoteHostsSettings',
+  Tea: 'TeaAssistantSettings',
   Sidebar: 'SidebarSettings',
   Workspace: 'WorkspaceSettings',
   Terminal: 'TerminalSettings',

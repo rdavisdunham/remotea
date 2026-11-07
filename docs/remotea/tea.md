@@ -104,7 +104,7 @@ The first live provider verification requires a configured API key. Connection t
 
 ## Setup and operating limits
 
-Tea starts disabled. Configure it in Settings → Remote hosts → Tea assistant, save a connection, discover models and run the selected-model tests. Enable Tea after choosing the models. A provider catalog failure still permits manual model entry. Compatible gateways must support the selected schema and tool contracts to pass validation.
+Tea starts disabled. Configure it in Settings → Tea, choose the host and save a connection, discover models and run the selected-model tests. Enable Tea after choosing the models. A provider catalog failure still permits manual model entry. Compatible gateways must support the selected schema and tool contracts to pass validation.
 
 One conversational loop processes up to twelve queued messages. Each turn has a ten-round limit and each model request has a ninety-second deadline. Explicit continuation gives an interrupted turn a new round budget while preserving saved action receipts. Summary requests have a forty-five-second deadline, use a separate coalesced queue and return bounded title and summary fields. SDK transient retries share the request deadline and happen before application actions execute.
 

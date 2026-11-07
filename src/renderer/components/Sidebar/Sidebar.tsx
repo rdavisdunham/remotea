@@ -57,6 +57,7 @@ interface SidebarProps {
   onOpenAgentNavigator?: () => void;
   /** remotea: open Settings → Remote hosts (the host attention row's "unconfirmed" chip). */
   onOpenHostSettings?: () => void;
+  onOpenTeaSettings?: (hostId?: string) => void;
 }
 
 export default function Sidebar({
@@ -82,6 +83,7 @@ export default function Sidebar({
   onFocusAgent,
   onOpenAgentNavigator,
   onOpenHostSettings,
+  onOpenTeaSettings,
 }: SidebarProps) {
   const t = useT();
   const textScale = useStore((s) => sidebarTextScale(s.sidebarPrefs.textScale));
@@ -466,7 +468,7 @@ export default function Sidebar({
       </div>
 
       <SidebarResizeHandle onWidthChange={handleResizeDelta} />
-      {teaOpen && <React.Suspense fallback={null}><TeaPanel onClose={() => setTeaOpen(false)} onSettings={onOpenHostSettings}/></React.Suspense>}
+      {teaOpen && <React.Suspense fallback={null}><TeaPanel onClose={() => setTeaOpen(false)} onSettings={onOpenTeaSettings}/></React.Suspense>}
 
       {contextMenu && (
         <WorkspaceContextMenu

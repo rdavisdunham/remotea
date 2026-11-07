@@ -24,9 +24,11 @@ function draftOf(state: TeaState): TeaConfigurationInput {
 export default function TeaSettings({
   hostId,
   connected,
+  expanded = false,
 }: {
   hostId: string;
   connected: boolean;
+  expanded?: boolean;
 }) {
   const host = useRemoteRegistry((state) =>
     state.views?.find((view) => view.hostId === hostId),
@@ -188,9 +190,10 @@ export default function TeaSettings({
       </fieldset>
     );
   };
+  const Container = expanded ? 'section' : 'details';
   return (
-    <details className="tea-settings">
-      <summary>Tea assistant</summary>
+    <Container className="tea-settings">
+      {!expanded && <summary>Tea assistant</summary>}
       <p className="settings-hint">
         Shared by Remotea apps connected to this host. The host stores
         credentials and runs Tea.
@@ -415,6 +418,6 @@ export default function TeaSettings({
           Settings changed on another device. Reload before saving your changes.
         </p>
       )}
-    </details>
+    </Container>
   );
 }

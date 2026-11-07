@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TeaSettings from '../../src/renderer/components/Settings/TeaSettings';
 import TeaPanel from '../../src/renderer/components/Tea/TeaPanel';
+import TeaAssistantSettings from '../../src/renderer/components/Settings/TeaAssistantSettings';
 import { setLatestRemoteViews } from '../../src/renderer/remote-sessions/registry-cache';
 import { useRemoteHosts } from '../../src/renderer/remote-sessions/status';
 import type { RemoteRegistryView } from '../../src/shared/remote-hosts-types';
@@ -90,6 +91,8 @@ beforeEach(() => {
   setLatestRemoteViews([view()]);
   useRemoteHosts.setState({
     loaded: true,
+    loadError: false,
+    status: { desk: { hostId: 'desk', state: 'ready', attempt: 0 } },
     hosts: {
       desk: {
         id: 'desk',
@@ -177,7 +180,89 @@ describe('Tea provider settings', () => {
   });
 });
 
+describe('Tea settings discovery', () => {
+  it('shows provider and key controls immediately on the Tea page', () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaAssistantSettings, { onManageHosts: vi.fn() }),
+      ),
+    );
+    expect(container.querySelector('input[type=password]')).not.toBeNull();
+    expect(container.querySelector('.tea-settings')?.tagName).toBe('SECTION');
+    expect(container.querySelector('.tea-settings > summary')).toBeNull();
+    expect(container.textContent).toContain('API keys');
+  });
+
+  it('opens the requested host and keeps credential drafts scoped to that host', () => {
+    const hosts = useRemoteHosts.getState().hosts;
+    useRemoteHosts.setState({
+      hosts: {
+        ...hosts,
+        laptop: { ...hosts.desk, id: 'laptop', name: 'Laptop' },
+      },
+      status: {
+        ...useRemoteHosts.getState().status,
+        laptop: { hostId: 'laptop', state: 'ready', attempt: 0 },
+      },
+    });
+    setLatestRemoteViews([view(), { ...view(), hostId: 'laptop' }]);
+    act(() =>
+      root.render(
+        React.createElement(TeaAssistantSettings, {
+          initialHostId: 'laptop',
+          onManageHosts: vi.fn(),
+        }),
+      ),
+    );
+    const selector =
+      container.querySelector<HTMLSelectElement>('#tea-settings-host')!;
+    expect(selector.value).toBe('laptop');
+    input(
+      container.querySelector<HTMLInputElement>('input[type=password]')!,
+      'synthetic-unsaved-key',
+    );
+    act(() => {
+      selector.value = 'desk';
+      selector.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(selector.value).toBe('desk');
+    expect(
+      container.querySelector<HTMLInputElement>('input[type=password]')?.value,
+    ).toBe('');
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('offers host management and disables edits when disconnected', () => {
+    useRemoteHosts.setState({
+      status: { desk: { hostId: 'desk', state: 'reconnecting', attempt: 1 } },
+    });
+    const manage = vi.fn();
+    act(() =>
+      root.render(
+        React.createElement(TeaAssistantSettings, { onManageHosts: manage }),
+      ),
+    );
+    expect(container.textContent).toContain('Connect to this host');
+    expect(container.querySelector('fieldset[disabled]')).not.toBeNull();
+    act(() => button('Manage remote hosts').click());
+    expect(manage).toHaveBeenCalledOnce();
+  });
+});
+
 describe('Tea conversation panel', () => {
+  it('opens Tea settings for the currently selected host', async () => {
+    const close = vi.fn(),
+      settings = vi.fn();
+    act(() =>
+      root.render(
+        React.createElement(TeaPanel, { onClose: close, onSettings: settings }),
+      ),
+    );
+    await act(async () => button('Configure Tea').click());
+    expect(close).toHaveBeenCalledOnce();
+    expect(settings).toHaveBeenCalledExactlyOnceWith('desk');
+  });
+
   it('explains why sending is unavailable before model validation', () => {
     const tea = state();
     tea.modelChecks.chat = false;

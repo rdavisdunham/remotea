@@ -3,6 +3,7 @@ import { useStore } from '../../store';
 import type { SettingsSection } from './settings-navigation';
 
 const SECTION_SCOPE_KEYS: Record<SettingsSection, TranslationKey> = {
+  Tea: 'settings.alignment.scope.Tea',
   General: 'settings.alignment.scope.General',
   Sidebar: 'settings.alignment.scope.Sidebar',
   Workspace: 'settings.alignment.scope.Workspace',
