@@ -114,6 +114,8 @@ export type LinkCap =
   | 'terminal.focus'
   // The host takes `ci.status`: GitHub CI's view of a run's pull request (gh pr view/checks, failed-job log tails).
   | 'ci.status'
+  // The host takes `pr.merge` and `pr.update_branch`: Eridani's Merge and Update branch buttons, done with its gh.
+  | 'pr.merge' | 'pr.update_branch'
   | 'run.cleanup'
   | 'run.cleanup.handoff'
   | 'input.direct' | 'output.live'
@@ -141,7 +143,7 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
 /** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus` and the `doctor` summary. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status']);
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status', 'pr.merge', 'pr.update_branch']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -1006,7 +1008,8 @@ export interface WorktreesScanCommand extends OpFields {
 /**
  * GitHub CI's view of the run's pull request, read with the host's logged-in
  * `gh` in the branch's worktree (Eridani's "CI as the final verification"):
- * `executed` with `result` = `{pr: {number, url, head_sha, state} | null,
+ * `executed` with `result` = `{pr: {number, url, head_sha, state, base, draft,
+ * mergeable, merge_state} | null,
  * checks: [{name, state, bucket, link, workflow, startedAt?, completedAt?}],
  * failed_logs: [{name, link, lines}], worktree_head}`. `log_lines` (0..200)
  * asks for the last lines of each failed Actions job's `--log-failed`, secrets
@@ -1020,6 +1023,50 @@ export interface CiStatusCommand extends OpFields {
   branch: string;
   turn_seq?: number | null;
   log_lines?: number;
+  /** The host's execution target id: its repository answers once the run's worktree is gone (a settled run). */
+  target?: string | null;
+  expires_at: number | string;
+}
+
+/**
+ * Merge the run's pull request (Eridani's Merge button, or auto-merge), with
+ * the host's logged-in `gh`, only if its head is still `head_sha` (the commit
+ * Eridani saw CI pass on): `executed` with `result` = `{merged: true, already,
+ * pr, merge_commit?}` (an already merged pull request is a success, so a retry
+ * is safe); `rejected` with `detail` = the reason (`behind`, `conflicts`,
+ * `head_moved`, `blocked`, `draft`, `not_open`, `no_pr`, `permission`) and
+ * `result` = `{reason, message, pr}`; `failed` when `gh` is missing or logged
+ * out or the repository is not on this host. `target` (the host's execution
+ * target id) finds the repository once the run's worktree is gone. Effectful
+ * but short-lived: `expires_at` is required, so a click never lands hours
+ * later.
+ */
+export interface PrMergeCommand extends OpFields {
+  t: 'pr.merge';
+  run_id: string;
+  generation: number;
+  branch: string;
+  head_sha: string;
+  target?: string | null;
+  origin?: 'human' | 'automation';
+  expires_at: number | string;
+}
+
+/**
+ * GitHub's "Update branch" on the run's pull request (its base merged into
+ * the head, on GitHub's side), only if the head is still `head_sha`; then the
+ * clean worktree is fast-forwarded to the new head. `executed` with `result`
+ * = `{updated: true, pr_number, base, new_head_sha (null if GitHub had not
+ * made it yet), worktree_synced}`; `rejected` like `pr.merge`.
+ */
+export interface PrUpdateBranchCommand extends OpFields {
+  t: 'pr.update_branch';
+  run_id: string;
+  generation: number;
+  branch: string;
+  head_sha: string;
+  target?: string | null;
+  origin?: 'human' | 'automation';
   expires_at: number | string;
 }
 
@@ -1391,6 +1438,16 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       if (!isStr(m.branch, 200) || !/^(?!-)[A-Za-z0-9._/-]+$/.test(m.branch) || m.branch.includes('..')) return 'bad branch';
       if (m.turn_seq !== undefined && m.turn_seq !== null && !isInt(m.turn_seq)) return 'bad turn_seq';
       if (m.log_lines !== undefined && !(isInt(m.log_lines) && m.log_lines >= 0 && m.log_lines <= 200)) return 'bad log_lines';
+      if (m.target !== undefined && m.target !== null && !(isStr(m.target, 64) && /^[A-Za-z0-9._-]+$/.test(m.target))) return 'bad target';
+      return null;
+    case 'pr.merge':
+    case 'pr.update_branch':
+      // Effectful but short-lived: a click nobody waits for any more is refused.
+      if (m.expires_at === undefined) return 'expires_at required';
+      if (!isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
+      if (!isStr(m.branch, 200) || !/^(?!-)[A-Za-z0-9._/-]+$/.test(m.branch) || m.branch.includes('..')) return 'bad branch';
+      if (typeof m.head_sha !== 'string' || !/^[0-9a-f]{40}$/.test(m.head_sha)) return 'bad head_sha';
+      if (m.target !== undefined && m.target !== null && !(isStr(m.target, 64) && /^[A-Za-z0-9._-]+$/.test(m.target))) return 'bad target';
       return null;
     case 'worktrees.scan':
       // Not effectful, but short-lived (2 min): a scan nobody waits for any more is refused.

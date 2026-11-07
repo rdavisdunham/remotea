@@ -4,7 +4,9 @@
  * asks the host while a run waits for CI and polls every 2 minutes.
  *
  * Read-only, in the run's worktree (or the target's repository when the worktree is gone), no shell:
- *   1. `gh pr view <branch> --json number,url,headRefOid,state`        → `pr` (null: no pull request)
+ *   1. `gh pr view <branch> --json number,url,headRefOid,state,baseRefName,isDraft,mergeable,mergeStateStatus`
+ *      → `pr` (null: no pull request), with whether GitHub would merge it now (`merge_state`: CLEAN, BEHIND,
+ *      DIRTY, BLOCKED, UNSTABLE, DRAFT, HAS_HOOKS, UNKNOWN) so Eridani can offer Merge or Update branch
  *   2. `gh pr checks <branch> --json name,state,bucket,link,workflow,startedAt,completedAt` → `checks`
  *      (exit 1 "a check failed" and 8 "some are pending" still print the JSON; "no checks reported" → [])
  *   3. for each failed check that is a GitHub Actions job (at most MAX_LOGS), when `log_lines` > 0:
@@ -48,8 +50,20 @@ export interface CiCheck {
   startedAt?: string;
   completedAt?: string;
 }
+export interface CiPr {
+  number: number;
+  url: string;
+  head_sha: string;
+  /** OPEN, MERGED or CLOSED. */
+  state: string;
+  base: string;
+  draft: boolean;
+  /** MERGEABLE, CONFLICTING or UNKNOWN (GitHub computes it lazily: UNKNOWN right after a push). */
+  mergeable: string;
+  merge_state: string;
+}
 export interface CiStatusResult {
-  pr: { number: number; url: string; head_sha: string; state: string } | null;
+  pr: CiPr | null;
   checks: CiCheck[];
   failed_logs: Array<{ name: string; link: string; lines: string[] }>;
   worktree_head: string | null;
@@ -75,15 +89,37 @@ export function branchOk(branch: unknown): branch is string {
  * Where to ask: the branch's managed worktree under a target's worktreeRoot (`<root>/<branchDir>`), else a
  * live folder the caller knows for the run, else null.
  */
-export function ciFolder(targets: ExecutionTarget[], branch: string, runCwd?: string | null): string | null {
+export function ciFolder(targets: ExecutionTarget[], branch: string, runCwd?: string | null, targetId?: string | null): string | null {
   for (const t of targets) {
     const dir = path.join(t.worktreeRoot, branchDir(branch));
     if (fs.existsSync(dir)) return dir;
   }
-  return runCwd && fs.existsSync(runCwd) ? runCwd : null;
+  if (runCwd && fs.existsSync(runCwd)) return runCwd;
+  // The worktree is gone (the run was cleaned up): gh only needs a clone of the same repository.
+  const target = targetId ? targets.find((t) => t.id === targetId) : undefined;
+  return target && fs.existsSync(target.repo) ? target.repo : null;
 }
 
-function firstLine(text: string): string {
+export const PR_FIELDS = 'number,url,headRefOid,state,baseRefName,isDraft,mergeable,mergeStateStatus';
+
+/** `gh pr view <ref> --json PR_FIELDS`: the pull request, null when there is none, else a CiStatusError. */
+export async function viewPr(exec: Exec, gh: string, ref: string, cwd: string): Promise<CiPr | null> {
+  const view = await exec(gh, ['pr', 'view', ref, '--json', PR_FIELDS], cwd);
+  if (view.missing) throw new CiStatusError('gh is not installed on this host (or not on the service PATH)');
+  if (view.code !== 0) {
+    if (/no (?:open )?pull requests? found/i.test(view.stderr)) return null;
+    throw new CiStatusError(`gh pr view: ${firstLine(view.stderr) || `exit ${view.code}`}`);
+  }
+  const p = json<Record<string, unknown>>(view.stdout);
+  if (!p || typeof p.number !== 'number') throw new CiStatusError('gh pr view: unreadable output');
+  return {
+    number: p.number, url: String(p.url ?? ''), head_sha: String(p.headRefOid ?? ''), state: String(p.state ?? ''),
+    base: String(p.baseRefName ?? ''), draft: p.isDraft === true, mergeable: String(p.mergeable ?? ''),
+    merge_state: String(p.mergeStateStatus ?? ''),
+  };
+}
+
+export function firstLine(text: string): string {
   return redact(text.trim().split('\n')[0] ?? '').slice(0, 200);
 }
 
@@ -115,16 +151,7 @@ export async function ciStatus(o: { cwd: string; branch: string; logLines: numbe
   const gh = o.gh ?? 'gh';
   if (!branchOk(o.branch)) throw new CiStatusError('bad branch');
 
-  const view = await exec(gh, ['pr', 'view', o.branch, '--json', 'number,url,headRefOid,state'], o.cwd);
-  if (view.missing) throw new CiStatusError('gh is not installed on this host (or not on the service PATH)');
-  let pr: CiStatusResult['pr'] = null;
-  if (view.code === 0) {
-    const p = json<{ number?: number; url?: string; headRefOid?: string; state?: string }>(view.stdout);
-    if (!p || typeof p.number !== 'number') throw new CiStatusError('gh pr view: unreadable output');
-    pr = { number: p.number, url: String(p.url ?? ''), head_sha: String(p.headRefOid ?? ''), state: String(p.state ?? '') };
-  } else if (!/no (?:open )?pull requests? found/i.test(view.stderr)) {
-    throw new CiStatusError(`gh pr view: ${firstLine(view.stderr) || `exit ${view.code}`}`);
-  }
+  const pr = await viewPr(exec, gh, o.branch, o.cwd);
 
   let checks: CiCheck[] = [];
   if (pr) {

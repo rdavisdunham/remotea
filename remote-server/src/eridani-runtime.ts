@@ -33,6 +33,10 @@
  *   - `ci.status` (GitHub CI as the run's final verification): `gh pr view`,
  *     `gh pr checks` and failed-job log tails (redacted) for the run's branch,
  *     plus the worktree's HEAD, read with this host's `gh` (ci-status.ts).
+ *   - `pr.merge` / `pr.update_branch` (Eridani's Merge and Update branch):
+ *     `gh pr merge --match-head-commit` and GitHub's update-branch API, with
+ *     this host's `gh` (pr-actions.ts). Journaled; a restart mid-way reports
+ *     `uncertain` and Eridani reads the pull request again.
  *   - `terminal.focus` (Eridani's "Open terminal in remotea"): the hub asks
  *     every connected app that understands `focus` to bring the run's tab to
  *     the front. `executed` when at least one app was told, `rejected`
@@ -64,6 +68,8 @@ import {
   type WorktreeReport,
   type WorktreesScanCommand,
   type CiStatusCommand,
+  type PrMergeCommand,
+  type PrUpdateBranchCommand,
 } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
@@ -87,6 +93,8 @@ import { ContextService } from './context';
 import { sameWorktreeState, WorktreeManager, worktreeStateOf, writersByPath } from './worktrees';
 import { loadTargets } from './eridani-targets';
 import { ciFolder, ciStatus, CiStatusError, type Exec } from './ci-status';
+import { prMerge, prUpdateBranch } from './pr-actions';
+import { branchDir } from './worktrees';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
 import { runPrepare, templateStatus, withTemplate } from './target-template';
@@ -149,6 +157,8 @@ export interface EridaniRuntimeDeps {
   hookPaths?: { cliDir: string; sourceDir: string };
   /** The service environment verify readiness is checked against (default: process.env). */
   verifyEnv?: NodeJS.ProcessEnv;
+  /** Tests: how `pr.update_branch` waits for GitHub's new head (default: setTimeout). */
+  prSleep?: (ms: number) => Promise<void>;
   /** Tests: how `ci.status` runs `gh` and `git` (default: execFile, no shell). */
   ciExec?: Exec;
   /**
@@ -444,11 +454,16 @@ export class EridaniRuntime {
         'worktrees.scan': (c, ctx) => this.scanCommand(c, ctx),
         'terminal.focus': async (c, ctx) => this.focusCommand(c, ctx),
         'ci.status': (c, ctx) => this.ciCommand(c, ctx),
+        'pr.merge': (c, ctx) => this.prCommand(c, ctx),
+        'pr.update_branch': (c, ctx) => this.prCommand(c, ctx),
       },
       precheck: (cmd) => this.dispatch.precheck(cmd),
       // A scan (or a focus) cut off by a restart already did whatever it did; Eridani's wait bounds it.
       recover: (rec) => (rec.t === 'worktrees.scan' || rec.t === 'terminal.focus' || rec.t === 'ci.status'
         ? { state: 'failed', detail: 'interrupted by a server restart' }
+        // A merge or update cut off mid-way may have happened on GitHub: Eridani reads the pull request again.
+        : rec.t === 'pr.merge' || rec.t === 'pr.update_branch'
+        ? { state: 'uncertain', detail: 'interrupted by a server restart' }
         : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
       caps: () => !Object.values(this.harnesses()).some((h) => h?.managed) ? linkCaps(mode) : [...linkCaps(mode), 'managed.sessions', 'input.direct', 'output.live', 'decisions.durable', 'commands.durable', 'role.options', 'run.pause', 'activity', 'model_catalog'],
@@ -740,7 +755,7 @@ export class EridaniRuntime {
   private async ciCommand(cmd: CommandBody, ctx: CommandContext): Promise<CommandResult> {
     const c = cmd as unknown as CiStatusCommand;
     const bound = this.deps.registry.sessions().find((s) => s.eridani?.runId === c.run_id && s.state !== 'exited');
-    const cwd = ciFolder(loadTargets(this.deps.dir), c.branch, bound ? (bound.lastCwd ?? bound.cwd) : null);
+    const cwd = ciFolder(loadTargets(this.deps.dir), c.branch, bound ? (bound.lastCwd ?? bound.cwd) : null, c.target ?? null);
     if (!cwd) return { state: 'failed', detail: `no worktree for ${c.branch} on this host` };
     ctx.begin();
     try {
@@ -748,6 +763,29 @@ export class EridaniRuntime {
       return { state: 'executed', result: result as unknown as Record<string, unknown> };
     } catch (err) {
       const msg = err instanceof CiStatusError ? err.message : `ci status failed: ${(err as Error)?.message ?? String(err)}`;
+      return { state: 'failed', detail: msg.slice(0, ERIDANI_LIMITS.reasonChars) };
+    }
+  }
+
+  /**
+   * `pr.merge` / `pr.update_branch`: Eridani's Merge and Update branch, with
+   * this host's `gh` (pr-actions.ts), in the branch's worktree, else a live
+   * session's folder, else the target's repository.
+   */
+  private async prCommand(cmd: CommandBody, ctx: CommandContext): Promise<CommandResult> {
+    const c = cmd as unknown as PrMergeCommand | PrUpdateBranchCommand;
+    const targets = loadTargets(this.deps.dir);
+    const bound = this.deps.registry.sessions().find((s) => s.eridani?.runId === c.run_id && s.state !== 'exited');
+    const cwd = ciFolder(targets, c.branch, bound ? (bound.lastCwd ?? bound.cwd) : null, c.target ?? null);
+    if (!cwd) return { state: 'failed', detail: `no clone of the repository for ${c.branch} on this host` };
+    const worktree = targets.map((t) => path.join(t.worktreeRoot, branchDir(c.branch))).find((d) => fs.existsSync(d)) ?? null;
+    ctx.begin();
+    try {
+      const o = { cwd, branch: c.branch, headSha: c.head_sha, exec: this.deps.ciExec };
+      const r = c.t === 'pr.merge' ? await prMerge(o) : await prUpdateBranch({ ...o, worktree, sleep: this.deps.prSleep });
+      return { state: r.state, ...(r.detail ? { detail: r.detail } : {}), result: r.result };
+    } catch (err) {
+      const msg = err instanceof CiStatusError ? err.message : `${c.t} failed: ${(err as Error)?.message ?? String(err)}`;
       return { state: 'failed', detail: msg.slice(0, ERIDANI_LIMITS.reasonChars) };
     }
   }
