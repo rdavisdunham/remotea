@@ -26,7 +26,7 @@ function TerminalRow({ workspace, surface, index, oscTitle }: {
   const insight = !session?.agent || session.tea?.source === `${session.agent.provider}:${session.agent.sessionId}` ? session?.tea : undefined;
   const summary = host?.tea?.config.summaries === false ? undefined : insight?.summary || (host?.tea?.config.enabled && !session?.agent ? `Shell in ${session?.lastCwd || session?.cwd || surface.cwd || 'its current directory'}` : undefined);
   const stale = !!insight && insight.version !== session?.teaSourceVersion;
-  const detail = [label, summary, stale ? 'Summary is waiting for an update' : undefined, insight ? `Summary generated ${new Date(insight.generatedAt).toLocaleString()}` : undefined, statusLabel, session?.agentState?.reason, surface.currentCwd || surface.cwd].filter(Boolean).join('\n');
+  const detail = [label, summary, stale ? 'New exchanges since this summary' : undefined, insight ? `Summary generated ${new Date(insight.generatedAt).toLocaleString()}` : undefined, statusLabel, session?.agentState?.reason, surface.currentCwd || surface.cwd].filter(Boolean).join('\n');
   return <button
     type="button"
     className="workspace-terminal"
@@ -43,7 +43,7 @@ function TerminalRow({ workspace, surface, index, oscTitle }: {
     <span className="workspace-terminal__number">{index + 1}</span>
     <span className="workspace-terminal__content">
       <span className="workspace-terminal__name">{label}</span>
-      {summary && <span className="workspace-terminal__summary">{summary}{stale ? ' · updating' : ''}</span>}
+      {summary && <span className="workspace-terminal__summary">{summary}{stale ? ' · recent activity' : ''}</span>}
       <span className="workspace-terminal__status">{statusLabel}</span>
     </span>
     {unread && <span className="workspace-terminal__unread" role="img" aria-label="Unread">●</span>}

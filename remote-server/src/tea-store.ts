@@ -13,12 +13,26 @@ import type {
 import { writePrivate } from './eridani-mcp';
 import type { TeaCall, TeaCompletion } from './tea-provider';
 
+export interface TeaExchange {
+  id: string;
+  at: number;
+  prompt: string;
+  reply: string;
+}
 export interface TeaEvidence {
   source: string;
   version: string;
   sourceAt: number;
   prompt: string;
   reply: string;
+  /** Latest ten root exchanges, retained between background updates. */
+  recent?: TeaExchange[];
+  /** Source-local completed exchange count. Older saved evidence starts at one. */
+  exchanges?: number;
+  /** Distilled context carried forward by the background model. */
+  memory?: string;
+  /** Count covered by memory. New captures can arrive during generation. */
+  summarizedExchanges?: number;
 }
 export interface TeaCallReceipt extends TeaCall {
   fence: string;

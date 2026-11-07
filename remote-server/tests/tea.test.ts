@@ -11,6 +11,7 @@ import { Collector } from '../src/collector/collector';
 import type { TeaCompletion, TeaProviderRequest } from '../src/tea-provider';
 import type { TeaConfigurationInput } from '../../src/shared/tea';
 import { FakeConn, fakeSpawner } from './helpers';
+import type { TurnFields } from '../src/turn-capture';
 
 const device = 'device-one';
 const configuration = (): TeaConfigurationInput => ({
@@ -63,9 +64,9 @@ afterEach(() => {
 function setup(
   onChat: (request: TeaProviderRequest) => Promise<TeaCompletion> = async () =>
     completion('Ready'),
-  onSummary: () => Promise<TeaCompletion> = async () =>
+  onSummary: (request: TeaProviderRequest) => Promise<TeaCompletion> = async () =>
     completion(
-      '{"title":"Fix login","summary":"Investigating login settings."}',
+      '{"title":"Fix login","summary":"Investigating login settings.","memory":"The fixture concerns saved login settings. Preserve the chosen credentials behavior and verify the pending sign-in change."}',
     ),
 ) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-tea-test-'));
@@ -111,8 +112,8 @@ function setup(
         return JSON.stringify(request.history).includes(
           'untrusted_terminal_context',
         )
-          ? onSummary()
-          : completion('{"title":"Fixture","summary":"A capability check."}');
+          ? onSummary(request)
+          : completion('{"title":"Fixture","summary":"A capability check.","memory":"The fixture concerns saved login settings. Preserve the chosen credentials behavior and verify the pending sign-in change."}');
       return onChat(request);
     },
   });
@@ -135,6 +136,224 @@ async function ready(tea: Tea) {
   ).toBe(true);
   expect((await tea.request({ action: 'testModels' }, device)).ok).toBe(true);
 }
+
+function capturedExchange(seq: number, patch: Partial<TurnFields> = {}): TurnFields {
+  return {
+    surf: 'surf-test', incarnation: 0, run_id: null, generation: 0,
+    provider: 'claude', tool: 'claude_code', provider_session_id: 'conversation',
+    provider_turn_id: `fixture-turn-${seq}`, root: true, seq,
+    prompt: `Fixture question ${seq}`, text: `Fixture answer ${seq}`,
+    truncated: false, missing: false, source: 'hook', ended_at: seq,
+    ...patch,
+  };
+}
+
+function summaryContext(request: TeaProviderRequest) {
+  return JSON.parse((request.history[0] as { content: string }).content)
+    .untrusted_terminal_context as {
+      previous_memory: string;
+      recent_exchanges: Array<{ id: string; prompt: string; reply: string }>;
+    };
+}
+
+function insight(memory = 'Preserve the original saffron decision and verify the latest fixture changes.') {
+  return completion(JSON.stringify({ title: 'Fixture work', summary: 'Reviewing fixture changes.', memory }));
+}
+
+describe('Tea rolling memory', () => {
+  it('makes one initial summary, then batches ten exchanges and searches both memory and recent context', async () => {
+    const summarize = vi.fn(async (_request: TeaProviderRequest) => insight());
+    const { tea, registry, hub } = setup(undefined, summarize);
+    await ready(tea);
+    tea.capture(capturedExchange(1, { prompt: 'Choose saffron for the original fixture.' }));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test']?.memory).toContain('saffron'));
+    for (let seq = 2; seq <= 10; seq++) tea.capture(capturedExchange(seq));
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(summarize).toHaveBeenCalledTimes(1);
+    expect(tea.state().backgroundPending).toBe(0);
+    tea.capture(capturedExchange(11));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(11));
+    expect(summarize).toHaveBeenCalledTimes(2);
+    const context = summaryContext(summarize.mock.calls[1][0]);
+    expect(context.previous_memory).toContain('saffron');
+    expect(context.recent_exchanges).toHaveLength(10);
+    expect(context.recent_exchanges[0].prompt).toBe('Fixture question 2');
+    expect(context.recent_exchanges.at(-1)?.reply).toBe('Fixture answer 11');
+    const tools = new TeaTools({
+      registry, attention: hub.chatAttention,
+      evidence: () => tea.store.data.evidence, messages: () => [],
+      publishSession: () => {}, publishGroup: () => {}, focus: () => 0,
+      refresh: () => {}, now: Date.now, safe: (text) => text,
+    });
+    const search = (query: string) => tools.execute({
+      id: 'search-fixture', name: 'search_terminals', input: { query },
+    }, device, '') as { terminals: Array<{ id: string }> };
+    expect(search('saffron').terminals.map((terminal) => terminal.id)).toEqual(['surf-test']);
+    expect(search('question 2').terminals.map((terminal) => terminal.id)).toEqual(['surf-test']);
+    const read = tools.execute({ id: 'read-fixture', name: 'read_terminal', input: { terminal_id: 'surf-test' } }, device, '') as {
+      untrusted_terminal_context: { memory: string; recent: unknown[] };
+    };
+    expect(read.untrusted_terminal_context.memory).toContain('saffron');
+    expect(read.untrusted_terminal_context.recent).toHaveLength(10);
+  });
+
+  it('counts distinct root replies with identical wording and ignores duplicate and synthetic events', async () => {
+    const summarize = vi.fn(async (_request: TeaProviderRequest) => insight());
+    const { tea } = setup(undefined, summarize);
+    await ready(tea);
+    const repeated = { prompt: 'Continue the fixture.', text: 'The fixture is progressing.' };
+    tea.capture(capturedExchange(1, repeated));
+    tea.capture(capturedExchange(1, repeated));
+    tea.capture(capturedExchange(3, { ...repeated, synthetic: true }));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test']?.summarizedExchanges).toBe(1));
+    tea.capture(capturedExchange(2, { ...repeated, interim: true }));
+    for (let seq = 2; seq <= 11; seq++) tea.capture(capturedExchange(seq, repeated));
+    tea.observe('surf-test', 'claude:conversation', repeated.prompt, repeated.text, 11);
+    tea.capture(capturedExchange(4, repeated));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(11));
+    expect(tea.store.data.evidence['surf-test'].exchanges).toBe(11);
+    expect(summarize).toHaveBeenCalledTimes(2);
+  });
+
+  it('persists the memory and batch count, and resumes a due batch after restart', async () => {
+    const summarize = vi.fn(async (_request: TeaProviderRequest) => insight());
+    const { tea, create } = setup(undefined, summarize);
+    await ready(tea);
+    tea.capture(capturedExchange(1));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test']?.summarizedExchanges).toBe(1));
+    for (let seq = 2; seq <= 10; seq++) tea.capture(capturedExchange(seq));
+    tea.stop();
+    const restored = create();
+    restored.start();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(summarize).toHaveBeenCalledTimes(1);
+    expect(restored.store.data.evidence['surf-test'].recent).toHaveLength(10);
+    restored.capture(capturedExchange(11));
+    restored.stop();
+    const due = create();
+    due.start();
+    await vi.waitFor(() => expect(due.store.data.evidence['surf-test'].summarizedExchanges).toBe(11));
+    expect(summarize).toHaveBeenCalledTimes(2);
+    expect(summaryContext(summarize.mock.calls[1][0]).previous_memory).toContain('saffron');
+  });
+
+  it('keeps exchanges arriving during generation in the next batch', async () => {
+    const releases: Array<(value: TeaCompletion) => void> = [];
+    const summarize = vi.fn((_request: TeaProviderRequest) => new Promise<TeaCompletion>((resolve) => releases.push(resolve)));
+    const { tea } = setup(undefined, summarize);
+    await ready(tea);
+    tea.capture(capturedExchange(1));
+    await vi.waitFor(() => expect(summarize).toHaveBeenCalledTimes(1));
+    for (let seq = 2; seq <= 10; seq++) tea.capture(capturedExchange(seq));
+    releases[0](insight());
+    await vi.waitFor(() => expect(tea.state().backgroundPending).toBe(0));
+    expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(1);
+    expect(tea.store.data.evidence['surf-test'].exchanges).toBe(10);
+    expect(summarize).toHaveBeenCalledTimes(1);
+    tea.capture(capturedExchange(11));
+    await vi.waitFor(() => expect(summarize).toHaveBeenCalledTimes(2));
+    expect(summaryContext(summarize.mock.calls[1][0]).recent_exchanges).toHaveLength(10);
+    releases[1](insight('The saffron decision remains valid after the next ten exchanges.'));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(11));
+  });
+
+  it('preserves memory and the unsummarized batch after a provider error, then supports manual refresh', async () => {
+    const summarize = vi.fn(async (_request: TeaProviderRequest) => insight());
+    const { tea } = setup(undefined, summarize);
+    await ready(tea);
+    tea.capture(capturedExchange(1));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test']?.summarizedExchanges).toBe(1));
+    summarize.mockRejectedValueOnce(new Error('Synthetic provider disconnect'));
+    for (let seq = 2; seq <= 11; seq++) tea.capture(capturedExchange(seq));
+    await vi.waitFor(() => expect(tea.state().backgroundError).toBeTruthy());
+    expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(1);
+    expect(tea.store.data.evidence['surf-test'].memory).toContain('saffron');
+    expect(tea.store.data.evidence['surf-test'].recent).toHaveLength(10);
+    await tea.request({ action: 'refresh', terminalId: 'surf-test' }, device);
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(11));
+    expect(summarize).toHaveBeenCalledTimes(3);
+    expect(summaryContext(summarize.mock.calls[2][0]).previous_memory).toContain('saffron');
+    expect(tea.state().backgroundError).toBeUndefined();
+  });
+
+  it('seeds older saved evidence from its existing display summary', async () => {
+    const summarize = vi.fn(async (_request: TeaProviderRequest) => insight());
+    const { tea, registry, create } = setup(undefined, summarize);
+    await ready(tea);
+    tea.store.data.evidence['surf-test'] = {
+      source: 'claude:conversation', version: 'legacy-version', sourceAt: 1,
+      prompt: 'Original fixture prompt', reply: 'Original fixture reply',
+    };
+    registry.updateSession('surf-test', { tea: {
+      title: 'Original fixture', summary: 'Preserve the original saffron choice.',
+      source: 'claude:conversation', version: 'legacy-version', sourceAt: 1, generatedAt: 1,
+    } });
+    registry.saveNow();
+    tea.store.save();
+    tea.stop();
+    const restored = create();
+    restored.start();
+    await vi.waitFor(() => expect(restored.store.data.evidence['surf-test'].memory).toBeTruthy());
+    expect(summaryContext(summarize.mock.calls[0][0]).previous_memory).toContain('saffron');
+    expect(restored.store.data.evidence['surf-test'].summarizedExchanges).toBe(1);
+    restored.capture(capturedExchange(2));
+    expect(restored.store.data.evidence['surf-test'].exchanges).toBe(2);
+  });
+
+  it('keeps manual refresh requests made while a summary is running', async () => {
+    const releases: Array<(value: TeaCompletion) => void> = [];
+    const summarize = vi.fn((_request: TeaProviderRequest) => new Promise<TeaCompletion>((resolve) => releases.push(resolve)));
+    const { tea } = setup(undefined, summarize);
+    await ready(tea);
+    tea.capture(capturedExchange(1));
+    await vi.waitFor(() => expect(summarize).toHaveBeenCalledTimes(1));
+    tea.capture(capturedExchange(2));
+    await tea.request({ action: 'refresh', terminalId: 'surf-test' }, device);
+    releases[0](insight());
+    await vi.waitFor(() => expect(summarize).toHaveBeenCalledTimes(2));
+    expect(summaryContext(summarize.mock.calls[1][0]).recent_exchanges.at(-1)?.reply).toBe('Fixture answer 2');
+    releases[1](insight());
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(2));
+    expect(tea.state().backgroundPending).toBe(0);
+  });
+
+  it('bounds and redacts rolling memory, and retains the batch when memory is missing from a response', async () => {
+    const credential = 'synthetic-secret-for-tea-tests';
+    const summarize = vi.fn(async (_request: TeaProviderRequest) => insight(`${credential} ${'fixture '.repeat(250)}`));
+    const { tea } = setup(undefined, summarize);
+    await ready(tea);
+    tea.capture(capturedExchange(1, { prompt: `A fixture with ${credential}` }));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test']?.memory).toBeTruthy());
+    const previous = tea.store.data.evidence['surf-test'].memory!;
+    expect(previous).not.toContain(credential);
+    expect(previous.split(/\s+/).length).toBeLessThanOrEqual(200);
+    expect(previous.length).toBeLessThanOrEqual(2000);
+    expect(JSON.stringify(summaryContext(summarize.mock.calls[0][0]))).not.toContain(credential);
+    summarize.mockResolvedValueOnce(completion('{"title":"Incomplete fixture","summary":"Missing the requested memory."}'));
+    for (let seq = 2; seq <= 11; seq++) tea.capture(capturedExchange(seq));
+    await vi.waitFor(() => expect(tea.state().backgroundError).toBeTruthy());
+    expect(tea.store.data.evidence['surf-test'].memory).toBe(previous);
+    expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(1);
+    await tea.request({ action: 'refresh', terminalId: 'surf-test' }, device);
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test'].summarizedExchanges).toBe(11));
+    expect(summarize).toHaveBeenCalledTimes(3);
+  });
+
+  it('starts fresh when the terminal switches conversations and rejects late context from the old one', async () => {
+    const summarize = vi.fn(async (_request: TeaProviderRequest) => insight());
+    const { tea, hub } = setup(undefined, summarize);
+    await ready(tea);
+    tea.capture(capturedExchange(1));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test']?.memory).toBeTruthy());
+    hub.updateRecord('surf-test', { agent: { provider: 'claude', sessionId: 'replacement', seenAt: 2 } });
+    tea.capture(capturedExchange(2, { provider_session_id: 'replacement' }));
+    tea.capture(capturedExchange(3));
+    await vi.waitFor(() => expect(summarize).toHaveBeenCalledTimes(2));
+    expect(summaryContext(summarize.mock.calls[1][0]).previous_memory).toBe('');
+    expect(tea.store.data.evidence['surf-test'].source).toBe('claude:replacement');
+    expect(tea.store.data.evidence['surf-test'].exchanges).toBe(1);
+  });
+});
 
 describe('Tea host state', () => {
   it('requests a terminal highlight only on the device asking Tea', async () => {
@@ -443,7 +662,7 @@ describe('Tea host state', () => {
     registry.saveNow();
     release(
       completion(
-        '{"title":"Automatic login name","summary":"Investigating saved login credentials."}',
+        '{"title":"Automatic login name","summary":"Investigating saved login credentials.","memory":"The fixture concerns saved login settings. Preserve the chosen credentials behavior and verify the pending sign-in change."}',
       ),
     );
     await vi.waitFor(() =>
@@ -477,7 +696,7 @@ describe('Tea host state', () => {
       },
     });
     release(
-      completion('{"title":"Old task","summary":"An outdated summary."}'),
+      completion('{"title":"Old task","summary":"An outdated summary.","memory":"The fixture concerns saved login settings. Preserve the chosen credentials behavior and verify the pending sign-in change."}'),
     );
     await vi.waitFor(() => expect(tea.state().backgroundPending).toBe(0));
     expect(registry.session('surf-test')?.tea).toBeUndefined();
