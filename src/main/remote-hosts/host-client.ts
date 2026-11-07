@@ -763,6 +763,20 @@ export class RemoteHostClient {
   private onServerMsg(msg: ServerMsg): void {
     switch (msg.t) {
       case 'welcome': return this.onWelcome(msg);
+      case 'teaStream': {
+        const state = this.teaState;
+        if (!state || state.revision >= msg.revision) return;
+        const messages = state.messages.some(message => message.id === msg.message.id)
+          ? state.messages.map(message => message.id === msg.message.id ? msg.message : message)
+          : [...state.messages, msg.message];
+        this.teaState = {
+          ...state,
+          revision: msg.revision,
+          messages: messages.slice(-180),
+        };
+        this.deps.onRegistry?.();
+        return;
+      }
       case 'teaChanged':
         if (this.teaState && this.teaState.revision > msg.state.revision) return;
         this.teaState = msg.state;

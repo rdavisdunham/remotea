@@ -9,6 +9,7 @@ import type {
   TeaRole,
   TeaState,
   TeaConnectionInput,
+  TeaMessage,
 } from '../../src/shared/tea';
 import type { SessionRecord } from '../../src/shared/remote-host-protocol';
 import { redact } from './collector/redact';
@@ -280,6 +281,7 @@ export class Tea {
             return { ok: true, state: this.state() };
           if (this.active?.turn.id === turn.id) this.active.controller.abort();
           turn.state = 'canceled';
+          this.interruptDraft(turn);
           delete turn.pending;
           if (turn.started) {
             this.store.data.history = [];
@@ -356,6 +358,7 @@ export class Tea {
           history,
           tools,
           signal,
+          onText: () => {},
         });
         if (
           response.calls.length !== 1 ||
@@ -375,6 +378,7 @@ export class Tea {
           history,
           tools,
           signal,
+          onText: () => {},
         });
         if (!final.text.trim() || final.calls.length)
           throw new TeaFault(
@@ -538,6 +542,115 @@ export class Tea {
     }
   }
 
+  /** Hold unfinished words so credentials split across provider chunks can be redacted together. */
+  private previewText(raw: string): string {
+    const completeWords = raw.replace(/\S+$/u, '');
+    let end = completeWords.length;
+    for (const key of Object.values(this.store.data.keys)) {
+      if (!/\s/u.test(key)) continue;
+      for (
+        let length = Math.min(key.length - 1, completeWords.length);
+        length > 0;
+        length--
+      ) {
+        if (completeWords.endsWith(key.slice(0, length))) {
+          end = Math.min(end, completeWords.length - length);
+          break;
+        }
+      }
+    }
+    return this.safe(completeWords.slice(0, end)).slice(0, 12000);
+  }
+
+  private interruptDraft(turn: SavedTeaTurn): void {
+    const message = this.store.data.messages.find(
+      (item) => item.id === turn.draftMessageId,
+    );
+    if (message) message.delivery = 'interrupted';
+  }
+
+  private async completeTurn(
+    turn: SavedTeaTurn,
+    provider: Provider,
+    signal: AbortSignal,
+  ): Promise<TeaCompletion> {
+    const id = turn.draftMessageId ?? crypto.randomUUID();
+    turn.draftMessageId = id;
+    let message = this.store.data.messages.find((item) => item.id === id);
+    if (message) {
+      message.text = '';
+      message.delivery = 'streaming';
+    }
+    this.changed();
+    let raw = '';
+    let timer: NodeJS.Timeout | undefined;
+    let lastPublishedAt = 0;
+    let lastCheckpointAt = 0;
+    let publishedText = '';
+    const publish = () => {
+      timer = undefined;
+      if (
+        signal.aborted ||
+        this.stopped ||
+        message?.delivery !== 'streaming' ||
+        message.text === publishedText
+      )
+        return;
+      publishedText = message.text;
+      lastPublishedAt = Date.now();
+      try {
+        if (lastPublishedAt - lastCheckpointAt >= 1000) {
+          this.changed();
+          lastCheckpointAt = lastPublishedAt;
+        } else {
+          this.store.data.revision++;
+          this.deps.hub.broadcast({
+            t: 'teaStream',
+            revision: this.store.data.revision,
+            message: { ...message },
+          });
+        }
+      } catch {
+        this.deps.log?.(
+          'Tea could not checkpoint a streamed reply. Review host storage.',
+        );
+        if (this.active?.turn === turn) this.active.controller.abort();
+      }
+    };
+    try {
+      return await provider.complete({
+        system: SYSTEM,
+        history: this.store.data.history,
+        tools: TEA_TOOLS,
+        signal,
+        onText: (delta) => {
+          if (signal.aborted || this.stopped || turn.state !== 'working')
+            return;
+          raw = (raw + delta).slice(0, 24000);
+          const text = this.previewText(raw);
+          if (!text || message?.text === text) return;
+          if (!message) {
+            message = {
+              id,
+              role: 'assistant',
+              text,
+              at: this.now(),
+              delivery: 'streaming',
+            };
+            this.store.data.messages.push(message);
+          } else message.text = text;
+          const delay = 100 - (Date.now() - lastPublishedAt);
+          if (delay <= 0) {
+            if (timer) clearTimeout(timer);
+            publish();
+          } else if (!timer) timer = setTimeout(publish, delay);
+        },
+      });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   private async run(turn: SavedTeaTurn): Promise<void> {
     const role = this.store.data.config.chat!;
     const fingerprint = this.fingerprint(role);
@@ -566,26 +679,36 @@ export class Tea {
         this.changed();
         let response = turn.pending;
         if (!response) {
-          response = await provider.complete({
-            system: SYSTEM,
-            history: this.store.data.history,
-            tools: TEA_TOOLS,
-            signal: AbortSignal.any([
-              controller.signal,
-              AbortSignal.timeout(90000),
-            ]),
-          });
+          response = await this.completeTurn(
+            turn,
+            provider,
+            AbortSignal.any([controller.signal, AbortSignal.timeout(90000)]),
+          );
           controller.signal.throwIfAborted();
           this.store.data.history.push(...response.output);
           turn.pending = response;
           turn.rounds++;
-          if (response.text.trim())
-            this.store.data.messages.push({
-              id: crypto.randomUUID(),
+          const id = turn.draftMessageId!;
+          const draft = this.store.data.messages.find(
+            (message) => message.id === id,
+          );
+          if (response.text.trim()) {
+            const finished: TeaMessage = {
+              id,
               role: 'assistant',
               text: this.safe(response.text).slice(0, 12000),
-              at: this.now(),
-            });
+              at: draft?.at ?? this.now(),
+            };
+            if (draft) {
+              Object.assign(draft, finished);
+              delete draft.delivery;
+            } else this.store.data.messages.push(finished);
+          } else if (draft) {
+            this.store.data.messages = this.store.data.messages.filter(
+              (message) => message.id !== id,
+            );
+          }
+          delete turn.draftMessageId;
           this.changed();
         }
         if (!response.calls.length) {
@@ -660,6 +783,7 @@ export class Tea {
         'Tea reached its ten-step turn limit. Review its progress before continuing.',
       );
     } catch (error) {
+      this.interruptDraft(turn);
       if (turn.state !== 'canceled') {
         turn.state = 'interrupted';
         turn.error = controller.signal.aborted

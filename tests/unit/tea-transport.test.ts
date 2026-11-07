@@ -109,6 +109,48 @@ function setup(features: string[] = ['tea']) {
 }
 
 describe('Tea desktop transport', () => {
+  it('updates one streamed message and rejects older updates after finalization', () => {
+    const { client, socket } = setup();
+    socket.receive({ t: 'teaChanged', state: state(1) });
+    const message = {
+      id: 'reply-stream',
+      role: 'assistant',
+      text: 'First ',
+      at: 1,
+      delivery: 'streaming',
+    };
+    socket.receive({ t: 'teaStream', revision: 2, message });
+    socket.receive({
+      t: 'teaStream',
+      revision: 3,
+      message: { ...message, text: 'First second ' },
+    });
+    expect(client.teaState?.messages).toHaveLength(1);
+    expect(client.teaState?.messages[0].text).toBe('First second ');
+    const finished = state(4);
+    finished.messages = [
+      {
+        id: 'reply-stream',
+        role: 'assistant',
+        text: 'First second done.',
+        at: 1,
+      },
+    ];
+    socket.receive({ t: 'teaChanged', state: finished });
+    socket.receive({ t: 'teaStream', revision: 3, message });
+    expect(client.teaState?.messages[0]).toEqual(finished.messages[0]);
+    expect(
+      parseServerMsg({ t: 'teaStream', revision: 5, message }),
+    ).not.toBeNull();
+    expect(
+      parseServerMsg({
+        t: 'teaStream',
+        revision: 5,
+        message: { ...message, text: 'x'.repeat(12001) },
+      }),
+    ).toBeNull();
+  });
+
   it('keeps the newest shared state when an older direct response arrives', async () => {
     const { client, socket } = setup();
     const request = client.tea({ action: 'state' });

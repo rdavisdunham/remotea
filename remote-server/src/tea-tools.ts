@@ -237,6 +237,7 @@ export class TeaTools {
               role: message.role,
               text: message.text.slice(0, 1500),
               at: message.at,
+              ...(message.delivery ? { delivery: message.delivery } : {}),
             })),
         };
       } else if (call.name === 'set_workspace_name') {

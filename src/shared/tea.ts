@@ -48,6 +48,7 @@ export interface TeaMessage {
   role: 'user' | 'assistant' | 'tool';
   text: string;
   at: number;
+  delivery?: 'streaming' | 'interrupted';
 }
 export interface TeaTurn {
   id: string;
