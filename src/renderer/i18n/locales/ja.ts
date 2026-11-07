@@ -439,6 +439,9 @@ export const ja: Translation = {
   'settings.workspacePanel.shellSection': 'シェル',
   'settings.workspacePanel.defaultShell': '既定のシェル',
   'settings.workspacePanel.shell.systemDefault': 'システムの既定',
+  'settings.workspacePanel.closeToTray': '閉じるとトレイに格納',
+  'settings.workspacePanel.closeToTrayHint':
+    'ウィンドウの × ボタンや Alt+F4 で remotea を終了せず、最後の remotea ウィンドウをシステムトレイに隠します。ターミナルセッションとエージェントは動き続けます。トレイアイコンをクリックすると元に戻り、そのメニューの「remotea を終了」で実際に終了します。上の確認より優先されます。',
   // ErrorBoundary のフォールバックカード
   'errorBoundary.labelFailed': '{label} に失敗しました',
   'errorBoundary.somethingWrong': '問題が発生しました',

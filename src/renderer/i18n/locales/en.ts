@@ -1180,6 +1180,9 @@ export const en = {
   'agentNavigator.fromScreen': 'read from the screen',
   'settings.workspacePanel.detectAgentScreens': 'Read agent screens to infer state',
   'settings.workspacePanel.detectAgentScreensHint': 'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `wmux detect explain` to see which rule fired.',
+  'settings.workspacePanel.closeToTray': 'Close to tray',
+  'settings.workspacePanel.closeToTrayHint':
+    'The window\'s × button or Alt+F4 hides the last remotea window to the system tray instead of quitting, so terminal sessions and agents keep running. Click the tray icon to bring it back; Quit remotea in its menu quits for real. Takes priority over the confirmation above.',
   'agentNavigator.silentProbed': 'detected — reports no state',
   'agentNavigator.hint': '↑↓ move · enter jump · a/b/q/w/i/u filter · esc close',
   'agentNavigator.workspacesWithAgents': 'workspaces',

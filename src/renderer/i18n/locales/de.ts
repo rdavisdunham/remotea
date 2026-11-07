@@ -428,6 +428,9 @@ export const de: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Standard-Shell',
   'settings.workspacePanel.shell.systemDefault': 'Systemstandard',
+  'settings.workspacePanel.closeToTray': 'In den Infobereich schließen',
+  'settings.workspacePanel.closeToTrayHint':
+    'Die ×-Schaltfläche des Fensters oder Alt+F4 blendet das letzte remotea-Fenster in den Infobereich aus, statt remotea zu beenden – Terminalsitzungen und Agents laufen weiter. Ein Klick auf das Symbol holt es zurück; „remotea beenden“ in seinem Menü beendet wirklich. Hat Vorrang vor der Bestätigung oben.',
   // ErrorBoundary-Fallback-Karte
   'errorBoundary.labelFailed': '{label} fehlgeschlagen',
   'errorBoundary.somethingWrong': 'Etwas ist schiefgelaufen',

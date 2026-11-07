@@ -439,6 +439,9 @@ export const tr: Translation = {
   'settings.workspacePanel.shellSection': 'Kabuk',
   'settings.workspacePanel.defaultShell': 'Varsayılan kabuk',
   'settings.workspacePanel.shell.systemDefault': 'Sistem varsayılanı',
+  'settings.workspacePanel.closeToTray': 'Sistem tepsisine kapat',
+  'settings.workspacePanel.closeToTrayHint':
+    'Pencerenin × düğmesi veya Alt+F4, remotea’tan çıkmak yerine son remotea penceresini sistem tepsisine gizler; terminal oturumları ve agent’lar çalışmaya devam eder. Geri getirmek için tepsi simgesine tıklayın; menüsündeki "remotea’tan çık" gerçekten çıkar. Yukarıdaki onaya göre önceliklidir.',
   // ErrorBoundary yedek kartı
   'errorBoundary.labelFailed': '{label} başarısız oldu',
   'errorBoundary.somethingWrong': 'Bir şeyler ters gitti',

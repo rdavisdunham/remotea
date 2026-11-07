@@ -429,6 +429,9 @@ export const es: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Shell predeterminado',
   'settings.workspacePanel.shell.systemDefault': 'Predeterminado del sistema',
+  'settings.workspacePanel.closeToTray': 'Cerrar a la bandeja',
+  'settings.workspacePanel.closeToTrayHint':
+    'El botón × de la ventana o Alt+F4 oculta la última ventana de remotea en la bandeja del sistema en lugar de salir, así que las sesiones de terminal y los agentes siguen en marcha. Haz clic en el icono de la bandeja para recuperarla; «Salir de remotea» en su menú sale de verdad. Tiene prioridad sobre la confirmación de arriba.',
   // Tarjeta de reserva de ErrorBoundary
   'errorBoundary.labelFailed': 'Fallo en {label}',
   'errorBoundary.somethingWrong': 'Algo salió mal',

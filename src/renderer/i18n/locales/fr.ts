@@ -744,6 +744,9 @@ export const fr: Translation = {
   'agentNavigator.fromScreen': 'lu à l’écran',
   'settings.workspacePanel.detectAgentScreens': 'Lire l’écran des agents pour déduire leur état',
   'settings.workspacePanel.detectAgentScreensHint': 'Pour les agents qui ne déclarent pas leur état (Codex, Gemini, Aider…), compare leur interface à l’écran à des règles fournies pour distinguer bloqué de en cours. Tourne entièrement sur cette machine et n’écrase jamais ce qu’un agent déclare — il précise seulement un inactif déclaré en question encore affichée, et les panes dont l’agent déclare être en cours ou bloqué ne sont pas lus du tout. Règles surchargeables dans %APPDATA%\\remotea\\agent-detection ; `wmux detect explain` indique quelle règle a décidé.',
+  'settings.workspacePanel.closeToTray': 'Réduire dans la zone de notification',
+  'settings.workspacePanel.closeToTrayHint':
+    'Le bouton × de la fenêtre ou Alt+F4 masque la dernière fenêtre remotea dans la zone de notification au lieu de quitter : les sessions de terminal et les agents continuent de tourner. Cliquez sur l\'icône pour la faire réapparaître ; Quitter remotea dans son menu quitte pour de bon. Prioritaire sur la confirmation ci-dessus.',
   'agentNavigator.silentProbed': 'détecté — ne déclare aucun état',
   'agentNavigator.hint': '↑↓ naviguer · entrée aller · a/b/q/w/i/u filtrer · échap fermer',
   'agentNavigator.workspacesWithAgents': 'espaces',

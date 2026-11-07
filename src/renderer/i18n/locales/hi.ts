@@ -439,6 +439,9 @@ export const hi: Translation = {
   'settings.workspacePanel.shellSection': 'शेल',
   'settings.workspacePanel.defaultShell': 'डिफ़ॉल्ट शेल',
   'settings.workspacePanel.shell.systemDefault': 'सिस्टम डिफ़ॉल्ट',
+  'settings.workspacePanel.closeToTray': 'ट्रे में बंद करें',
+  'settings.workspacePanel.closeToTrayHint':
+    'विंडो का × बटन या Alt+F4 remotea से बाहर निकलने के बजाय आख़िरी remotea विंडो को सिस्टम ट्रे में छिपा देता है, ताकि टर्मिनल सत्र और एजेंट चलते रहें। उसे वापस लाने के लिए ट्रे आइकन पर क्लिक करें; उसके मेनू में "remotea से बाहर निकलें" सचमुच बंद करता है। ऊपर की पुष्टि से पहले लागू होता है।',
   // ErrorBoundary फ़ॉलबैक कार्ड
   'errorBoundary.labelFailed': '{label} विफल रहा',
   'errorBoundary.somethingWrong': 'कुछ गलत हो गया',

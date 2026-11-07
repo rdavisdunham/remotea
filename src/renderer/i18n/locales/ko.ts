@@ -447,6 +447,9 @@ export const ko: Translation = {
   'settings.workspacePanel.shellSection': '셸',
   'settings.workspacePanel.defaultShell': '기본 셸',
   'settings.workspacePanel.shell.systemDefault': '시스템 기본값',
+  'settings.workspacePanel.closeToTray': '닫을 때 트레이로 숨기기',
+  'settings.workspacePanel.closeToTrayHint':
+    '창의 × 버튼이나 Alt+F4를 누르면 remotea를 종료하는 대신 마지막 remotea 창을 시스템 트레이로 숨겨, 터미널 세션과 에이전트가 계속 실행됩니다. 트레이 아이콘을 클릭하면 다시 나타나고, 메뉴의 "remotea 종료"를 누르면 실제로 종료됩니다. 위의 확인보다 우선합니다.',
   // ErrorBoundary 대체 카드
   'errorBoundary.labelFailed': '{label} 실패',
   'errorBoundary.somethingWrong': '문제가 발생했습니다',

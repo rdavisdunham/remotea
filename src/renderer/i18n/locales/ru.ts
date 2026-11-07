@@ -439,6 +439,9 @@ export const ru: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Shell по умолчанию',
   'settings.workspacePanel.shell.systemDefault': 'Системный по умолчанию',
+  'settings.workspacePanel.closeToTray': 'Сворачивать в трей',
+  'settings.workspacePanel.closeToTrayHint':
+    'Кнопка × окна или Alt+F4 скрывает последнее окно remotea в системный трей вместо выхода, поэтому сеансы терминала и агенты продолжают работать. Щёлкните значок в трее, чтобы вернуть окно; «Выйти из remotea» в его меню завершает работу по-настоящему. Имеет приоритет над подтверждением выше.',
   // Запасная карточка ErrorBoundary
   'errorBoundary.labelFailed': '{label} не работает',
   'errorBoundary.somethingWrong': 'Что-то пошло не так',

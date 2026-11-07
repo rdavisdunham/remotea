@@ -428,6 +428,9 @@ export const it: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Shell predefinita',
   'settings.workspacePanel.shell.systemDefault': 'Predefinita di sistema',
+  'settings.workspacePanel.closeToTray': 'Chiudi nell\'area di notifica',
+  'settings.workspacePanel.closeToTrayHint':
+    'Il pulsante × della finestra o Alt+F4 nasconde l\'ultima finestra di remotea nell\'area di notifica invece di uscire, così le sessioni del terminale e gli agenti continuano a funzionare. Fai clic sull\'icona per riaprirla; «Esci da remotea» nel suo menu esce davvero. Ha la precedenza sulla conferma qui sopra.',
   // Scheda di fallback ErrorBoundary
   'errorBoundary.labelFailed': '{label} non riuscito',
   'errorBoundary.somethingWrong': 'Qualcosa è andato storto',

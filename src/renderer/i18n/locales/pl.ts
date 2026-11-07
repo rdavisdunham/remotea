@@ -439,6 +439,9 @@ export const pl: Translation = {
   'settings.workspacePanel.shellSection': 'Powłoka',
   'settings.workspacePanel.defaultShell': 'Domyślna powłoka',
   'settings.workspacePanel.shell.systemDefault': 'Domyślna systemowa',
+  'settings.workspacePanel.closeToTray': 'Zamykaj do zasobnika',
+  'settings.workspacePanel.closeToTrayHint':
+    'Przycisk × okna lub Alt+F4 ukrywa ostatnie okno remotea w zasobniku systemowym zamiast zamykać program, więc sesje terminala i agenci dalej działają. Kliknij ikonę w zasobniku, aby je przywrócić; „Zakończ remotea” w jej menu naprawdę zamyka program. Ma pierwszeństwo przed potwierdzeniem powyżej.',
   // Zapasowa karta ErrorBoundary
   'errorBoundary.labelFailed': '{label} nie działa',
   'errorBoundary.somethingWrong': 'Coś poszło nie tak',
