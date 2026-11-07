@@ -181,20 +181,29 @@ export class ManagedSessions {
     if (m.type === 'assistant') for (const b of m.message?.content ?? []) if (b.type === 'tool_use') { e.items.set(b.id, b); this.toolActivity(e, b.name, b.input?.command ?? ''); }
   }
   private toolFailed(e: Entry, item: any): void {
+    const tool = String(item.tool ?? item.name ?? '');
+    const name = tool.replace(/^mcp__eridani__/, '');
+    // Read failures and unrelated MCP tools cannot leave a planning write unconfirmed.
+    if (!['task_interview', 'submit_plan', 'submit_plan_review'].includes(name) ||
+        (item.server && item.server !== 'eridani')) return;
     const raw = JSON.stringify(item);
-    // Only a structured domain rejection proves nothing was saved. Transport errors remain uncertain.
+    const correctionCodes = ['INVALID_ARGUMENT', 'VERIFY_UNKNOWN', 'REVISION_CONFLICT', 'REVIEW_UNRESOLVED'];
+    const rejectionCodes = ['RUN_TOKEN_REQUIRED', 'RUN_NOT_BOUND', ...correctionCodes];
     let code: string | undefined;
     const inspect = (value: any): void => {
       if (!value || code) return;
       if (typeof value === 'string') { try { inspect(JSON.parse(value)); } catch { /* not JSON */ } }
       else if (Array.isArray(value)) value.forEach(inspect);
       else if (typeof value === 'object') {
-        if (typeof value.error?.code === 'string' && ['RUN_TOKEN_REQUIRED', 'RUN_NOT_BOUND'].includes(value.error.code)) code = value.error.code;
+        if (typeof value.error?.code === 'string' && rejectionCodes.includes(value.error.code)) code = value.error.code;
         else Object.values(value).forEach(inspect);
       }
     };
+    // Arguments may contain error examples. Only a structured tool response proves rejection.
     inspect({ error: item.error, result: item.result, content: item.content });
-    const tool = String(item.tool ?? item.name ?? 'planning tool');
+    // The provider has the validation response and can correct it in this turn.
+    // Interrupting here would prevent that correction and manufacture a receipt deadlock.
+    if (code && correctionCodes.includes(code)) return;
     const reason = code ? `Planning submission rejected (${code}); no interview or plan was saved.` : 'Coordination tool failed or timed out; reconcile its receipt before retry';
     this.setAttention(e, { kind: 'receipt_uncertain', reason, tool,
       action: { coordination: { code: code ?? 'DELIVERY_UNCONFIRMED', outcome: code ? 'rejected' : 'uncertain', tool,

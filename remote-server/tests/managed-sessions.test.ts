@@ -123,7 +123,7 @@ describe('managed durable ownership', () => {
   });
   it('surfaces coordination tool failures and stops automatic continuation', async () => {
     const { manager, adapter, events } = fixture(); await manager.ready(spec.surf);
-    adapter.emit('event', { method: 'item/completed', params: { item: { id: 'coordination', type: 'mcpToolCall', status: 'failed', error: { message: 'timeout' } } } });
+    adapter.emit('event', { method: 'item/completed', params: { item: { id: 'coordination', type: 'mcpToolCall', server: 'eridani', tool: 'submit_plan', status: 'failed', error: { message: 'timeout' } } } });
     expect(adapter.interrupted).toBe(1); expect(events.filter((e) => e.t === 'activity').at(-1)).toMatchObject({ kind: 'waiting', label: 'Coordination tool failed or timed out; reconcile its receipt before retry' });
   });
   it('keeps deferred Claude question answers submitted until the actual tool result confirms them', async () => {
@@ -220,4 +220,38 @@ it('does not mistake error-looking tool arguments for a confirmed server rejecti
   adapter.emit('event', { method: 'item/completed', params: { item: { id: 'transport-failure', type: 'mcpToolCall', tool: 'task_interview', status: 'failed', arguments: { example: { error: { code: 'RUN_TOKEN_REQUIRED' } } }, error: { message: 'connection closed' } } } });
   const saved = JSON.parse(fs.readFileSync(fs.readdirSync(path.join(dir, 'managed')).map(f => path.join(dir, 'managed', f))[0], 'utf8'));
   expect(saved.attention.action.coordination).toMatchObject({ code: 'DELIVERY_UNCONFIRMED', outcome: 'uncertain' });
+});
+
+it.each(['INVALID_ARGUMENT', 'VERIFY_UNKNOWN', 'REVISION_CONFLICT', 'REVIEW_UNRESOLVED'])('lets Claude correct a confirmed %s rejection without manufacturing an uncertain receipt', async code => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-validation-')); temps.push(dir);
+  const { adapter, manager } = fixture(dir); await manager.ready(spec.surf);
+  adapter.emit('event', { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'plan', name: 'mcp__eridani__submit_plan', input: {} }] } });
+  adapter.emit('event', { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'plan', is_error: true, content: JSON.stringify({ error: { code, message: 'A verify criterion names the plan’s verify_id.' } }) }] } });
+  const saved = JSON.parse(fs.readFileSync(fs.readdirSync(path.join(dir, 'managed')).map(f => path.join(dir, 'managed', f))[0], 'utf8'));
+  expect(saved.paused).toBe(false);
+  expect(saved.attention).toBeUndefined();
+  expect(adapter.interrupted).toBe(0);
+});
+
+it('lets Codex correct a confirmed validation rejection and ignores failed read or unrelated tools', async () => {
+  const { adapter, manager, events } = fixture(); await manager.ready(spec.surf);
+  for (const item of [
+    { tool: 'submit_plan', server: 'eridani', error: { code: 'INVALID_ARGUMENT' } },
+    { tool: 'task_plan', server: 'eridani', error: { message: 'Read timed out' } },
+    { tool: 'records_list', server: 'eridani', error: { code: 'INVALID_ARGUMENT' } },
+    { tool: 'submit_plan', server: 'other', error: { message: 'Unrelated server' } },
+  ]) adapter.emit('event', { method: 'item/completed', params: { item: { id: 'failed-tool', type: 'mcpToolCall', status: 'failed', ...item } } });
+  expect(adapter.interrupted).toBe(0);
+  expect(events.some(event => event.attention?.action?.coordination)).toBe(false);
+});
+
+it('keeps genuinely uncertain Claude submissions paused for reconciliation', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-claude-transport-')); temps.push(dir);
+  const { adapter, manager } = fixture(dir); await manager.ready(spec.surf);
+  adapter.emit('event', { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'plan', name: 'mcp__eridani__submit_plan', input: {} }] } });
+  adapter.emit('event', { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'plan', is_error: true, content: 'Connection closed before the response' }] } });
+  const saved = JSON.parse(fs.readFileSync(fs.readdirSync(path.join(dir, 'managed')).map(f => path.join(dir, 'managed', f))[0], 'utf8'));
+  expect(saved.attention.action.coordination).toMatchObject({ code: 'DELIVERY_UNCONFIRMED', outcome: 'uncertain' });
+  expect(saved.paused).toBe(true);
+  expect(adapter.interrupted).toBe(1);
 });
