@@ -19,6 +19,7 @@ import { runFsOp } from './remote-fs';
 import { EridaniRuntime, serverVersion } from './eridani-runtime';
 import { loadBuildInfo, serverInfo, writeServerInfo } from './build-info';
 import { UPLOADS_STATUS_FILE, UploadStore } from './upload';
+import { Tea } from './tea';
 
 const DAY = 24 * 60 * 60 * 1000;
 const BIND_RETRY_MS = 5_000;
@@ -70,6 +71,14 @@ async function main(): Promise<void> {
     hooks: { status: () => toAgentStatus(hooksStatus()), install: () => toAgentStatus(installHooks()) },
     fs: runFsOp,
   });
+  let tea: Tea | undefined;
+  try {
+    tea = new Tea({ dir, hub, registry, log });
+    hub.setTea(tea);
+    tea.start();
+  } catch {
+    log('Tea state could not be opened. Terminal hosting remains available.');
+  }
   // The bridge comes up before the Eridani runtime exists; its held methods answer as "not remote" until then.
   let eridaniRt: EridaniRuntime | null = null;
   const bridge = new HookBridge({
@@ -191,6 +200,7 @@ async function main(): Promise<void> {
   const stop = async (signal: string) => {
     if (stopping) return;
     stopping = true;
+    tea?.stop();
     log(`${signal}: shutting down`);
     clearInterval(reminderTimer);
     clearInterval(lagTimer);

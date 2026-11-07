@@ -8,11 +8,11 @@ The following requests are tracked here and in Eridani. Checked entries are impl
 
 ### Live terminal work summaries
 
-- [ ] Show concise live descriptions of what each terminal is working on overall.
+- [x] Show concise live descriptions of what each terminal is working on overall.
 
 Eridani backlog task `20a8228c-cc1a-486a-9fb2-d78e26a451e5`.
 
-Start with the expandable terminal list in the workspace sidebar and consider a detail view. Reuse captured turns, task/run metadata and existing session summaries where possible. Define refresh triggers, freshness, server persistence and reconnect behaviour so connected apps show consistent summaries. Preserve user-chosen names and show generated summaries separately from live activity and status. This is a later feature expansion.
+Start with the expandable terminal list in the workspace sidebar and consider a detail view. Reuse captured turns, task/run metadata and existing session summaries where possible. Define refresh triggers, freshness, server persistence and reconnect behaviour so connected apps show consistent summaries. Preserve user-chosen names and show generated summaries separately from live activity and status. Implemented through Tea’s host-backed captured-context summaries, freshness markers and shared metadata. See [Tea](tea.md) for setup, provider configuration and research.
 
 ### Easy installation and updates
 

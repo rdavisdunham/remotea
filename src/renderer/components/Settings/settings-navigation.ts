@@ -23,7 +23,7 @@ const fieldSections: Record<keyof typeof PREFERENCE_FIELDS, SettingsSection> = {
   KeyboardPrefs: 'Shortcuts',
 };
 const aliases: Partial<Record<SettingsSection, string>> = {
-  Hosts: 'connection ssh server remote host eridani recovery activity',
+  Hosts: 'connection ssh server remote host eridani recovery activity tea assistant api provider model summary naming',
   Remote: 'phone access remote console pairing mobile',
   Agents: 'eridani integration consent hooks detection readiness manual status agent',
   Profiles: 'quick launch profiles commands shell location',

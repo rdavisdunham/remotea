@@ -699,6 +699,10 @@ export default function SurfaceTabBar({
             {t('surfaceTab.rename', 'Rename')}
           </div>
           {ctxSurface?.type === 'terminal' && <>
+            {!!ctxSurface.customTitle && !!ctxSurface.automaticTitle && <button className="ctx-menu__item" role="menuitem" onClick={() => {
+              if (activeWorkspaceId) renameSurface(activeWorkspaceId, paneId, ctxMenu.surfaceId, '');
+              setCtxMenu(null);
+            }}>Use automatic name</button>}
             <button className="ctx-menu__item" role="menuitem" onClick={() => {
               const chat = chatAttentionFor(ctxMenu.surfaceId);
               void actOnChat(ctxMenu.surfaceId, chat.unread ? { action: 'read', revision: chat.attention!.revision } : { action: 'unread' }).then(r => setAttentionError(r.ok ? '' : r.error ?? 'Could not update chat.')).catch(() => setAttentionError('Could not reach the server.'));

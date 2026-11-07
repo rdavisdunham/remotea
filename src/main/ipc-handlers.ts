@@ -14,6 +14,7 @@ import { RemoteHosts } from './remote-hosts';
 import { diag as remoteDiag } from './remote-hosts/diag';
 import { isRemoteShellSpec, parseRemoteShellSpec, remoteShellSpec } from '../shared/remote-shell-spec';
 import type { HostSaveRequest, HostTestRequest } from '../shared/remote-hosts-types';
+import { isTeaCommand } from '../shared/tea';
 import { PtyLedger, reapOrphans } from './pty-ledger';
 import { SshDetector } from './ssh-detect';
 import { agentIdentity } from './agent-identity';
@@ -790,6 +791,8 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   });
 
   ipcMain.handle(IPC_CHANNELS.RHOST_LIST, () => remoteHosts.list());
+  ipcMain.handle(IPC_CHANNELS.RHOST_TEA, (_event, hostId: unknown, command: unknown) =>
+    typeof hostId === 'string' && isTeaCommand(command) ? remoteHosts.tea(hostId, command) : { ok: false, error: 'Invalid Tea request.' });
   ipcMain.handle(IPC_CHANNELS.RHOST_SAVE, (_event, req: HostSaveRequest) => {
     try {
       return { ok: true, host: remoteHosts.save(req) };

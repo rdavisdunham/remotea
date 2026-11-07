@@ -32,6 +32,7 @@ import type { FsRequest } from './remote-fs';
 import { childrenIndex } from './proc';
 import { AgentStateTracker } from './agent-state';
 import { TurnCapture, type PromptFields, type TurnFields } from './turn-capture';
+import type { Tea } from './tea';
 import type { ExitBody, SnapshotSurface, StatusBody } from '../../src/shared/eridani-link-protocol';
 
 /**
@@ -154,6 +155,7 @@ export class Hub {
   readonly chatAttention: ChatAttentionService;
   readonly turns: TurnCapture;
   private sink: HubEventSink | null;
+  private tea: Tea | null = null;
   private eridani: HubEridaniHooks = {};
   /** The last `permission_mode` a hook reported, per surface (effective_permission_mode). */
   private readonly permissionMode = new Map<string, string>();
@@ -200,6 +202,7 @@ export class Hub {
       session: (id) => this.registry.session(id),
       update: (id, patch) => void this.registry.updateSession(id, patch),
       emit: (t) => {
+        try { this.tea?.capture(t); } catch { this.log('Tea could not checkpoint captured context.'); }
         this.sink?.turn(t);
         this.eridani.turn?.(t);
       },
@@ -222,6 +225,8 @@ export class Hub {
   setSink(sink: HubEventSink | null): void {
     this.sink = sink;
   }
+
+  setTea(tea: Tea): void { this.tea = tea; }
 
   setEridani(hooks: HubEridaniHooks | null): void {
     this.eridani = hooks ?? {};
@@ -285,6 +290,10 @@ export class Hub {
     }
     const device = conn.device.id;
     switch (msg.t) {
+      case 'tea':
+        if (!this.tea) { conn.sendJson({ t: 'teaResult', rid: msg.rid, result: { ok: false, error: 'Tea is unavailable on this host.' } }); return; }
+        void this.tea.request(msg.command, device).then(result => conn.sendJson({ t: 'teaResult', rid: msg.rid, result }));
+        return;
       case 'open': return this.open(conn, msg);
       case 'detach':
         for (const id of msg.ids) this.sessions.get(id)?.detach(conn.id);
@@ -333,6 +342,7 @@ export class Hub {
     if (this.deps.diag) f.push('diag');
     if (this.deps.hooks) f.push('hooks');
     if (this.deps.fs) f.push('fs');
+    if (this.tea) f.push('tea');
     // This server may send `focus` (Eridani's terminal.focus) to apps whose hello listed it.
     f.push('focus');
     if (this.eridani.takeover) f.push('managedSessions');
@@ -423,6 +433,13 @@ export class Hub {
     }
     this.agentState.rpc(id, method, params);
     if (method === 'hook.event') {
+      if (params.event === 'UserPromptSubmit' && typeof params.prompt === 'string' && !params.agentId && !/^\s*<agent-message from=/.test(params.prompt)) {
+        const rec = this.registry.session(id);
+        if (rec?.agent) {
+          try { this.tea?.observe(id, `${rec.agent.provider}:${rec.agent.sessionId}`, params.prompt, '', this.now()); }
+          catch { this.log('Tea could not checkpoint captured context.'); }
+        }
+      }
       const captured = this.turns.hook(id, params);
       if (captured) this.sink?.turnCaptured?.(captured.provider, captured.sessionId);
       this.eridani.hook?.(id, params);
@@ -452,6 +469,7 @@ export class Hub {
       features: this.features(),
       hooks: this.hookStatus(),
     });
+    if (this.tea) conn.sendJson({ t: 'teaChanged', state: this.tea.state() });
     this.log(`hello from ${msg.device.name} (${msg.device.id}) ${msg.app.name} ${msg.app.version}`);
   }
 
@@ -663,12 +681,13 @@ export class Hub {
    * older app would drop the message), and not a device that hid the
    * session. Returns how many apps were sent it: 0 means nobody can show it.
    */
-  focus(id: string, runId?: string): number {
+  focus(id: string, runId?: string, device?: string): number {
     const rec = this.registry.session(id);
     if (!rec) return 0;
     let sent = 0;
     for (const c of this.conns.values()) {
       if (!c.device || !c.features?.has('focus') || rec.hiddenBy.includes(c.device.id)) continue;
+      if (device && c.device.id !== device) continue;
       c.sendJson({ t: 'focus', id: id as RemoteSurfaceId, ...(runId ? { runId } : {}) });
       sent++;
     }

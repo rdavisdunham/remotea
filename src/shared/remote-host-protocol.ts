@@ -22,6 +22,8 @@
  * and the server.
  */
 
+import { isTeaCommand, type TeaCommand, type TeaReply, type TeaState, type TeaInsight } from './tea';
+
 export const PROTO = 1;
 
 export type RemoteSurfaceId = `surf-${string}`;
@@ -103,6 +105,9 @@ export interface SessionRecord {
   title?: string;
   /** Last explicit rename or reset, including a reset to no custom title. */
   titleUpdatedAt?: number;
+  /** Server-generated metadata is separate from the operator's title. */
+  tea?: TeaInsight;
+  teaSourceVersion?: string;
   /** Directory the session was created in. */
   cwd: string;
   /** Last foreground cwd the server observed. */
@@ -371,6 +376,7 @@ export type ClientMsg =
   | { t: 'unhide'; rid: number; id: RemoteSurfaceId }
   | { t: 'theme'; fg: string; bg: string; cursor: string }
   | { t: 'ping'; n: number }
+  | { t: 'tea'; rid: number; command: TeaCommand }
   /** App diagnostics for the server's log (only when welcome lists 'diag'). No terminal content. */
   | { t: 'diag'; events: DiagEvent[] }
   /** Register remotea's status hooks with the server's agents (welcome lists 'hooks'). The user asked for it in the app. */
@@ -395,7 +401,7 @@ export interface DiagEvent {
 }
 
 /** Features a server announces in `welcome`; an app uses a feature only when listed. */
-export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention';
+export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention' | 'tea';
 
 /**
  * Features an app announces in `hello`. `focus`: it brings a session's tab to
@@ -469,6 +475,8 @@ export type ServerMsg =
   | { t: 'hooksStatus'; hooks: HookAgentStatus[] }
   /** The answer to an `fs` request: exactly what the app's local operation would have returned. */
   | { t: 'fsResult'; rid: number; result: unknown }
+  | { t: 'teaResult'; rid: number; result: TeaReply }
+  | { t: 'teaChanged'; state: TeaState }
   /**
    * Bring session `id`'s tab to the front (Eridani's "Open terminal in
    * remotea"). Sent only to apps whose hello listed the `focus` feature.
@@ -657,6 +665,8 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
     case 'diag':
       return Array.isArray(m.events) && m.events.length <= LIMITS.maxDiagEvents && m.events.every(isDiagEvent)
         ? (m as unknown as ClientMsg) : null;
+    case 'tea':
+      return isRid(m.rid) && isTeaCommand(m.command) ? (m as unknown as ClientMsg) : null;
     case 'hooksInstall':
       return isRid(m.rid) ? (m as unknown as ClientMsg) : null;
     case 'fs':
@@ -674,7 +684,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
 const SERVER_TYPES = new Set([
   'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
   'sessionAdded', 'sessionUpdated', 'sessionClosed', 'groupUpserted', 'groupClosed',
-  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus', 'fsResult', 'focus',
+  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus', 'fsResult', 'focus', 'teaResult', 'teaChanged',
 ]);
 
 /**
@@ -685,6 +695,10 @@ export function parseServerMsg(raw: unknown): ServerMsg | null {
   if (!isObj(raw) || typeof raw.t !== 'string' || !SERVER_TYPES.has(raw.t)) return null;
   const m = raw;
   switch (m.t) {
+    case 'teaChanged':
+      return isObj(m.state) && typeof m.state.revision === 'number' && isObj(m.state.config) && Array.isArray(m.state.messages) && Array.isArray(m.state.turns) ? (m as unknown as ServerMsg) : null;
+    case 'teaResult':
+      return isRid(m.rid) && isObj(m.result) && typeof m.result.ok === 'boolean' ? (m as unknown as ServerMsg) : null;
     case 'welcome':
       return isInt(m.proto, 0, 1_000_000) && typeof m.bootId === 'string' && typeof m.serverId === 'string'
         && Array.isArray(m.sessions) && Array.isArray(m.groups) ? (m as unknown as ServerMsg) : null;

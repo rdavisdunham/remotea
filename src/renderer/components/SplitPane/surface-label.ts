@@ -58,6 +58,7 @@ export function getSurfaceLabel(
 ): string {
   if (surface.customTitle) return surface.customTitle;
   if (agentLabel) return agentLabel;
+  if (surface.type === 'terminal' && surface.automaticTitle) return surface.automaticTitle;
   // Only a terminal has a program that can announce a title of its own, so
   // anywhere else a profile's name keeps the rank it always had.
   if (surface.type !== 'terminal' && surface.defaultTitle) return surface.defaultTitle;

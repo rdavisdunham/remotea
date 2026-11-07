@@ -3,6 +3,7 @@
  * the renderer can set one (write-only) and learn whether one is stored.
  */
 import type { GroupRecord, HookAgentStatus, LostInfo, SessionRecord } from './remote-host-protocol';
+import type { TeaState } from './tea';
 
 export type HostConnState =
   | 'disabled'      // no token yet, or switched off
@@ -146,6 +147,8 @@ export interface TerminalSnapshot {
 
 /** The registry as one device sees it, pushed to renderers for placement (phase 2). */
 export interface RemoteRegistryView {
+  tea?: TeaState;
+  teaAvailable?: boolean;
   hostId: string;
   deviceId: string;
   connected: boolean;

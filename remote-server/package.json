@@ -20,10 +20,13 @@
     "start": "node dist/remote-server/src/main.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0",
     "@xterm/addon-serialize": "0.14.0",
     "@xterm/addon-unicode11": "0.9.0",
     "@xterm/headless": "6.0.0",
+    "ajv": "8.20.0",
     "node-pty": "1.1.0",
+    "openai": "7.53.0",
     "ws": "8.21.0"
   },
   "devDependencies": {
