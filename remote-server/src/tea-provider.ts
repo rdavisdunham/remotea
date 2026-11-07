@@ -36,8 +36,12 @@ export interface TeaProviderRequest {
 export const INSIGHT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['title', 'summary'],
-  properties: { title: { type: 'string' }, summary: { type: 'string' } },
+  required: ['title', 'summary', 'memory'],
+  properties: {
+    title: { type: 'string' },
+    summary: { type: 'string' },
+    memory: { type: 'string' },
+  },
 };
 export class TeaFault extends Error {}
 

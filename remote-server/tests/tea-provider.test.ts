@@ -192,7 +192,7 @@ describe('Tea provider contracts', () => {
       anthropic([
         {
           type: 'text',
-          text: '{"title":"Login","summary":"Investigating sign-in"}',
+          text: '{"title":"Login","summary":"Investigating sign-in","memory":"The fixture concerns saved login settings. Preserve the chosen credentials behavior and verify the pending sign-in change."}',
         },
       ]),
     );

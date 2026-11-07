@@ -70,7 +70,7 @@ describe('workspace terminal dropdown', () => {
     snapshot.sessions[0].teaSourceVersion = 'v2';
     setLatestRemoteViews([snapshot]);
     render(); toggle();
-    expect(terminal('surf-working').querySelector('.workspace-terminal__summary')?.textContent).toBe('Repairing login settings. · updating');
+    expect(terminal('surf-working').querySelector('.workspace-terminal__summary')?.textContent).toBe('Repairing login settings. · recent activity');
     expect(terminal('surf-working').textContent).toContain('API fix');
     expect(terminal('surf-working').textContent).toContain('Working on it');
   });

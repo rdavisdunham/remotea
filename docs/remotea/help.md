@@ -41,7 +41,9 @@ Set up Tea under **Settings → Tea** and choose the host. **Configure Tea** ope
 
 Keys are write-only and stored in the host's private configuration directory. A blank key field preserves the stored key. Use **Remove saved key** and save to delete a credential, or remove the connection and save. Connection and model tests make real provider requests and may incur API usage charges.
 
-Expand a workspace's terminal list to see quick work summaries alongside current activity. Tea generates names for terminals without custom names. A name you set takes precedence across devices. Use **Use automatic name** in a tab's context menu to clear your override. Summaries keep updating under custom names. The updating label identifies a summary awaiting newer captured evidence.
+Expand a workspace's terminal list to see quick work summaries alongside current activity. Tea generates names for terminals without custom names. A name you set takes precedence across devices. Use **Use automatic name** in a tab's context menu to clear your override. Summaries keep updating under custom names. The recent-activity label identifies exchanges captured since the displayed summary.
+
+Tea makes an initial name, one-sentence summary and rolling memory from the first captured exchange, then updates all three together after ten further completed exchanges per terminal. The rolling memory carries forward the overall goal, decisions, unresolved issues and progress in up to 200 words. Tea searches that memory alongside the latest ten redacted exchanges, so new context remains searchable between summary updates. Refresh and Retry summaries can request an earlier update. The memory and batch count persist on the host across restarts. Switching the terminal to another harness conversation starts fresh context for that conversation.
 
 Tea shows a thinking bubble while requesting a reply, then streams its text into the same conversation bubble. A cursor and Responding indicator show generation in progress. You can scroll through earlier messages while new text arrives. Interrupted text is marked as a partial reply. Continue saved turn replaces that draft in place.
 
