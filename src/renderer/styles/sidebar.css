@@ -1694,7 +1694,7 @@
 }
 
 .workspace-terminal__summary {
-  font-size: 11px;
+  font-size: calc(11px * var(--sidebar-text-scale, 1));
   color: var(--ui-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
