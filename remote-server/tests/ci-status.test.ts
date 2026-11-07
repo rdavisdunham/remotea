@@ -31,7 +31,8 @@ afterEach(async () => {
 });
 
 const HEAD = 'a'.repeat(40);
-const PR_JSON = JSON.stringify({ number: 151, url: 'https://github.com/o/r/pull/151', headRefOid: HEAD, state: 'OPEN' });
+const PR_JSON = JSON.stringify({ number: 151, url: 'https://github.com/o/r/pull/151', headRefOid: HEAD, state: 'OPEN', baseRefName: 'main', isDraft: false, mergeable: 'MERGEABLE', mergeStateStatus: 'BEHIND' });
+const VIEW = ['--json', 'number,url,headRefOid,state,baseRefName,isDraft,mergeable,mergeStateStatus'];
 const job = (run: number, id: number) => `https://github.com/o/r/actions/runs/${run}/job/${id}`;
 
 /** A fake `gh`/`git`: answers by the argv's first words; records every call. */
@@ -57,13 +58,13 @@ describe('ciStatus', () => {
     const { exec, calls } = fakeExec({ 'pr view': ok(PR_JSON), 'pr checks': { code: 8, stdout: JSON.stringify(checks), stderr: '' }, git: ok(`${HEAD}\n`) });
     const r = await ciStatus({ cwd: '/w', branch: 'eri/task-1', logLines: 40, exec });
     expect(r).toEqual({
-      pr: { number: 151, url: 'https://github.com/o/r/pull/151', head_sha: HEAD, state: 'OPEN' },
+      pr: { number: 151, url: 'https://github.com/o/r/pull/151', head_sha: HEAD, state: 'OPEN', base: 'main', draft: false, mergeable: 'MERGEABLE', merge_state: 'BEHIND' },
       checks,
       failed_logs: [],
       worktree_head: HEAD,
     });
     expect(calls).toEqual([
-      ['gh', 'pr', 'view', 'eri/task-1', '--json', 'number,url,headRefOid,state'],
+      ['gh', 'pr', 'view', 'eri/task-1', ...VIEW],
       ['gh', 'pr', 'checks', 'eri/task-1', '--json', 'name,state,bucket,link,workflow,startedAt,completedAt'],
       ['git', 'rev-parse', 'HEAD'],
     ]);
@@ -148,16 +149,22 @@ describe('ci.status command shape', () => {
     expect(commandShapeError(cmd({ branch: 'a;b' }))).toBe('bad branch');
     expect(commandShapeError(cmd({ log_lines: 201 }))).toBe('bad log_lines');
     expect(commandShapeError(cmd({ log_lines: -1 }))).toBe('bad log_lines');
+    expect(commandShapeError(cmd({ target: 'jarvis' }))).toBeNull();
+    expect(commandShapeError(cmd({ target: '../x' }))).toBe('bad target');
   });
 });
 
 describe('ciFolder', () => {
-  it('finds the managed worktree of the branch, else the run folder', () => {
+  it('finds the managed worktree of the branch, else the run folder, else the target repository', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-ci-'));
     cleanups.push(() => fs.rmSync(root, { recursive: true, force: true }));
     const target = { id: 'p', repo: path.join(root, 'repo'), worktreeRoot: path.join(root, 'wt'), base: 'main', launch: { claude: {} }, verify: [] };
     expect(ciFolder([target], 'eri/task-1', null)).toBeNull();
     expect(ciFolder([target], 'eri/task-1', root)).toBe(root);
+    expect(ciFolder([target], 'eri/task-1', null, 'p')).toBeNull(); // the repository does not exist yet
+    fs.mkdirSync(path.join(root, 'repo'));
+    expect(ciFolder([target], 'eri/task-1', null, 'p')).toBe(path.join(root, 'repo'));
+    expect(ciFolder([target], 'eri/task-1', null, 'other')).toBeNull();
     fs.mkdirSync(path.join(root, 'wt', branchDir('eri/task-1')), { recursive: true });
     expect(ciFolder([target], 'eri/task-1', null)).toBe(path.join(root, 'wt', 'eri--task-1'));
   });
@@ -230,6 +237,7 @@ async function runtime(exec: Exec) {
     windowsUsers: null, checkMs: 3_600_000, scanMs: 3_600_000, resumeAgents: false,
     probe: async () => ({ ok: true, version: '1.0.0' }),
     ciExec: exec,
+    prSleep: async () => {},
   });
   cleanups.push(() => rt.stop());
   rt.start();
@@ -248,7 +256,7 @@ describe('ci.status on the link', () => {
     eri.send({ t: 'ci.status', op_id: 'op-ci-1', run_id: 'run-1', generation: 1, branch: 'eri/task-1', turn_seq: 3, log_lines: 40, expires_at: Date.now() + 60_000 });
     await until(() => !!eri.outcome('op-ci-1'));
     expect(eri.outcome('op-ci-1')).toMatchObject({ state: 'executed', kind: 'ci.status', result: { pr: { number: 151, head_sha: HEAD }, checks: [], failed_logs: [], worktree_head: HEAD } });
-    expect(calls[0]).toEqual(['gh', 'pr', 'view', 'eri/task-1', '--json', 'number,url,headRefOid,state']);
+    expect(calls[0]).toEqual(['gh', 'pr', 'view', 'eri/task-1', ...VIEW]);
     expect(calls.every((c) => c.length > 1)).toBe(true);
     expect(fs.existsSync(path.join(worktreeRoot, 'eri--task-1'))).toBe(true);
   });
@@ -268,5 +276,40 @@ describe('ci.status on the link', () => {
     eri.send({ t: 'ci.status', op_id: 'op-ci-3', run_id: 'run-1', generation: 1, branch: 'eri/task-1', expires_at: Date.now() + 60_000 });
     await until(() => !!eri.outcome('op-ci-3'));
     expect(eri.outcome('op-ci-3')).toMatchObject({ state: 'failed', detail: expect.stringContaining('gh auth login') });
+  });
+
+  it('pr.merge is advertised and merges through the same gh, refusals carry the reason', async () => {
+    const merged = JSON.stringify({ ...JSON.parse(PR_JSON), state: 'MERGED' });
+    const views = [PR_JSON, merged, `${'c'.repeat(40)}\n`];
+    const { exec, calls } = fakeExec({ 'pr view': () => ok(views.shift() ?? merged), 'pr merge': ok(''), git: ok(HEAD) });
+    const { eri } = await runtime(exec);
+    const hello = eri.frames.find((f) => f.t === 'hello') as unknown as { caps: string[] };
+    expect(hello.caps).toEqual(expect.arrayContaining(['pr.merge', 'pr.update_branch']));
+    eri.send({ t: 'pr.merge', op_id: 'op-m-1', run_id: 'run-1', generation: 1, branch: 'eri/task-1', head_sha: HEAD, target: 'proj', origin: 'human', expires_at: Date.now() + 60_000 });
+    await until(() => !!eri.outcome('op-m-1'));
+    expect(eri.outcome('op-m-1')).toMatchObject({ state: 'executed', kind: 'pr.merge', result: { merged: true, already: false, merge_commit: 'c'.repeat(40) } });
+    expect(calls).toContainEqual(['gh', 'pr', 'merge', '151', '--merge', '--match-head-commit', HEAD]);
+
+    eri.send({ t: 'pr.merge', op_id: 'op-m-2', run_id: 'run-1', generation: 1, branch: 'eri/task-1', head_sha: 'd'.repeat(40), expires_at: Date.now() + 60_000 });
+    await until(() => !!eri.outcome('op-m-2'));
+    expect(eri.outcome('op-m-2')).toMatchObject({ state: 'executed', result: { merged: true, already: true } });
+  });
+
+  it('pr.update_branch with no clone of the repository fails with the reason', async () => {
+    const { exec, calls } = fakeExec({});
+    const { eri } = await runtime(exec);
+    eri.send({ t: 'pr.update_branch', op_id: 'op-u-1', run_id: 'run-1', generation: 1, branch: 'eri/elsewhere', head_sha: HEAD, target: 'nope', expires_at: Date.now() + 60_000 });
+    await until(() => !!eri.outcome('op-u-1'));
+    expect(eri.outcome('op-u-1')).toMatchObject({ state: 'failed', detail: 'no clone of the repository for eri/elsewhere on this host' });
+    expect(calls).toEqual([]);
+  });
+
+  it('pr.update_branch falls back to the target repository once the worktree is gone', async () => {
+    const { exec, calls } = fakeExec({ 'pr view': ok(PR_JSON), 'api -X': ok('{}') });
+    const { eri } = await runtime(exec);
+    eri.send({ t: 'pr.update_branch', op_id: 'op-u-2', run_id: 'run-1', generation: 1, branch: 'eri/gone', head_sha: HEAD, target: 'proj', expires_at: Date.now() + 60_000 });
+    await until(() => !!eri.outcome('op-u-2'));
+    expect(eri.outcome('op-u-2')).toMatchObject({ state: 'executed', result: { updated: true, new_head_sha: null, worktree_synced: false } });
+    expect(calls[0]).toEqual(['gh', 'pr', 'view', 'eri/gone', ...VIEW]);
   });
 });
