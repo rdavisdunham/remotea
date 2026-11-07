@@ -79,6 +79,45 @@ function openai(output: unknown[], status = 'completed') {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Tea provider contracts', () => {
+  it.each(['anthropic', 'openai', 'openai-compatible'] as const)(
+    'reports a %s refusal before returning tools',
+    async (protocol) => {
+      const refusal =
+        protocol === 'anthropic'
+          ? anthropic([{ type: 'text', text: 'Declined' }], 'refusal')
+          : protocol === 'openai'
+            ? openai([
+                {
+                  type: 'message',
+                  id: 'refusal-message',
+                  role: 'assistant',
+                  status: 'completed',
+                  content: [{ type: 'refusal', refusal: 'Declined' }],
+                },
+              ])
+            : {
+                id: 'refusal-chat',
+                choices: [
+                  {
+                    finish_reason: 'stop',
+                    message: {
+                      role: 'assistant',
+                      content: null,
+                      refusal: 'Declined',
+                    },
+                  },
+                ],
+              };
+      network(refusal);
+      await expect(
+        new TeaProvider(connection(protocol), {
+          ...role,
+          effort: 'auto',
+        }).complete(request),
+      ).rejects.toThrow('model declined');
+    },
+  );
+
   it('uses native Claude tool options and preserves signed thinking with tool results', async () => {
     const thinking = {
       type: 'thinking',

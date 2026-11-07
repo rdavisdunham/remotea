@@ -178,6 +178,19 @@ describe('Tea provider settings', () => {
 });
 
 describe('Tea conversation panel', () => {
+  it('explains why sending is unavailable before model validation', () => {
+    const tea = state();
+    tea.modelChecks.chat = false;
+    setLatestRemoteViews([view(tea)]);
+    act(() =>
+      root.render(React.createElement(TeaPanel, { onClose: () => {} })),
+    );
+    expect(document.querySelector('.tea-panel')?.textContent).toContain(
+      'before sending messages',
+    );
+    expect(button('Send').disabled).toBe(true);
+  });
+
   it('renders outside the sidebar, exposes recovery controls and closes with Escape', () => {
     const tea = state();
     tea.turns = [

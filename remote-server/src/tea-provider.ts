@@ -179,6 +179,10 @@ export class TeaProvider {
         },
         { signal },
       );
+      if (response.stop_reason === 'refusal')
+        throw new TeaFault(
+          'The model declined this request. Revise the request before trying again.',
+        );
       if (
         response.stop_reason !== 'end_turn' &&
         response.stop_reason !== 'tool_use'
@@ -243,6 +247,16 @@ export class TeaProvider {
         throw new TeaFault(
           'The provider stopped before a complete reply. Check the output limit and continue the turn.',
         );
+      if (
+        response.output.some(
+          (item) =>
+            item.type === 'message' &&
+            item.content.some((block) => block.type === 'refusal'),
+        )
+      )
+        throw new TeaFault(
+          'The model declined this request. Revise the request before trying again.',
+        );
       const calls = response.output
         .filter((item) => item.type === 'function_call')
         .map((item) => ({
@@ -291,11 +305,13 @@ export class TeaProvider {
       { signal },
     );
     const choice = response.choices[0];
+    if (choice?.message.refusal)
+      throw new TeaFault(
+        'The model declined this request. Revise the request before trying again.',
+      );
     if (
       !choice ||
-      (choice.finish_reason !== 'stop' &&
-        choice.finish_reason !== 'tool_calls') ||
-      choice.message.refusal
+      (choice.finish_reason !== 'stop' && choice.finish_reason !== 'tool_calls')
     )
       throw new Error('Provider returned an incomplete or refused response');
     const calls = (choice.message.tool_calls ?? []).map((call) => {

@@ -129,12 +129,20 @@ export default function TeaPanel({
             hosts.
           </p>
         )}
-        {tea?.config.enabled && !tea.messages.length && (
+        {tea?.config.enabled && !tea.modelChecks.chat && (
           <p>
-            Ask me where you were working, which terminals need attention, or to
-            rename a terminal and set a reminder.
+            Test Tea’s conversational model in Settings → Remote hosts before
+            sending messages.
           </p>
         )}
+        {tea?.config.enabled &&
+          tea.modelChecks.chat &&
+          !tea.messages.length && (
+            <p>
+              Ask me where you were working, which terminals need attention, or
+              to rename a terminal and set a reminder.
+            </p>
+          )}
         {tea?.messages.map((message) => {
           if (message.role === 'tool')
             return (

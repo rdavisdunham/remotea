@@ -116,7 +116,7 @@ The test suite uses synthetic provider responses and terminal evidence. Real pro
 
 ## Verification results
 
-The full Linux server suite passed with 978 tests. The selected client transport, naming, host integration and UI suites passed with 121 tests. App and server typechecks, main/preload compilation, renderer production bundling and server compilation also passed.
+The full Linux server suite passed with 981 tests. The selected client transport, naming, host integration and UI suites passed with 122 tests. App and server typechecks, main/preload compilation, renderer production bundling and server compilation also passed.
 
 An isolated Windows Electron app connected to a test server and a synthetic Anthropic-compatible endpoint. It verified the complete desktop-to-provider path for model discovery, structured output and tool-result replay. Captured terminal hooks produced a shared name and summary. An explicit custom name remained authoritative. Sending a real panel message exercised terminal search and returned an actionable terminal link. The panel and send controls fitted within the desktop viewport. This fixture check used a synthetic key and synthetic model responses.
 
