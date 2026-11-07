@@ -344,6 +344,40 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "After start or reconnect, ask only about exited or closed terminals and worktrees with unmerged work. Restoring a view or resuming a conversation does not revive an ended process."
     }
   ],
+  "Tea": [
+    {
+      "key": "settings.tea.title",
+      "label": "Tea assistant"
+    },
+    {
+      "key": "settings.tea.description",
+      "label": "Configure API keys, provider connections and models for Tea on your selected host."
+    },
+    {
+      "key": "settings.tea.loadError",
+      "label": "Could not load your hosts. Open remote host settings to reconnect."
+    },
+    {
+      "key": "settings.tea.loading",
+      "label": "Loading your configured hosts…"
+    },
+    {
+      "key": "settings.tea.noHosts",
+      "label": "Add a Remotea host to set up Tea."
+    },
+    {
+      "key": "settings.tea.host",
+      "label": "Remotea host"
+    },
+    {
+      "key": "settings.tea.disconnected",
+      "label": "Connect to this host to change Tea settings."
+    },
+    {
+      "key": "settings.tea.manageHosts",
+      "label": "Manage remote hosts"
+    }
+  ],
   "Sidebar": [
     {
       "key": "settings.sidebarPanel.detailsSection",

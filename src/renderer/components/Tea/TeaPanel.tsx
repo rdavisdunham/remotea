@@ -14,7 +14,7 @@ export default function TeaPanel({
   onSettings,
 }: {
   onClose(): void;
-  onSettings?(): void;
+  onSettings?(hostId?: string): void;
 }) {
   const hosts = useRemoteHosts((state) => state.hosts);
   const views = useRemoteRegistry((state) => state.views);
@@ -116,7 +116,7 @@ export default function TeaPanel({
           type="button"
           onClick={() => {
             onClose();
-            onSettings?.();
+            onSettings?.(hostId);
           }}
         >
           Configure Tea
@@ -124,15 +124,12 @@ export default function TeaPanel({
       </div>
       <div className="tea-panel__messages" ref={messages}>
         {!tea?.config.enabled && (
-          <p>
-            Enable Tea and configure its provider models in Settings → Remote
-            hosts.
-          </p>
+          <p>Enable Tea and configure its provider models in Settings → Tea.</p>
         )}
         {tea?.config.enabled && !tea.modelChecks.chat && (
           <p>
-            Test Tea’s conversational model in Settings → Remote hosts before
-            sending messages.
+            Test Tea’s conversational model in Settings → Tea before sending
+            messages.
           </p>
         )}
         {tea?.config.enabled &&

@@ -137,6 +137,21 @@ async function ready(tea: Tea) {
 }
 
 describe('Tea host state', () => {
+  it('purges removed connection credentials from persistent state', () => {
+    const { tea, dir } = setup();
+    tea.store.configure(configuration(), 0);
+    tea.store.configure(
+      { ...configuration(), connections: [], chat: null, background: null },
+      1,
+    );
+    const restored = new TeaStore(path.join(dir, 'tea-state.json'));
+    expect(restored.data.keys).toEqual({});
+    expect(restored.data.config.connections).toEqual([]);
+    expect(
+      fs.readFileSync(path.join(dir, 'tea-state.json'), 'utf8'),
+    ).not.toContain('synthetic-secret-for-tea-tests');
+  });
+
   it('keeps API credentials private, persists settings and rejects stale edits', () => {
     const { dir, tea } = setup();
     tea.store.configure(configuration(), 0);

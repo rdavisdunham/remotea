@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TeaSettings from '../../src/renderer/components/Settings/TeaSettings';
 import TeaPanel from '../../src/renderer/components/Tea/TeaPanel';
+import TeaAssistantSettings from '../../src/renderer/components/Settings/TeaAssistantSettings';
 import { setLatestRemoteViews } from '../../src/renderer/remote-sessions/registry-cache';
 import { useRemoteHosts } from '../../src/renderer/remote-sessions/status';
 import type { RemoteRegistryView } from '../../src/shared/remote-hosts-types';
@@ -90,6 +91,8 @@ beforeEach(() => {
   setLatestRemoteViews([view()]);
   useRemoteHosts.setState({
     loaded: true,
+    loadError: false,
+    status: { desk: { hostId: 'desk', state: 'ready', attempt: 0 } },
     hosts: {
       desk: {
         id: 'desk',
@@ -112,6 +115,188 @@ afterEach(() => {
 });
 
 describe('Tea provider settings', () => {
+  it('shows discovery feedback beside the connection and makes returned models selectable', async () => {
+    const current = state();
+    current.config.connections[0].protocol = 'openai';
+    current.config.connections[0].baseUrl = 'https://api.openai.com/v1';
+    setLatestRemoteViews([view(current)]);
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    request.mockResolvedValue({
+      ok: true,
+      state: current,
+      models: [
+        { id: 'gpt-fixture-chat', name: 'GPT fixture chat' },
+        { id: 'gpt-fixture-small', name: 'GPT fixture small' },
+      ],
+    });
+    await act(async () => button('Test connection and find models').click());
+    expect(
+      container.querySelector('.tea-connection .tea-connection-feedback')
+        ?.textContent,
+    ).toContain('Found 2 models');
+    const picker = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Tea conversation and actions discovered model"]',
+    )!;
+    expect(picker.disabled).toBe(false);
+    expect(Array.from(picker.options).map((option) => option.value)).toContain(
+      'gpt-fixture-chat',
+    );
+    act(() => {
+      picker.value = 'gpt-fixture-chat';
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(
+      container.querySelector<HTMLInputElement>('.tea-role input')?.value,
+    ).toBe('gpt-fixture-chat');
+    input(
+      container.querySelector<HTMLInputElement>('input[type=password]')!,
+      'synthetic-replacement-key',
+    );
+    expect(picker.disabled).toBe(true);
+    expect(container.querySelector('.tea-connection-feedback')).toBeNull();
+  });
+
+  it('reports discovery failures within the connection card', async () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    request.mockResolvedValue({
+      ok: false,
+      error: 'The provider refused this credential.',
+    });
+    await act(async () => button('Test connection and find models').click());
+    const feedback = container.querySelector('.tea-connection [role=alert]');
+    expect(feedback?.textContent).toContain('Connection test failed');
+    expect(feedback?.textContent).toContain('refused this credential');
+  });
+
+  it('removes a saved key explicitly and confirms the stored state', async () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    expect(container.textContent).toContain('API key saved on this host');
+    act(() => button('Remove saved key').click());
+    expect(container.textContent).toContain('will be removed when you save');
+    const saved = state();
+    saved.revision = 2;
+    saved.config.revision = 2;
+    saved.config.connections[0].hasKey = false;
+    request.mockResolvedValue({ ok: true, state: saved });
+    await act(async () => button('Save Tea settings').click());
+    expect(request).toHaveBeenCalledWith(
+      'desk',
+      expect.objectContaining({
+        action: 'configure',
+        config: expect.objectContaining({
+          connections: [expect.objectContaining({ apiKey: '' })],
+        }),
+      }),
+    );
+    expect(container.textContent).toContain('No API key saved on this host');
+  });
+
+  it('resets provider-specific models when the API format changes', async () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    const protocol = container.querySelector<HTMLSelectElement>(
+      '.tea-connection select',
+    )!;
+    act(() => {
+      protocol.value = 'openai';
+      protocol.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(
+      container.querySelector<HTMLInputElement>('.tea-role input')?.value,
+    ).toBe('');
+    expect(
+      container.querySelector<HTMLInputElement>(
+        '.tea-connection input[placeholder="https://gateway.example/v1"]',
+      )?.value,
+    ).toBe('https://api.openai.com/v1');
+    request.mockResolvedValue({ ok: true });
+    await act(async () => button('Save Tea settings').click());
+    expect(request).toHaveBeenCalledWith(
+      'desk',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          chat: null,
+          background: null,
+          connections: [expect.objectContaining({ protocol: 'openai' })],
+        }),
+      }),
+    );
+  });
+
+  it('adds OpenAI with the correct label and API format', async () => {
+    const empty = state();
+    empty.config.connections = [];
+    empty.config.chat = null;
+    empty.config.background = null;
+    setLatestRemoteViews([view(empty)]);
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    const protocol = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="New provider"]',
+    )!;
+    act(() => {
+      protocol.value = 'openai';
+      protocol.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    act(() => button('Add provider connection').click());
+    expect(
+      container.querySelector<HTMLInputElement>('.tea-connection input')?.value,
+    ).toBe('OpenAI');
+    expect(
+      container.querySelector<HTMLSelectElement>('.tea-connection select')
+        ?.value,
+    ).toBe('openai');
+    expect(
+      container.querySelector<HTMLInputElement>('.tea-role input')?.value,
+    ).toBe('');
+  });
+
+  it('allows discovery after clearing an unfinished model selection', async () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    input(container.querySelector<HTMLInputElement>('.tea-role input')!, '');
+    const saved = state();
+    saved.revision = 2;
+    saved.config.revision = 2;
+    saved.config.chat = null;
+    request
+      .mockResolvedValueOnce({ ok: true, state: saved })
+      .mockResolvedValueOnce({
+        ok: true,
+        models: [{ id: 'fixture-model', name: 'Fixture model' }],
+      });
+    await act(async () => button('Test connection and find models').click());
+    expect(request.mock.calls[0][1].config.chat).toBeNull();
+    expect(request.mock.calls[1][1]).toEqual({
+      action: 'discover',
+      connectionId: 'connection-one',
+    });
+    expect(
+      container.querySelector('.tea-connection-feedback')?.textContent,
+    ).toContain('Found 1 model');
+  });
+
   it('keeps stored keys write-only and exposes separate protocol and effort controls', () => {
     act(() =>
       root.render(
@@ -125,7 +310,7 @@ describe('Tea provider settings', () => {
     expect(container.textContent).toContain(
       'OpenAI-compatible Chat Completions',
     );
-    expect(container.querySelectorAll('.tea-role select')).toHaveLength(4);
+    expect(container.querySelectorAll('.tea-role select')).toHaveLength(6);
     expect(container.querySelectorAll('.tea-role input')).toHaveLength(2);
   });
 
@@ -177,7 +362,89 @@ describe('Tea provider settings', () => {
   });
 });
 
+describe('Tea settings discovery', () => {
+  it('shows provider and key controls immediately on the Tea page', () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaAssistantSettings, { onManageHosts: vi.fn() }),
+      ),
+    );
+    expect(container.querySelector('input[type=password]')).not.toBeNull();
+    expect(container.querySelector('.tea-settings')?.tagName).toBe('SECTION');
+    expect(container.querySelector('.tea-settings > summary')).toBeNull();
+    expect(container.textContent).toContain('API keys');
+  });
+
+  it('opens the requested host and keeps credential drafts scoped to that host', () => {
+    const hosts = useRemoteHosts.getState().hosts;
+    useRemoteHosts.setState({
+      hosts: {
+        ...hosts,
+        laptop: { ...hosts.desk, id: 'laptop', name: 'Laptop' },
+      },
+      status: {
+        ...useRemoteHosts.getState().status,
+        laptop: { hostId: 'laptop', state: 'ready', attempt: 0 },
+      },
+    });
+    setLatestRemoteViews([view(), { ...view(), hostId: 'laptop' }]);
+    act(() =>
+      root.render(
+        React.createElement(TeaAssistantSettings, {
+          initialHostId: 'laptop',
+          onManageHosts: vi.fn(),
+        }),
+      ),
+    );
+    const selector =
+      container.querySelector<HTMLSelectElement>('#tea-settings-host')!;
+    expect(selector.value).toBe('laptop');
+    input(
+      container.querySelector<HTMLInputElement>('input[type=password]')!,
+      'synthetic-unsaved-key',
+    );
+    act(() => {
+      selector.value = 'desk';
+      selector.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(selector.value).toBe('desk');
+    expect(
+      container.querySelector<HTMLInputElement>('input[type=password]')?.value,
+    ).toBe('');
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('offers host management and disables edits when disconnected', () => {
+    useRemoteHosts.setState({
+      status: { desk: { hostId: 'desk', state: 'reconnecting', attempt: 1 } },
+    });
+    const manage = vi.fn();
+    act(() =>
+      root.render(
+        React.createElement(TeaAssistantSettings, { onManageHosts: manage }),
+      ),
+    );
+    expect(container.textContent).toContain('Connect to this host');
+    expect(container.querySelector('fieldset[disabled]')).not.toBeNull();
+    act(() => button('Manage remote hosts').click());
+    expect(manage).toHaveBeenCalledOnce();
+  });
+});
+
 describe('Tea conversation panel', () => {
+  it('opens Tea settings for the currently selected host', async () => {
+    const close = vi.fn(),
+      settings = vi.fn();
+    act(() =>
+      root.render(
+        React.createElement(TeaPanel, { onClose: close, onSettings: settings }),
+      ),
+    );
+    await act(async () => button('Configure Tea').click());
+    expect(close).toHaveBeenCalledOnce();
+    expect(settings).toHaveBeenCalledExactlyOnceWith('desk');
+  });
+
   it('explains why sending is unavailable before model validation', () => {
     const tea = state();
     tea.modelChecks.chat = false;

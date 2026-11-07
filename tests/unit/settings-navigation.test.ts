@@ -15,6 +15,11 @@ describe('settings navigation compatibility and discovery', () => {
     expect(new Set(sections).size).toBe(sections.length);
     expect(sections).toEqual(expect.arrayContaining(['General', 'Hosts', 'Sidebar', 'Workspace', 'Terminal', 'Prompts', 'Notifications', 'Browser', 'Profiles', 'Shortcuts', 'Remote', 'Changelog', 'Help', 'Agents']));
   });
+  it('finds Tea directly by provider and credential settings', () => {
+    for (const query of ['Tea', 'API key', 'Anthropic', 'OpenAI', 'base URL', 'background models']) {
+      expect(searchSettings(query)).toContain('Tea');
+    }
+  });
   it('indexes every current preference field from the interfaces', () => {
     const source = ts.createSourceFile('settings.ts', readFileSync('src/renderer/store/settings-slice.ts', 'utf8'), ts.ScriptTarget.Latest, true);
     let count = 0;

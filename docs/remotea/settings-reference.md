@@ -453,7 +453,7 @@ The host introduction and hidden-session help now distinguish ownership from liv
 
 ### Tea host settings
 
-Tea settings are on each host card under **Tea assistant**. The host persists them in private `tea-state.json` alongside conversation checkpoints and redacted evidence. All connected apps share these values. Saving uses a configuration revision and rejects conflicting edits from another device.
+Tea has a dedicated **Settings → Tea** tab with a host selector and visible provider controls. **Configure Tea** opens that tab for the host selected in the conversation panel. Host cards also expose the same settings under **Tea assistant**. The host persists them in private `tea-state.json` alongside conversation checkpoints and redacted evidence. All connected apps share these values. Saving uses a configuration revision and rejects conflicting edits from another device.
 
 | Setting | Default | Behavior |
 |---|---|---|
@@ -463,11 +463,11 @@ Tea settings are on each host card under **Tea assistant**. The host persists th
 | Connection name | Anthropic suggestion | Display label for one of up to eight provider profiles |
 | API format | Anthropic Messages suggestion | Anthropic Messages, native OpenAI Responses, or OpenAI-compatible Chat Completions |
 | Base URL | Provider default | HTTPS endpoint, with HTTP supported for loopback gateways |
-| API key | Empty | Write-only field. Blank preserves a saved key. Removing the profile removes its key |
+| API key | Empty | Write-only field. Blank preserves a saved key. Remove saved key clears it on Save. Removing the profile and saving also removes its key |
 | Conversation connection and model | Sonnet 5.5 suggestion | Model for Tea replies and application actions |
 | Background connection and model | Haiku 5.5 suggestion | Model for automatic names and summaries |
 | Effort per role | Medium for Sonnet, low for Haiku | Model default, low, medium, high. Capability tests verify the chosen API options |
-| Test connection and find models | Explicit action | Saves edits, authenticates and fetches the model catalog. Supports manually entered model IDs |
+| Test connection and find models | Explicit action | Saves edits, authenticates and fetches the catalog into visible model dropdowns. Results appear beside the connection. Manual model IDs remain supported |
 | Test selected models | Explicit action | Makes real schema and tool-result replay requests. Success is tied to the selected connection, credential, model and effort |
 | Reload settings | Explicit action | Replaces local unsaved edits with current host settings |
 

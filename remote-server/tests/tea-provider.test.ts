@@ -79,6 +79,26 @@ function openai(output: unknown[], status = 'completed') {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Tea provider contracts', () => {
+  it('discovers native OpenAI models through the model-list endpoint', async () => {
+    const fetch = network({
+      object: 'list',
+      data: [
+        { id: 'gpt-fixture', object: 'model', created: 1, owned_by: 'fixture' },
+      ],
+    });
+    const provider = new TeaProvider(connection('openai'), {
+      ...role,
+      model: 'discovery',
+      effort: 'auto',
+    });
+    expect(await provider.models(AbortSignal.timeout(5000))).toEqual([
+      { id: 'gpt-fixture', name: 'gpt-fixture' },
+    ]);
+    expect(String(fetch.mock.calls[0][0])).toBe(
+      'https://provider.test/v1/models',
+    );
+  });
+
   it.each(['anthropic', 'openai', 'openai-compatible'] as const)(
     'reports a %s refusal before returning tools',
     async (protocol) => {
