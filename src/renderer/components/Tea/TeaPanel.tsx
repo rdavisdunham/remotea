@@ -7,6 +7,7 @@ import { requestTea } from '../../remote-sessions/tea';
 import { useStore } from '../../store';
 import { findSurfaceOwner } from '../../store/split-utils';
 import { requestFocusSurface } from '../Git/open-git';
+import { highlightTerminal } from '../../utils/terminal-highlight';
 import '../../styles/tea.css';
 
 export default function TeaPanel({
@@ -55,8 +56,15 @@ export default function TeaPanel({
       setBusy(false);
     }
   };
+  const canSend = !!(
+    text.trim() &&
+    !busy &&
+    view?.connected &&
+    tea?.config.enabled &&
+    tea.modelChecks.chat
+  );
   const send = async () => {
-    if (!text.trim() || busy) return;
+    if (!canSend) return;
     const input =
       pending.current?.text === text
         ? pending.current
@@ -73,8 +81,10 @@ export default function TeaPanel({
       useStore.getState().workspaces,
       id as SurfaceId,
     );
-    if (owner) requestFocusSurface(owner.workspaceId, id as SurfaceId);
-    else
+    if (owner) {
+      requestFocusSurface(owner.workspaceId, id as SurfaceId);
+      highlightTerminal(id);
+    } else
       setError(
         'This terminal is not placed in this window. Open it through Host activity.',
       );
@@ -304,19 +314,28 @@ export default function TeaPanel({
           value={text}
           maxLength={8000}
           onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (
+              event.key === 'Enter' &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing &&
+              event.nativeEvent.keyCode !== 229
+            ) {
+              event.preventDefault();
+              void send();
+            }
+          }}
+          aria-describedby="tea-message-hint"
           placeholder="Where was I fixing the login settings?"
           disabled={busy || !view?.connected || !tea?.config.enabled}
         />
+        <p id="tea-message-hint" className="tea-panel__hint">
+          Enter to send · Shift+Enter for a new line
+        </p>
         <div className="tea-actions">
           <button
             type="submit"
-            disabled={
-              busy ||
-              !text.trim() ||
-              !view?.connected ||
-              !tea?.config.enabled ||
-              !tea?.modelChecks.chat
-            }
+            disabled={!canSend}
           >
             Send
           </button>

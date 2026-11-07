@@ -137,6 +137,29 @@ async function ready(tea: Tea) {
 }
 
 describe('Tea host state', () => {
+  it('requests a terminal highlight only on the device asking Tea', async () => {
+    let calls = 0;
+    const { tea, hub } = setup(async () => {
+      calls++;
+      return calls === 1
+        ? completion('', [{ id: 'open-fixture', name: 'open_terminal', input: { terminal_id: 'surf-test' } }])
+        : completion('Here is your fixture terminal.');
+    });
+    await ready(tea);
+    const first = new FakeConn(1), second = new FakeConn(2);
+    for (const [connection, id] of [[first, device], [second, 'device-two']] as const) {
+      hub.connect(connection);
+      hub.handle(connection, {
+        t: 'hello', proto: 1, device: { id, name: id },
+        app: { name: 'test', version: '1' }, features: ['focus'],
+      });
+    }
+    await tea.request({ action: 'send', id: 'message-open-fixture', text: 'Show my fixture terminal' }, device);
+    await vi.waitFor(() => expect(tea.state().turns[0].state).toBe('done'));
+    expect(first.json('focus')).toEqual([{ t: 'focus', id: 'surf-test', highlight: true }]);
+    expect(second.json('focus')).toEqual([]);
+  });
+
   it('publishes partial text before completion and finalizes the same message', async () => {
     let emit!: (delta: string) => void;
     let finish!: (value: TeaCompletion) => void;

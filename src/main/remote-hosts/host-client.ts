@@ -121,7 +121,7 @@ export interface HostClientDeps {
    * (Eridani's "Open terminal in remotea"). Hello lists the `focus` feature
    * only when this is set.
    */
-  onFocus?: (id: RemoteSurfaceId, runId?: string) => void;
+  onFocus?: (id: RemoteSurfaceId, runId?: string, highlight?: boolean) => void;
   socket?: SocketFactory;
   timers?: ClientTimers;
   now?: () => number;
@@ -827,7 +827,7 @@ export class RemoteHostClient {
       }
       case 'focus':
         diag('surf.focus', { host: this.hostId }, msg.id);
-        this.deps.onFocus?.(msg.id, msg.runId);
+        this.deps.onFocus?.(msg.id, msg.runId, msg.highlight);
         return;
       case 'fsResult': {
         const w = this.fsWaiters.get(msg.rid);

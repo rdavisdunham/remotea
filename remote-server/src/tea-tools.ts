@@ -47,7 +47,7 @@ export const TEA_TOOLS: TeaTool[] = [
   ),
   tool(
     'open_terminal',
-    'Request that the device asking Tea select this existing terminal. Reports delivery to an app, which is separate from a confirmed UI selection.',
+    'Request that the device asking Tea select and highlight this existing terminal until the operator clicks it. Use this to point out a terminal the operator asks to locate. Reports delivery to an app, which is separate from a confirmed UI selection.',
     { terminal_id: string },
   ),
   tool(

@@ -103,6 +103,11 @@
 .tea-panel form {
   padding: 10px 12px;
 }
+.tea-panel__hint {
+  margin: 6px 0;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+}
 .tea-panel textarea {
   display: block;
   box-sizing: border-box;

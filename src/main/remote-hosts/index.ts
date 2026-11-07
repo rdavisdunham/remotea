@@ -39,7 +39,7 @@ export class RemoteHosts {
   private readonly hooksNotNow = new Set<string>();
   private metaListener: ((surfaceId: string, meta: { cwd?: string }) => void) | undefined;
   private rpcListener: ((surfaceId: string, method: string, params: Record<string, unknown>, replay: boolean) => void) | undefined;
-  private focusListener: ((surfaceId: string, windowIds: number[]) => void) | undefined;
+  private focusListener: ((surfaceId: string, windowIds: number[], highlight?: boolean) => void) | undefined;
   /** Per renderer window: whether its layout is restored, and the remote tabs it shows. */
   private readonly windows = new Map<number, { ready: boolean; ids: Set<string>; send: (payload: RegistryPayload) => void }>();
 
@@ -65,7 +65,7 @@ export class RemoteHosts {
    * (Eridani's terminal.focus): the session and the renderer windows
    * (webContents ids) that show it, oldest first; empty when none does yet.
    */
-  setFocusListener(fn: (surfaceId: string, windowIds: number[]) => void): void {
+  setFocusListener(fn: (surfaceId: string, windowIds: number[], highlight?: boolean) => void): void {
     this.focusListener = fn;
   }
 
@@ -99,7 +99,7 @@ export class RemoteHosts {
         onRegistry: () => this.registryChanged(),
         onMeta: (id, meta) => this.metaListener?.(id, meta),
         onRpc: (id, method, params, replay) => this.rpcListener?.(id, method, params, replay),
-        onFocus: (id) => this.focusListener?.(id, this.windowsShowing(id)),
+        onFocus: (id, _runId, highlight) => this.focusListener?.(id, this.windowsShowing(id), highlight),
         hooksPromptDeclined: () => this.hooksNotNow.has(host.id) || !!this.store.get(host.id)?.hooksPromptDeclined,
         socket: this.deps.socket,
         log: this.log,

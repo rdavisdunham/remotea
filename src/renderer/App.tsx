@@ -704,7 +704,7 @@ export default function App() {
   // this layer but --ui-bg-1, and fading toward the app's own chrome colour is
   // not a look anyone asked for.
   const customBgOpacity = customBgLayerAlpha(appearancePrefs, transparencyPending);
-  // Browser panel auto-opens on startup unless disabled in Settings (issue #22).
+  // Browser startup is opt-in through Settings.
   const [browserOpen, setBrowserOpen] = useState(() => useStore.getState().browserPrefs.openOnStartup);
   // Subscribed rather than read once: the start page (#212) can change under a
   // `wmux reload-config`, and a panel already mounted for a workspace that has
