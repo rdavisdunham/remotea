@@ -43,6 +43,8 @@ Keys are write-only and stored in the host's private configuration directory. A 
 
 Expand a workspace's terminal list to see quick work summaries alongside current activity. Tea generates names for terminals without custom names. A name you set takes precedence across devices. Use **Use automatic name** in a tab's context menu to clear your override. Summaries keep updating under custom names. The updating label identifies a summary awaiting newer captured evidence.
 
+Tea shows a thinking bubble while requesting a reply, then streams its text into the same conversation bubble. A cursor and Responding indicator show generation in progress. You can scroll through earlier messages while new text arrives. Interrupted text is marked as a partial reply. Continue saved turn replaces that draft in place.
+
 Tea saves accepted messages and action receipts before continuing. Closing the desktop leaves host work running. After a host restart or provider interruption, **Continue saved turn** reconciles confirmed actions. **Cancel turn** abandons the remaining work. Previously applied names and reminders remain recorded. If delivery is unconfirmed, refresh and retry the same message to reconcile its saved ID.
 
 ## Inspect Eridani work

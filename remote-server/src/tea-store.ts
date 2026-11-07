@@ -29,6 +29,7 @@ export interface SavedTeaTurn extends TeaTurn {
   device: string;
   text: string;
   started?: boolean;
+  draftMessageId?: string;
   rounds: number;
   pending?: TeaCompletion;
   receipts: Record<string, TeaCallReceipt>;
@@ -88,6 +89,8 @@ export class TeaStore {
       )
         throw new Error('Invalid Tea state');
       this.data = saved;
+      for (const message of this.data.messages)
+        if (message.delivery === 'streaming') message.delivery = 'interrupted';
       for (const turn of this.data.turns)
         if (turn.state === 'working') {
           turn.state = 'interrupted';

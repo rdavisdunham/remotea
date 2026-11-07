@@ -22,7 +22,7 @@
  * and the server.
  */
 
-import { isTeaCommand, type TeaCommand, type TeaReply, type TeaState, type TeaInsight } from './tea';
+import { isTeaCommand, type TeaCommand, type TeaReply, type TeaState, type TeaInsight, type TeaMessage } from './tea';
 
 export const PROTO = 1;
 
@@ -477,6 +477,7 @@ export type ServerMsg =
   | { t: 'fsResult'; rid: number; result: unknown }
   | { t: 'teaResult'; rid: number; result: TeaReply }
   | { t: 'teaChanged'; state: TeaState }
+  | { t: 'teaStream'; revision: number; message: TeaMessage }
   /**
    * Bring session `id`'s tab to the front (Eridani's "Open terminal in
    * remotea"). Sent only to apps whose hello listed the `focus` feature.
@@ -684,7 +685,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
 const SERVER_TYPES = new Set([
   'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
   'sessionAdded', 'sessionUpdated', 'sessionClosed', 'groupUpserted', 'groupClosed',
-  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus', 'fsResult', 'focus', 'teaResult', 'teaChanged',
+  'goingAway', 'pong', 'error', 'rpc', 'hooksStatus', 'fsResult', 'focus', 'teaResult', 'teaChanged', 'teaStream',
 ]);
 
 /**
@@ -695,6 +696,8 @@ export function parseServerMsg(raw: unknown): ServerMsg | null {
   if (!isObj(raw) || typeof raw.t !== 'string' || !SERVER_TYPES.has(raw.t)) return null;
   const m = raw;
   switch (m.t) {
+    case 'teaStream':
+      return isInt(m.revision, 0, Number.MAX_SAFE_INTEGER) && isObj(m.message) && typeof m.message.id === 'string' && /^[A-Za-z0-9_-]{8,96}$/.test(m.message.id) && m.message.role === 'assistant' && typeof m.message.text === 'string' && m.message.text.length <= 12000 && isInt(m.message.at, 0, Number.MAX_SAFE_INTEGER) && m.message.delivery === 'streaming' ? (m as unknown as ServerMsg) : null;
     case 'teaChanged':
       return isObj(m.state) && typeof m.state.revision === 'number' && isObj(m.state.config) && Array.isArray(m.state.messages) && Array.isArray(m.state.turns) ? (m as unknown as ServerMsg) : null;
     case 'teaResult':

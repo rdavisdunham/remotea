@@ -30,6 +30,7 @@ export interface TeaProviderRequest {
   tools?: TeaTool[];
   schema?: Record<string, unknown>;
   signal: AbortSignal;
+  onText?: (delta: string) => void;
 }
 
 export const INSIGHT_SCHEMA = {
@@ -143,42 +144,45 @@ export class TeaProvider {
   }
 
   async complete(request: TeaProviderRequest): Promise<TeaCompletion> {
-    const { system, history, tools, schema, signal } = request;
+    const { system, history, tools, schema, signal, onText } = request;
     const effort = this.role.effort === 'auto' ? undefined : this.role.effort;
     if (this.anthropic) {
-      const response = await this.anthropic.messages.create(
-        {
-          model: this.role.model,
-          system,
-          max_tokens: schema ? 2048 : 12000,
-          messages: history as Anthropic.MessageParam[],
-          ...(tools
-            ? {
-                tools: tools.map((tool) => ({
-                  name: tool.name,
-                  description: tool.description,
-                  input_schema: tool.parameters as Anthropic.Tool.InputSchema,
-                  strict: true,
-                })),
-                tool_choice: { type: 'auto' as const },
-              }
-            : {}),
-          ...(schema || effort
-            ? {
-                output_config: {
-                  ...(schema
-                    ? { format: { type: 'json_schema' as const, schema } }
-                    : {}),
-                  ...(effort ? { effort } : {}),
-                },
-              }
-            : {}),
-          ...(schema && /^claude-haiku-5-5(?:-|$)/.test(this.role.model)
-            ? { thinking: { type: 'disabled' as const } }
-            : {}),
-        },
-        { signal },
-      );
+      const parameters = {
+        model: this.role.model,
+        system,
+        max_tokens: schema ? 2048 : 12000,
+        messages: history as Anthropic.MessageParam[],
+        ...(tools
+          ? {
+              tools: tools.map((tool) => ({
+                name: tool.name,
+                description: tool.description,
+                input_schema: tool.parameters as Anthropic.Tool.InputSchema,
+                strict: true,
+              })),
+              tool_choice: { type: 'auto' as const },
+            }
+          : {}),
+        ...(schema || effort
+          ? {
+              output_config: {
+                ...(schema
+                  ? { format: { type: 'json_schema' as const, schema } }
+                  : {}),
+                ...(effort ? { effort } : {}),
+              },
+            }
+          : {}),
+        ...(schema && /^claude-haiku-5-5(?:-|$)/.test(this.role.model)
+          ? { thinking: { type: 'disabled' as const } }
+          : {}),
+      } satisfies Anthropic.MessageCreateParamsNonStreaming;
+      const response = onText
+        ? await this.anthropic.messages
+            .stream(parameters, { signal })
+            .on('text', (delta) => onText(delta))
+            .finalMessage()
+        : await this.anthropic.messages.create(parameters, { signal });
       if (response.stop_reason === 'refusal')
         throw new TeaFault(
           'The model declined this request. Revise the request before trying again.',
@@ -204,45 +208,47 @@ export class TeaProvider {
           .join(''),
         calls,
         output: [{ role: 'assistant', content: response.content }],
-        requestId: response._request_id ?? undefined,
+        requestId: (response as { _request_id?: string })._request_id,
       };
     }
     if (this.connection.protocol === 'openai') {
-      const response = await this.openai!.responses.create(
-        {
-          model: this.role.model,
-          instructions: system,
-          input: history as OpenAI.Responses.ResponseInput,
-          store: false,
-          include: ['reasoning.encrypted_content'],
-          max_output_tokens: schema ? 4096 : 12000,
-          ...(effort ? { reasoning: { effort } } : {}),
-          ...(tools
-            ? {
-                tools: tools.map((tool) => ({
-                  type: 'function' as const,
-                  name: tool.name,
-                  description: tool.description,
-                  parameters: tool.parameters,
+      const parameters = {
+        model: this.role.model,
+        instructions: system,
+        input: history as OpenAI.Responses.ResponseInput,
+        store: false,
+        include: ['reasoning.encrypted_content'],
+        max_output_tokens: schema ? 4096 : 12000,
+        ...(effort ? { reasoning: { effort } } : {}),
+        ...(tools
+          ? {
+              tools: tools.map((tool) => ({
+                type: 'function' as const,
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.parameters,
+                strict: true,
+              })),
+            }
+          : {}),
+        ...(schema
+          ? {
+              text: {
+                format: {
+                  type: 'json_schema' as const,
+                  name: 'tea_insight',
+                  schema,
                   strict: true,
-                })),
-              }
-            : {}),
-          ...(schema
-            ? {
-                text: {
-                  format: {
-                    type: 'json_schema' as const,
-                    name: 'tea_insight',
-                    schema,
-                    strict: true,
-                  },
                 },
-              }
-            : {}),
-        },
-        { signal },
-      );
+              },
+            }
+          : {}),
+      } satisfies OpenAI.Responses.ResponseCreateParamsNonStreaming;
+      const response = onText
+        ? await this.openai!.responses.stream(parameters, { signal })
+            .on('response.output_text.delta', (event) => onText(event.delta))
+            .finalResponse()
+        : await this.openai!.responses.create(parameters, { signal });
       if (response.status !== 'completed')
         throw new TeaFault(
           'The provider stopped before a complete reply. Check the output limit and continue the turn.',
@@ -257,7 +263,8 @@ export class TeaProvider {
         throw new TeaFault(
           'The model declined this request. Revise the request before trying again.',
         );
-      const calls = response.output
+      const output: OpenAI.Responses.ResponseOutputItem[] = response.output;
+      const calls = output
         .filter((item) => item.type === 'function_call')
         .map((item) => ({
           id: item.call_id,
@@ -267,43 +274,45 @@ export class TeaProvider {
       return {
         text: response.output_text,
         calls,
-        output: toResponseInputItems(response.output),
-        requestId: response._request_id ?? undefined,
+        output: toResponseInputItems(output),
+        requestId: (response as { _request_id?: string })._request_id,
       };
     }
-    const response = await this.openai!.chat.completions.create(
-      {
-        model: this.role.model,
-        messages: [
-          { role: 'system', content: system },
-          ...history,
-        ] as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-        max_tokens: schema ? 2048 : 12000,
-        ...(effort ? { reasoning_effort: effort } : {}),
-        ...(tools
-          ? {
-              tools: tools.map((tool) => ({
-                type: 'function' as const,
-                function: {
-                  name: tool.name,
-                  description: tool.description,
-                  parameters: tool.parameters,
-                  strict: true,
-                },
-              })),
-            }
-          : {}),
-        ...(schema
-          ? {
-              response_format: {
-                type: 'json_schema' as const,
-                json_schema: { name: 'tea_insight', schema, strict: true },
+    const parameters = {
+      model: this.role.model,
+      messages: [
+        { role: 'system', content: system },
+        ...history,
+      ] as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+      max_tokens: schema ? 2048 : 12000,
+      ...(effort ? { reasoning_effort: effort } : {}),
+      ...(tools
+        ? {
+            tools: tools.map((tool) => ({
+              type: 'function' as const,
+              function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.parameters,
+                strict: true,
               },
-            }
-          : {}),
-      },
-      { signal },
-    );
+            })),
+          }
+        : {}),
+      ...(schema
+        ? {
+            response_format: {
+              type: 'json_schema' as const,
+              json_schema: { name: 'tea_insight', schema, strict: true },
+            },
+          }
+        : {}),
+    } satisfies OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+    const response = onText
+      ? await this.openai!.chat.completions.stream(parameters, { signal })
+          .on('content', (delta) => onText(delta))
+          .finalChatCompletion()
+      : await this.openai!.chat.completions.create(parameters, { signal });
     const choice = response.choices[0];
     if (choice?.message.refusal)
       throw new TeaFault(
@@ -323,11 +332,24 @@ export class TeaProvider {
         input: JSON.parse(call.function.arguments),
       };
     });
+    // Streaming helpers attach parsed values that are not wire message fields.
+    const message = { ...choice.message };
+    delete (message as { parsed?: unknown }).parsed;
+    if (message.tool_calls)
+      message.tool_calls = message.tool_calls.map((call) => {
+        if (call.type !== 'function')
+          throw new Error('Unsupported provider tool');
+        const fn = { ...call.function };
+        delete (fn as { parsed_arguments?: unknown }).parsed_arguments;
+        const wire = { ...call, function: fn };
+        delete (wire as { index?: number }).index;
+        return wire;
+      });
     return {
       text: choice.message.content ?? '',
       calls,
-      output: [choice.message],
-      requestId: response._request_id ?? undefined,
+      output: [message],
+      requestId: (response as { _request_id?: string })._request_id,
     };
   }
 }

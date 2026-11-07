@@ -121,3 +121,13 @@ The full Linux server suite passed with 981 tests. The selected client transport
 An isolated Windows Electron app connected to a test server and a synthetic Anthropic-compatible endpoint. It verified the complete desktop-to-provider path for model discovery, structured output and tool-result replay. Captured terminal hooks produced a shared name and summary. An explicit custom name remained authoritative. Sending a real panel message exercised terminal search and returned an actionable terminal link. The panel and send controls fitted within the desktop viewport. This fixture check used a synthetic key and synthetic model responses.
 
 Real account authentication, model availability and response quality require the operator's configured API key. The built-in tests cover authentication, generation contracts and replay. Human review of initial live summaries and terminal selections will establish the quality baseline for the chosen models.
+
+## Reply streaming
+
+Conversational requests stream public text through the native provider SDK helpers for Anthropic Messages, OpenAI Responses and compatible Chat Completions. The helpers also produce the complete final response for validated tool execution and provider-state replay. Conversational capability checks exercise streaming tool calls and result replay.
+
+The host coalesces redacted preview updates at 100 ms intervals and checkpoints active text approximately once per second. Final response state, cancellation and interruption flush the saved message state. Reconnecting apps receive the current partial reply through their initial host snapshot. Older desktops receive periodic complete state snapshots.
+
+A partial reply has a stable message ID. An interrupted request preserves its readable draft, and an explicit retry replaces that draft. Incomplete streams cannot authorize tool execution. Stream rendering shows Thinking before visible text, Responding during output and an interrupted-partial label after interruption. Auto-scroll follows new output while the reader is near the bottom. Animation respects reduced-motion preferences.
+
+Preview redaction waits for complete words and handles configured credentials across chunk boundaries. Provider reasoning and tool argument fragments remain in private adapter state until a complete response is available. Native provider references are [OpenAI streaming](https://developers.openai.com/api/docs/guides/streaming-responses) and [Anthropic streaming](https://platform.claude.com/docs/en/build-with-claude/streaming).

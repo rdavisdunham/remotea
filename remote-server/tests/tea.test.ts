@@ -137,6 +137,182 @@ async function ready(tea: Tea) {
 }
 
 describe('Tea host state', () => {
+  it('publishes partial text before completion and finalizes the same message', async () => {
+    let emit!: (delta: string) => void;
+    let finish!: (value: TeaCompletion) => void;
+    const { tea, hub } = setup(async (request) => {
+      emit = request.onText!;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    await ready(tea);
+    const conn = new FakeConn(1);
+    hub.connect(conn);
+    hub.handle(conn, {
+      t: 'hello',
+      proto: 1,
+      device: { id: device, name: 'Test' },
+      app: { name: 'test', version: '1' },
+    });
+    await tea.request(
+      { action: 'send', id: 'message-streaming', text: 'Say hello' },
+      device,
+    );
+    await vi.waitFor(() => expect(emit).toBeTypeOf('function'));
+    emit('Hello ');
+    const partial = tea
+      .state()
+      .messages.find((message) => message.role === 'assistant')!;
+    expect(partial).toMatchObject({ text: 'Hello ', delivery: 'streaming' });
+    expect(tea.state().turns[0].state).toBe('working');
+    const reconnected = new FakeConn(2);
+    hub.connect(reconnected);
+    hub.handle(reconnected, {
+      t: 'hello',
+      proto: 1,
+      device: { id: 'device-reconnected', name: 'Second app' },
+      app: { name: 'test', version: '1' },
+    });
+    expect(
+      reconnected
+        .json('teaChanged')[0]
+        ?.state.messages.find((message) => message.id === partial.id)?.text,
+    ).toBe('Hello ');
+    emit('there ');
+    await vi.waitFor(() =>
+      expect(conn.json('teaStream').at(-1)?.message.text).toBe('Hello there '),
+    );
+    finish(completion('Hello there!'));
+    await vi.waitFor(() => expect(tea.state().turns[0].state).toBe('done'));
+    expect(
+      tea.state().messages.filter((message) => message.role === 'assistant'),
+    ).toEqual([{ ...partial, text: 'Hello there!', delivery: undefined }]);
+  });
+
+  it('keeps an interrupted draft readable across restart and replaces it on retry', async () => {
+    let attempts = 0;
+    const { tea, create } = setup(async (request) => {
+      attempts++;
+      request.onText!('A partial ');
+      if (attempts === 1) throw new Error('Fixture connection lost');
+      return completion('A complete answer.');
+    });
+    await ready(tea);
+    await tea.request(
+      { action: 'send', id: 'message-stream-retry', text: 'Answer please' },
+      device,
+    );
+    await vi.waitFor(() =>
+      expect(tea.state().turns[0].state).toBe('interrupted'),
+    );
+    const draft = tea
+      .state()
+      .messages.find((message) => message.role === 'assistant')!;
+    expect(draft.delivery).toBe('interrupted');
+    tea.stop();
+    const restored = create();
+    expect(
+      restored.state().messages.find((message) => message.id === draft.id)
+        ?.delivery,
+    ).toBe('interrupted');
+    await restored.request(
+      { action: 'retry', id: 'message-stream-retry' },
+      device,
+    );
+    await vi.waitFor(() =>
+      expect(restored.state().turns[0].state).toBe('done'),
+    );
+    expect(
+      restored
+        .state()
+        .messages.filter((message) => message.role === 'assistant'),
+    ).toEqual([{ ...draft, text: 'A complete answer.', delivery: undefined }]);
+  });
+
+  it('redacts keys split between streamed chunks and leaves tool execution until completion', async () => {
+    let finish!: (value: TeaCompletion) => void;
+    let emit!: (delta: string) => void;
+    const { tea, registry } = setup(async (request) => {
+      emit = request.onText!;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    await ready(tea);
+    await tea.request(
+      {
+        action: 'send',
+        id: 'message-stream-redaction',
+        text: 'Prepare a rename',
+      },
+      device,
+    );
+    await vi.waitFor(() => expect(emit).toBeTypeOf('function'));
+    emit('A key synthetic-secret-for-');
+    expect(
+      tea.state().messages.find((message) => message.role === 'assistant')
+        ?.text,
+    ).toBe('A key ');
+    emit('tea-tests is hidden. ');
+    expect(
+      tea.state().messages.find((message) => message.role === 'assistant')
+        ?.text,
+    ).toBe('A key [redacted] is hidden. ');
+    expect(registry.session('surf-test')?.title).toBeUndefined();
+    await tea.request(
+      { action: 'cancel', id: 'message-stream-redaction' },
+      device,
+    );
+    emit('This late chunk must be ignored. ');
+    finish(
+      completion('Late completed text.', [
+        {
+          id: 'tool-late',
+          name: 'set_terminal_name',
+          input: { terminal_id: 'surf-test', title: 'Unapproved late rename' },
+        },
+      ]),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(registry.session('surf-test')?.title).toBeUndefined();
+    expect(
+      tea.state().messages.find((message) => message.role === 'assistant'),
+    ).toMatchObject({
+      text: 'A key [redacted] is hidden. ',
+      delivery: 'interrupted',
+    });
+  });
+
+  it('marks a checkpointed in-flight stream interrupted when the host reopens its state', async () => {
+    let emit!: (delta: string) => void;
+    let finish!: (value: TeaCompletion) => void;
+    const { tea, dir } = setup(async (request) => {
+      emit = request.onText!;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    await ready(tea);
+    await tea.request(
+      { action: 'send', id: 'message-stream-reopen', text: 'Continue later' },
+      device,
+    );
+    await vi.waitFor(() => expect(emit).toBeTypeOf('function'));
+    emit('Checkpointed words ');
+    const reopened = new TeaStore(path.join(dir, 'tea-state.json'));
+    expect(
+      reopened.data.messages.find((message) => message.role === 'assistant')
+        ?.delivery,
+    ).toBe('interrupted');
+    expect(reopened.data.turns[0].state).toBe('interrupted');
+    await tea.request(
+      { action: 'cancel', id: 'message-stream-reopen' },
+      device,
+    );
+    finish(completion('Stopped.'));
+  });
+
   it('purges removed connection credentials from persistent state', () => {
     const { tea, dir } = setup();
     tea.store.configure(configuration(), 0);

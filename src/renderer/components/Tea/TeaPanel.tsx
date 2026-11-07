@@ -26,6 +26,7 @@ export default function TeaPanel({
   const [busy, setBusy] = useState(false);
   const pending = useRef<{ id: string; text: string } | undefined>(undefined);
   const messages = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -38,9 +39,12 @@ export default function TeaPanel({
       void requestTea(hostId, { action: 'state' });
   }, [hostId, view?.connected, view?.teaAvailable, !!tea]);
   useEffect(() => {
-    if (messages.current)
+    following.current = true;
+  }, [hostId]);
+  useEffect(() => {
+    if (messages.current && following.current)
       messages.current.scrollTop = messages.current.scrollHeight;
-  }, [tea?.messages.length, hostId]);
+  }, [tea?.messages, tea?.turns, hostId]);
   const command = async (action: Parameters<typeof requestTea>[1]) => {
     setBusy(true);
     try {
@@ -76,6 +80,9 @@ export default function TeaPanel({
       );
   };
   const active = tea?.turns.find((turn) => turn.state === 'working');
+  const responding = tea?.messages.some(
+    (message) => message.delivery === 'streaming' && !!message.text,
+  );
   const queued =
     tea?.turns.filter((turn) => turn.state === 'queued').length || 0;
   const recovery =
@@ -122,7 +129,16 @@ export default function TeaPanel({
           Configure Tea
         </button>
       </div>
-      <div className="tea-panel__messages" ref={messages}>
+      <div
+        className="tea-panel__messages"
+        ref={messages}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          following.current =
+            element.scrollHeight - element.scrollTop - element.clientHeight <
+            64;
+        }}
+      >
         {!tea?.config.enabled && (
           <p>Enable Tea and configure its provider models in Settings → Tea.</p>
         )}
@@ -141,6 +157,7 @@ export default function TeaPanel({
             </p>
           )}
         {tea?.messages.map((message) => {
+          if (message.delivery === 'streaming' && !message.text) return null;
           if (message.role === 'tool')
             return (
               <details
@@ -160,7 +177,19 @@ export default function TeaPanel({
               key={message.id}
             >
               <strong>{message.role === 'user' ? 'You' : 'Tea'}</strong>
-              <p>{message.text}</p>
+              {message.delivery === 'interrupted' && (
+                <span className="tea-message__partial">
+                  Partial reply · interrupted
+                </span>
+              )}
+              <p>
+                {message.text}
+                {message.delivery === 'streaming' && (
+                  <span className="tea-message__cursor" aria-hidden="true">
+                    ▍
+                  </span>
+                )}
+              </p>
               {message.role === 'user' &&
                 tea.turns.some(
                   (turn) => turn.id === message.id && turn.state === 'queued',
@@ -176,6 +205,7 @@ export default function TeaPanel({
                   </button>
                 )}
               {message.role === 'assistant' &&
+                !message.delivery &&
                 ids.map((id) => (
                   <button type="button" key={id} onClick={() => focus(id)}>
                     Open{' '}
@@ -189,6 +219,20 @@ export default function TeaPanel({
             </article>
           );
         })}
+        {view?.connected && active?.phase === 'Thinking' && (
+          <div
+            className="tea-thinking"
+            role="status"
+            aria-label={responding ? 'Tea is responding' : 'Tea is thinking'}
+          >
+            <span className="tea-thinking__dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span>{responding ? 'Responding' : 'Thinking'}</span>
+          </div>
+        )}
       </div>
       <div className="tea-panel__status" role="status">
         {!view?.connected

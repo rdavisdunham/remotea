@@ -432,6 +432,88 @@ describe('Tea settings discovery', () => {
 });
 
 describe('Tea conversation panel', () => {
+  it('shows a thinking bubble before text and updates the same reply while streaming', () => {
+    const current = state();
+    current.turns = [
+      { id: 'turn-stream', state: 'working', phase: 'Thinking' },
+    ];
+    setLatestRemoteViews([view(current)]);
+    act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
+    expect(
+      document.querySelector('[aria-label="Tea is thinking"]'),
+    ).not.toBeNull();
+    const partial = {
+      ...current,
+      messages: [
+        {
+          id: 'reply-stream',
+          role: 'assistant' as const,
+          text: 'First ',
+          at: 1,
+          delivery: 'streaming' as const,
+        },
+      ],
+    };
+    act(() => setLatestRemoteViews([view(partial)]));
+    expect(document.querySelectorAll('.tea-message--assistant')).toHaveLength(
+      1,
+    );
+    expect(document.querySelector('.tea-message__cursor')).not.toBeNull();
+    expect(
+      document.querySelector('[aria-label="Tea is responding"]'),
+    ).not.toBeNull();
+    const scroll = document.querySelector<HTMLDivElement>(
+      '.tea-panel__messages',
+    )!;
+    Object.defineProperties(scroll, {
+      scrollHeight: { value: 1000 },
+      clientHeight: { value: 100 },
+    });
+    scroll.scrollTop = 50;
+    act(() => scroll.dispatchEvent(new Event('scroll', { bubbles: true })));
+    const finished = {
+      ...current,
+      messages: [
+        {
+          id: 'reply-stream',
+          role: 'assistant' as const,
+          text: 'First second done.',
+          at: 1,
+        },
+      ],
+      turns: [{ id: 'turn-stream', state: 'done' as const, phase: 'Finished' }],
+    };
+    act(() => setLatestRemoteViews([view(finished)]));
+    expect(document.querySelectorAll('.tea-message--assistant')).toHaveLength(
+      1,
+    );
+    expect(
+      document.querySelector('.tea-message--assistant')?.textContent,
+    ).toContain('First second done.');
+    expect(scroll.scrollTop).toBe(50);
+    expect(document.querySelector('.tea-thinking')).toBeNull();
+    expect(document.querySelector('.tea-message__cursor')).toBeNull();
+  });
+
+  it('keeps an interrupted reply visibly partial', () => {
+    const current = state();
+    current.messages = [
+      {
+        id: 'reply-interrupted',
+        role: 'assistant',
+        text: 'Unfinished words',
+        at: 1,
+        delivery: 'interrupted',
+      },
+    ];
+    act(() => setLatestRemoteViews([view(current)]));
+    act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
+    expect(
+      document.querySelector('.tea-message__partial')?.textContent,
+    ).toContain('interrupted');
+    expect(document.querySelector('.tea-message__cursor')).toBeNull();
+  });
+
   it('opens Tea settings for the currently selected host', async () => {
     const close = vi.fn(),
       settings = vi.fn();
