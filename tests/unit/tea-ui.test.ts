@@ -195,6 +195,9 @@ describe('Tea conversation panel', () => {
       document.querySelector('.tea-panel__notices')?.textContent,
     ).toContain('Provider disconnected');
     expect(button('Continue saved turn').disabled).toBe(false);
+    expect(document.querySelector('.tea-panel__status')?.textContent).toContain(
+      'Needs you',
+    );
     act(() =>
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })),
     );

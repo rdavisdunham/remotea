@@ -113,3 +113,11 @@ The host keeps up to 300 recent public messages, exposes the latest 180 to apps,
 API keys live in a permission-restricted local file under the host's configuration directory. They are available to the account running the host service. Removing a provider profile deletes its saved credential. Settings and model tests make billable provider calls. The first release has bounded job sizes and queues. Spending limits can also be managed in the chosen provider account.
 
 The test suite uses synthetic provider responses and terminal evidence. Real provider authentication, access and model quality are verified through the app after the operator supplies a key.
+
+## Verification results
+
+The full Linux server suite passed with 978 tests. The selected client transport, naming, host integration and UI suites passed with 121 tests. App and server typechecks, main/preload compilation, renderer production bundling and server compilation also passed.
+
+An isolated Windows Electron app connected to a test server and a synthetic Anthropic-compatible endpoint. It verified the complete desktop-to-provider path for model discovery, structured output and tool-result replay. Captured terminal hooks produced a shared name and summary. An explicit custom name remained authoritative. Sending a real panel message exercised terminal search and returned an actionable terminal link. The panel and send controls fitted within the desktop viewport. This fixture check used a synthetic key and synthetic model responses.
+
+Real account authentication, model availability and response quality require the operator's configured API key. The built-in tests cover authentication, generation contracts and replay. Human review of initial live summaries and terminal selections will establish the quality baseline for the chosen models.

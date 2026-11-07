@@ -78,6 +78,10 @@ export default function TeaPanel({
   const active = tea?.turns.find((turn) => turn.state === 'working');
   const queued =
     tea?.turns.filter((turn) => turn.state === 'queued').length || 0;
+  const recovery =
+    tea?.turns.filter(
+      (turn) => turn.state === 'interrupted' || turn.state === 'failed',
+    ) ?? [];
   return createPortal(
     <section className="tea-panel" role="dialog" aria-label="Tea assistant">
       <header>
@@ -184,11 +188,15 @@ export default function TeaPanel({
       <div className="tea-panel__status" role="status">
         {!view?.connected
           ? 'Host disconnected'
-          : active
-            ? `Tea · ${active.phase || 'Working'}`
-            : queued
-              ? `${queued} message${queued === 1 ? '' : 's'} queued`
-              : 'Ready'}
+          : !tea?.config.enabled
+            ? 'Tea disabled'
+            : active
+              ? `Tea · ${active.phase || 'Working'}`
+              : recovery.length
+                ? 'Needs you · continue or cancel a saved turn'
+                : queued
+                  ? `${queued} message${queued === 1 ? '' : 's'} queued`
+                  : 'Ready'}
         {!!tea?.backgroundPending && (
           <span>
             {' '}
@@ -198,29 +206,25 @@ export default function TeaPanel({
         )}
       </div>
       <div className="tea-panel__notices">
-        {tea?.turns
-          .filter(
-            (turn) => turn.state === 'interrupted' || turn.state === 'failed',
-          )
-          .map((turn) => (
-            <div className="tea-panel__notice" key={turn.id}>
-              <span>{turn.error || 'This turn needs recovery.'}</span>
-              <button
-                type="button"
-                disabled={busy || !view?.connected}
-                onClick={() => void command({ action: 'retry', id: turn.id })}
-              >
-                Continue saved turn
-              </button>
-              <button
-                type="button"
-                disabled={busy || !view?.connected}
-                onClick={() => void command({ action: 'cancel', id: turn.id })}
-              >
-                Cancel turn
-              </button>
-            </div>
-          ))}
+        {recovery.map((turn) => (
+          <div className="tea-panel__notice" key={turn.id}>
+            <span>{turn.error || 'This turn needs recovery.'}</span>
+            <button
+              type="button"
+              disabled={busy || !view?.connected}
+              onClick={() => void command({ action: 'retry', id: turn.id })}
+            >
+              Continue saved turn
+            </button>
+            <button
+              type="button"
+              disabled={busy || !view?.connected}
+              onClick={() => void command({ action: 'cancel', id: turn.id })}
+            >
+              Cancel turn
+            </button>
+          </div>
+        ))}
         {error && (
           <p className="tea-panel__notice" role="alert">
             {error}

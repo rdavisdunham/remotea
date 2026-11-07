@@ -48,7 +48,6 @@ export interface TeaMessage {
   role: 'user' | 'assistant' | 'tool';
   text: string;
   at: number;
-  terminalIds?: string[];
 }
 export interface TeaTurn {
   id: string;
