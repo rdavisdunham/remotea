@@ -101,6 +101,7 @@ import type { JournalRecord } from './eridani-journal';
 import type { ExecutionTarget, LaunchSpec } from './eridani-targets';
 import { liveWriters, type EnsuredWorktree, type WorktreeManager } from './worktrees';
 import { ManagedSessions, type ManagedSpec } from './managed-sessions';
+import { eridaniToolsForRole } from './managed-harness';
 import type { AutomationHoldCommand, RunCleanupCommand, RunCleanupSurface, RunCleanupSurfaceResult, RunPauseCommand } from '../../src/shared/eridani-link-protocol';
 import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
@@ -168,7 +169,9 @@ export function freshnessNote(wt: Pick<EnsuredWorktree, 'branch' | 'base' | 'bas
  */
 export const CLAUDE_READ_ONLY_TOOLS: readonly string[] = Object.freeze([
   'Read', 'Grep', 'Glob',
-  'Bash(git status *)', 'Bash(git log *)', 'Bash(git diff *)', 'Bash(git show *)', 'Bash(ls *)', 'Bash(cat *)', 'Bash(rg *)',
+  'Bash(git status *)', 'Bash(git log *)', 'Bash(git diff *)', 'Bash(git show *)',
+  'Bash(git ls-files *)', 'Bash(git ls-tree *)', 'Bash(git rev-parse *)',
+  'Bash(pwd)', 'Bash(ls *)', 'Bash(cat *)', 'Bash(rg *)',
 ]);
 export const CLAUDE_READ_ONLY_DENIED: readonly string[] = Object.freeze(['Edit', 'Write', 'NotebookEdit']);
 
@@ -779,7 +782,7 @@ export class Dispatch {
   }
 
   private roleMcpArgs(b: EridaniBinding, args: string[]): string[] {
-    const scope = b.role === 'reviewer' ? ['task_plan', 'submit_plan_review', 'session_link'] : b.role === 'worker' ? ['task_plan', 'task_step', 'session_link'] : ['task_plan', 'task_interview', 'submit_plan', 'session_link'];
+    const scope = eridaniToolsForRole(b.role);
     let scoped = [...args];
     if (b.harness === 'codex') scoped.push('-c', `mcp_servers.${MCP_SERVER_NAME}.enabled_tools=${JSON.stringify(scope)}`, '-c', `mcp_servers.${MCP_SERVER_NAME}.tool_timeout_sec=120`, ...scope.flatMap((tool) => ['-c', `mcp_servers.${MCP_SERVER_NAME}.tools.${tool}.approval_mode="auto"`]));
     else {
@@ -792,7 +795,14 @@ export class Dispatch {
 
   private prepareManaged(surf: string, b: EridaniBinding, launch: LaunchSpec, prompt: string, operationId: string, args: string[], env: Record<string, string>, incarnation = 1, origin?: 'human' | 'automation', automationHoldRevision?: number): void {
     const scoped = this.roleMcpArgs(b, args);
-    this.managed.prepare({ origin, automationHoldRevision, surf, runId: b.runId, generation: b.generation, incarnation, prompt, operationId, harness: b.harness, bin: launch.bin ?? b.harness, args: [...scoped, ...(launch.args ?? [])], cwd: b.worktree, env: { ...env, ...(this.mcpEnv.get(surf) ?? {}) }, model: b.model, effort: b.effort, planRevision: b.planRevision ?? b.verify?.planRevision ?? 0, profile: b.permissionProfile ?? (b.mode ? 'read-only' : 'workspace-write') });
+    this.managed.prepare({
+      origin, automationHoldRevision, surf, runId: b.runId, generation: b.generation, incarnation, prompt, operationId,
+      preapprovedEridaniTools: b.harness === 'claude' ? eridaniToolsForRole(b.role).map(tool => `mcp__${MCP_SERVER_NAME}__${tool}`) : undefined,
+      harness: b.harness, bin: launch.bin ?? b.harness, args: [...scoped, ...(launch.args ?? [])], cwd: b.worktree,
+      env: { ...env, ...(this.mcpEnv.get(surf) ?? {}) }, model: b.model, effort: b.effort,
+      planRevision: b.planRevision ?? b.verify?.planRevision ?? 0,
+      profile: b.permissionProfile ?? (b.mode ? 'read-only' : 'workspace-write'),
+    });
   }
 
   private automationBlocked(cmd: { run_id: string; origin?: 'human' | 'automation'; automation_hold?: boolean; automation_hold_revision?: number }): string | null {

@@ -99,7 +99,7 @@ const spawn = (over: Record<string, unknown> = {}) => ({
 const PLANNER = surfFor('run-1', 1, 1);
 const REVIEWER = surfFor('run-1', 1, 2);
 
-const CLAUDE_LISTS = `--allowedTools 'Read' 'Grep' 'Glob' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' --disallowedTools 'Edit' 'Write' 'NotebookEdit'`;
+const CLAUDE_LISTS = `--allowedTools 'Read' 'Grep' 'Glob' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(git ls-files *)' 'Bash(git ls-tree *)' 'Bash(git rev-parse *)' 'Bash(pwd)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' --disallowedTools 'Edit' 'Write' 'NotebookEdit'`;
 
 describe('hyperplan: read-only launch lines', () => {
   it('claude mode: review swaps auto for dontAsk with the allow and deny lists, before --model so the prompt is never a list value', () => {
