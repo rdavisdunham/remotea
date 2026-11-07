@@ -9,6 +9,9 @@ import { setLatestRemoteViews } from '../../src/renderer/remote-sessions/registr
 import { useRemoteHosts } from '../../src/renderer/remote-sessions/status';
 import type { RemoteRegistryView } from '../../src/shared/remote-hosts-types';
 import type { TeaReply, TeaState } from '../../src/shared/tea';
+import { useTerminalHighlight } from '../../src/renderer/utils/terminal-highlight';
+import { useStore } from '../../src/renderer/store';
+import type { PaneId, SurfaceId, WorkspaceId, WorkspaceInfo } from '../../src/shared/types';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 const request = vi.hoisted(() => vi.fn());
@@ -87,6 +90,7 @@ function input(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
   });
 }
 beforeEach(() => {
+  useTerminalHighlight.setState({ surfaceId: null });
   request.mockReset().mockResolvedValue({ ok: true });
   setLatestRemoteViews([view()]);
   useRemoteHosts.setState({
@@ -432,6 +436,101 @@ describe('Tea settings discovery', () => {
 });
 
 describe('Tea conversation panel', () => {
+  it('highlights the exact terminal selected from a reply', async () => {
+    const previous = useStore.getState().workspaces;
+    const workspace: WorkspaceInfo = {
+      id: 'fixture-workspace' as WorkspaceId, title: 'Fixture', pinned: false,
+      shell: 'bash', unreadCount: 0,
+      splitTree: {
+        type: 'leaf', paneId: 'fixture-pane' as PaneId, activeSurfaceIndex: 0,
+        surfaces: [{ id: 'surf-fixture' as SurfaceId, type: 'terminal' }],
+      },
+    };
+    useStore.setState({ workspaces: [workspace] });
+    const current = view();
+    current.tea!.messages = [{
+      id: 'reply-fixture', role: 'assistant', text: 'Here is surf-fixture.', at: 1,
+    }];
+    current.sessions = [{
+      id: 'surf-fixture', title: 'Fixture terminal', groupId: 'grp-fixture',
+      cwd: '/fixture', createdBy: 'test-device', bootId: 'boot', createdAt: 1,
+      state: 'live', hiddenBy: [],
+    }];
+    setLatestRemoteViews([current]);
+    try {
+      act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
+      await act(async () => button('Open Fixture terminal').click());
+      expect(useTerminalHighlight.getState().surfaceId).toBe('surf-fixture');
+    } finally {
+      useStore.setState({ workspaces: previous });
+    }
+  });
+
+  it('sends with Enter and keeps Shift+Enter and IME confirmation available', async () => {
+    act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
+    const textarea = document.querySelector<HTMLTextAreaElement>('#tea-message')!;
+    input(textarea, 'Find the fixture terminal');
+    for (const options of [
+      { shiftKey: true },
+      { isComposing: true },
+      { keyCode: 229 },
+    ]) {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Enter', bubbles: true, cancelable: true, ...options,
+      });
+      act(() => textarea.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(false);
+      expect(request).not.toHaveBeenCalled();
+    }
+    input(textarea, 'Find the fixture terminal\nwith the latest changes');
+    const enter = new KeyboardEvent('keydown', {
+      key: 'Enter', bubbles: true, cancelable: true,
+    });
+    await act(async () => textarea.dispatchEvent(enter));
+    expect(enter.defaultPrevented).toBe(true);
+    expect(request).toHaveBeenCalledExactlyOnceWith('desk', {
+      action: 'send', id: expect.any(String),
+      text: 'Find the fixture terminal\nwith the latest changes',
+    });
+    expect(textarea.value).toBe('');
+  });
+
+  it.each(['empty', 'unvalidated', 'disconnected', 'disabled'])(
+    'keeps Enter subject to Send eligibility when %s',
+    async (condition) => {
+      const current = view();
+      if (condition === 'unvalidated') current.tea!.modelChecks.chat = false;
+      if (condition === 'disconnected') current.connected = false;
+      if (condition === 'disabled') current.tea!.config.enabled = false;
+      setLatestRemoteViews([current]);
+      act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
+      const textarea = document.querySelector<HTMLTextAreaElement>('#tea-message')!;
+      if (condition !== 'empty') input(textarea, 'A fixture question');
+      await act(async () => textarea.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Enter', bubbles: true, cancelable: true,
+      })));
+      expect(button('Send').disabled).toBe(true);
+      expect(request).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not send a duplicate while the previous request is pending', async () => {
+    act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
+    const textarea = document.querySelector<HTMLTextAreaElement>('#tea-message')!;
+    input(textarea, 'A fixture question');
+    let resolve!: (reply: TeaReply) => void;
+    request.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter', bubbles: true, cancelable: true,
+    })));
+    act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter', bubbles: true, cancelable: true,
+    })));
+    expect(request).toHaveBeenCalledOnce();
+    await act(async () => resolve({ ok: true }));
+    expect(textarea.value).toBe('');
+  });
+
   it('shows a thinking bubble before text and updates the same reply while streaming', () => {
     const current = state();
     current.turns = [

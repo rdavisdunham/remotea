@@ -681,14 +681,14 @@ export class Hub {
    * older app would drop the message), and not a device that hid the
    * session. Returns how many apps were sent it: 0 means nobody can show it.
    */
-  focus(id: string, runId?: string, device?: string): number {
+  focus(id: string, runId?: string, device?: string, highlight = false): number {
     const rec = this.registry.session(id);
     if (!rec) return 0;
     let sent = 0;
     for (const c of this.conns.values()) {
       if (!c.device || !c.features?.has('focus') || rec.hiddenBy.includes(c.device.id)) continue;
       if (device && c.device.id !== device) continue;
-      c.sendJson({ t: 'focus', id: id as RemoteSurfaceId, ...(runId ? { runId } : {}) });
+      c.sendJson({ t: 'focus', id: id as RemoteSurfaceId, ...(runId ? { runId } : {}), ...(highlight ? { highlight: true } : {}) });
       sent++;
     }
     this.log(`focus ${id}: sent to ${sent} app${sent === 1 ? '' : 's'}`);

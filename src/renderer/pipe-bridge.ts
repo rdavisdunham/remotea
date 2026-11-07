@@ -16,6 +16,8 @@ import { promptSummary, type PromptEntry, type PromptSource } from './store/prom
 import { v4 as uuid } from 'uuid';
 import { buildManifestTree, describeWorkspaceTree, type ManifestWorkspaceSpec } from './store/manifest-tree';
 import { translate, type TranslationKey } from './i18n/core';
+import { requestFocusSurface } from './components/Git/open-git';
+import { highlightTerminal } from './utils/terminal-highlight';
 
 /** Non-hook context (bridges the main process to the store) — reads the current language directly. */
 const bridgeT = (key: TranslationKey, fallback?: string): string =>
@@ -500,7 +502,7 @@ export function initPipeBridge(): void {
     return { ok: false, error: 'Surface not found' };
   };
 
-  w.__wmux_focusSurface = (surfaceId: string, workspaceId?: string) => {
+  w.__wmux_focusSurface = (surfaceId: string, workspaceId?: string, highlight = false) => {
     const store = useStore.getState();
     for (const ws of searchScope(workspaceId)) {
       for (const pid of getAllPaneIds(ws.splitTree)) {
@@ -508,6 +510,10 @@ export function initPipeBridge(): void {
         const idx = leaf?.surfaces?.findIndex(s => s.id === surfaceId) ?? -1;
         if (idx >= 0) {
           store.selectSurface(ws.id, pid, idx);
+          if (highlight) {
+            requestFocusSurface(ws.id, surfaceId as SurfaceId);
+            highlightTerminal(surfaceId);
+          }
           return;
         }
       }

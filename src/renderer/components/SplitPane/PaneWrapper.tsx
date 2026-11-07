@@ -21,6 +21,7 @@ import { useStore } from '../../store';
 import { shouldRememberUrl } from '../../utils/browser-start-page';
 import { activeHistoryUrl } from '../../../shared/browser-history';
 import { keyDismissesAttention } from './attention-dismiss';
+import { dismissTerminalHighlight, useTerminalHighlight } from '../../utils/terminal-highlight';
 import type { SurfaceDragCommitOptions, SurfaceDragPayload, SurfaceDragPreviewTarget } from './drag-preview-types';
 import {
   getSurfaceDragDropDecision,
@@ -62,6 +63,9 @@ export default function PaneWrapper({
 }: PaneWrapperProps) {
   const t = useT();
   const { surfaces, activeSurfaceIndex, paneId } = leaf;
+  const highlightedSurfaceId = useTerminalHighlight((state) => state.surfaceId);
+  const activeSurface = surfaces[activeSurfaceIndex];
+  const teaHighlighted = activeSurface?.type === 'terminal' && activeSurface.id === highlightedSurfaceId;
 
   const notifications = useStore((s) => s.notifications);
   const markRead = useStore((s) => s.markRead);
@@ -87,6 +91,14 @@ export default function PaneWrapper({
 
   // Root element — the attention ring's interaction listeners hang off it.
   const paneRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane || !teaHighlighted || !highlightedSurfaceId) return;
+    // Native capture also sees clicks inside the kept-alive terminal portal.
+    const dismiss = () => dismissTerminalHighlight(highlightedSurfaceId);
+    pane.addEventListener('click', dismiss, true);
+    return () => pane.removeEventListener('click', dismiss, true);
+  }, [teaHighlighted, highlightedSurfaceId]);
 
   const hasUnread = useMemo(
     () => notifications.some((n) => !n.read && surfaceIds.includes(n.surfaceId as SurfaceId)),
@@ -689,6 +701,11 @@ export default function PaneWrapper({
       data-pane-id={paneId}
       className={`pane-wrapper ${isFocused ? 'pane-wrapper--focused' : ''} ${dragActive ? 'pane-wrapper--drag-active' : ''}`}
     >
+      {teaHighlighted && (
+        <div className="pane-wrapper__tea-highlight" role="status">
+          <span>Tea found this terminal · click to dismiss</span>
+        </div>
+      )}
       <SurfaceTabBar
         paneId={paneId}
         workspaceShell={workspace?.shell}

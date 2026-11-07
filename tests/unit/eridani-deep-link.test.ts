@@ -118,7 +118,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true });
 });
 
-function client(onFocus?: (id: string, runId?: string) => void) {
+function client(onFocus?: (id: string, runId?: string, highlight?: boolean) => void) {
   const sock = new FakeSocket();
   const c = new RemoteHostClient({
     hostId: 'desk', url: () => 'ws://desk:7717', token: () => 'tok', device: { id: 'dev-0123456789abcdef', name: 'laptop' }, appVersion: 'test',
@@ -145,6 +145,15 @@ describe('focus from the server', () => {
     expect(got).toEqual([['surf-run', RUN], ['surf-run', undefined]]);
   });
 
+  it('passes Tea highlights through and rejects malformed flags', () => {
+    const got: Array<boolean | undefined> = [];
+    const { sock } = client((_id, _runId, highlight) => got.push(highlight));
+    sock.toClient({ t: 'focus', id: 'surf-run', highlight: true });
+    sock.toClient({ t: 'focus', id: 'surf-run', highlight: 'yes' });
+    sock.toClient({ t: 'focus', id: 'surf-run' });
+    expect(got).toEqual([true, undefined]);
+  });
+
   it('RemoteHosts hands the listener the windows that show the tab, oldest first', () => {
     const sockets: FakeSocket[] = [];
     const box: SecretBox = { isEncryptionAvailable: () => true, encryptString: (s) => Buffer.from(s), decryptString: (b) => b.toString() };
@@ -153,8 +162,8 @@ describe('focus from the server', () => {
       sockets.push(s);
       return s;
     } });
-    const calls: Array<[string, number[]]> = [];
-    hosts.setFocusListener((id, windows) => calls.push([id, windows]));
+    const calls: Array<[string, number[], boolean | undefined]> = [];
+    hosts.setFocusListener((id, windows, highlight) => calls.push([id, windows, highlight]));
     hosts.report(7, () => {}, { ready: true, surfaceIds: ['surf-run'] });
     hosts.report(3, () => {}, { ready: true, surfaceIds: ['surf-run', 'surf-x'] });
     hosts.report(5, () => {}, { ready: true, surfaceIds: ['surf-x'] });
@@ -164,7 +173,11 @@ describe('focus from the server', () => {
     expect(sock.sent[0]).toMatchObject({ t: 'hello', features: ['focus'] });
     sock.toClient({ t: 'focus', id: 'surf-run', runId: RUN });
     sock.toClient({ t: 'focus', id: 'surf-nowhere' });
-    expect(calls).toEqual([['surf-run', [3, 7]], ['surf-nowhere', []]]);
+    sock.toClient({ t: 'focus', id: 'surf-run', highlight: true });
+    expect(calls).toEqual([
+      ['surf-run', [3, 7], undefined], ['surf-nowhere', [], undefined],
+      ['surf-run', [3, 7], true],
+    ]);
     hosts.detachAllNow();
   });
 });

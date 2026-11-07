@@ -79,7 +79,7 @@ export class Tea {
         const group = deps.registry.group(id);
         if (group) deps.hub.broadcast({ t: 'groupUpserted', group });
       },
-      focus: (id, device) => deps.hub.focus(id, undefined, device),
+      focus: (id, device) => deps.hub.focus(id, undefined, device, true),
       refresh: (id) => this.refresh(id),
       now: this.now,
       safe: (text) => this.safe(text),

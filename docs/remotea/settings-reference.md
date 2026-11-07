@@ -280,7 +280,7 @@ Audio accepts aac/flac/m4a/mp3/oga/ogg/opus/wav/webm, max10MiB (`main/ipc-handle
 | Exact label | Field/default | Choices / effect | UI source |
 |---|---|---|---|
 | Default search engine | `searchEngine='google'` | Google / DuckDuckGo / Bing / Brave Search | Browser:13–26 |
-| Open browser panel on startup | `openOnStartup=true` | on/off; startup | Browser:34 |
+| Open browser panel on startup | `openOnStartup=false` | on/off; startup. Previously saved choices remain in effect | Browser:34 |
 | Start page | `defaultUrl=''` | Draft text with inline validation; only valid trimmed values persist. Empty uses Remotea page; Explicit scheme:// or about: URLs accepted; http(s) additionally requires a hostname. Custom protocols remain supported. New workspace browser before navigation | Browser:45–60 |
 | Auto-open dev servers in the browser panel | `autoOpenDevServer=true` | on/off; detection still shows ports while off | Browser:66–78 |
 | Open links in the system browser | `openLinksExternally=false` | on/off; terminal/markdown clicked links, Ctrl+click inverse; in mouse-owning apps Ctrl+click uses configured preference | Browser:87–106 |

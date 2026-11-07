@@ -1687,7 +1687,7 @@ app.whenReady().then(() => {
   // Eridani's "Open terminal in remotea" (terminal.focus): bring the window
   // that shows the run's tab to the front and select the tab. A tab no window
   // shows yet (just placed, or hidden here) still raises the app.
-  remoteHosts.setFocusListener((surfaceId, windowIds) => {
+  remoteHosts.setFocusListener((surfaceId, windowIds, highlight) => {
     const wins = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
     const win = windowIds.map((id) => wins.find((w) => w.webContents.id === id)).find((w) => !!w) ?? wins[0];
     if (!win) return;
@@ -1695,7 +1695,7 @@ app.whenReady().then(() => {
     win.show();
     win.focus();
     if (windowIds.length) {
-      win.webContents.executeJavaScript(`window.__wmux_focusSurface?.(${JSON.stringify(surfaceId)})`).catch(() => {});
+      win.webContents.executeJavaScript(`window.__wmux_focusSurface?.(${JSON.stringify(surfaceId)}, undefined, ${highlight === true})`).catch(() => {});
     }
   });
   remoteHosts.start();

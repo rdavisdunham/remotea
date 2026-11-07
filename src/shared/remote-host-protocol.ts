@@ -482,7 +482,7 @@ export type ServerMsg =
    * Bring session `id`'s tab to the front (Eridani's "Open terminal in
    * remotea"). Sent only to apps whose hello listed the `focus` feature.
    */
-  | { t: 'focus'; id: RemoteSurfaceId; runId?: string }
+  | { t: 'focus'; id: RemoteSurfaceId; runId?: string; highlight?: boolean }
   | { t: 'goingAway' }
   | { t: 'pong'; n: number; serverAt: number }
   | { t: 'error'; code: string; message: string };
@@ -714,7 +714,8 @@ export function parseServerMsg(raw: unknown): ServerMsg | null {
     case 'sessionClosed':
       return isSurfaceId(m.id) ? (m as unknown as ServerMsg) : null;
     case 'focus':
-      return isSurfaceId(m.id) && (m.runId === undefined || isStr(m.runId, 128)) ? (m as unknown as ServerMsg) : null;
+      return isSurfaceId(m.id) && (m.runId === undefined || isStr(m.runId, 128)) &&
+        (m.highlight === undefined || typeof m.highlight === 'boolean') ? (m as unknown as ServerMsg) : null;
     case 'sessionAdded':
     case 'sessionUpdated':
       return isObj(m.session) && isSurfaceId(m.session.id) ? (m as unknown as ServerMsg) : null;

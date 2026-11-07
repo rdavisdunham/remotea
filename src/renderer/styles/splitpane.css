@@ -46,6 +46,26 @@
 .pane-wrapper--focused {
   border-color: rgba(var(--ui-accent-rgb), 0.3);
 }
+.pane-wrapper__tea-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  border: 3px solid var(--ui-accent);
+  box-shadow: inset 0 0 12px rgba(var(--ui-accent-rgb), 0.25);
+}
+.pane-wrapper__tea-highlight span {
+  position: absolute;
+  top: 32px;
+  right: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px;
+  border: 1px solid var(--ui-accent);
+  border-radius: 4px;
+  background: var(--ui-bg-1);
+  color: var(--ui-text-primary);
+  font-size: 12px;
+}
 /* Over a translucent window the gutters between panes must render at the same
    opacity the panes do, or a split shows as bright seams through the terminal.
    `:not(--focused)` keeps the accent border on the focused pane, which would

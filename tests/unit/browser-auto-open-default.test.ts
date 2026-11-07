@@ -19,6 +19,14 @@ import { DEFAULT_BROWSER_PREFS } from '../../src/renderer/store/settings-slice';
  * has to be a decision someone makes on purpose, not a diff nobody notices.
  */
 describe('browser prefs — auto-open default (#219)', () => {
+  it('keeps the browser drawer closed at startup by default', () => {
+    expect(DEFAULT_BROWSER_PREFS.openOnStartup).toBe(false);
+  });
+
+  it.each([true, false])('preserves a saved startup choice of %s', (openOnStartup) => {
+    expect({ ...DEFAULT_BROWSER_PREFS, openOnStartup }.openOnStartup).toBe(openOnStartup);
+  });
+
   it('defaults dev-server auto-open ON, so upgrading never revokes it', () => {
     expect(DEFAULT_BROWSER_PREFS.autoOpenDevServer).toBe(true);
   });
