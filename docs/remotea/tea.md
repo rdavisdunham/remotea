@@ -110,7 +110,7 @@ One conversational loop processes up to twelve queued messages. Each turn has a 
 
 The host keeps up to 300 recent public messages, exposes the latest 180 to apps, and retains the current replayable provider segment. A fresh segment begins after a model profile change or when the saved wire context exceeds 96,000 characters. A history-search tool retrieves earlier retained public messages. Raw provider reasoning and API credentials stay in private host state. General terminal text passes through the existing redactor and an additional configured-key redaction pass.
 
-API keys live in a permission-restricted local file under the host's configuration directory. They are available to the account running the host service. Removing a provider profile deletes its saved credential. Settings and model tests make billable provider calls. The first release has bounded job sizes and queues. Spending limits can also be managed in the chosen provider account.
+API keys live in a permission-restricted local file under the host's configuration directory. They are available to the account running the host service. Saving a removed provider profile deletes its credential. Remove saved key explicitly clears the credential while retaining the connection. Settings and model tests make billable provider calls. The first release has bounded job sizes and queues. Spending limits can also be managed in the chosen provider account.
 
 The test suite uses synthetic provider responses and terminal evidence. Real provider authentication, access and model quality are verified through the app after the operator supplies a key.
 

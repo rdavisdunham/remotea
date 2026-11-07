@@ -115,6 +115,188 @@ afterEach(() => {
 });
 
 describe('Tea provider settings', () => {
+  it('shows discovery feedback beside the connection and makes returned models selectable', async () => {
+    const current = state();
+    current.config.connections[0].protocol = 'openai';
+    current.config.connections[0].baseUrl = 'https://api.openai.com/v1';
+    setLatestRemoteViews([view(current)]);
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    request.mockResolvedValue({
+      ok: true,
+      state: current,
+      models: [
+        { id: 'gpt-fixture-chat', name: 'GPT fixture chat' },
+        { id: 'gpt-fixture-small', name: 'GPT fixture small' },
+      ],
+    });
+    await act(async () => button('Test connection and find models').click());
+    expect(
+      container.querySelector('.tea-connection .tea-connection-feedback')
+        ?.textContent,
+    ).toContain('Found 2 models');
+    const picker = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="Tea conversation and actions discovered model"]',
+    )!;
+    expect(picker.disabled).toBe(false);
+    expect(Array.from(picker.options).map((option) => option.value)).toContain(
+      'gpt-fixture-chat',
+    );
+    act(() => {
+      picker.value = 'gpt-fixture-chat';
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(
+      container.querySelector<HTMLInputElement>('.tea-role input')?.value,
+    ).toBe('gpt-fixture-chat');
+    input(
+      container.querySelector<HTMLInputElement>('input[type=password]')!,
+      'synthetic-replacement-key',
+    );
+    expect(picker.disabled).toBe(true);
+    expect(container.querySelector('.tea-connection-feedback')).toBeNull();
+  });
+
+  it('reports discovery failures within the connection card', async () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    request.mockResolvedValue({
+      ok: false,
+      error: 'The provider refused this credential.',
+    });
+    await act(async () => button('Test connection and find models').click());
+    const feedback = container.querySelector('.tea-connection [role=alert]');
+    expect(feedback?.textContent).toContain('Connection test failed');
+    expect(feedback?.textContent).toContain('refused this credential');
+  });
+
+  it('removes a saved key explicitly and confirms the stored state', async () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    expect(container.textContent).toContain('API key saved on this host');
+    act(() => button('Remove saved key').click());
+    expect(container.textContent).toContain('will be removed when you save');
+    const saved = state();
+    saved.revision = 2;
+    saved.config.revision = 2;
+    saved.config.connections[0].hasKey = false;
+    request.mockResolvedValue({ ok: true, state: saved });
+    await act(async () => button('Save Tea settings').click());
+    expect(request).toHaveBeenCalledWith(
+      'desk',
+      expect.objectContaining({
+        action: 'configure',
+        config: expect.objectContaining({
+          connections: [expect.objectContaining({ apiKey: '' })],
+        }),
+      }),
+    );
+    expect(container.textContent).toContain('No API key saved on this host');
+  });
+
+  it('resets provider-specific models when the API format changes', async () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    const protocol = container.querySelector<HTMLSelectElement>(
+      '.tea-connection select',
+    )!;
+    act(() => {
+      protocol.value = 'openai';
+      protocol.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(
+      container.querySelector<HTMLInputElement>('.tea-role input')?.value,
+    ).toBe('');
+    expect(
+      container.querySelector<HTMLInputElement>(
+        '.tea-connection input[placeholder="https://gateway.example/v1"]',
+      )?.value,
+    ).toBe('https://api.openai.com/v1');
+    request.mockResolvedValue({ ok: true });
+    await act(async () => button('Save Tea settings').click());
+    expect(request).toHaveBeenCalledWith(
+      'desk',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          chat: null,
+          background: null,
+          connections: [expect.objectContaining({ protocol: 'openai' })],
+        }),
+      }),
+    );
+  });
+
+  it('adds OpenAI with the correct label and API format', async () => {
+    const empty = state();
+    empty.config.connections = [];
+    empty.config.chat = null;
+    empty.config.background = null;
+    setLatestRemoteViews([view(empty)]);
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    const protocol = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="New provider"]',
+    )!;
+    act(() => {
+      protocol.value = 'openai';
+      protocol.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    act(() => button('Add provider connection').click());
+    expect(
+      container.querySelector<HTMLInputElement>('.tea-connection input')?.value,
+    ).toBe('OpenAI');
+    expect(
+      container.querySelector<HTMLSelectElement>('.tea-connection select')
+        ?.value,
+    ).toBe('openai');
+    expect(
+      container.querySelector<HTMLInputElement>('.tea-role input')?.value,
+    ).toBe('');
+  });
+
+  it('allows discovery after clearing an unfinished model selection', async () => {
+    act(() =>
+      root.render(
+        React.createElement(TeaSettings, { hostId: 'desk', connected: true }),
+      ),
+    );
+    input(container.querySelector<HTMLInputElement>('.tea-role input')!, '');
+    const saved = state();
+    saved.revision = 2;
+    saved.config.revision = 2;
+    saved.config.chat = null;
+    request
+      .mockResolvedValueOnce({ ok: true, state: saved })
+      .mockResolvedValueOnce({
+        ok: true,
+        models: [{ id: 'fixture-model', name: 'Fixture model' }],
+      });
+    await act(async () => button('Test connection and find models').click());
+    expect(request.mock.calls[0][1].config.chat).toBeNull();
+    expect(request.mock.calls[1][1]).toEqual({
+      action: 'discover',
+      connectionId: 'connection-one',
+    });
+    expect(
+      container.querySelector('.tea-connection-feedback')?.textContent,
+    ).toContain('Found 1 model');
+  });
+
   it('keeps stored keys write-only and exposes separate protocol and effort controls', () => {
     act(() =>
       root.render(
@@ -128,7 +310,7 @@ describe('Tea provider settings', () => {
     expect(container.textContent).toContain(
       'OpenAI-compatible Chat Completions',
     );
-    expect(container.querySelectorAll('.tea-role select')).toHaveLength(4);
+    expect(container.querySelectorAll('.tea-role select')).toHaveLength(6);
     expect(container.querySelectorAll('.tea-role input')).toHaveLength(2);
   });
 

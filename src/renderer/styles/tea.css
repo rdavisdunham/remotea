@@ -167,3 +167,10 @@
 .tea-panel {
   user-select: text;
 }
+
+.tea-connection-feedback {
+  color: var(--ui-text-primary);
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  padding: 8px;
+}
