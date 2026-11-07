@@ -64,6 +64,17 @@ afterEach(() => {
 });
 
 describe('workspace terminal dropdown', () => {
+  it('shows concise generated work separately from observed activity and marks stale evidence', () => {
+    const snapshot = view();
+    snapshot.sessions[0].tea = { title: 'Generated work', summary: 'Repairing login settings.', source: 'claude:chat', version: 'v1', sourceAt: 1, generatedAt: 2 };
+    snapshot.sessions[0].teaSourceVersion = 'v2';
+    setLatestRemoteViews([snapshot]);
+    render(); toggle();
+    expect(terminal('surf-working').querySelector('.workspace-terminal__summary')?.textContent).toBe('Repairing login settings. · updating');
+    expect(terminal('surf-working').textContent).toContain('API fix');
+    expect(terminal('surf-working').textContent).toContain('Working on it');
+  });
+
   it('starts collapsed and includes every terminal and its live state when expanded', () => {
     render();
     const button = container.querySelector<HTMLButtonElement>('.workspace-row__terminal-toggle')!;

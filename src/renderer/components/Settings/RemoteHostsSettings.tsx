@@ -7,6 +7,7 @@ import type { HostDTO, HostSaveRequest, HostStatus, HostTestRequest, HostTestRes
 import { classifyHostUrl } from '../../../shared/host-url';
 import { closeRemoteSession, unhideRemoteSession } from '../../remote-sessions/sync';
 import RemoteHostHealth from './RemoteHostHealth';
+import TeaSettings from './TeaSettings';
 import RemotePendingChanges from './RemotePendingChanges';
 import { forgetPendingChange, pendingChanges } from '../../remote-sessions/pending-changes';
 import '../../styles/remote-hosts.css';
@@ -259,6 +260,7 @@ export default function RemoteHostsSettings() {
               <span className="remote-host-card__url">{h.url}</span>
             </div>
             <RemoteHostHealth status={status[h.id]} view={views.find((v) => v.hostId === h.id)} now={now} />
+            <TeaSettings hostId={h.id} connected={st === 'ready'}/>
             {status[h.id]?.error && st !== 'ready' && (
               <div className="remote-host-message remote-host-message--error">{status[h.id]?.error}</div>
             )}

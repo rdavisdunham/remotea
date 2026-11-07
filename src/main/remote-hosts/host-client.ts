@@ -41,6 +41,7 @@ import {
   type SessionRecord,
 } from '../../shared/remote-host-protocol';
 import type { HostStatus, PtyExitInfo, RemoteSize, TerminalSnapshot } from '../../shared/remote-hosts-types';
+import type { TeaCommand, TeaReply, TeaState } from '../../shared/tea';
 import { initialFsm, publicState, step, type Fsm, type FsmEvent } from './connection-fsm';
 import type { OutboxEntry, PendingIntent, PendingIntents } from './host-config';
 import { diag } from './diag';
@@ -207,6 +208,9 @@ export class RemoteHostClient {
   /** Epoch ms of the current connection's welcome. */
   private connectedAt: number | undefined;
   private readonly fsWaiters = new Map<number, (result: unknown) => void>();
+  private readonly teaWaiters = new Map<number, (result: TeaReply) => void>();
+  teaState?: TeaState;
+  get teaAvailable(): boolean { return this.features.has('tea'); }
   private readonly timers: ClientTimers;
   private readonly now: () => number;
   private readonly log: (msg: string) => void;
@@ -310,6 +314,23 @@ export class RemoteHostClient {
   installHooks(): Promise<RequestResult> {
     if (!this.features.has('hooks')) return Promise.resolve({ ok: false, error: 'this server cannot install hooks; update it, or run `remotea hooks install` there' });
     return this.request((rid) => ({ t: 'hooksInstall', rid }));
+  }
+
+  tea(command: TeaCommand): Promise<TeaReply> {
+    if (!this.teaAvailable) return Promise.resolve({ ok: false, error: 'Update the Remotea server to use Tea.' });
+    const rid = this.nextRid++;
+    return new Promise(resolve => {
+      const timer = this.timers.setTimeout(() => {
+        this.teaWaiters.delete(rid);
+        resolve({ ok: false, uncertain: true, error: 'The host did not confirm this Tea request. Refresh its state before retrying.' });
+      }, 120000);
+      this.teaWaiters.set(rid, result => { this.timers.clearTimeout(timer); resolve(result); });
+      if (!this.sendJson({ t: 'tea', rid, command })) {
+        this.teaWaiters.delete(rid);
+        this.timers.clearTimeout(timer);
+        resolve({ ok: false, error: 'Connect to this host to use Tea.' });
+      }
+    });
   }
 
   /** Explicit handoff only; an uncertain reply is reconciled through the session registry. */
@@ -529,6 +550,10 @@ export class RemoteHostClient {
       this.fsWaiters.delete(rid);
       w({ error: 'Disconnected from the remote host', code: 'read_failed' });
     }
+    for (const [rid, waiter] of this.teaWaiters) {
+      this.teaWaiters.delete(rid);
+      waiter({ ok: false, uncertain: true, error: 'Disconnected before the host confirmed the Tea request. Refresh before retrying.' });
+    }
   }
 
   // ── Outbox (see PendingIntents) ──────────────────────────────────────────
@@ -738,6 +763,18 @@ export class RemoteHostClient {
   private onServerMsg(msg: ServerMsg): void {
     switch (msg.t) {
       case 'welcome': return this.onWelcome(msg);
+      case 'teaChanged':
+        if (this.teaState && this.teaState.revision > msg.state.revision) return;
+        this.teaState = msg.state;
+        this.deps.onRegistry?.();
+        return;
+      case 'teaResult': {
+        if (msg.result.state && (!this.teaState || msg.result.state.revision >= this.teaState.revision)) { this.teaState = msg.result.state; this.deps.onRegistry?.(); }
+        const waiter = this.teaWaiters.get(msg.rid);
+        this.teaWaiters.delete(msg.rid);
+        waiter?.(msg.result);
+        return;
+      }
       case 'opened': return this.onOpened(msg);
       case 'openError': return this.onOpenError(msg);
       case 'ack': {
@@ -873,6 +910,7 @@ export class RemoteHostClient {
     this.epoch = msg.epoch;
     this.serverHostname = msg.hostname;
     this.features = new Set(msg.features ?? []);
+    this.teaState = undefined;
     this.hooks = msg.features?.includes('hooks') ? msg.hooks : undefined;
     diag('conn.welcome', { host: this.hostId, boot: msg.bootId.slice(0, 8), sessions: msg.sessions.length, features: (msg.features ?? []).join(',') });
     this.groups.clear();

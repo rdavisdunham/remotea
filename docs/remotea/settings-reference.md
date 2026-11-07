@@ -451,6 +451,28 @@ Sources: [hidden sessions](https://github.com/rdavisdunham/remotea/blob/b31f92c4
 
 The host introduction and hidden-session help now distinguish ownership from liveness: desktop exit does not request host-process termination, host/service availability is required, same-PC WSL depends on that PC, and offline process status is unknown. Hiding alone is not evidence that a process is running.
 
+### Tea host settings
+
+Tea settings are on each host card under **Tea assistant**. The host persists them in private `tea-state.json` alongside conversation checkpoints and redacted evidence. All connected apps share these values. Saving uses a configuration revision and rejects conflicting edits from another device.
+
+| Setting | Default | Behavior |
+|---|---|---|
+| Enable Tea on this host | Off | Enables conversational and background work. Disabling interrupts pending turns and stops new capture |
+| Automatic names for unnamed terminals | On | Generated names yield to custom names and explicit agent labels |
+| Quick terminal summaries | On | Shows short work descriptions in expanded workspace terminal lists |
+| Connection name | Anthropic suggestion | Display label for one of up to eight provider profiles |
+| API format | Anthropic Messages suggestion | Anthropic Messages, native OpenAI Responses, or OpenAI-compatible Chat Completions |
+| Base URL | Provider default | HTTPS endpoint, with HTTP supported for loopback gateways |
+| API key | Empty | Write-only field. Blank preserves a saved key. Removing the profile removes its key |
+| Conversation connection and model | Sonnet 5.5 suggestion | Model for Tea replies and application actions |
+| Background connection and model | Haiku 5.5 suggestion | Model for automatic names and summaries |
+| Effort per role | Medium for Sonnet, low for Haiku | Model default, low, medium, high. Capability tests verify the chosen API options |
+| Test connection and find models | Explicit action | Saves edits, authenticates and fetches the model catalog. Supports manually entered model IDs |
+| Test selected models | Explicit action | Makes real schema and tool-result replay requests. Success is tied to the selected connection, credential, model and effort |
+| Reload settings | Explicit action | Replaces local unsaved edits with current host settings |
+
+Model tests and normal Tea work use the configured provider's API billing. The complete design and source research are in [Tea](tea.md).
+
 ## Phone access (Remote): pairing and device administration
 
 This is the desktop-hosted **Remote Console**, not the remote execution server and not the Eridani connection. Navigation is **Connections → Phone access** (internal ID `Remote`). Every setting below belongs to the desktop instance on this computer. Closing that desktop ends phone access, even when its remote terminal sessions continue on a host.

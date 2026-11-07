@@ -13,6 +13,7 @@
  */
 import { v4 as uuid } from 'uuid';
 import { useStore } from '../store';
+import { findLeaf } from '../store/split-utils';
 import type { SplitNode, SurfaceRef, WorkspaceId, PaneId, SurfaceId } from '../../shared/types';
 import type { RegistryPayload, RemoteRegistryView } from '../../shared/remote-hosts-types';
 import { parseRemoteShellSpec } from '../../shared/remote-shell-spec';
@@ -221,6 +222,17 @@ function runSync(): void {
       pendingMeta: new Set(),
       groupEridani: true,
     }));
+    for (const surface of buildLocalIndex().surfaces) {
+      if (!surface.paneId) continue;
+      const view = views.find(item => item.hostId === surface.hostId);
+      const session = view?.sessions.find(item => item.id === surface.id);
+      const sourceMatches = !session?.agent || session.tea?.source === `${session.agent.provider}:${session.agent.sessionId}`;
+      const automaticTitle = view?.tea?.config.autoName === false || !sourceMatches ? undefined : session?.tea?.title || undefined;
+      const state = useStore.getState();
+      const workspace = state.workspaces.find(item => item.id === surface.workspaceId);
+      const current = workspace && findLeaf(workspace.splitTree, surface.paneId as PaneId)?.surfaces.find(item => item.id === surface.id);
+      if (current?.automaticTitle !== automaticTitle) state.updateSurface(surface.workspaceId as WorkspaceId, surface.paneId as PaneId, surface.id as SurfaceId, { automaticTitle });
+    }
   } finally {
     rememberMetadata();
     applyingMetadata = false;

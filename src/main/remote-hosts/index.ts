@@ -332,6 +332,8 @@ export class RemoteHosts {
       for (const id of o.closing) closedIds.add(id);
       return {
         hostId: c.hostId,
+        tea: c.teaState,
+        teaAvailable: c.teaAvailable,
         deviceId: me,
         connected: c.ready,
         bootId: c.bootId,
@@ -418,6 +420,11 @@ export class RemoteHosts {
     const client = this.clients.get(hostId);
     if (!client || !SURFACE_ID_RE.test(surfaceId)) return Promise.resolve({ ok: false, error: 'Invalid host or session.' });
     return client.takeover(surfaceId);
+  }
+
+  tea(hostId: string, command: import('../../shared/tea').TeaCommand) {
+    const client = this.clients.get(hostId);
+    return client?.tea(command) ?? Promise.resolve({ ok: false, error: 'Unknown remote host.' });
   }
 
   chatAttention(hostId: string, surfaceId: string, action: import('../../shared/remote-host-protocol').ChatAttentionAction) {

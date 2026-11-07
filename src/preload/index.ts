@@ -92,6 +92,7 @@ contextBridge.exposeInMainWorld('wmux', {
   },
   // remotea: remote session servers. The token is write-only from here.
   remoteHosts: {
+    tea: (hostId: string, command: import('../shared/tea').TeaCommand) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_TEA, hostId, command) as Promise<import('../shared/tea').TeaReply>,
     list: () => ipcRenderer.invoke(IPC_CHANNELS.RHOST_LIST) as Promise<HostDTO[]>,
     save: (req: HostSaveRequest) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_SAVE, req) as Promise<{ ok: boolean; host?: HostDTO; error?: string }>,
     remove: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.RHOST_REMOVE, id) as Promise<boolean>,

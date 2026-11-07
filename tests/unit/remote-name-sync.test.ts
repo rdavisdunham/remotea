@@ -58,6 +58,24 @@ afterEach(() => {
 });
 
 describe('shared workspace and terminal names through renderer sync', () => {
+  it('syncs generated names without converting them to manual renames', async () => {
+    const remote = view();
+    remote.sessions[0].tea = { title: 'Generated login work', summary: 'Investigating login.', source: 'claude:chat', version: 'v1', sourceAt: 1, generatedAt: 2 };
+    await receive(remote);
+    const workspace = useStore.getState().workspaces.find(item => item.id === workspaceId)!;
+    if (workspace.splitTree.type !== 'leaf') throw new Error('Expected a leaf');
+    expect(workspace.splitTree.surfaces[0].automaticTitle).toBe('Generated login work');
+    expect(names().terminal).toBe('Original');
+    expect(sessionUpdate).not.toHaveBeenCalled();
+    remote.sessions[0].agent = { provider: 'claude', sessionId: 'replacement', seenAt: 3 };
+    await receive(remote);
+    const updated = useStore.getState().workspaces.find(item => item.id === workspaceId)!;
+    if (updated.splitTree.type !== 'leaf') throw new Error('Expected a leaf');
+    expect(updated.splitTree.surfaces[0].automaticTitle).toBeUndefined();
+    expect(names().terminal).toBe('Original');
+    expect(sessionUpdate).not.toHaveBeenCalled();
+  });
+
   it('sends user renames, receives another app’s renames without echo, and supports clearing a name', async () => {
     await receive(view());
     useStore.getState().renameWorkspace(workspaceId, 'abc');

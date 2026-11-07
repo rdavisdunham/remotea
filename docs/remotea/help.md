@@ -31,6 +31,20 @@ Settings → Agent integration configures instructions, status hooks and optiona
 
 Chat replies also have an unread state, independent of agent activity. Use the terminal status bar or tab menu to mark a chat unread or set a server reminder. See [chat attention and reminders](chat-attention.md).
 
+## Find and organize terminals with Tea
+
+<a id="tea"></a>
+
+Open **Tea** in the sidebar footer and select a connected host. Tea shares its conversation, terminal summaries and settings across apps using that host. Ask where you were working, request a terminal rename, move a terminal into an existing workspace, mark it unread or set a reminder. Open buttons in Tea replies select matching terminals in this window.
+
+Set up Tea under **Settings → Remote hosts → Tea assistant** on the host card. Add a provider connection, choose its API format, enter the base URL and API key, then save. **Test connection and find models** populates available model IDs. Choose a conversational model and a background model, then **Test selected models** to check tool calling, result replay and structured summaries. Enable Tea and save. Sonnet is suggested for conversation and Haiku for quick metadata. Native OpenAI Responses and explicitly selected OpenAI-compatible gateways are also supported.
+
+Keys are write-only and stored in the host's private configuration directory. A blank key field preserves the stored key. Remove a connection to remove its stored credential. Connection and model tests make real provider requests and may incur API usage charges.
+
+Expand a workspace's terminal list to see quick work summaries alongside current activity. Tea generates names for terminals without custom names. A name you set takes precedence across devices. Use **Use automatic name** in a tab's context menu to clear your override. Summaries keep updating under custom names. The updating label identifies a summary awaiting newer captured evidence.
+
+Tea saves accepted messages and action receipts before continuing. Closing the desktop leaves host work running. After a host restart or provider interruption, **Continue saved turn** reconciles confirmed actions. **Cancel turn** abandons the remaining work. Previously applied names and reminders remain recorded. If delivery is unconfirmed, refresh and retry the same message to reconcile its saved ID.
+
 ## Inspect Eridani work
 
 <a id="eridani"></a>

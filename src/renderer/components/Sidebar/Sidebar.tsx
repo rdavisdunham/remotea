@@ -21,6 +21,7 @@ import { useT } from '../../i18n';
 import { getStoredWorkspaceLabel } from '../SplitPane/use-osc-title';
 import '../../styles/sidebar.css';
 import '../../styles/trace.css';
+const TeaPanel = React.lazy(() => import('../Tea/TeaPanel'));
 
 interface ContextMenuState {
   x: number;
@@ -89,6 +90,7 @@ export default function Sidebar({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [sessionMenuMode, setSessionMenuMode] = useState<'load' | 'save' | null>(null);
   const [showWorktreeModal, setShowWorktreeModal] = useState(false);
+  const [teaOpen, setTeaOpen] = useState(false);
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const manualWorkspaces = workspaces.filter((workspace) => !workspace.eridaniTask);
   const eridaniWorkspaces = workspaces.filter((workspace) => workspace.eridaniTask);
@@ -429,6 +431,7 @@ export default function Sidebar({
       )}
 
       <div className="sidebar__footer">
+        <button type="button" className="sidebar__footer-btn" title="Tea assistant" aria-label="Open Tea assistant" onClick={() => setTeaOpen(value => !value)}>Tea</button>
         <button
           className="sidebar__footer-btn"
           onClick={() => setSessionMenuMode(sessionMenuMode === 'save' ? null : 'save')}
@@ -463,6 +466,7 @@ export default function Sidebar({
       </div>
 
       <SidebarResizeHandle onWidthChange={handleResizeDelta} />
+      {teaOpen && <React.Suspense fallback={null}><TeaPanel onClose={() => setTeaOpen(false)} onSettings={onOpenHostSettings}/></React.Suspense>}
 
       {contextMenu && (
         <WorkspaceContextMenu

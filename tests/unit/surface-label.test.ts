@@ -11,6 +11,13 @@ function surface(id: string, patch: Partial<SurfaceRef> = {}): SurfaceRef {
 }
 
 describe('surface labels', () => {
+  it('uses automatic names below custom and explicit agent names', () => {
+    const named = surface('surf-tea', { automaticTitle: 'Login repair', currentCwd: '/repo' });
+    expect(getSurfaceLabel(named, undefined, undefined, undefined, 'Program title')).toBe('Login repair');
+    expect(getSurfaceLabel({ ...named, customTitle: 'My task' })).toBe('My task');
+    expect(getSurfaceLabel(named, 'Reviewer')).toBe('Reviewer');
+  });
+
   it('labels from resolvedShell, so a spec with arguments stays readable', () => {
     // `shell` is the requested spec and may be a whole command line. Rendering
     // that as a tab caption produced "Ssh Fortuna@honoured Accident"; the
