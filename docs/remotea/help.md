@@ -47,6 +47,12 @@ If a separate worker takes over after planning, the planner's terminal closes on
 
 Legacy terminal sessions retain their native provider approval behavior. Model and effort choices come from the host's verified installed harness, and unsupported choices require correction instead of a silent substitution. An activity gap is shown as **No recent output · last reported …**, preserving the last observed activity without claiming the agent is still actively producing output.
 
+### Managed Claude permissions
+
+Managed planners and reviewers use Claude Plan mode with source-edit tools denied. Workers use Auto mode for routine development work. The host pre-approves role-authorized Eridani coordination calls through Claude's permission callback when the request is mode-driven and the run is bound. Planners can read their task, ask interview questions and submit drafts. Reviewers can read and submit reviews. Workers can read and update plan steps. Each role can link its session to the task.
+
+The run approval card handles exceptional requests, including explicit permission rules and recovered unapproved actions. After a recovered action is explicitly allowed and the harness confirms consuming that decision, the session returns to its configured role mode. The separate plan approval card controls when implementation starts.
+
 ## Use files, Git and browser tools
 
 <a id="files"></a>

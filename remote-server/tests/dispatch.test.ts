@@ -160,6 +160,23 @@ describe('dispatch: managed integration', () => {
     expect(dispatch.managed.automation.get('run-1')).toMatchObject({held:true,revision:1});
   });
 
+  it.each(['planner', 'reviewer', 'worker'] as const)('carries the Claude %s permission policy through the normal managed launch', async role => {
+    const { run, dispatch, specifications } = managedSetup();
+    const expected = role === 'reviewer' ? ['task_plan', 'submit_plan_review', 'session_link']
+      : role === 'worker' ? ['task_plan', 'task_step', 'session_link']
+      : ['task_plan', 'task_interview', 'submit_plan', 'session_link'];
+    const result = await run(spawnCmd({ execution: 'managed', harness: 'claude', model: 'sonnet', role,
+      permission_profile: role === 'worker' ? 'workspace-write' : 'read-only',
+      mode: role === 'worker' ? undefined : role === 'reviewer' ? 'review' : 'plan' }));
+    expect(result.state).toBe('executed');
+    await dispatch.managed.ready(surfFor('run-1', 1, 1));
+    const spec = specifications[0];
+    expect(spec.preapprovedEridaniTools).toEqual(expected.map(tool => `mcp__eridani__${tool}`));
+    expect(spec.env.ERIDANI_RUN_TOKEN).toBe('tok-123');
+    for (const tool of spec.preapprovedEridaniTools!) expect(spec.args).toContain(tool);
+    if (role !== 'worker') expect(spec.args).toEqual(expect.arrayContaining(['--disallowedTools', 'Edit', 'Write', 'NotebookEdit']));
+  });
+
   it('launches through the structured adapter with role options and no native terminal writer', async () => {
     const { run, dispatch, sp, registry, adapter, specifications } = managedSetup();
     const result = await run(managedSpawn());

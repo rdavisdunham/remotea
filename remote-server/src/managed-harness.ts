@@ -8,7 +8,16 @@ import { loginShell, buildEnv } from './pty-spawn';
 export interface HarnessSpec {
   harness: 'codex' | 'claude'; bin: string; args: string[]; cwd: string; env: Record<string, string>;
   model: string; effort?: string; profile: 'read-only' | 'workspace-write'; sessionId?: string;
+  /** Exact run-coordination tools the host owner pre-approved for this role. */
+  preapprovedEridaniTools?: readonly string[];
 }
+/** Shared by the native allow rules and the structured permission callback. */
+export function eridaniToolsForRole(role?: 'planner' | 'reviewer' | 'worker'): string[] {
+  if (role === 'reviewer') return ['task_plan', 'submit_plan_review', 'session_link'];
+  if (role === 'worker') return ['task_plan', 'task_step', 'session_link'];
+  return ['task_plan', 'task_interview', 'submit_plan', 'session_link'];
+}
+
 export interface HarnessRequest { id: string | number; method: string; params: Record<string, any> }
 export interface DirectInputContext { active: boolean; turnId: string | null }
 export interface DirectInputReceipt { turnId: string | null; providerAcknowledged: boolean }
@@ -154,6 +163,17 @@ export const CODEX_APP_SERVER_ARGS: readonly string[] = ['app-server', '--stdio'
 /** The hooks the Claude adapter registers in `initialize`; receive() answers both callback ids. */
 export const CLAUDE_INITIALIZE = { hooks: { PreToolUse: [{ matcher: '*', hookCallbackIds: ['remotea-defer-ask'] }], PermissionDenied: [{ matcher: '*', hookCallbackIds: ['remotea-permission-denied'] }] } };
 
+/** The configured mode, including fixed launcher overrides, to restore after an interrupted request. */
+function claudePermissionMode(spec: HarnessSpec): string {
+  let mode = spec.profile === 'read-only' ? 'plan' : 'auto';
+  for (let index = 0; index < spec.args.length; index++) {
+    const argument = spec.args[index];
+    if (argument === '--permission-mode' && spec.args[index + 1]) mode = spec.args[++index];
+    else if (argument.startsWith('--permission-mode=')) mode = argument.slice('--permission-mode='.length);
+  }
+  return mode;
+}
+
 /**
  * The Claude adapter's command line. `--permission-prompt-tool stdio` is what makes Claude Code send
  * `can_use_tool` (approvals, AskUserQuestion) to this host; `--permission-prompts host` alone leaves
@@ -171,8 +191,34 @@ export function flagsOf(args: readonly string[]): string[] {
 export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapter {
   sessionId = '';
   private recoveryGate = false;
+  private recoveryReceipt: string | null = null;
+  private recoveryTarget: HarnessRequest | null = null;
   private deferredAnswer: { input: unknown; id: string; response: any } | null = null;
   protected override receive(message: any): void {
+    const request = message.request;
+    if (this.recoveryReceipt && message.type === 'user' && Array.isArray(message.message?.content) &&
+        message.message.content.some((block: any) => block.type === 'tool_result' && block.tool_use_id === this.recoveryReceipt)) {
+      this.recoveryReceipt = null;
+      const target = this.recoveryTarget;
+      void this.call('control:set_permission_mode', { mode: claudePermissionMode(this.spec) })
+        .then(() => {
+          if (this.recoveryTarget === target) {
+            this.recoveryGate = false;
+            this.recoveryTarget = null;
+          }
+        })
+        .catch(() => this.emit('fault', new Error('Could not restore the role permission mode after recovered approval')));
+    }
+    // Plan mode still asks about coordination writes after matching --allowedTools.
+    // Apply the owner's role policy only to mode prompts from the configured run-bound server.
+    if (message.type === 'control_request' && request?.subtype === 'can_use_tool' && !this.recoveryGate &&
+        request.decision_reason_type === 'mode' && request.mcp_server?.name === 'eridani' &&
+        this.spec.env.ERIDANI_RUN_TOKEN && this.spec.preapprovedEridaniTools?.includes(request.tool_name) &&
+        (request.input?.run_token === undefined || request.input.run_token === this.spec.env.ERIDANI_RUN_TOKEN)) {
+      this.write({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id,
+        response: { behavior: 'allow', updatedInput: request.input } } });
+      return;
+    }
     if (message.type === 'control_request' && message.request?.subtype === 'hook_callback' && message.request?.callback_id === 'remotea-permission-denied') {
       this.write({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response: { hookSpecificOutput: { hookEventName: 'PermissionDenied', retry: false } } } });
       this.emit('event', { type: 'remotea/permission-denied', input: message.request.input }); return;
@@ -208,7 +254,9 @@ export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapt
     return { turnId: context.turnId, providerAcknowledged: false };
   }
   async recreate(request: HarnessRequest): Promise<void> {
-    this.recoveryGate = true; await this.call('control:set_permission_mode', { mode: 'manual' });
+    this.recoveryGate = true;
+    this.recoveryTarget = request;
+    await this.call('control:set_permission_mode', { mode: 'manual' });
     await this.send(`A host restart interrupted an UNAPPROVED request. Recreate only this exact request for fresh human review. Do not execute unrelated work or replay any uncertain action. Pending request: ${canonicalJson({ method: request.method, params: request.params })}`, randomUUID());
   }
   async interrupt(): Promise<void> { this.write({ type: 'control_request', request_id: `interrupt-${Date.now()}`, request: { subtype: 'interrupt' } }); }
@@ -217,6 +265,12 @@ export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapt
       this.deferredAnswer = { id: String(request.id), input: request.params.input, response };
       this.restarting = true; try { await this.stop(); this.spec.sessionId = this.sessionId; await this.start(); } finally { this.restarting = false; }
       return;
+    }
+    if (this.recoveryGate && this.recoveryTarget && (response as { behavior?: unknown } | null)?.behavior === 'allow' &&
+        request.method === this.recoveryTarget.method && request.params.tool_name === this.recoveryTarget.params.tool_name &&
+        canonicalJson(request.params.input) === canonicalJson(this.recoveryTarget.params.input) &&
+        typeof request.params.tool_use_id === 'string') {
+      this.recoveryReceipt = request.params.tool_use_id;
     }
     this.write({ type: 'control_response', response: { subtype: 'success', request_id: request.id, response } });
   }
