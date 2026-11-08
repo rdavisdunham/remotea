@@ -1,10 +1,17 @@
+import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import type { SplitNode, SurfaceRef, WorkspaceInfo } from '../../../shared/types';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
-import { markChatRead, useChatAttention } from '../../remote-sessions/chat-attention';
+import { chatActivityState, markChatRead, useChatAttention, useLocalChatAttention } from '../../remote-sessions/chat-attention';
+import { useRemoteRegistry } from '../../remote-sessions/registry-cache';
+import { chatIsUnread } from '../../../shared/chat-attention';
+import { surfaceAgentState } from '../../store/agent-rollup';
+import type { ClaudeSessionView, HookActivityEntry } from '../../store/claude-session-view';
 import { requestFocusSurface } from '../Git/open-git';
 import { getSurfaceLabel } from '../SplitPane/surface-label';
 import { useOscTitleLookup } from '../SplitPane/use-osc-title';
+import { toolChannel } from './trace-signals';
 
 /** Tree order includes inactive tabs and excludes browsers, files and other panels. */
 export function terminalSurfaces(tree: SplitNode): SurfaceRef[] {
@@ -12,26 +19,46 @@ export function terminalSurfaces(tree: SplitNode): SurfaceRef[] {
   return [...terminalSurfaces(tree.children[0]), ...terminalSurfaces(tree.children[1])];
 }
 
-function TerminalRow({ workspace, surface, index, oscTitle }: {
+function reportedState(session: ClaudeSessionView | undefined) {
+  if (!session) return undefined;
+  if (session.blocked || session.question) return 'needs_you' as const;
+  return session.working ? 'working' as const : undefined;
+}
+
+function TerminalRow({
+  workspace, surface, index, oscTitle, compact,
+  sessionControl, activityDetail, answering, onAnswer,
+}: {
   workspace: WorkspaceInfo;
   surface: SurfaceRef;
   index: number;
   oscTitle?: string;
+  compact: boolean;
+  sessionControl?: ClaudeSessionView;
+  activityDetail?: string;
+  answering?: string | null;
+  onAnswer?(session: ClaudeSessionView, choiceId: string): void;
 }) {
   const t = useT();
   const agentLabel = useStore(state => state.agentMeta.get(surface.id)?.label);
-  const { host, session, unread, status } = useChatAttention(surface.id);
+  const { host, session, state, unread, status } = useChatAttention(surface.id, reportedState(sessionControl));
+  const uiMode = useStore(state => state.appearancePrefs.uiMode);
   const label = getSurfaceLabel(surface, agentLabel, workspace.shell, t, oscTitle);
-  const statusLabel = `${status.label}${host && !host.connected ? ' · offline' : ''}`;
+  const activityLabel = sessionControl?.answerPending || (state === 'working' && sessionControl?.working)
+    ? activityDetail || status.label : status.label;
+  const statusLabel = `${activityLabel}${host && !host.connected ? ' · offline' : ''}`;
   const insight = !session?.agent || session.tea?.source === `${session.agent.provider}:${session.agent.sessionId}` ? session?.tea : undefined;
   const summary = host?.tea?.config.summaries === false ? undefined : insight?.summary || (host?.tea?.config.enabled && !session?.agent ? `Shell in ${session?.lastCwd || session?.cwd || surface.cwd || 'its current directory'}` : undefined);
   const stale = !!insight && insight.version !== session?.teaSourceVersion;
-  const detail = [label, summary, stale ? 'New exchanges since this summary' : undefined, insight ? `Summary generated ${new Date(insight.generatedAt).toLocaleString()}` : undefined, statusLabel, session?.agentState?.reason, surface.currentCwd || surface.cwd].filter(Boolean).join('\n');
-  return <button
+  const detail = [label, summary, stale ? 'New exchanges since this summary' : undefined, insight ? `Summary generated ${new Date(insight.generatedAt).toLocaleString()}` : undefined, statusLabel, activityDetail, session?.agentState?.reason, surface.currentCwd || surface.cwd].filter(Boolean).join('\n');
+  return <div className="workspace-terminal-entry">
+    <button
     type="button"
-    className="workspace-terminal"
+    className={`workspace-terminal${compact ? ' workspace-terminal--preview' : ''}`}
     data-surface-id={surface.id}
     data-tone={status.tone}
+    data-tr-live={uiMode === 'trace' && sessionControl?.working ? '1' : undefined}
+    data-tr-chan={uiMode === 'trace' ? toolChannel(sessionControl?.tool ?? null) ?? undefined : undefined}
     title={detail}
     draggable={false}
     onClick={event => {
@@ -40,24 +67,91 @@ function TerminalRow({ workspace, surface, index, oscTitle }: {
       markChatRead(surface.id);
     }}
   >
-    <span className="workspace-terminal__number">{index + 1}</span>
+    {!compact && <span className="workspace-terminal__number">{index + 1}</span>}
     <span className="workspace-terminal__content">
       <span className="workspace-terminal__name">{label}</span>
-      {summary && <span className="workspace-terminal__summary">{summary}{stale ? ' · recent activity' : ''}</span>}
+      {!compact && summary && <span className="workspace-terminal__summary">{summary}{stale ? ' · recent activity' : ''}</span>}
       <span className="workspace-terminal__status">{statusLabel}</span>
     </span>
     {unread && <span className="workspace-terminal__unread" role="img" aria-label="Unread">●</span>}
-  </button>;
+    </button>
+    {!compact && sessionControl && sessionControl.choices.length > 0 && (
+      <div className="workspace-row__answers">
+        {sessionControl.choices.map(choice => (
+          <button
+            key={choice.id}
+            type="button"
+            className="workspace-row__answer"
+            disabled={answering === surface.id}
+            title={t('workspaceRow.answerTitle', 'Answer without switching to this pane')}
+            onClick={event => {
+              event.stopPropagation();
+              onAnswer?.(sessionControl, choice.id);
+            }}
+          >{choice.label}</button>
+        ))}
+      </div>
+    )}
+  </div>;
 }
 
-export default function WorkspaceTerminals({ id, workspace, terminals }: {
+export default function WorkspaceTerminals({
+  id, workspace, terminals, expanded, hookActivity, claudeActivity,
+  sessions, activityDetails, answering, onAnswer,
+}: {
   id: string;
   workspace: WorkspaceInfo;
   terminals: SurfaceRef[];
+  expanded: boolean;
+  hookActivity?: Record<string, HookActivityEntry>;
+  claudeActivity?: Record<string, { lastUpdate?: number }>;
+  sessions: ClaudeSessionView[];
+  activityDetails: Record<string, string>;
+  answering: string | null;
+  onAnswer(session: ClaudeSessionView, choiceId: string): void;
 }) {
   const t = useT();
   const oscTitleFor = useOscTitleLookup();
-  return <div id={id} className="workspace-terminals" role="group" aria-label={t('workspaceRow.terminals', 'Terminals')}>
-    {terminals.map((surface, index) => <TerminalRow key={surface.id} workspace={workspace} surface={surface} index={index} oscTitle={oscTitleFor(surface.id)} />)}
+  const views = useRemoteRegistry(state => state.views);
+  const localAttention = useLocalChatAttention(state => state.entries);
+  const signals = useStore(useShallow(state => ({ declared: state.agentStates, detected: state.agentDetections })));
+  const preview = useMemo(() => terminals.map(surface => {
+    const host = views?.find(view => view.sessions.some(session => session.id === surface.id));
+    const session = host?.sessions.find(session => session.id === surface.id);
+    const attention = session ? session.chatAttention : localAttention[surface.id];
+    const declared = signals.declared[surface.id];
+    const detected = signals.detected[surface.id];
+    const control = sessions.find(control => control.surfaceId === surface.id);
+    const fallback = surfaceAgentState(declared, detected)?.state ?? (!session?.agentState ? reportedState(control) : undefined);
+    const state = chatActivityState(session, fallback);
+    const needsAttention = chatIsUnread(attention, host?.deviceId ?? 'local') || state === 'needs_you';
+    const activityAt = Math.max(
+      session?.createdAt ?? 0,
+      session?.lastActivityAt ?? 0,
+      session?.agentState?.since ?? 0,
+      attention?.at ?? 0,
+      declared?.idleSince ?? 0,
+      declared?.blockedSince ?? 0,
+      detected?.observedAt ?? 0,
+      hookActivity?.[surface.id]?.lastSeen ?? 0,
+      claudeActivity?.[surface.id]?.lastUpdate ?? 0,
+    );
+    return { surface, needsAttention, activityAt };
+  }).sort((a, b) => Number(b.needsAttention) - Number(a.needsAttention) || b.activityAt - a.activityAt)[0]?.surface,
+  [terminals, views, localAttention, signals, hookActivity, claudeActivity, sessions]);
+  const shown = expanded ? terminals : preview ? [preview] : [];
+  return <div id={id} className={expanded ? 'workspace-terminals' : 'workspace-terminal-preview'} role="group" aria-label={t('workspaceRow.terminals', 'Terminals')}>
+    {shown.map(surface => <TerminalRow
+      key={surface.id}
+      workspace={workspace}
+      surface={surface}
+      index={terminals.indexOf(surface)}
+      oscTitle={oscTitleFor(surface.id)}
+      compact={!expanded}
+      sessionControl={sessions.find(session => session.surfaceId === surface.id)}
+      activityDetail={activityDetails[surface.id]}
+      answering={answering}
+      onAnswer={onAnswer}
+    />)}
   </div>;
 }

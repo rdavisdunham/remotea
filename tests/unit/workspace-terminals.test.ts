@@ -9,6 +9,7 @@ import { useLocalChatAttention } from '../../src/renderer/remote-sessions/chat-a
 import { FOCUS_SURFACE_EVENT } from '../../src/renderer/components/Git/open-git';
 import type { RemoteRegistryView } from '../../src/shared/remote-hosts-types';
 import type { PaneId, SurfaceId, WorkspaceId } from '../../src/shared/types';
+import { DEFAULT_SIDEBAR_PREFS } from '../../src/renderer/store/settings-slice';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let root: Root;
@@ -26,9 +27,9 @@ function view(): RemoteRegistryView {
     })) };
 }
 
-function render() {
+function render(options: Partial<React.ComponentProps<typeof WorkspaceRow>> = {}) {
   const workspace = useStore.getState().workspaces.find(w => w.id === workspaceId)!;
-  act(() => root.render(React.createElement(WorkspaceRow, { workspace, isActive: false, onSelect, onClose: () => {} })));
+  act(() => root.render(React.createElement(WorkspaceRow, { workspace, isActive: false, onSelect, onClose: () => {}, ...options })));
 }
 function toggle() {
   act(() => container.querySelector<HTMLButtonElement>('.workspace-row__terminal-toggle')!.click());
@@ -42,7 +43,7 @@ beforeEach(() => {
   onSelect.mockReset();
   chatAttention.mockReset().mockResolvedValue({ ok: true });
   window.wmux = { remoteSessions: { chatAttention } } as unknown as typeof window.wmux;
-  useStore.setState({ workspaces: [], activeWorkspaceId: null, agentStates: {}, agentDetections: {}, agentIdentities: {}, agentMeta: new Map(), oscTitles: {} });
+  useStore.setState({ workspaces: [], activeWorkspaceId: null, agentStates: {}, agentDetections: {}, agentIdentities: {}, agentMeta: new Map(), oscTitles: {}, sidebarPrefs: { ...DEFAULT_SIDEBAR_PREFS } });
   useLocalChatAttention.setState({ entries: {} });
   workspaceId = useStore.getState().createWorkspace({ title: 'Project', shell: 'remote:desk', splitTree: {
     type: 'branch', direction: 'horizontal', ratio: .5, children: [
@@ -64,6 +65,115 @@ afterEach(() => {
 });
 
 describe('workspace terminal dropdown', () => {
+  it('previews an unread finished terminal ahead of more recent working activity', () => {
+    const snapshot = view();
+    snapshot.sessions[0].lastActivityAt = 300;
+    snapshot.sessions[1].agentState = { state: 'idle', since: 100 };
+    snapshot.sessions[1].chatAttention = { revision: 3, at: 100, kind: 'finished', seenBy: {} };
+    setLatestRemoteViews([snapshot]);
+    render();
+    expect(container.querySelectorAll('.workspace-terminal')).toHaveLength(1);
+    expect(terminal('surf-waiting').textContent).toContain('Login fixFinished · unread');
+    expect(container.querySelector('.workspace-row__status')).toBeNull();
+    expect(chatAttention).not.toHaveBeenCalled();
+    toggle();
+    expect([...container.querySelectorAll('.workspace-terminal')].map(row => row.getAttribute('data-surface-id')))
+      .toEqual(['surf-working', 'surf-waiting', 'surf-shell']);
+    expect(container.querySelectorAll('.workspace-row__session')).toHaveLength(0);
+  });
+
+  it('chooses the latest actionable terminal and advances after its read receipt arrives', async () => {
+    const snapshot = view();
+    snapshot.sessions[0].lastActivityAt = 500;
+    snapshot.sessions[0].chatAttention = { revision: 2, at: 200, kind: 'finished', seenBy: {} };
+    snapshot.sessions[0].agentState = { state: 'idle', since: 200 };
+    snapshot.sessions[1].lastActivityAt = 600;
+    snapshot.sessions[1].chatAttention = { revision: 3, at: 300, kind: 'finished', seenBy: {} };
+    snapshot.sessions[1].agentState = { state: 'idle', since: 300 };
+    setLatestRemoteViews([snapshot]);
+    render();
+    expect(container.querySelector('.workspace-terminal')?.getAttribute('data-surface-id')).toBe('surf-waiting');
+    const focus = vi.fn();
+    document.addEventListener(FOCUS_SURFACE_EVENT, focus);
+    try {
+      await act(async () => terminal('surf-waiting').click());
+      expect(chatAttention).toHaveBeenCalledExactlyOnceWith('desk', 'surf-waiting', { action: 'read', revision: 3 });
+      expect((focus.mock.calls[0][0] as CustomEvent).detail).toEqual({ workspaceId, surfaceId: 'surf-waiting' });
+      expect(container.querySelector('.workspace-terminal')?.getAttribute('data-surface-id')).toBe('surf-waiting');
+      const acknowledged = structuredClone(snapshot);
+      acknowledged.sessions[1].chatAttention!.seenBy['device-me'] = 3;
+      act(() => setLatestRemoteViews([acknowledged]));
+      expect(container.querySelector('.workspace-terminal')?.getAttribute('data-surface-id')).toBe('surf-working');
+    } finally {
+      document.removeEventListener(FOCUS_SURFACE_EVENT, focus);
+    }
+  });
+
+  it('falls back to latest activity and uses tree order for ties', () => {
+    const snapshot = view();
+    snapshot.sessions[1].agentState = { state: 'idle', since: 1 };
+    snapshot.sessions[0].lastActivityAt = 100;
+    snapshot.sessions[2].lastActivityAt = 200;
+    setLatestRemoteViews([snapshot]);
+    render();
+    expect(container.querySelector('.workspace-terminal')?.getAttribute('data-surface-id')).toBe('surf-shell');
+    const tied = structuredClone(snapshot);
+    tied.sessions[0].lastActivityAt = 200;
+    act(() => setLatestRemoteViews([tied]));
+    expect(container.querySelector('.workspace-terminal')?.getAttribute('data-surface-id')).toBe('surf-working');
+  });
+
+  it('keeps waiting terminals actionable after they have been read and identifies offline context', () => {
+    const snapshot = view();
+    snapshot.sessions[0].lastActivityAt = 300;
+    snapshot.sessions[1].chatAttention = { revision: 2, at: 100, kind: 'needs_you', seenBy: { 'device-me': 2 } };
+    snapshot.connected = false;
+    setLatestRemoteViews([snapshot]);
+    render();
+    expect(terminal('surf-waiting').textContent).toContain('Login fixNeeds you · offline');
+    expect(terminal('surf-waiting').querySelector('.workspace-terminal__unread')).toBeNull();
+  });
+
+  it('uses canonical custom and generated names in both collapsed and expanded readouts', () => {
+    act(() => useStore.getState().updateSurface(workspaceId, 'pane-left' as PaneId, 'surf-waiting' as SurfaceId, {
+      customTitle: undefined, automaticTitle: 'Generated login fix', currentCwd: '/fixture/folder',
+    }));
+    render();
+    expect(terminal('surf-waiting').textContent).toContain('Generated login fix');
+    expect(terminal('surf-waiting').textContent).not.toContain('/fixture/folder');
+    toggle();
+    expect(terminal('surf-waiting').textContent).toContain('Generated login fix');
+    act(() => useStore.getState().renameSurface(workspaceId, 'pane-left' as PaneId, 'surf-waiting' as SurfaceId, 'Chosen login name'));
+    render();
+    expect(terminal('surf-waiting').textContent).toContain('Chosen login name');
+    expect(terminal('surf-waiting').textContent).not.toContain('Generated login fix');
+  });
+
+  it('keeps branch and directory context in tooltips and respects the sidebar detail settings', () => {
+    render({ workspace: { ...useStore.getState().workspaces.find(item => item.id === workspaceId)!, cwd: '/fixture/project', gitBranch: 'feature/fixture', gitDirty: true } });
+    expect(container.querySelector('.workspace-row__context')).toBeNull();
+    expect(container.querySelector('.workspace-row__title')?.getAttribute('title')).toContain('feature/fixture*');
+    expect(container.querySelector('.workspace-row__title')?.getAttribute('title')).toContain('/fixture/project');
+    act(() => useStore.getState().setSidebarPrefs({ hideAllDetails: true }));
+    expect(container.querySelector('.workspace-row__title')?.getAttribute('title')).toBe('Project');
+  });
+
+  it('keeps declared answer buttons with the matching terminal in the expanded list', async () => {
+    const answer = vi.fn().mockResolvedValue({ ok: true });
+    window.wmux.agentState = { answer } as typeof window.wmux.agentState;
+    const declared = { 'surf-waiting': { state: 'blocked', blockedReason: 'Fixture approval', choices: [{ id: 'allow', label: 'Allow fixture' }] } };
+    render({ agentStates: declared });
+    expect(container.querySelector('.workspace-row__answer')).toBeNull();
+    toggle();
+    const row = terminal('surf-waiting').closest('.workspace-terminal-entry')!;
+    const choice = row.querySelector<HTMLButtonElement>('.workspace-row__answer')!;
+    expect(choice.textContent).toBe('Allow fixture');
+    await act(async () => choice.click());
+    expect(answer).toHaveBeenCalledExactlyOnceWith('surf-waiting', 'allow');
+    expect(chatAttention).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('shows concise generated work separately from observed activity and marks stale evidence', () => {
     const snapshot = view();
     snapshot.sessions[0].tea = { title: 'Generated work', summary: 'Repairing login settings.', source: 'claude:chat', version: 'v1', sourceAt: 1, generatedAt: 2 };
@@ -120,7 +230,7 @@ describe('workspace terminal dropdown', () => {
     expect(terminal('surf-working').getAttribute('data-tone')).toBe('ready');
     act(() => vi.advanceTimersByTime(4_001));
     expect(terminal('surf-working').getAttribute('data-tone')).toBe('attention');
-    expect(terminal('surf-working').textContent).toContain('Unread · check this chat');
+    expect(terminal('surf-working').textContent).toContain('Finished · unread');
     act(() => setLatestRemoteViews([{ ...finished, connected: false }]));
     expect(terminal('surf-working').textContent).toContain('offline');
     finished.sessions[2].state = 'exited';

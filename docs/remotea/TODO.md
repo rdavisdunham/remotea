@@ -14,6 +14,15 @@ Eridani backlog task `20a8228c-cc1a-486a-9fb2-d78e26a451e5`.
 
 Start with the expandable terminal list in the workspace sidebar and consider a detail view. Reuse captured turns, task/run metadata and existing session summaries where possible. Define refresh triggers, freshness, server persistence and reconnect behaviour so connected apps show consistent summaries. Preserve user-chosen names and show generated summaries separately from live activity and status. Implemented through Tea’s host-backed captured-context summaries, freshness markers and shared metadata. See [Tea](tea.md) for setup, provider configuration and research.
 
+### Workspace terminal readout
+
+- [x] Use the terminal's chosen or generated name consistently in the workspace readout.
+- [x] Show one attention-first terminal preview beneath each collapsed workspace.
+- [x] Expand the workspace dropdown to see every terminal, status and work summary.
+- [x] Keep branch and directory context in tooltips and preserve sidebar answer controls with the matching expanded terminal.
+
+Unread or waiting terminals take priority in the compact preview. The latest observed activity wins within that group. With no terminal needing attention, show the most recently active terminal. Ties retain split-tree order, and the expanded list keeps its original order. Selecting a terminal acknowledges that terminal's current attention revision. Expansion alone preserves unread state.
+
 ### Easy installation and updates
 
 - [ ] Make Remotea and Eridani easy to install and update.

@@ -23,7 +23,7 @@ describe('workspace title wrapping (#342)', () => {
   });
 
   it('shows the full name on hover in every mode', () => {
-    expect(ROW).toMatch(/className=\{`workspace-row__title[^`]*`\}\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*title=\{workspaceLabel\}/);
+    expect(ROW).toMatch(/className=\{`workspace-row__title[^`]*`\}\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*title=\{\[workspaceLabel, contextLine\]/);
   });
 
   it('adds the wrap modifier only when the pref is on', () => {

@@ -20,6 +20,9 @@ const store = create(() => ({
   sidebarPrefs: { ...DEFAULT_SIDEBAR_PREFS },
   appearancePrefs: { uiMode: 'trace' },
   surfaceProgress: {},
+  terminalPrefs: { oscTitleTabs: false },
+  oscTitles: {},
+  agentStates: {},
   agentMeta: new Map(),
   agentIdentities: {},
   agentDetections: {},
@@ -84,7 +87,7 @@ describe('full-width workspace titles', () => {
     // The title and the status text each have a line to themselves.
     expect(classesOf(header())).toEqual(['workspace-row__title']);
     expect(header().textContent).toBe(workspace.title);
-    expect(row().querySelector(':scope > .workspace-row__status')?.textContent).toBe('Reading file...');
+    expect(row().querySelector('.workspace-terminal__status')?.textContent).toBe('Reading file...');
     expect(topLine()!.nextElementSibling).toBe(header());
   });
 

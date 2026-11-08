@@ -1653,6 +1653,20 @@
   cursor: pointer;
 }
 .workspace-terminal:hover { background: var(--ui-bg-2); }
+.workspace-terminal-preview {
+  margin-top: 3px;
+}
+.workspace-terminal--preview {
+  padding: 3px 0;
+}
+.workspace-terminal-entry {
+  min-width: 0;
+}
+.workspace-terminal-entry .workspace-row__answers {
+  flex-wrap: wrap;
+  margin-top: 2px;
+  padding-left: 20px;
+}
 .workspace-terminal__number {
   flex-shrink: 0;
   font-size: calc(10px * var(--sidebar-text-scale, 1));
