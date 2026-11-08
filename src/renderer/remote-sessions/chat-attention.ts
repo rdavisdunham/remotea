@@ -49,21 +49,21 @@ export function chatActivityState(session: SessionRecord | undefined, fallback: 
   return fallback ?? session?.agentState?.state;
 }
 
-export function useChatAttention(surfaceId: string) {
+export function useChatAttention(surfaceId: string, reportedState?: AgentStateName) {
   const views = useRemoteRegistry(s => s.views);
   const host = views?.find(v => v.sessions.some(s => s.id === surfaceId));
   const session = host?.sessions.find(s => s.id === surfaceId);
   const declared = useStore(s => s.agentStates?.[surfaceId]);
   const detected = useStore(s => s.agentDetections?.[surfaceId]);
   const identity = useStore(s => s.agentIdentities?.[surfaceId]);
-  const fallback = surfaceAgentState(declared, detected)?.state;
+  const fallback = surfaceAgentState(declared, detected)?.state ?? (!session?.agentState ? reportedState : undefined);
   const state = chatActivityState(session, fallback);
   const local = useLocalChatAttention(s => s.entries[surfaceId]);
   useEffect(() => { if (!session) observeLocalChat(surfaceId, state); }, [surfaceId, state, !!session]);
   const attention = session ? session.chatAttention : local;
   const device = host?.deviceId ?? 'local';
   const unread = chatIsUnread(attention, device);
-  const hasHarness = !!(identity?.kind || detected?.agent || declared?.sessionId || declared?.sessionProvider || session?.agent || session?.eridani);
+  const hasHarness = !!(identity?.kind || detected?.agent || declared?.sessionId || declared?.sessionProvider || session?.agent || session?.eridani || reportedState);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     setNow(Date.now());

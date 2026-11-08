@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { WorkspaceInfo, SplitNode, PaneId } from '../../../shared/types';
+import { WorkspaceInfo, SplitNode, PaneId, SurfaceId } from '../../../shared/types';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import { aggregateProgress } from '../../store/progress-slice';
@@ -14,10 +14,11 @@ import { chatIsUnread } from '../../../shared/chat-attention';
 import PrStatusIcon from './PrStatusIcon';
 import WorkspaceTerminals, { terminalSurfaces } from './WorkspaceTerminals';
 import { IconCaret } from '../SplitPane/icons';
-import { traceState, toolChannel } from './trace-signals';
+import { traceState } from './trace-signals';
 import { resolveStatusText, statusClassFor, stateDotClassFor, backgroundShellsText, type StatusTextInputs, type T } from './workspace-status';
 import { buildContextLine, sidebarDetails } from './context-line';
 import { useWorkspaceLabel } from '../SplitPane/use-osc-title';
+import { requestFocusSurface } from '../Git/open-git';
 
 /** Stable empty view — avoids allocating a fresh object every collapsed tick. */
 const EMPTY_AGENTS_VIEW: WorkspaceAgentsView = { lines: [], total: 0, running: 0, shells: 0 };
@@ -292,12 +293,14 @@ export default function WorkspaceRow({
     setAnswering(surfaceId);
     try {
       const res = await window.wmux?.agentState?.answer?.(surfaceId, choiceId);
-      if (!res?.ok) onFocusAgentPane?.(paneId);
+      if (res?.ok) return;
     } catch {
-      onFocusAgentPane?.(paneId);
+      // The terminal provides the recovery path for an unconfirmed answer.
     } finally {
       setAnswering(null);
     }
+    requestFocusSurface(workspace.id, surfaceId as SurfaceId);
+    onFocusAgentPane?.(paneId);
   };
 
   // Legacy workspace-keyed entry — only written by hook events with no surfaceId.
@@ -528,6 +531,7 @@ export default function WorkspaceRow({
       // Read by the sidebar list's own drop handler (#330), which has to map a
       // pointer in empty space back onto the nearest row.
       data-workspace-id={workspace.id}
+      title={[workspaceLabel, contextLine].filter(Boolean).join("\n")}
       // TRACE drives everything from attributes so the CSS owns the rendering
       // and no style object is rebuilt per tick. Absent in classic mode, where
       // rowTrace is null and none of these selectors exist.
@@ -582,7 +586,7 @@ export default function WorkspaceRow({
             className={`workspace-row__title${sidebarPrefs.wrapTitles ? ' workspace-row__title--wrap' : ''}`}
             // The full name on hover (#342): a truncated title was otherwise
             // readable only by opening the rename box.
-            title={workspaceLabel}
+            title={[workspaceLabel, contextLine].filter(Boolean).join("\n")}
             onDoubleClick={(e) => {
               e.stopPropagation();
               startRename();
@@ -598,79 +602,27 @@ export default function WorkspaceRow({
       </div>
 
       {/* Line 2: Status — always visible */}
-      <div className={`workspace-row__status ${statusClass}`}>
-        {statusText}
-      </div>
-
-      {terminalsExpanded && terminals.length > 0 && <WorkspaceTerminals id={terminalsId} workspace={workspace} terminals={terminals} />}
-
-      {/* Per-Claude-session sub-lines — one per pane running Claude Code,
-          shown as soon as the workspace hosts 2+ sessions (click → focus pane) */}
-      {(sessions.length >= 2 || blockedSessions > 0) && (
-        <div className="workspace-row__agents workspace-row__sessions">
-          {sessions.map((s, i) => (
-            <React.Fragment key={s.surfaceId}>
-            <div
-              className={[
-                'workspace-row__agent',
-                'workspace-row__agent--clickable',
-                'workspace-row__session',
-                s.blocked ? 'workspace-row__session--blocked' : '',
-                s.question ? 'workspace-row__session--question' : '',
-                s.working || s.blocked || s.question || s.backgroundShells > 0 ? '' : 'workspace-row__session--idle',
-              ].filter(Boolean).join(' ')}
-              // Per-session channel: this is what makes "that one is REWRITING
-              // my code, that one is only reading" legible at a glance. Bound
-              // to the tool name, a closed vocabulary from the hook, so an
-              // unknown tool falls back to the neutral bus colour rather than
-              // being miscoloured as something harmless.
-              data-tr-live={uiMode === 'trace' && s.working ? '1' : undefined}
-              data-tr-chan={uiMode === 'trace' ? (toolChannel(s.tool) ?? undefined) : undefined}
-              onClick={(e) => {
-                e.stopPropagation();
-                onFocusAgentPane?.(s.paneId);
-              }}
-            >
-              <span className="workspace-row__agent-glyph" aria-hidden="true">{i === sessions.length - 1 ? '└' : '├'}</span>
-              {s.blocked && <span className="workspace-row__agent-dot workspace-row__agent-dot--blocked" />}
-              {s.question && <span className="workspace-row__agent-dot workspace-row__agent-dot--question" />}
-              {(s.working || s.backgroundShells > 0) && !s.blocked && !s.question && <span className="workspace-row__agent-dot" />}
-              <span className="workspace-row__agent-name">{s.label}</span>
-              <span className={`workspace-row__agent-detail${uiMode === 'trace' ? ' workspace-row__session-tool' : ''}`}>
-                {sessionDetailText(s, t)}
-              </span>
-            </div>
-            {/* The back-channel (issue #128): answer the pane that needs you
-                without leaving the pane you are in. Only rendered when the
-                AGENT declared these answers — wmux never invents a keystroke
-                for someone else's prompt. */}
-            {s.choices.length > 0 && (
-              <div className="workspace-row__answers">
-                <span className="workspace-row__agent-glyph" aria-hidden="true">{' '}</span>
-                {s.choices.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className="workspace-row__answer"
-                    disabled={answering === s.surfaceId}
-                    title={t('workspaceRow.answerTitle', 'Answer without switching to this pane')}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void answerSession(s.surfaceId, c.id, s.paneId);
-                    }}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            </React.Fragment>
-          ))}
+      {(terminalsExpanded || terminals.length === 0) && (
+        <div className={`workspace-row__status ${statusClass}`}>
+          {statusText}
         </div>
       )}
 
+      {terminals.length > 0 && <WorkspaceTerminals
+        id={terminalsId}
+        workspace={workspace}
+        terminals={terminals}
+        expanded={terminalsExpanded}
+        hookActivity={hookActivity}
+        claudeActivity={claudeActivity}
+        sessions={sessions}
+        activityDetails={Object.fromEntries(sessions.map(session => [session.surfaceId, sessionDetailText(session, t)]))}
+        answering={answering}
+        onAnswer={(session, choiceId) => void answerSession(session.surfaceId, choiceId, session.paneId)}
+      />}
+
       {/* Agent sub-lines — only while agents run (+10s linger with ✓) */}
-      {wsAgents.lines.length > 0 && (
+      {terminalsExpanded && wsAgents.lines.length > 0 && (
         <div className="workspace-row__agents">
           {wsAgents.lines.map((agent, i) => (
             <div
@@ -725,14 +677,14 @@ export default function WorkspaceRow({
       )}
 
       {/* Line 3: Context — branch · path */}
-      {contextLine && (
+      {terminals.length === 0 && contextLine && (
         <div className="workspace-row__context">
           {contextLine}
         </div>
       )}
 
       {/* Active skill */}
-      {wsActivity?.activeSkill && (
+      {terminalsExpanded && wsActivity?.activeSkill && (
         <div className="workspace-row__meta-line workspace-row__skill">
           {wsActivity.activeSkill}
         </div>

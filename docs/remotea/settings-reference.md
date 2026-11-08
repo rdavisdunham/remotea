@@ -145,8 +145,8 @@ Persisted `sidebarPrefs`, except Sidebar mode in `appearancePrefs`. All apply li
 | Wrap long workspace titles | `wrapTitles=false` | on/off | Sidebar:14 |
 | Give workspace titles the full row width | `fullWidthTitles=false` | on/off; moves status to separate row | Sidebar:24 |
 | Eridani runs expanded | `sidebarPrefs.eridaniRunsExpanded=false` | Expand/collapse control at the bottom of the desktop sidebar. Saved in settings.json across restarts | Sidebar header |
-| Show git branch | `showGitBranch=true` | on/off | Sidebar:40 |
-| Show working directory | `showWorkingDir=true` | on/off | Sidebar:50 |
+| Show git branch | `showGitBranch=true` | on/off; workspace tooltip for terminal workspaces | Sidebar:40 |
+| Show working directory | `showWorkingDir=true` | on/off; workspace tooltip for terminal workspaces | Sidebar:50 |
 | Show PR status | `showPR=true` | on/off | Sidebar:60 |
 | Show ports | `showPorts=true` | on/off | Sidebar:70 |
 | Show notification message | `showNotificationMessage=true` | on/off | Sidebar:80 |

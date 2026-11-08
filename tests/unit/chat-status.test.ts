@@ -55,12 +55,12 @@ describe('chat status and reminders', () => {
     expect(container.querySelector('.chat-status')?.getAttribute('data-tone')).toBe('ready');
     expect(chatAttention).not.toHaveBeenCalled();
     await act(async () => vi.advanceTimersByTime(4001));
-    expect(read()).toBe('Unread · check this chat');
+    expect(read()).toBe('Finished · unread');
     expect(container.querySelector('.chat-status')?.getAttribute('data-tone')).toBe('attention');
     await act(async () => container.querySelector('textarea')!.dispatchEvent(new Event('pointerdown', { bubbles: true })));
     expect(chatAttention).toHaveBeenCalledExactlyOnceWith('desk', id, { action: 'read', revision: 1 });
     // The UI waits for registry confirmation, not just an RPC response.
-    expect(read()).toBe('Unread · check this chat');
+    expect(read()).toBe('Finished · unread');
     await act(async () => setLatestRemoteViews(view({ ...finish(), chatAttention: { ...finish().chatAttention, seenBy: { 'device-a': 1 } } })));
     expect(read()).toBe('Finished');
   });

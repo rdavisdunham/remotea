@@ -12,6 +12,9 @@ const store = create(() => ({
   sidebarPrefs: { activeTabIndicator: 'leftRail' },
   appearancePrefs: { uiMode: 'classic' },
   surfaceProgress: {},
+  terminalPrefs: { oscTitleTabs: false },
+  oscTitles: {},
+  agentStates: {},
   agentMeta: new Map(),
   agentIdentities: {} as Record<string, AgentIdentitySnapshot>,
   agentDetections: {} as Record<string, DetectionSnapshot>,
@@ -37,6 +40,7 @@ afterEach(() => {
 });
 
 function render(states: Record<string, DeclaredAgentSnapshot> = {}, overrides: Partial<WorkspaceInfo> = {}) {
+  store.setState({ agentStates: states });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -45,6 +49,7 @@ function render(states: Record<string, DeclaredAgentSnapshot> = {}, overrides: P
     onSelect: () => {}, onClose: () => {}, agentStates: states,
     hookActivity: {}, claudeActivity: {},
   })));
+  act(() => container.querySelector<HTMLButtonElement>('.workspace-row__terminal-toggle')!.click());
 }
 /** `base` plus its BEM modifier, or `base` alone when the chain yielded none. */
 function withModifier(base: string, modifier: string): string {
@@ -62,21 +67,21 @@ function expectStatus(text: string, status: string, dot: string) {
 describe('workspace status shares the roster state (#235)', () => {
   it('updates Codex detail rows and the provider-neutral summary through a whole turn', () => {
     render({ a: { state: 'unknown' }, b: { state: 'unknown' }, c: { state: 'unknown' } });
-    const detail = () => [...container.querySelectorAll('.workspace-row__sessions .workspace-row__agent-detail')]
+    const detail = () => [...container.querySelectorAll('.workspace-terminal__status')]
       .map(el => el.textContent);
-    expect(detail()).toEqual(['Idle', 'Idle', 'Idle']);
+    expect(detail()).toEqual(['No harness detected', 'No harness detected', 'No harness detected']);
     act(() => store.setState({ agentDetections: {
       a: { agent: 'codex', state: 'working' },
       b: { agent: 'codex', state: 'idle' }, c: { agent: 'codex', state: 'idle' },
     } }));
     expectStatus('1/3 running', 'working', 'running');
-    expect(detail()).toEqual(['Running…', 'Idle', 'Idle']);
+    expect(detail()).toEqual(['Running…', 'Idle · ready for you', 'Idle · ready for you']);
     act(() => store.setState({ agentDetections: {
       a: { agent: 'codex', state: 'idle' },
       b: { agent: 'codex', state: 'idle' }, c: { agent: 'codex', state: 'idle' },
     } }));
     expectStatus('Idle', 'idle', 'idle');
-    expect(detail()).toEqual(['Idle', 'Idle', 'Idle']);
+    expect(detail()).toEqual(['Finished · unread', 'Idle · ready for you', 'Idle · ready for you']);
   });
   it('updates the mounted row for a detected working remote tab without hook reports', () => {
     render();
@@ -129,12 +134,12 @@ describe('workspace status shares the roster state (#235)', () => {
   it.each(['running', 'interrupted', 'idle', undefined] as const)(
     'a silent agent renders identically to no agent at all (shell: %s)', shellState => {
       render({}, { shellState });
-      const before = container.innerHTML;
+      const before = container.querySelector('.workspace-row__status')!.outerHTML;
       act(() => store.setState({
         agentIdentities: { a: { kind: 'claude', source: 'command' } },
         agentDetections: { a: { agent: 'claude', state: 'unknown' } },
       }));
-      expect(container.innerHTML).toBe(before);
+      expect(container.querySelector('.workspace-row__status')!.outerHTML).toBe(before);
     });
 
   it('a screen-identified agent stays on the shell until a state is detected', () => {
