@@ -36,8 +36,8 @@ function TerminalRow({
   compact: boolean;
   sessionControl?: ClaudeSessionView;
   activityDetail?: string;
-  answering?: string | null;
-  onAnswer?(session: ClaudeSessionView, choiceId: string): void;
+  answering: string | null;
+  onAnswer(session: ClaudeSessionView, choiceId: string): void;
 }) {
   const t = useT();
   const agentLabel = useStore(state => state.agentMeta.get(surface.id)?.label);
@@ -86,7 +86,7 @@ function TerminalRow({
             title={t('workspaceRow.answerTitle', 'Answer without switching to this pane')}
             onClick={event => {
               event.stopPropagation();
-              onAnswer?.(sessionControl, choice.id);
+              onAnswer(sessionControl, choice.id);
             }}
           >{choice.label}</button>
         ))}

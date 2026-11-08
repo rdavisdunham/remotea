@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { WorkspaceInfo, SplitNode, PaneId } from '../../../shared/types';
+import { WorkspaceInfo, SplitNode, PaneId, SurfaceId } from '../../../shared/types';
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import { aggregateProgress } from '../../store/progress-slice';
@@ -18,6 +18,7 @@ import { traceState } from './trace-signals';
 import { resolveStatusText, statusClassFor, stateDotClassFor, backgroundShellsText, type StatusTextInputs, type T } from './workspace-status';
 import { buildContextLine, sidebarDetails } from './context-line';
 import { useWorkspaceLabel } from '../SplitPane/use-osc-title';
+import { requestFocusSurface } from '../Git/open-git';
 
 /** Stable empty view — avoids allocating a fresh object every collapsed tick. */
 const EMPTY_AGENTS_VIEW: WorkspaceAgentsView = { lines: [], total: 0, running: 0, shells: 0 };
@@ -292,12 +293,14 @@ export default function WorkspaceRow({
     setAnswering(surfaceId);
     try {
       const res = await window.wmux?.agentState?.answer?.(surfaceId, choiceId);
-      if (!res?.ok) onFocusAgentPane?.(paneId);
+      if (res?.ok) return;
     } catch {
-      onFocusAgentPane?.(paneId);
+      // The terminal provides the recovery path for an unconfirmed answer.
     } finally {
       setAnswering(null);
     }
+    requestFocusSurface(workspace.id, surfaceId as SurfaceId);
+    onFocusAgentPane?.(paneId);
   };
 
   // Legacy workspace-keyed entry — only written by hook events with no surfaceId.

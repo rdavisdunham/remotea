@@ -174,6 +174,23 @@ describe('workspace terminal dropdown', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('opens the exact inactive terminal when a sidebar answer needs recovery', async () => {
+    const answer = vi.fn().mockResolvedValue({ ok: false });
+    window.wmux.agentState = { answer } as typeof window.wmux.agentState;
+    const focusPane = vi.fn();
+    render({ agentStates: { 'surf-waiting': { state: 'blocked', choices: [{ id: 'allow', label: 'Allow fixture' }] } }, onFocusAgentPane: focusPane });
+    toggle();
+    const focus = vi.fn();
+    document.addEventListener(FOCUS_SURFACE_EVENT, focus);
+    try {
+      await act(async () => container.querySelector<HTMLButtonElement>('.workspace-row__answer')!.click());
+      expect((focus.mock.calls[0][0] as CustomEvent).detail).toEqual({ workspaceId, surfaceId: 'surf-waiting' });
+      expect(focusPane).toHaveBeenCalledExactlyOnceWith('pane-left');
+    } finally {
+      document.removeEventListener(FOCUS_SURFACE_EVENT, focus);
+    }
+  });
+
   it('shows concise generated work separately from observed activity and marks stale evidence', () => {
     const snapshot = view();
     snapshot.sessions[0].tea = { title: 'Generated work', summary: 'Repairing login settings.', source: 'claude:chat', version: 'v1', sourceAt: 1, generatedAt: 2 };
