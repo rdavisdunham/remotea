@@ -317,9 +317,10 @@ describe('double-click empty workspace-list space', () => {
     expect(props.onCreate).not.toHaveBeenCalled();
   });
 
-  it.each(['.workspace-row', '.workspace-row__header', '.workspace-row__status', '.workspace-row__close', '.sidebar', '.sidebar__footer', '.sidebar-resize-handle'])(
+  it.each(['.workspace-row', '.workspace-row__header', '.workspace-terminal__name', '.workspace-terminal__status', '.workspace-row__status', '.workspace-row__close', '.sidebar', '.sidebar__footer', '.sidebar-resize-handle'])(
     'does not treat %s as empty list space', selector => {
       const props = renderSidebar();
+      if (selector === '.workspace-row__status') click(element('.workspace-row__terminal-toggle'));
       doubleClick(element(selector));
       expect(props.onCreate).not.toHaveBeenCalled();
     },
