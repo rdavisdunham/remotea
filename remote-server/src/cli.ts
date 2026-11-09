@@ -572,6 +572,7 @@ usage:
   remotea screen <surf-id>
   remotea eridani connect [--url <wss://…>] [--machine <name>] | status [--json] | disconnect [--forget] | collect [--dry-run] [--days N]
   remotea eridani collector [parity|authoritative]              show or switch the collector mode (prints the cutover checklist)
+  remotea eridani collector scope [remotea|all]                 report only remotea sessions (default) or every session on the machine
   remotea eridani targets list [--json] | add … | remove <id>     where Eridani may start work
   remotea eridani worktrees [--json]                            managed worktrees and unmerged work (never removes)
   remotea launcher probe [claude|codex] [--bin <path>] [--no-turns] [--json]

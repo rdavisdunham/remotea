@@ -19,6 +19,7 @@
  *       --dry-run prints what the collector would report (like collector.py
  *       --dry-run); without it, asks the running server for a scan now
  *   collector [parity|authoritative]
+ *   collector scope [remotea|all]
  *       shows or switches the collector mode and prints what to do around
  *       the switch (the cutover checklist, or the rollback). The running
  *       server follows within 30 s; status --json turns v2 in authoritative.
@@ -65,6 +66,8 @@ export interface EridaniSummary {
   url: string | null;
   machine: string;
   collector: string;
+  /** Which sessions the collector reports: 'remotea' (default) or 'all'. */
+  collectorScope: string;
   keyPresent: boolean;
   /** The link's state as the running server reports it; 'stopped' when no server is running it. */
   state: string;
@@ -91,6 +94,7 @@ export function eridaniSummary(dir: string, serverRunning: boolean): EridaniSumm
     url: cfg?.url ?? null,
     machine: cfg?.machine ?? os.hostname(),
     collector: cfg?.collector ?? 'parity',
+    collectorScope: cfg?.collector_scope ?? 'remotea',
     keyPresent: readEridaniToken(dir) !== null,
     state: !enabled ? 'disabled' : fresh ? link!.state : 'stopped',
     link: fresh ? link : null,
@@ -329,7 +333,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
         out.write('not set up: run `remotea eridani setup` (or `remotea eridani connect --url wss://…`)\n');
         return 0;
       }
-      out.write(`link ${s.state}  ${s.url}  as ${s.machine}  collector ${s.collector}  key ${s.keyPresent ? 'present' : 'MISSING'}\n`);
+      out.write(`link ${s.state}  ${s.url}  as ${s.machine}  collector ${s.collector} (${s.collectorScope === 'all' ? 'all sessions' : 'remotea sessions'})  key ${s.keyPresent ? 'present' : 'MISSING'}\n`);
       const l = s.link;
       if (l) {
         out.write(`host ${l.hostId ?? '-'}  epoch ${l.connEpoch ?? '-'}  last connected ${fmtTime(l.lastConnectedAt)}  last ack ${fmtTime(l.lastAckAt)}\n`);
@@ -407,6 +411,25 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
     case 'collector': {
       const prev = loadEridaniConfig(dir);
       const want = rest[0];
+      if (want === 'scope') {
+        const scope = rest[1];
+        if (!prev) throw new Error('the link is not set up: run `remotea eridani connect --url wss://…` first');
+        const now = prev.collector_scope ?? 'remotea';
+        if (scope === undefined) {
+          out.write(`collector scope ${now}\n`);
+          return 0;
+        }
+        if (scope !== 'remotea' && scope !== 'all') throw new Error('usage: remotea eridani collector scope [remotea|all]');
+        if (now === scope) out.write(`collector scope already ${scope}\n`);
+        else {
+          saveEridaniConfig(dir, { ...prev, collector_scope: scope });
+          out.write(`collector scope ${now} → ${scope}; the server follows within 30 s\n`);
+        }
+        out.write(scope === 'remotea'
+          ? 'Only sessions that ran in a remotea terminal are reported. Sessions reported before stay in Eridani.\n'
+          : 'Every Claude Code, Claude Desktop and Codex session on this machine is reported, as the Python collector did.\n');
+        return 0;
+      }
       if (want === undefined) {
         out.write(`collector ${prev?.collector ?? 'parity'}${prev ? '' : ' (no link set up)'}\n`);
         return 0;
@@ -428,7 +451,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
       return worktreesCommand(dir, rest, out);
     default:
       process.stderr.write(`usage: remotea eridani setup [--help | <flags>] | connect [--url <wss://…>] [--machine <name>] | status [--json] [--probe] | disconnect [--forget] | collect [--dry-run] [--days N]
-       remotea eridani collector [parity|authoritative]
+       remotea eridani collector [parity|authoritative] | collector scope [remotea|all]
        remotea eridani targets list [--json] | add --id <id> --repo <path> --worktree-root <path> [--base <branch>] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>] [--prepare <id>=<command>]… [--prepare-timeout <s>] [--max-runs <n>] | add --json '<target>' | remove <id>
        remotea eridani worktrees [--json]\n`);
       return sub === undefined ? 0 : 2;

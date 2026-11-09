@@ -206,6 +206,19 @@ export function parseCollectorMode(v: unknown): CollectorMode {
   return v === 'authoritative' || v === 'off' ? v : 'parity';
 }
 
+/**
+ * Which sessions the collector reports. 'remotea' (default): only sessions
+ * that ran in a remotea terminal, now or before (the collector state's
+ * session → workspace map remembers them). 'all': every Claude Code, Claude
+ * Desktop, Codex CLI and Codex desktop session on the machine, as collector.py did.
+ */
+export type CollectorScope = 'remotea' | 'all';
+export const COLLECTOR_SCOPES: readonly CollectorScope[] = ['remotea', 'all'];
+
+export function parseCollectorScope(v: unknown): CollectorScope {
+  return v === 'all' ? 'all' : 'remotea';
+}
+
 export interface EridaniConfig {
   enabled: boolean;
   /** wss://…/api/v1/external/agents/link */
@@ -214,6 +227,8 @@ export interface EridaniConfig {
   machine?: string;
   /** See CollectorMode; 'parity' unless switched with `remotea eridani collector`. */
   collector: CollectorMode;
+  /** See CollectorScope; 'remotea' unless switched with `remotea eridani collector scope all`. */
+  collector_scope?: CollectorScope;
 }
 
 export const ERIDANI_FILE = 'eridani.json';
@@ -250,6 +265,7 @@ export function loadEridaniConfig(dir: string): EridaniConfig | null {
       url: raw.url,
       machine: typeof raw.machine === 'string' && raw.machine.trim() ? raw.machine.trim().slice(0, 100) : undefined,
       collector: parseCollectorMode(raw.collector),
+      collector_scope: parseCollectorScope(raw.collector_scope),
     };
   } catch {
     return null;
@@ -363,5 +379,5 @@ export function eridaniConfigStamp(dir: string): string {
   } catch {
     /* no key */
   }
-  return `${cfg ? JSON.stringify([cfg.enabled, cfg.url, cfg.machine ?? null, cfg.collector]) : '-'}|${key}`;
+  return `${cfg ? JSON.stringify([cfg.enabled, cfg.url, cfg.machine ?? null, cfg.collector, cfg.collector_scope]) : '-'}|${key}`;
 }

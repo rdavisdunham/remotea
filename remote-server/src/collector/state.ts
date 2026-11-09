@@ -50,6 +50,20 @@ export class CollectorState {
     }
   }
 
+  /**
+   * Adds the session → workspace map from another mode's state file (each mode keeps its own), so every session
+   * ever seen in a remotea terminal still counts as one after a mode switch. Entries already here win.
+   */
+  rememberTerminalsFrom(file: string): void {
+    try {
+      const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<CollectorStateData>;
+      const groups = raw?.remotea?.groups;
+      if (groups && typeof groups === 'object') this.data.remotea.groups = { ...groups, ...this.data.remotea.groups };
+    } catch {
+      /* no other file */
+    }
+  }
+
   get(source: string): SourceRecord | undefined {
     return this.data.sessions[source];
   }

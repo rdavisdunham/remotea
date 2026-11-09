@@ -96,7 +96,7 @@ async function runtimeSetup(mode: 'parity' | 'authoritative') {
   await new Promise((r) => eri.wss.once('listening', r));
   const dir = tmpDir();
   writeEridaniToken(dir, 'eri_bot_test0123456789');
-  saveEridaniConfig(dir, { enabled: true, url: eri.url, machine: 'cutover-box', collector: mode });
+  saveEridaniConfig(dir, { enabled: true, url: eri.url, machine: 'cutover-box', collector: mode, collector_scope: 'all' });
   const registry = Registry.load({ file: null, bootId: 'boot-1' });
   const hub = new Hub({ registry, spawn: fakeSpawner().spawn, bootId: 'boot-1', serverId: 'srv', hostname: 'box', timers: new ManualTimers(), probe: () => ({}) });
   const logs: string[] = [];
@@ -152,7 +152,7 @@ describe('collector mode switch', () => {
     const sent = eri.frames.length;
     saveEridaniConfig(dir, { ...loadEridaniConfig(dir)!, collector: 'parity' });
     rt.check();
-    await until(() => logs.filter((l) => l.includes('(collector parity)')).length === 2);
+    await until(() => logs.filter((l) => l.includes('(collector parity,')).length === 2);
     await new Promise((r) => setTimeout(r, 300));
     expect(eri.frames.slice(sent).filter((f) => f.t === 'session.report')).toHaveLength(0);
   });

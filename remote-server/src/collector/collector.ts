@@ -56,6 +56,9 @@ export interface CollectorOptions {
   repoOf?: RepoLookup;
   /** Test seam for the node:sqlite check made when the collector starts. */
   probeSqlite?: () => string | null;
+  /** 'remotea': only sessions that ran in a remotea terminal (live now, or remembered in the state's
+   * session → workspace map). 'all' (the default here, collector.py's behaviour): every session. */
+  scope?: 'remotea' | 'all';
 }
 
 export interface ScanOptions {
@@ -143,7 +146,8 @@ export class Collector {
       ...claudeSources(path.join(home, '.claude/projects'), 'wsl', repoOf),
       ...(codex ? codexSources(reader, path.join(home, '.codex'), 'codex_cli', repoOf, warn) : []),
     ];
-    for (const w of this.windowsHomes()) {
+    // remotea terminals run on this side: a Windows-side session never ran in one.
+    for (const w of this.opts.scope === 'remotea' ? [] : this.windowsHomes()) {
       out.push(...claudeSources(path.join(w, '.claude/projects'), 'windows', repoOf));
       if (codex) out.push(...codexSources(reader, path.join(w, '.codex'), 'codex_desktop', repoOf, warn));
     }
@@ -199,6 +203,7 @@ export class Collector {
         if (src.modified < cutoff) continue;
         const sid = sourceId(src.source);
         if (opts.only && !opts.only(sid)) continue;
+        if (this.opts.scope === 'remotea' && !(sid in terminals.groups) && !terminals.live[sid]) continue;
         const version = [src.version, READER, pyDigest([terminals.installed, terminals.live[sid] ?? null, terminals.groups[sid] ?? null]).slice(0, 16)];
         const previous: Partial<typeof known[string]> = known[src.source] ?? {};
         if (!dry && !opts.force && sameJson(previous.version, version) && (previous.settled || !this.settled(previous.last_active))) continue;

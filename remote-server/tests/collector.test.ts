@@ -33,7 +33,8 @@ const HOME = (() => {
   return home;
 })();
 
-function make(opts: { state?: CollectorState; send?: (r: ReportOut) => boolean; now?: () => number } = {}) {
+function make(opts: { state?: CollectorState; send?: (r: ReportOut) => boolean; now?: () => number; scope?: 'remotea' | 'all';
+  status?: () => StatusLike | null } = {}) {
   const sent: ReportOut[] = [];
   const state = opts.state ?? new CollectorState(null);
   const c = new Collector({
@@ -41,7 +42,8 @@ function make(opts: { state?: CollectorState; send?: (r: ReportOut) => boolean; 
     windowsUsers: path.join(FIX, 'windows-users'),
     machine: 'fixturepc',
     state,
-    status: () => status,
+    status: opts.status ?? (() => status),
+    scope: opts.scope,
     send: opts.send ?? ((r) => (sent.push(r), true)),
     now: opts.now,
     repoOf: (cwd, origin) => (origin ? origin.replace(/\/+$/, '').split('/').pop()!.split(':').pop()!.replace(/\.git$/, '') : ''),
@@ -118,6 +120,40 @@ describe('collector parity with collector.py', () => {
     await again.c.scan();
     expect(again.sent.length).toBe(0);
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('collector scope', () => {
+  it('reports only sessions that ran in a remotea terminal, and skips the Windows side', async () => {
+    const { c, sent } = make({ scope: 'remotea' });
+    await c.scan();
+    // 0f8f… is live in a terminal; t9 ran in one that has since exited. The other six never did.
+    expect(sent.map((r) => r.entity).sort()).toEqual(['claude_code:0f8fad5b-d9cb-469f-a165-70867728950e', 'codex_cli:t9']);
+  });
+
+  it('remembers a session that left remotea, across restarts and from the other mode\'s file', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'collector-scope-'));
+    const parity = path.join(dir, 'parity.json'), authoritative = path.join(dir, 'authoritative.json');
+    const seen = new CollectorState(parity);
+    await make({ state: seen, scope: 'remotea' }).c.scan();
+    seen.save();
+    // Later: remotea no longer lists either terminal, and the collector runs from a fresh file (a mode switch).
+    const fresh = new CollectorState(authoritative);
+    fresh.rememberTerminalsFrom(parity);
+    const later = make({ state: fresh, scope: 'remotea', status: () => ({ ...status, sessions: [] }) });
+    await later.c.scan();
+    expect(later.sent.map((r) => r.entity).sort()).toEqual(['claude_code:0f8fad5b-d9cb-469f-a165-70867728950e', 'codex_cli:t9']);
+    // Without the remembered map, nothing counts as remotea.
+    const forgot = make({ state: new CollectorState(null), scope: 'remotea', status: () => ({ ...status, sessions: [] }) });
+    await forgot.c.scan();
+    expect(forgot.sent).toEqual([]);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("'all' reports every session, as collector.py did", async () => {
+    const { c, sent } = make({ scope: 'all' });
+    await c.scan();
+    expect(sent.length).toBe(Object.keys(expected).length);
   });
 });
 
