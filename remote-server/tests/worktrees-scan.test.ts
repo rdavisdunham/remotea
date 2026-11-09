@@ -93,7 +93,7 @@ async function setup() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-wtscan-'));
   cleanups.push(() => fs.rmSync(dir, { recursive: true, force: true }));
   writeEridaniToken(dir, 'eri_bot_test0123456789');
-  saveEridaniConfig(dir, { enabled: true, url: eri.url, machine: 'scan-box', collector: 'parity' });
+  saveEridaniConfig(dir, { enabled: true, url: eri.url, machine: 'scan-box', collector: 'parity', collector_scope: 'all' });
   const registry = Registry.load({ file: null, bootId: 'boot-1' });
   const hub = new Hub({ registry, spawn: fakeSpawner().spawn, bootId: 'boot-1', serverId: 'srv', hostname: 'box', timers: new ManualTimers(), probe: () => ({}) });
   const logs: string[] = [];

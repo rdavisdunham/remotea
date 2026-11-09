@@ -97,6 +97,14 @@ Both files live in the server's config dir (`~/.config/remotea`, or
 - `collector` is `"parity"` (default), `"authoritative"` (stage E, see
   [Collector cutover](#stage-e-collector-cutover)) or `"off"`. Anything else
   reads as `"parity"`.
+- `collector_scope` is `"remotea"` (default) or `"all"`. `"remotea"` reports
+  only sessions that ran in a remotea terminal: live now, or remembered in the
+  collector state's session → workspace map (`remotea.groups`, merged from both
+  modes' files), and never the Windows side. `"all"` reports every Claude Code,
+  Claude Desktop, Codex CLI and Codex desktop session, as the Python collector
+  did. Anything else reads as `"remotea"`. Switch it with
+  `remotea eridani collector scope [remotea|all]`; sessions reported before stay
+  in Eridani.
 
 `eridani-token` holds the link key (`eri_bot_…`), mode 0600. The key is sent
 only in the `Authorization` header. It is never logged, never written to the
@@ -226,6 +234,7 @@ remotea eridani status [--json] [--probe]
 remotea eridani disconnect [--forget]
 remotea eridani collect [--dry-run] [--days N]
 remotea eridani collector [parity|authoritative]
+remotea eridani collector scope [remotea|all]
 ```
 
 - `connect` asks for the key without echoing it (or reads it from stdin when

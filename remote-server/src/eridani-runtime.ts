@@ -406,11 +406,13 @@ export class EridaniRuntime {
     const mode = cfg!.collector;
     const parity = mode !== 'authoritative';
     this.state = new CollectorState(path.join(this.deps.dir, STATE_FILES[mode === 'off' ? 'parity' : mode]));
+    for (const other of Object.values(STATE_FILES)) this.state.rememberTerminalsFrom(path.join(this.deps.dir, other));
     const collector: Collector | null = mode === 'off' ? null : new Collector({
       home: this.deps.collectorHome,
       windowsUsers: this.deps.windowsUsers === undefined ? WINDOWS_USERS : this.deps.windowsUsers,
       machine,
       state: this.state,
+      scope: cfg!.collector_scope ?? 'remotea',
       status: () => statusFromRegistry(
         {
           groups: Object.fromEntries(this.deps.registry.groups().map((g) => [g.id, g])),
@@ -505,7 +507,7 @@ export class EridaniRuntime {
         this.collector.scanOne(provider, sessionId).catch((err) => this.deps.log(`eridani collector: ${(err as Error).message}`));
       },
     });
-    this.deps.log(`eridani: link to ${cfg!.url} as ${machine} (collector ${cfg!.collector}); build ${this.build.sha.slice(0, 12)}${this.build.dirty ? '+dirty' : ''}`);
+    this.deps.log(`eridani: link to ${cfg!.url} as ${machine} (collector ${cfg!.collector}, ${cfg!.collector_scope === 'all' ? 'all sessions' : 'remotea sessions only'}); build ${this.build.sha.slice(0, 12)}${this.build.dirty ? '+dirty' : ''}`);
     // hello is sent on every connect: probe first so it never claims a harness that would not start.
     const launchers = launchersToProbe(loadTargets(this.deps.dir));
     const known = launchers.every((l) => this.probes.has(probeKey(l.harness, l.bin)));
