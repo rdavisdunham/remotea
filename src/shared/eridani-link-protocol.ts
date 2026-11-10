@@ -125,7 +125,9 @@ export type LinkCap =
   // Hyperplan: `spawn` takes `role` and `mode` (read-only sessions beside the run's
   // writer), `runs.snapshot` entries may name one surface, and `verify` never
   // lands on a reviewer. Eridani refuses hyperplan / split-worker starts without it.
-  | 'spawn.roles' | 'managed.sessions' | 'decisions.durable' | 'commands.durable' | 'role.options' | 'run.pause' | 'activity' | 'model_catalog';
+  | 'spawn.roles' | 'managed.sessions' | 'decisions.durable' | 'commands.durable' | 'role.options' | 'run.pause' | 'activity' | 'model_catalog'
+  // The host takes `run.reopen`: an exited run surface is resumed in place (`claude --resume`) as its next incarnation.
+  | 'run.reopen';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -142,8 +144,8 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 /** Stage E, advertised only while `eridani.json.collector` is `authoritative`. */
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
-/** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus` and the `doctor` summary. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status', 'pr.merge', 'pr.update_branch']);
+/** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus`, the `doctor` summary and `run.reopen`. */
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status', 'pr.merge', 'pr.update_branch', 'run.reopen']);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -966,6 +968,21 @@ export interface RunPauseCommand extends OpFields, AutomationHoldFields {
   t: 'run.pause' | 'run.resume'; run_id: string; generation: number; surf: string; incarnation: number; expires_at: number | string;
 }
 
+/**
+ * Reopen an exited run surface in place (Eridani's "Reopen terminal"): the
+ * host respawns `surf` the way boot recovery respawns a lost one, resuming
+ * the run's conversation with the binding, run token, MCP args and verify
+ * config it already holds, as the next incarnation. `incarnation` is the one
+ * that exited. `executed` carries `result: { surf, incarnation }` (the new
+ * incarnation); a reopen already done (the surface is live at a newer
+ * incarnation) is `executed` again with the current facts. `rejected` with a
+ * short reason when it does not apply; `failed` when the respawn did not
+ * start (the surface stays exited).
+ */
+export interface RunReopenCommand extends OpFields {
+  t: 'run.reopen'; run_id: string; generation: number; surf: string; incarnation: number; expires_at: number | string;
+}
+
 export interface StopCommand extends OpFields, AutomationHoldFields {
   t: 'stop';
   surf: string;
@@ -1335,7 +1352,7 @@ const noControl = (s: string) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f
 export const isPasteSafe = (s: string) => !/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/.test(s);
 
 /** Effectful commands: each must carry `expires_at` within the replay horizon (L11, stage F). */
-export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify', 'run.pause', 'run.resume', 'run.cleanup', 'automation.hold']);
+export const EFFECTFUL_COMMANDS: ReadonlySet<string> = new Set(['spawn', 'input', 'answer', 'stop', 'verify', 'run.pause', 'run.resume', 'run.reopen', 'run.cleanup', 'automation.hold']);
 
 /**
  * Validate a stage C command's body. Returns null when it is well formed,
@@ -1418,6 +1435,7 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       return new Set(m.surfaces.map((surface) => (surface as Record<string, unknown>).surf)).size === m.surfaces.length ? null : 'duplicate cleanup surface';
     case 'run.pause':
     case 'run.resume':
+    case 'run.reopen':
       return isStr(m.surf, 120) && isInt(m.incarnation) && isStr(m.run_id, 128) && isInt(m.generation) ? null : 'bad fence';
     case 'stop':
       if (!isStr(m.surf, 120) || !isInt(m.incarnation) || !isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';

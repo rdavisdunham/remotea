@@ -817,6 +817,7 @@ changes.
 | `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then (800 ms later) the text. Typed as a bracketed paste and Enter (150 ms later). Never counts as a person answering. The outcome is `executed` only once Enter was sent; see [Input and steer outcomes](#input-and-steer-outcomes). |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
+| `run.reopen` | `surf, incarnation, run_id, generation, expires_at` (Eridani gives it 5 min) | Eridani's "Reopen terminal" for a run whose agent exited: sent only to a host whose hello `caps` has `run.reopen`. `incarnation` is the one that exited. The host respawns that surface **in place**, the way recovery on boot (below) respawns a lost one: the same `surf`, binding, `eridani-runs.json` env (run token included), MCP arguments and verify config, the resume line (`claude --resume <id> …`, a managed run through its managed resume), as the next incarnation. No prompt is typed: the agent waits at its prompt, and (M7) input waits for its new SessionStart. `executed` with `result {surf, incarnation: <the new one>}`. A reopen that already happened (the surface is live at a newer incarnation) is `executed` again with the current facts and starts nothing. `rejected` with `detail`: `unknown surface` (no record: closed, or pruned after `exitedRetentionMs`), `run does not match`, `stale generation` (not the binding's generation), `not the run's worker` (a reviewer), `a stop was requested`, `the surface is still running` (live at that incarnation), `stale incarnation`, `resuming agents is turned off`, `no conversation to resume` (no agent session was ever reported). `failed` `reopen: <reason>` when the respawn does not start (`the run could not be resumed` when no resume line can be built, or the spawn error); the surface then stays exited exactly as it was (D4: never a bare shell holding the binding) and no second `exit` is sent. Apps showing the dead terminal are handed the new process (an `opened` with `wasLost`). Found `executing` after a restart it settles as `executed` when the surface moved on to a newer incarnation, else `failed`. |
 | `verify` | `attempt_id, run_id, generation, turn_seq, plan_revision, verify_id, expires_at` | Runs one of the target's `verify` entries in the run's worktree (fixed argv, no shell, a minimal environment, the target's timeout), then sends `verify.result`. Shares the attempt machinery of [stage D](#stage-d-verification-after-turns). |
 | `terminal.focus` | `surf, run_id, generation, expires_at` (Eridani gives it 30 s) | Eridani's "Open terminal in remotea": sent only to a host whose hello `caps` has `terminal.focus`. The hub sends `{t: "focus", id: surf, runId}` to every connected app whose hello listed the `focus` feature and that has not hidden the session; the app raises its window and selects the tab. `executed` with `result {desktops: <how many apps were told>}`; `rejected` `no_desktop` when none was (no app connected, only older apps, or every app hid the tab), so Eridani shows where the terminal is instead; `rejected` `unknown_surf` when the surface is gone, exited, or not bound to `run_id`. The generation is informational (a stale one is harmless). `expires_at` is required. Journaled like every command; found `executing` after a restart it settles as `failed`. See [Open in Eridani](#open-in-eridani-and-the-terminal-from-eridani). |
 | `worktrees.scan` | `run_id, generation, branch, turn_seq, tool?, session_id?, expires_at` (Eridani gives it 2 min) | The judge's PR evidence (Eridani PR #94): sent only to a host whose hello `caps` has `worktrees.scan`, while a judge verdict waits for a PR record newer than the turn. Rescans the worktrees and sends `worktrees.report` **even if nothing changed**; when `tool` and `session_id` are given (both or neither), re-reads that session with the collector and sends its `session.report` even if its fingerprint is unchanged. Then `executed` with `result {worktrees: "reported", session?: "reported" \| "not_found" \| "collector_off"}`; `failed` (with the reason) when a scan fails or the outbox refuses a report. The run fence is informational: a stale `run_id`/`generation` is harmless and not rejected, but `expires_at` is required and a past one is `rejected` ("expired"). Journaled like every command (refused with `journal_unavailable` when the journal cannot record it); found `executing` after a restart it settles as `failed`. |
@@ -824,10 +825,10 @@ changes.
 | `pr.merge` | `run_id, generation, branch, head_sha, target?, origin?, expires_at` (Eridani gives it a few minutes) | Eridani's Merge button and auto-merge: sent only to a host whose hello `caps` has `pr.merge`. With the host's logged-in `gh`, in the branch's worktree, else a live session's folder, else the repository of execution target `target` (a merge after the run's worktree was cleaned up). Reads the pull request first: already `MERGED` is `executed` with `already: true` (a retry is safe); `CLOSED`, none, or a head other than `head_sha` is refused before merging. Then `gh pr merge <number> --merge --match-head-commit <head_sha>` (never `--delete-branch`) and reads the pull request back. `executed` with `result {merged: true, already, pr, merge_commit}`; `rejected` with `detail` = the reason (`behind` its base, `conflicts`, `head_moved`, `blocked` by a rule or a required check, `draft`, `not_open`, `no_pr`, `permission`) and `result {reason, message, pr}`; `failed` when `gh` is missing or logged out or there is no clone of the repository here. `head_sha` is a full 40-hex sha. Found `executing` after a restart it settles as `uncertain` (Eridani reads the pull request again with `ci.status`). |
 | `pr.update_branch` | `run_id, generation, branch, head_sha, target?, origin?, expires_at` | Eridani's Update branch (a pull request behind its base under a strict "up to date" rule): sent only to a host whose hello `caps` has `pr.update_branch`. `gh api -X PUT repos/{owner}/{repo}/pulls/<n>/update-branch -f expected_head_sha=<head_sha>` (GitHub merges the base into the head on its side; gh 2.45 has no `gh pr update-branch`). The host then waits up to ~10 s for the new head and, when the run's worktree is clean and still on `head_sha`, fast-forwards it so the agent's next push is not refused. `executed` with `result {updated: true, pr_number, base, new_head_sha (null if GitHub had not made it yet), worktree_synced}`; `rejected` like `pr.merge` (`head_moved`, `conflicts`, `permission`, `not_open`, `no_pr`, `blocked`). Found `executing` after a restart it settles as `uncertain`. |
 
-Every command (except `worktrees.scan` and `ci.status`, which only read, `terminal.focus`, which only raises a tab, and `pr.merge` / `pr.update_branch`, which act on GitHub and are fenced by `head_sha` instead) needs a fence that matches: an `input`/`stop` names the surface
-and its `incarnation`, the run, and the generation (a queued input must match
-the current generation; steer and stop may name a newer one). Every effectful
-command (`spawn`, `input`, `answer`, `stop`, `verify`) must carry
+Every command (except `worktrees.scan` and `ci.status`, which only read, `terminal.focus`, which only raises a tab, and `pr.merge` / `pr.update_branch`, which act on GitHub and are fenced by `head_sha` instead) needs a fence that matches: an `input`/`stop`/`run.reopen` names the surface
+and its `incarnation`, the run, and the generation (a queued input and a
+reopen must match the current generation; steer and stop may name a newer one). Every effectful
+command (`spawn`, `input`, `answer`, `stop`, `verify`, `run.reopen`) must carry
 `expires_at`, and so must `worktrees.scan`, `ci.status`, `pr.merge`, `pr.update_branch` and `terminal.focus`. A missing one is rejected (`expires_at required`, since stage
 F), and so is one that is past or more than 7 days out (the replay horizon,
 the time the journal remembers an `op_id`).
@@ -846,7 +847,8 @@ ack of an accepted command already says
   (the process ended with the server) or, when the PTY keeper kept the
   process, as `failed` ("interrupted by a server restart; the process
   outlived it…": the stop stays requested and boot sends it again), a
-  `verify` as `failed`; an `input` or
+  `verify` as `failed`, a `run.reopen` as `executed` when its surface is
+  at a newer incarnation (else `failed`); an `input` or
   `answer` becomes `uncertain`, since its bytes may or may not have arrived;
 - a duplicate `op_id` gets its recorded outcome, never a second run.
 
@@ -909,7 +911,9 @@ So is one that cannot be resumed: no conversation was ever reported, or
 `exit {code: -1, reason}` and is never respawned as a bare shell. That rule
 holds whether the server notices it on boot or an app reopens the tab. To get
 a shell there, open a new tab in the worktree yourself. It is not bound to the
-run. This happens whether or not the link is enabled.
+run. This happens whether or not the link is enabled. An exited run surface
+can be resumed in place the same way later, on Eridani's request
+([`run.reopen`](#commands)).
 
 A session whose process the PTY keeper kept ([upgrade.md](upgrade.md), off by
 default) was not lost: it is adopted before anything else runs and stays
@@ -1694,7 +1698,9 @@ Eridani may require it), `context.scope`, `prompt` (live `prompt` frames,
 sent only when Eridani advertises `prompt` back), `worktrees.scan` (the
 host takes the [`worktrees.scan`](#commands) command; an Eridani that never
 sends it loses nothing), `terminal.focus` (the host takes the
-[`terminal.focus`](#commands) command; likewise optional), `doctor` (live
+[`terminal.focus`](#commands) command; likewise optional), `run.reopen` (the
+host takes the [`run.reopen`](#commands) command; Eridani sends it only to a
+host that advertises it), `doctor` (live
 [`doctor`](#doctor) frames, sent only when Eridani advertises `doctor` back;
 hello carries the summary regardless) and `spawn.roles` ([Roles and read-only
 modes](#roles-and-read-only-modes-hyperplan); an Eridani that never sends

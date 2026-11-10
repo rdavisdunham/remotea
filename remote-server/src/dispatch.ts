@@ -102,7 +102,7 @@ import type { ExecutionTarget, LaunchSpec } from './eridani-targets';
 import { liveWriters, type EnsuredWorktree, type WorktreeManager } from './worktrees';
 import { ManagedSessions, type ManagedSpec } from './managed-sessions';
 import { eridaniToolsForRole } from './managed-harness';
-import type { AutomationHoldCommand, RunCleanupCommand, RunCleanupSurface, RunCleanupSurfaceResult, RunPauseCommand } from '../../src/shared/eridani-link-protocol';
+import type { AutomationHoldCommand, RunCleanupCommand, RunCleanupSurface, RunCleanupSurfaceResult, RunPauseCommand, RunReopenCommand } from '../../src/shared/eridani-link-protocol';
 import type { QuestionBroker } from './questions-claude';
 import { runVerify, workspaceFingerprint, type VerifyOutcome, type VerifyRunOptions } from './verify-runner';
 import { VerifyAttempts, type VerifyResultFields } from './verify-attempts';
@@ -446,6 +446,7 @@ export class Dispatch {
       'run.cleanup': (c, ctx) => this.cleanupRun(c as unknown as RunCleanupCommand, ctx),
       'run.pause': (c, ctx) => this.pauseRun(c as unknown as RunPauseCommand, ctx),
       'run.resume': (c, ctx) => this.pauseRun(c as unknown as RunPauseCommand, ctx),
+      'run.reopen': (c, ctx) => this.reopenRun(c as unknown as RunReopenCommand, ctx),
       verify: (c, ctx) => this.verify(c as unknown as VerifyCommand, ctx),
     };
   }
@@ -555,6 +556,8 @@ export class Dispatch {
         return this.fence(cmd as unknown as StopCommand, 'stop');
       case 'stop':
         return this.fence(cmd as unknown as StopCommand, 'stop');
+      case 'run.reopen':
+        return this.reopenRefusal(cmd as unknown as RunReopenCommand);
       case 'answer': {
         const c = cmd as unknown as AnswerCommand;
         if (this.managed.findQuestion(c.question_id)) return this.managed.precheck(c);
@@ -709,6 +712,12 @@ export class Dispatch {
         return body ? { state: 'executed', outcome: { ...(body.scope === 'retired_planner' ? { scope: body.scope, handoff_to: body.handoff_to } : { terminal_state: body.terminal_state }), surfaces: this.recoverCleanup({ ...body, op_id: rec.op_id } as unknown as RunCleanupCommand) } } : null;
       case 'verify':
         return { state: 'failed', detail: 'interrupted by a server restart' };
+      case 'run.reopen': {
+        // The respawn either happened (a newer incarnation that boot recovery resumes in turn) or it did not.
+        const rec = typeof body?.surf === 'string' ? this.deps.registry.session(body.surf) : undefined;
+        if (rec && rec.state !== 'exited' && (rec.incarnation ?? 0) > Number(body?.incarnation)) return { state: 'executed', detail: 'reopened before the restart', outcome: { surf: rec.id, incarnation: rec.incarnation ?? 0 } };
+        return { state: 'failed', detail: 'interrupted by a server restart' };
+      }
       default:
         return null; // input, answer: the bytes may or may not have reached the agent
     }
@@ -826,6 +835,62 @@ export class Dispatch {
   private async pauseRun(cmd: RunPauseCommand, ctx: CommandContext): Promise<CommandResult> {
     if (!this.managed.has(cmd.surf)) return { state: 'rejected', detail: 'native sessions do not support managed pause' };
     ctx.begin(); await this.managed.pause(cmd.surf, cmd.t === 'run.pause'); return { state: 'executed' };
+  }
+
+  // ── reopen ───────────────────────────────────────────────────────────────
+
+  /**
+   * Why `run.reopen` does not apply now, or null. Null also for a reopen that
+   * already happened (the surface is live at a newer incarnation): the
+   * handler answers that one with the current facts.
+   */
+  private reopenRefusal(cmd: RunReopenCommand): string | null {
+    const rec = this.deps.registry.session(cmd.surf);
+    // A pruned (or closed) surface has no record: nothing is left to reopen.
+    if (!rec) return 'unknown surface';
+    const b = rec.eridani;
+    if (!b || b.runId !== cmd.run_id) return 'run does not match';
+    if (cmd.generation !== b.generation) return 'stale generation';
+    if (b.role === 'reviewer') return 'not the run\'s worker';
+    if (b.stopRequested) return 'a stop was requested';
+    const incarnation = rec.incarnation ?? 0;
+    if (this.deps.hub.isLive(cmd.surf) || rec.state === 'live') {
+      if (incarnation > cmd.incarnation) return null;
+      return incarnation === cmd.incarnation ? 'the surface is still running' : 'stale incarnation';
+    }
+    if (incarnation !== cmd.incarnation) return 'stale incarnation';
+    // What resumeCommand would refuse (the same order resumeOnBoot checks), said before anything is touched.
+    if (this.deps.resumeAgents === false) return 'resuming agents is turned off';
+    if (!rec.agent && !(b.execution === 'managed' && b.controller !== 'terminal')) return 'no conversation to resume';
+    return null;
+  }
+
+  /**
+   * Eridani's "Reopen terminal": resume an exited run surface in place, the
+   * way resumeOnBoot resumes a lost one (`conn.open` → the hub's respawn
+   * path → resumeCommand → the next incarnation). The binding, the runs-file
+   * secrets (ERIDANI_RUN_TOKEN), the worktree and the verify config are
+   * reused as they are; no prompt is typed (a resumed agent waits at its
+   * prompt). A respawn that does not start leaves the surface exited (D4).
+   */
+  private async reopenRun(cmd: RunReopenCommand, ctx: CommandContext): Promise<CommandResult> {
+    const refused = this.reopenRefusal(cmd);
+    if (refused) return { state: 'rejected', detail: refused };
+    const rec = this.deps.registry.session(cmd.surf)!;
+    if (this.deps.hub.isLive(cmd.surf)) return { state: 'executed', detail: 'already reopened', result: { surf: rec.id, incarnation: rec.incarnation ?? 0 } };
+    ctx.begin();
+    // An exited record goes through the hub's reopen (which puts it back on failure); a lost one is boot's case.
+    const res = rec.state === 'exited' ? this.deps.hub.reopenExited(cmd.surf, () => this.conn.open(cmd.surf, {})) : this.conn.open(cmd.surf, {});
+    const now = this.deps.registry.session(cmd.surf);
+    if (!res.ok || !now || !this.deps.hub.isLive(cmd.surf)) {
+      const why = res.ok ? 'the process did not start' : res.message;
+      this.log(`eridani: cannot reopen ${cmd.surf} (run ${cmd.run_id}): ${why}`);
+      return { state: 'failed', detail: `reopen: ${why}`.slice(0, ERIDANI_LIMITS.reasonChars) };
+    }
+    this.deps.registry.saveNow();
+    this.deps.changed?.();
+    this.log(`eridani: reopened ${cmd.surf} (run ${cmd.run_id}) as incarnation ${now.incarnation ?? 0}`);
+    return { state: 'executed', result: { surf: now.id, incarnation: now.incarnation ?? 0 } };
   }
 
   // ── spawn ────────────────────────────────────────────────────────────────

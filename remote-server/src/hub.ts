@@ -146,6 +146,8 @@ export interface HubConn extends ConnLike {
 export class Hub {
   readonly conns = new Map<number, HubConn>();
   readonly sessions = new Map<string, TermSession>();
+  /** Exited sessions being respawned in place right now (reopenExited). */
+  private readonly reopening = new Set<string>();
   private theme: ThemeColors = DEFAULT_THEME;
   private shuttingDown = false;
   private readonly cfg: HubConfig;
@@ -560,6 +562,11 @@ export class Hub {
       conn.sendJson({ t: 'openError', rid: msg.rid, id: msg.id, code: 'spawn-failed', message: custom.pending });
       return;
     }
+    if (custom === null && this.reopening.has(msg.id)) {
+      // run.reopen (reopenExited): the surface already exited and Eridani knows; it is put back as it was.
+      conn.sendJson({ t: 'openError', rid: msg.rid, id: msg.id, code: 'spawn-failed', message: 'the run could not be resumed' });
+      return;
+    }
     if (wasLost && rec?.eridani && custom === null) {
       // D4 (stage F): a run that cannot be resumed stays exited. A bare shell
       // carrying the run binding would type Eridani's next input as a command.
@@ -621,6 +628,49 @@ export class Hub {
     });
     this.sessions.set(rec.id, session);
     return session;
+  }
+
+  /**
+   * Eridani's `run.reopen` (dispatch.ts): respawn an EXITED session in place,
+   * through the path boot recovery takes for a lost one. For the duration of
+   * `open` the record is `lost` and its dead terminal is set aside, so the
+   * open path asks the Eridani hook for the resume line, keeps the binding and
+   * bumps the incarnation. Anything short of a new process puts the exited
+   * record and its dead terminal back exactly as they were: never a bare shell
+   * holding the run binding (D4), and no second `exit` for an incarnation
+   * Eridani already saw end. Apps showing the dead terminal are attached to
+   * the new process.
+   */
+  reopenExited(id: string, open: () => { ok: true } | { ok: false; message: string }): { ok: true } | { ok: false; message: string } {
+    const rec = this.registry.session(id);
+    if (!rec || rec.state !== 'exited' || this.isLive(id) || this.reopening.has(id)) return { ok: false, message: 'the session has not exited' };
+    const dead = this.sessions.get(id);
+    const viewers = dead?.attachments() ?? [];
+    this.sessions.delete(id);
+    this.registry.updateSession(id, { state: 'lost' });
+    this.reopening.add(id);
+    let res: { ok: true } | { ok: false; message: string };
+    try {
+      res = open();
+    } catch (err) {
+      res = { ok: false, message: err instanceof Error ? err.message : String(err) };
+    } finally {
+      this.reopening.delete(id);
+    }
+    const fresh = this.sessions.get(id);
+    if (res.ok && fresh && fresh !== dead) {
+      dead?.dispose();
+      for (const v of viewers) fresh.attach(v.conn, { cols: v.cols, rows: v.rows, created: false, wasLost: true });
+      return { ok: true };
+    }
+    if (fresh && fresh !== dead) {
+      this.sessions.delete(id);
+      fresh.kill();
+      fresh.dispose();
+    }
+    if (dead) this.sessions.set(id, dead);
+    if (this.registry.session(id)?.state === 'lost') this.registry.updateSession(id, { state: 'exited' });
+    return res.ok ? { ok: false, message: 'the process did not start' } : res;
   }
 
   /**
