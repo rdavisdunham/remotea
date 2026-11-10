@@ -69,7 +69,9 @@ export class ManagedSessions {
     const interruptedTurn = state.active;
     // This is a new provider process. A completed input receipt may be resumed with a new safe continuation; unknown operation IDs remain tombstoned.
     state.active = false;
-    const adapter = this.deps.factory?.({ ...spec, sessionId: state.sessionId || undefined }) ?? (spec.harness === 'codex' ? new CodexRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }) : new ClaudeRuntimeAdapter({ ...spec, sessionId: state.sessionId || undefined }));
+    // A new surface has no saved conversation; a spec that names one (a restarted run) starts by resuming it, then takes the spawn prompt.
+    const sessionId = state.sessionId || spec.sessionId || undefined;
+    const adapter = this.deps.factory?.({ ...spec, sessionId }) ?? (spec.harness === 'codex' ? new CodexRuntimeAdapter({ ...spec, sessionId }) : new ClaudeRuntimeAdapter({ ...spec, sessionId }));
     const terminal = new ManagedTerminal();
     let e!: Entry;
     const output = new ManagedOutput(state.output, () => ({ run_id: spec.runId, generation: spec.generation, surf: spec.surf, incarnation: spec.incarnation, session_id: state.sessionId, turn_id: state.turnId }), () => this.save(e), body => this.deps.emit(body), () => this.attention(e, 'Public output could not be persisted'));

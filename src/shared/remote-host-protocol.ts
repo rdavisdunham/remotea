@@ -255,6 +255,13 @@ export interface EridaniBinding {
    */
   role?: 'planner' | 'reviewer' | 'worker';
   mode?: 'plan' | 'review';
+  /**
+   * The spawn asked to continue an earlier Claude conversation
+   * (`resume_session_id`, cap `spawn.resume`), and whether it did (false: its
+   * transcript was not found for the worktree, or the harness is not Claude,
+   * so the agent started fresh). Absent: an ordinary spawn.
+   */
+  resume?: { sessionId: string; resumed: boolean };
 }
 
 /** Stage D: the latest verification attempt on a surface (verify-attempts.ts). */

@@ -116,6 +116,9 @@ export type LinkCap =
   | 'ci.status'
   // The host takes `pr.merge` and `pr.update_branch`: Eridani's Merge and Update branch buttons, done with its gh.
   | 'pr.merge' | 'pr.update_branch'
+  // The host takes `spawn`'s `resume_session_id` (Restart run): a Claude spawn continues that conversation (`claude --resume`) when its
+  // transcript exists for the worktree, else starts fresh; the outcome says which (`result.resumed`).
+  | 'spawn.resume'
   | 'run.cleanup'
   | 'run.cleanup.handoff'
   | 'input.direct' | 'output.live'
@@ -143,7 +146,9 @@ export const STAGE_D_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_C_CAPS, 
 export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'collector.authoritative']);
 
 /** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus` and the `doctor` summary. */
-export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status', 'pr.merge', 'pr.update_branch']);
+export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status', 'pr.merge', 'pr.update_branch',
+  'spawn.resume',
+]);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
 /**
@@ -889,8 +894,23 @@ export interface SpawnCommand extends OpFields, AutomationHoldFields {
    * `rejected` `mode_unsupported`.
    */
   mode?: SpawnMode;
+  /**
+   * Cap `spawn.resume` (Eridani's "Restart run"): the provider session id of
+   * an earlier run's Claude conversation. When that conversation's transcript
+   * exists for the worktree's directory, the agent starts as
+   * `claude --resume <id>` with `prompt` as its first message (an empty
+   * prompt sends nothing, so the agent waits at its prompt); otherwise it
+   * starts fresh exactly as without the field. Ignored for a non-Claude
+   * harness. The `executed` outcome of a spawn that carried it has
+   * `result.resumed: boolean`. Shape: RESUME_SESSION_ID_RE, else
+   * `rejected` "bad resume_session_id".
+   */
+  resume_session_id?: string;
   expires_at: number | string;
 }
+
+/** The provider session ids a resume line accepts (dispatch.ts resumeLine). */
+export const RESUME_SESSION_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 
 /** Hyperplan: the roles a session may play in a run. */
 export type RunRole = 'planner' | 'reviewer' | 'worker';
@@ -1373,6 +1393,7 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       if (m.share !== undefined && typeof m.share !== 'boolean') return 'bad share';
       if (m.role !== undefined && !RUN_ROLES.includes(m.role as RunRole)) return 'bad role';
       if (m.mode !== undefined && !SPAWN_MODES.includes(m.mode as SpawnMode)) return 'bad mode';
+      if (m.resume_session_id !== undefined && !(typeof m.resume_session_id === 'string' && RESUME_SESSION_ID_RE.test(m.resume_session_id))) return 'bad resume_session_id';
       if (m.run_token !== undefined && !(isStr(m.run_token, 512) && /^[\x21-\x7e]+$/.test(m.run_token))) return 'bad run_token';
       if (m.env !== undefined) {
         if (!isObj(m.env) || Object.keys(m.env).length > 32) return 'bad env';

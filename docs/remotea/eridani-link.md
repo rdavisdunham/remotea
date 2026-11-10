@@ -813,7 +813,7 @@ changes.
 
 | `t` | Fields | Effect |
 |---|---|---|
-| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, share?, role?, mode?, expires_at` | `share` (boolean, optional, S-S4): start even when another live session writes the branch's worktree; without it such a spawn is `rejected` `worktree_busy` with `result {branch, writer {surf, run_id}}` (see [Worktrees](#worktrees)). `role` (`planner` \| `reviewer` \| `worker`, optional; absent = planner) and `mode` (`plan` \| `review`, optional; absent = writable): hyperplan, see [Roles and read-only modes](#roles-and-read-only-modes-hyperplan); with `mode` the launch below is the read-only one, the outcome's `result` carries `role` and `mode` back, and a harness without a read-only launch is `rejected` `mode_unsupported`. Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. S-Q3 ([Target templates](#target-templates-s-q3)): a target whose template fails is `rejected` `target_not_ready: <reasons>` with `result {template}`; one at `limits.maxRuns` is `rejected` `target_busy` with `result {limit, running}`; with `prepare` steps the worktree is prepared first and `result.prepare` is `{ran, ok, steps: [{id, exit_code, duration_ms, timed_out?, error?}], reason?, log?, tail?}` (`ran: false`: an earlier preparation of the same steps still holds); a failed preparation is `failed` `prepare: <reason>` with `result {worktree, branch, target, prepare}` (with `tail`, the last 2,000 characters of output) and no agent starts. |
+| `spawn` | `run_id, generation, attempt, harness, model, target {id, repo?, branch, base?}, task_id?, title?, group?, prompt, env?, run_token?, verify? {verify_id, plan_revision}, migration? {number, dir}, share?, role?, mode?, resume_session_id?, expires_at` | `resume_session_id` (optional, cap `spawn.resume`): continue an earlier Claude conversation, see [Restart run](#restart-run-spawnresume); the outcome's `result` then carries `resumed`. `share` (boolean, optional, S-S4): start even when another live session writes the branch's worktree; without it such a spawn is `rejected` `worktree_busy` with `result {branch, writer {surf, run_id}}` (see [Worktrees](#worktrees)). `role` (`planner` \| `reviewer` \| `worker`, optional; absent = planner) and `mode` (`plan` \| `review`, optional; absent = writable): hyperplan, see [Roles and read-only modes](#roles-and-read-only-modes-hyperplan); with `mode` the launch below is the read-only one, the outcome's `result` carries `role` and `mode` back, and a harness without a read-only launch is `rejected` `mode_unsupported`. Ensures the worktree and opens a session in it, device "Eridani", in the named group (default "Eridani"). Claude: `claude [--mcp-config <file>] --model <m> --permission-mode auto "$ERIDANI_PROMPT"`. Codex: `codex [-c mcp_servers.eridani.…] --disable daemon_auto_start -m <m> "$ERIDANI_PROMPT"` (see [Eridani MCP](#eridani-mcp-for-spawned-agents)). The outcome's `result` carries `mcp {configured, reason?}`. The surface id is derived from `(run_id, generation, attempt)`: the same spawn never starts two processes. S-Q3 ([Target templates](#target-templates-s-q3)): a target whose template fails is `rejected` `target_not_ready: <reasons>` with `result {template}`; one at `limits.maxRuns` is `rejected` `target_busy` with `result {limit, running}`; with `prepare` steps the worktree is prepared first and `result.prepare` is `{ran, ok, steps: [{id, exit_code, duration_ms, timed_out?, error?}], reason?, log?, tail?}` (`ran: false`: an earlier preparation of the same steps still holds); a failed preparation is `failed` `prepare: <reason>` with `result {worktree, branch, target, prepare}` (with `tail`, the last 2,000 characters of output) and no agent starts. |
 | `input` | `surf, incarnation, run_id, generation, mode: queue\|steer, text, expires_at` | `text` may contain no control character except newline and tab, and may not start with `/` or `!` (stage F). `queue` waits until the agent is idle at its prompt **and** the link is up; `steer` advances the binding's generation first, sends Esc, then (800 ms later) the text. Typed as a bracketed paste and Enter (150 ms later). Never counts as a person answering. The outcome is `executed` only once Enter was sent; see [Input and steer outcomes](#input-and-steer-outcomes). |
 | `stop` | `surf, incarnation, run_id, generation, mode: interrupt\|kill` | `stopRequested` is persisted on the session before anything is sent, and cleared only when the exit is seen. `interrupt`: Ctrl-C twice, and again after 1.5 s; if the process is still there after 20 s the outcome is `failed` ("send mode:kill") and the stop stays requested. `kill`: the process tree. A run with a requested stop is never resumed. |
 | `answer` | `question_id, provider_request_id, answers [{item_id, choice_ids?, text?}]` | See [Questions](#questions-claude). |
@@ -1065,6 +1065,46 @@ shared with the writer, so what a reviewer can read is bounded by the same
 git-ignore hygiene as the planner's. `status` frames already carry
 `effective_permission_mode`. Live use of a new build needs the service
 rebuilt and restarted (`remotea upgrade`).
+
+### Restart run (`spawn.resume`)
+
+Eridani's "Restart run" continues a finished run as a new run on the same
+task, branch and worktree. Where it can, the new run's agent continues the old
+run's Claude conversation, so it remembers the earlier work. hello `caps`
+advertises `spawn.resume` (every host, beside the other stage F caps), and
+only then does Eridani add `resume_session_id` to the new run's `spawn`: the
+old run's Claude session id. An Eridani that never sends it gets the same
+host as before; a host without the cap never receives it.
+
+- **Shape.** The id must match `[A-Za-z0-9._:-]{1,128}`, the ids a resume line
+  takes; anything else is `rejected` `bad resume_session_id`.
+- **Where the conversation is looked for.** The spawn ensures the worktree as
+  any spawn does (same branch, same path). Claude finds a conversation by
+  working directory, so the host then looks for
+  `<claude config>/projects/<folder>/<id>.jsonl`, where `<claude config>` is
+  `$CLAUDE_CONFIG_DIR` or `~/.claude` (of the remotea service) and `<folder>`
+  is the worktree path with every character other than a letter or digit made
+  `-`. A folder name over 200 characters is matched by its first 200 plus `-`
+  (Claude adds a hash there that differs between builds). The worktree's path
+  and its real path are both tried.
+- **Found.** The agent starts with the line boot recovery resumes with
+  (`claude --resume <id> … --model <m> [--effort <e>] --permission-mode auto`,
+  read-only with `mode`) followed by `"$ERIDANI_PROMPT"`, so the spawn's
+  prompt is its first message. An empty prompt appends nothing and the
+  resumed agent waits at its prompt. The record's `agent` is set to the
+  resumed id at once (a restart of the server before the agent's first hook
+  can still resume it).
+- **Not found, or not Claude.** The spawn starts fresh exactly as without the
+  field. A Codex (or other non-Claude) spawn ignores the field.
+- **Managed runs.** The id goes to the managed adapter, which launches
+  `claude -p … --resume <id>` and then sends the prompt (none when it is
+  empty). A managed Codex run starts fresh.
+- **Outcome.** Every `spawn` that carried the field reports
+  `result.resumed: true | false` in its `executed` outcome (also on a replay
+  and after a restart); a spawn without it has no `resumed`.
+
+The binding, run token, secrets and MCP config are new, as for any spawn: it
+is a new run that happens to share a conversation.
 
 ### Open in Eridani, and the terminal from Eridani
 

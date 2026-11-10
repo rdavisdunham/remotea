@@ -91,7 +91,7 @@ import type {
   WorktreeWriter,
   HelloTemplate,
 } from '../../src/shared/eridani-link-protocol';
-import { MODE_UNSUPPORTED, TARGET_BUSY, TARGET_NOT_READY, WORKTREE_BUSY } from '../../src/shared/eridani-link-protocol';
+import { MODE_UNSUPPORTED, RESUME_SESSION_ID_RE, TARGET_BUSY, TARGET_NOT_READY, WORKTREE_BUSY } from '../../src/shared/eridani-link-protocol';
 import type { SpawnMode } from '../../src/shared/eridani-link-protocol';
 import type { CreateSpec, EridaniBinding, PrepareFacts, RemoteSurfaceId, ServerMsg, SessionRecord } from '../../src/shared/remote-host-protocol';
 import type { Hub, HubConn, HubEridaniHooks } from './hub';
@@ -227,6 +227,58 @@ export function resumeLine(b: EridaniBinding, spec: LaunchSpec | undefined, sess
   return [bin, 'resume', ...mcp, '--disable', 'daemon_auto_start', '-m', q(b.model), ...(b.effort ? ['-c', q(`model_reasoning_effort=${JSON.stringify(b.effort)}`)] : []), ...(ro?.tail ?? []), q(sessionId)].join(' ');
 }
 
+/** Claude Code cuts a project folder name to this many characters, then adds `-<hash>`. */
+const CLAUDE_PROJECT_NAME_MAX = 200;
+
+/** Claude's config folder (eridani-setup.ts reads `.claude.json` the same way). */
+export function defaultClaudeConfigDir(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+}
+
+/**
+ * Whether Claude's transcript of `sessionId` exists for `cwd`, which is what
+ * `claude --resume <id>` started in that directory needs: Claude keeps a
+ * conversation as `<config>/projects/<folder>/<id>.jsonl`, where `<folder>`
+ * is the working directory with every character other than a letter or a
+ * digit made `-`. A name longer than 200 characters is cut to 200 and given
+ * `-<hash>`, a hash that differs between Claude builds, so such a folder is
+ * matched by that prefix. Both the path as given and its real path are tried
+ * (Claude records the directory it was started in).
+ */
+export function claudeTranscriptExists(configDir: string, cwd: string, sessionId: string): boolean {
+  if (!RESUME_SESSION_ID_RE.test(sessionId)) return false;
+  const root = path.join(configDir, 'projects');
+  const cwds = new Set([cwd]);
+  try {
+    cwds.add(fs.realpathSync(cwd));
+  } catch {
+    /* the path as given is still tried */
+  }
+  const isFile = (p: string) => {
+    try {
+      return fs.statSync(p).isFile();
+    } catch {
+      return false;
+    }
+  };
+  let listed: string[] | null = null;
+  for (const dir of cwds) {
+    const name = dir.replace(/[^a-zA-Z0-9]/g, '-');
+    let folders = [name];
+    if (name.length > CLAUDE_PROJECT_NAME_MAX) {
+      const prefix = `${name.slice(0, CLAUDE_PROJECT_NAME_MAX)}-`;
+      try {
+        listed ??= fs.readdirSync(root);
+      } catch {
+        listed = [];
+      }
+      folders = listed.filter((f) => f.startsWith(prefix));
+    }
+    if (folders.some((f) => isFile(path.join(root, f, `${sessionId}.jsonl`)))) return true;
+  }
+  return false;
+}
+
 /** A client of the hub that is Eridani: it opens sessions and reads nothing back. */
 export class EridaniConn implements HubConn {
   readonly id: number;
@@ -342,6 +394,8 @@ export interface DispatchDeps {
   checkTarget?: (target: ExecutionTarget) => HelloTemplate;
   /** S-Q3: dependency preparation in a worktree (target-template.ts runPrepare); `force` for a new worktree. Default: runPrepare. */
   prepare?: (target: ExecutionTarget, worktree: string, force: boolean) => Promise<PrepareFacts | null>;
+  /** Claude's config folder, where a spawn's `resume_session_id` transcript is looked for. Default: defaultClaudeConfigDir(). */
+  claudeConfigDir?: string;
 }
 
 export const DEFAULT_TIMING = {
@@ -793,9 +847,10 @@ export class Dispatch {
     return scoped;
   }
 
-  private prepareManaged(surf: string, b: EridaniBinding, launch: LaunchSpec, prompt: string, operationId: string, args: string[], env: Record<string, string>, incarnation = 1, origin?: 'human' | 'automation', automationHoldRevision?: number): void {
+  private prepareManaged(surf: string, b: EridaniBinding, launch: LaunchSpec, prompt: string, operationId: string, args: string[], env: Record<string, string>, incarnation = 1, origin?: 'human' | 'automation', automationHoldRevision?: number, resumeSessionId?: string): void {
     const scoped = this.roleMcpArgs(b, args);
     this.managed.prepare({
+      ...(resumeSessionId ? { sessionId: resumeSessionId } : {}),
       origin, automationHoldRevision, surf, runId: b.runId, generation: b.generation, incarnation, prompt, operationId,
       preapprovedEridaniTools: b.harness === 'claude' ? eridaniToolsForRole(b.role).map(tool => `mcp__${MCP_SERVER_NAME}__${tool}`) : undefined,
       harness: b.harness, bin: launch.bin ?? b.harness, args: [...scoped, ...(launch.args ?? [])], cwd: b.worktree,
@@ -839,6 +894,7 @@ export class Dispatch {
       ...(b.prepare ? { prepare: { ...b.prepare } } : {}),
       ...(b.role ? { role: b.role } : {}),
       ...(b.mode ? { mode: b.mode } : {}),
+      ...(b.resume ? { resumed: b.resume.resumed } : {}),
     };
   }
 
@@ -945,6 +1001,11 @@ export class Dispatch {
         if (prepare && !prepare.ok) return { state: 'failed', detail: `prepare: ${prepare.reason ?? 'failed'}`, result: { worktree: wt.path, branch: wt.branch, target: target.id, prepare } };
       }
       const superseded = this.automationBlocked(cmd); if (superseded) return {state:'rejected',detail:superseded};
+      // Restart run (cap spawn.resume): continue the earlier Claude conversation when its transcript is here (Claude finds
+      // conversations by working directory); otherwise, and for any other harness, start fresh as without the field.
+      const resumeId = cmd.resume_session_id;
+      const resumed = !!resumeId && cmd.harness === 'claude' && claudeTranscriptExists(this.deps.claudeConfigDir ?? defaultClaudeConfigDir(), wt.path, resumeId);
+      if (resumeId) this.log(`eridani: spawn for run ${cmd.run_id} ${resumed ? `resumes Claude conversation ${resumeId}` : `starts fresh: ${cmd.harness !== 'claude' ? `${cmd.harness} does not resume` : `no transcript of ${resumeId} for ${wt.path}`}`}`);
       const note = cmd.prompt ? freshnessNote(wt, cmd.migration ?? null) : '';
       const prompt = note ? `${note}\n\n${cmd.prompt}` : cmd.prompt;
       const env: Record<string, string> = {
@@ -993,15 +1054,18 @@ export class Dispatch {
         // Hyperplan: the role and read-only mode stay on the record (resume reuses the mode; verify skips reviewers).
         ...(cmd.role ? { role: cmd.role } : {}),
         ...(cmd.mode ? { mode: cmd.mode } : {}),
+        ...(resumeId ? { resume: { sessionId: resumeId, resumed } } : {}),
       };
       const webUrl = this.webUrl();
       if (webUrl) binding.webUrl = webUrl;
       const mcp = this.prepareMcp(surf, target, cmd.harness);
       if (mcp) binding.mcp = mcp.status;
-      if (cmd.execution === 'managed') this.prepareManaged(surf, binding, launch, prompt, cmd.op_id, mcp?.args ?? [], env, 1, cmd.origin, cmd.automation_hold_revision);
+      if (cmd.execution === 'managed') this.prepareManaged(surf, binding, launch, prompt, cmd.op_id, mcp?.args ?? [], env, 1, cmd.origin, cmd.automation_hold_revision, resumed ? resumeId : undefined);
       const { groupId, group } = this.groupFor(cmd.group ?? 'Eridani');
+      // A resumed conversation gets the prompt as its first message; an empty prompt adds nothing (the agent waits).
+      const resumeCmd = resumed && cmd.execution !== 'managed' ? resumeLine(binding, launch, resumeId!, mcp?.args) : null;
       const res = this.conn.open(surf, {
-        cmd: launchCommand(cmd.harness, cmd.model, launch, !!prompt, mcp?.args, cmd.mode),
+        cmd: resumeCmd ? `${resumeCmd}${prompt ? ' "$ERIDANI_PROMPT"' : ''}` : launchCommand(cmd.harness, cmd.model, launch, !!prompt, mcp?.args, cmd.mode),
         cwd: wt.path,
         groupId: groupId as CreateSpec['groupId'],
         group,
@@ -1014,7 +1078,8 @@ export class Dispatch {
         this.dropMcp(surf);
         return { state: 'failed', detail: `spawn: ${res.message}` };
       }
-      const rec = this.deps.hub.updateRecord(surf, { eridani: binding });
+      // A resumed conversation keeps its id, so the record knows it before the agent's first hook (a lost session can resume it).
+      const rec = this.deps.hub.updateRecord(surf, { eridani: binding, ...(resumed ? { agent: { provider: 'claude' as const, sessionId: resumeId!, seenAt: this.now() } } : {}) });
       this.noteLaunched(surf, rec?.incarnation ?? 1);
       this.deps.registry.saveNow();
       if (cmd.execution === 'managed') { try { await this.managed.ready(surf); } catch { return { state: 'uncertain', detail: 'managed provider startup or receipt failed; reconcile before retry', result: this.spawnFacts(rec!) }; } }
