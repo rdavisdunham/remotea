@@ -375,6 +375,11 @@ export class TermSession {
     for (const r of latest) conn.sendJson({ t: 'rpc', id: this.id, method: r.method, params: r.params, replay: true });
   }
 
+  /** The apps attached, at the size each asked for (Hub.reopenExited hands them to the new process). */
+  attachments(): Array<{ conn: ConnLike; cols: number; rows: number }> {
+    return [...this.subs.values()].map((sub) => ({ conn: sub.conn, ...(this.desired.get(sub.conn.id) ?? { cols: this.cols, rows: this.rows }) }));
+  }
+
   detach(connId: number): void {
     this.subs.delete(connId);
     this.desired.delete(connId);
