@@ -168,6 +168,23 @@ describe('ciFolder', () => {
     fs.mkdirSync(path.join(root, 'wt', branchDir('eri/task-1')), { recursive: true });
     expect(ciFolder([target], 'eri/task-1', null)).toBe(path.join(root, 'wt', 'eri--task-1'));
   });
+
+  it('asks in the named target, not in another target that has a worktree of the same branch', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-ci-'));
+    cleanups.push(() => fs.rmSync(root, { recursive: true, force: true }));
+    const mk = (id: string) => ({ id, repo: path.join(root, id, 'repo'), worktreeRoot: path.join(root, id, 'wt'), base: 'main', launch: { claude: {} }, verify: [] });
+    const first = mk('first'); const second = mk('second');
+    const dir = (t: { worktreeRoot: string }) => path.join(t.worktreeRoot, branchDir('task/1'));
+    // An earlier run of the same task left a worktree under the first target; the run in question is on the second.
+    fs.mkdirSync(dir(first), { recursive: true });
+    fs.mkdirSync(second.repo, { recursive: true });
+    expect(ciFolder([first, second], 'task/1', null, 'second')).toBe(second.repo);
+    expect(ciFolder([first, second], 'task/1', root, 'second')).toBe(root);
+    fs.mkdirSync(dir(second), { recursive: true });
+    expect(ciFolder([first, second], 'task/1', root, 'second')).toBe(dir(second));
+    expect(ciFolder([first, second], 'task/1', null, 'first')).toBe(dir(first));
+    expect(ciFolder([first, second], 'task/1', null)).toBe(dir(first)); // no target named: the first match, as before
+  });
 });
 
 // ── Runtime ────────────────────────────────────────────────────────────────
