@@ -19,7 +19,8 @@ import { readLinkStatus } from '../src/eridani-link';
 import { harnessMatrix, helloTargets, launchersToProbe, probeKey, probeLauncher, verifyStatus, type LauncherProbe, type ProbeHarness } from '../src/launch-caps';
 import { CONFORMANCE_FILE, writeRecord } from '../src/launcher-conformance';
 import { fileVersion, hookVersion, loadBuildInfo, readServerInfo, serverInfo, UNKNOWN_BUILD, writeServerInfo } from '../src/build-info';
-import { buildStatus, fmtBuild } from '../src/cli';
+import { STATUS_VERSION, STATUS_VERSION_PARITY, buildStatus, fmtBuild, fmtMainRef } from '../src/cli';
+import type { GitRunner } from '../src/worktrees';
 import { fmtAdvertised } from '../src/eridani-cli';
 import { Hub } from '../src/hub';
 import { Registry } from '../src/registry';
@@ -252,6 +253,44 @@ describe('build identity', () => {
     const sha = 'c'.repeat(40);
     expect(fmtBuild({ ...s.server, build: { sha, dirty: false, builtAt: null, pid: 1, startedAt: 0, version: '0.1.0' }, diskBuild: { sha: 'd'.repeat(40), dirty: false, builtAt: null }, hooks: { installed: 'abc', bundled: 'def', current: false } }))
       .toBe(`build ${sha.slice(0, 12)}; on disk ${'d'.repeat(12)} (restart to run it); proto 1 caps v2; hooks abc (stale: run \`remotea hooks install\`)`);
+  });
+
+  it('remotea status: server.mainRef is unknown from sources without running git, and status --json keeps its version', async () => {
+    const dir = tmpDir();
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ port: 1 }));
+    const calls: string[][] = [];
+    const git: GitRunner = async (args) => {
+      calls.push(args);
+      return { code: 1, stdout: '', stderr: '' };
+    };
+    const s = await buildStatus(dir, { git });
+    expect(s.server.mainRef).toEqual({ state: 'unknown', sha: null, remoteSha: null, behind: null, ahead: null, reason: 'the build has no git commit' });
+    expect((await buildStatus(dir)).server.mainRef.state).toBe('unknown');
+    expect(calls).toEqual([]);
+    expect(fmtMainRef(s.server)).toBe('not compared with origin/main: the build has no git commit');
+    expect(s.version).toBe(STATUS_VERSION_PARITY);
+    expect([STATUS_VERSION, STATUS_VERSION_PARITY]).toEqual([2, 1]);
+    // Additive: every field status --json had is still there.
+    expect(Object.keys(s).sort()).toEqual(['groups', 'server', 'sessions', 'uploads', 'version']);
+    expect(Object.keys(s.server).sort()).toEqual(['build', 'capsVersion', 'collector', 'configDir', 'diskBuild', 'epoch', 'eridani', 'hooks', 'hostname', 'mainRef', 'port', 'proto', 'ptyKeeper', 'running', 'serverId']);
+    // An answer handed in is reported as is.
+    const given = { state: 'level' as const, sha: 'c'.repeat(40), remoteSha: 'c'.repeat(40), behind: 0, ahead: 0, reason: null };
+    expect((await buildStatus(dir, { mainRef: given, checkoutDir: dir, git })).server.mainRef).toBe(given);
+    expect(calls).toEqual([]);
+  });
+
+  it('fmtMainRef: one line, the same sentence as doctor; the fix follows a behind build', () => {
+    const sha = 'c'.repeat(40);
+    const remote = 'e'.repeat(40);
+    const disk = { sha, dirty: false, builtAt: null };
+    const running = { ...disk, pid: 1, startedAt: 0, version: '0.1.0' };
+    const behind = { state: 'behind' as const, sha, remoteSha: remote, behind: 2, ahead: 0, reason: null };
+    expect(fmtMainRef({ build: running, diskBuild: disk, mainRef: behind }))
+      .toBe(`running ${sha.slice(0, 12)} is 2 commits behind origin/main (${remote.slice(0, 12)}): git pull, then cd remote-server && npm run build && remotea upgrade`);
+    expect(fmtMainRef({ build: null, diskBuild: disk, mainRef: { ...behind, behind: null, ahead: null } }))
+      .toBe(`the build on disk ${sha.slice(0, 12)} is behind origin/main (${remote.slice(0, 12)}); how many commits is unknown until that commit is fetched: git pull, then cd remote-server && npm run build && remotea upgrade`);
+    expect(fmtMainRef({ build: running, diskBuild: disk, mainRef: { state: 'level', sha, remoteSha: sha, behind: 0, ahead: 0, reason: null } })).toBe(`running ${sha.slice(0, 12)} is level with origin/main`);
+    expect(fmtMainRef({ build: running, diskBuild: disk, mainRef: { state: 'ahead', sha, remoteSha: remote, behind: 0, ahead: 1, reason: null } })).toBe(`running ${sha.slice(0, 12)} is 1 commit ahead of origin/main`);
   });
 });
 

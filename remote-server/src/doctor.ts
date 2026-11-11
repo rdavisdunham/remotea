@@ -5,8 +5,9 @@
  *
  *   service    the systemd user unit: installed, active, enabled, the user it
  *              runs as and the PATH it gives the server; the PTY keeper (S-Q5)
- *   build      the running server's commit (dirty?), the one on disk, the
- *              link protocol and caps version
+ *   build      the running server's commit (dirty?), the one on disk, whether
+ *              origin/main has moved past it (main-ref.ts), the link protocol
+ *              and caps version
  *   listener   port 7717 accepts a connection and answers /healthz; the
  *              token file exists (never read or printed); the hook bridge
  *   collector  mode, node:sqlite, the last scan (parity age)
@@ -27,7 +28,8 @@
  *              sessions the registry still holds for a dead process
  *
  * Read-only: it never starts, restarts or installs anything, never fetches
- * (the worktree check runs git with fetch refused) and never prints a key, a
+ * (the worktree check runs git with fetch refused; the origin/main check only
+ * reads the remote ref with `git ls-remote`) and never prints a key, a
  * token, an environment or a command line; paths under $HOME are written
  * with `~`. `--probe` runs the launch probes (`<bin> --version` through the
  * login shell, as `remotea eridani status --probe`); without it launch
@@ -61,6 +63,7 @@ import { probeSqlite } from './collector/codex-sqlite';
 import { UploadStore, readUploadsStatus } from './upload';
 import { observeKeeperStatus, type KeeperObservation } from './pty-backend';
 import { existingAncestor, statfs } from './target-template';
+import { checkMainRef, defaultCheckoutDir, describeMainRef, mainRefSubject, type MainRefStatus } from './main-ref';
 
 export { statfs };
 
@@ -173,6 +176,8 @@ export interface DoctorFacts {
   registry: RegistryData | null;
   /** S-Q5 (optional): the PTY keeper as an observer sees it; absent in facts built before it existed. */
   keeper?: KeeperObservation | null;
+  /** The build against origin's main (main-ref.ts). Optional: facts built without it leave `build.main` out. */
+  mainRef?: MainRefStatus | null;
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -274,6 +279,10 @@ export function evaluate(f: DoctorFacts): DoctorItem[] {
     else add('build', 'build.running', 'ok', `running ${short(r.build)} (version ${r.version}, up ${fmtAgo(f.now - r.startedAt)})`);
     if (r.build.sha !== f.diskBuild.sha || r.build.dirty !== f.diskBuild.dirty) add('build', 'build.disk', 'warn', `on disk ${short(f.diskBuild)} differs from the running ${short(r.build)}: a restart would run it`, 'systemctl --user restart remotea (running processes end; the apps respawn them)');
     else add('build', 'build.disk', 'ok', 'the build on disk is the one running');
+  }
+  if (f.mainRef) {
+    const d = describeMainRef(f.mainRef, mainRefSubject(r?.build, f.mainRef));
+    add('build', 'build.main', d.level, d.summary, d.fix);
   }
   add('build', 'build.caps', 'ok', `Eridani link proto ${r?.proto ?? ERIDANI_PROTO}, caps v${r?.capsVersion ?? ERIDANI_CAPS_VERSION}`);
 
@@ -582,6 +591,10 @@ export interface GatherOptions {
   diskBuild?: BuildInfo;
   /** S-Q5: the PTY keeper observation (null: leave the check out). Default: ask the keeper's socket. */
   keeper?: KeeperObservation | null;
+  /** The build against origin's main, as given (null: leave the check out). Default: ask (main-ref.ts). */
+  mainRef?: MainRefStatus | null;
+  /** The checkout the build came from, where git is run for that check (null: none, nothing is run). Default: defaultCheckoutDir(). */
+  checkoutDir?: string | null;
 }
 
 const run = (file: string, args: string[], timeoutMs = 3000): Promise<string | null> =>
@@ -712,6 +725,13 @@ export async function gatherFacts(o: GatherOptions): Promise<DoctorFacts> {
   // build
   const running = o.serverInfo !== undefined ? o.serverInfo : healthy ? readServerInfo(dir) : null;
   const hookPaths = o.hookPaths ?? defaultHookPaths();
+  const diskBuild = o.diskBuild ?? loadBuildInfo();
+  // Against origin/main: started here, awaited at the end, so its ls-remote overlaps the probes below.
+  // Not wrapped in noFetch: main-ref.ts never fetches by construction.
+  const mainRef: Promise<MainRefStatus | null> =
+    o.mainRef !== undefined
+      ? Promise.resolve(o.mainRef)
+      : checkMainRef({ sha: running ? running.build.sha : diskBuild.sha, cwd: o.checkoutDir !== undefined ? o.checkoutDir : defaultCheckoutDir(), git: o.git ?? runGit });
 
   // eridani
   const ecfg = loadEridaniConfig(dir);
@@ -788,7 +808,7 @@ export async function gatherFacts(o: GatherOptions): Promise<DoctorFacts> {
     service: { unitFile, installed: unit !== null, active, enabled, user, path: unitPath },
     listener: { port: cfg.port, accepting, healthy, hookPort: cfg.hookPort, hookAccepting, token },
     running,
-    diskBuild: o.diskBuild ?? loadBuildInfo(),
+    diskBuild,
     helper: hookVersion(hookPaths),
     agentHooks: agentHookChecks(hookPaths),
     eridani: { configured: !!ecfg, enabled: !!ecfg?.enabled, keyPresent: readEridaniToken(dir) !== null, mode, link },
@@ -804,6 +824,7 @@ export async function gatherFacts(o: GatherOptions): Promise<DoctorFacts> {
     worktrees,
     registry,
     keeper: o.keeper !== undefined ? o.keeper : await observeKeeperStatus(dir, cfg.ptyKeeper),
+    mainRef: await mainRef,
   };
 }
 
