@@ -36,6 +36,11 @@ export interface ServerConfig {
   ptyKeeper: boolean;
   /** S-Q5: the keeper exits after this many minutes with no server attached and no live session. */
   ptyKeeperIdleMinutes: number;
+  /**
+   * The inactivity watchdog: an agent session that reads `working` with no hook event and no terminal output
+   * for this many minutes is flagged `stalled` (to the apps and to Eridani). 0 turns the watchdog off.
+   */
+  stallMinutes: number;
 }
 
 export const DEFAULT_CONFIG: ServerConfig = {
@@ -52,6 +57,7 @@ export const DEFAULT_CONFIG: ServerConfig = {
   uploadMaxAgeDays: 7,
   ptyKeeper: false,
   ptyKeeperIdleMinutes: 10,
+  stallMinutes: 15,
 };
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {

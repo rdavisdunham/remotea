@@ -15,6 +15,14 @@
  *                         own startup commands (`deliver`) never reach here.
  *   - the process exits → exited
  *
+ * On top of the state sits `trouble`: what is wrong with a session that the
+ * state alone does not say. The inactivity watchdog (`tick`) sets `stalled`
+ * when a session reads `working` but neither a hook nor terminal output has
+ * arrived for `stallAfterMs`; any new sign of life clears it. Hooks tell us a
+ * turn started, never that the agent hung, so without this a dead turn reads
+ * `working` forever. `setTrouble` is the entry point for failures a harness
+ * reports itself (errored, rate_limited, auth_expired).
+ *
  * Hook processes race to the bridge, so reports are ordered by the stamp the
  * helper took when the hook fired (`at`), exactly as the app does (#151).
  */
@@ -24,7 +32,7 @@ import {
   isAnsweringInput,
   type ClaudeHookEvent,
 } from '../../src/shared/agent-hook-rules';
-import type { AgentStateInfo, AgentStateName } from '../../src/shared/remote-host-protocol';
+import type { AgentStateInfo, AgentStateName, AgentTrouble, AgentTroubleKind } from '../../src/shared/remote-host-protocol';
 
 const TURN_START_EVENTS: ClaudeHookEvent[] = ['SessionStart', 'UserPromptSubmit', 'PreToolUse'];
 const MAX_REASON = 300;
@@ -41,6 +49,11 @@ interface Rec {
   since: number;
   /** The reason last published. */
   published: string | null;
+  /** The last sign of life the tracker itself saw (a hook report, human input), epoch ms. */
+  lastActivity: number;
+  trouble: AgentTrouble | null;
+  /** The trouble last published, as `kind:since`. */
+  publishedTrouble: string | null;
 }
 
 export interface AgentStateChange {
@@ -52,6 +65,8 @@ export interface AgentStateDeps {
   now?: () => number;
   /** Called once per real state change (never for a report that changes nothing). */
   onChange: (change: AgentStateChange) => void;
+  /** The watchdog's limit: a `working` session silent this long is `stalled`. 0 or absent turns it off. */
+  stallAfterMs?: number;
 }
 
 export function resolveState(rec: Pick<Rec, 'awaitingHuman' | 'runDepth' | 'exited'>): AgentStateName {
@@ -69,9 +84,11 @@ export class AgentStateTracker {
    */
   private turnStartTracked = false;
   private readonly now: () => number;
+  private readonly stallAfterMs: number;
 
   constructor(private readonly deps: AgentStateDeps) {
     this.now = deps.now ?? Date.now;
+    this.stallAfterMs = deps.stallAfterMs && deps.stallAfterMs > 0 ? deps.stallAfterMs : 0;
   }
 
   get(surf: string): AgentStateInfo | undefined {
@@ -92,6 +109,10 @@ export class AgentStateTracker {
       state: info.state,
       since: info.since,
       published: info.reason ?? null,
+      // A restart is not silence: the clock starts again, and old trouble needs fresh evidence.
+      lastActivity: this.now(),
+      trouble: null,
+      publishedTrouble: null,
     });
   }
 
@@ -152,6 +173,8 @@ export class AgentStateTracker {
       rec.lastHookAt = p.hookAt;
     }
     rec.exited = false;
+    rec.lastActivity = this.now();
+    rec.trouble = null;
     if (p.awaitingHuman !== undefined) {
       rec.awaitingHuman = p.awaitingHuman;
       rec.reason = p.awaitingHuman ? clipReason(p.reason ?? null) : null;
@@ -170,6 +193,7 @@ export class AgentStateTracker {
     rec.awaitingHuman = false;
     rec.runDepth = 0;
     rec.reason = reason;
+    rec.trouble = null;
     this.publish(surf, rec);
   }
 
@@ -177,6 +201,7 @@ export class AgentStateTracker {
   humanInput(surf: string, data: string): void {
     const rec = this.recs.get(surf);
     if (!rec || rec.exited) return;
+    rec.lastActivity = this.now();
     if (data === '\x1b' && rec.runDepth > 0) {
       rec.runDepth = 0;
       rec.awaitingHuman = false;
@@ -197,7 +222,48 @@ export class AgentStateTracker {
     rec.awaitingHuman = false;
     rec.runDepth = 0;
     rec.reason = `exit ${code}`;
+    rec.trouble = null;
     this.publish(surf, rec);
+  }
+
+  /**
+   * A failure the harness itself reported (errored, rate_limited, auth_expired). It stays until the next sign of
+   * life: a hook report, the process exiting, or the agent letting go. Ignored for a surface with no agent state.
+   */
+  setTrouble(surf: string, kind: AgentTroubleKind, detail?: string | null): void {
+    const rec = this.recs.get(surf);
+    if (!rec || rec.exited) return;
+    const clipped = clipReason(detail ?? null);
+    rec.trouble = clipped ? { kind, since: this.now(), detail: clipped } : { kind, since: this.now() };
+    this.publish(surf, rec);
+  }
+
+  /**
+   * The inactivity watchdog. Call on a timer. `lastOutputAt` gives the time of a surface's last terminal output
+   * (epoch ms), which counts as a sign of life next to the tracker's own (hooks, human input).
+   *
+   * A `working` session with no sign of life for `stallAfterMs` becomes `stalled`; output arriving after that
+   * clears it. Only `working` can stall: `needs_you` is waiting on a person and `idle` is not doing anything.
+   */
+  tick(lastOutputAt?: (surf: string) => number | undefined): void {
+    if (!this.stallAfterMs) return;
+    const now = this.now();
+    for (const [surf, rec] of this.recs) {
+      if (rec.exited) continue;
+      const seen = Math.max(rec.lastActivity, lastOutputAt?.(surf) ?? 0);
+      if (rec.trouble?.kind === 'stalled') {
+        if (seen > rec.trouble.since) {
+          rec.trouble = null;
+          this.publish(surf, rec);
+        }
+        continue;
+      }
+      if (rec.trouble || resolveState(rec) !== 'working') continue;
+      const quiet = now - seen;
+      if (quiet < this.stallAfterMs) continue;
+      rec.trouble = { kind: 'stalled', since: now, detail: `no activity for ${Math.max(1, Math.round(quiet / 60_000))} min` };
+      this.publish(surf, rec);
+    }
   }
 
   /** A respawned process starts with no agent state. */
@@ -212,14 +278,19 @@ export class AgentStateTracker {
   private getOrCreate(surf: string): Rec {
     let rec = this.recs.get(surf);
     if (!rec) {
-      rec = { awaitingHuman: false, runDepth: 0, reason: null, lastHookAt: 0, lastSeq: -Infinity, exited: false, state: 'idle', since: 0, published: null };
+      rec = { awaitingHuman: false, runDepth: 0, reason: null, lastHookAt: 0, lastSeq: -Infinity, exited: false, state: 'idle', since: 0, published: null, lastActivity: this.now(), trouble: null, publishedTrouble: null };
       this.recs.set(surf, rec);
     }
     return rec;
   }
 
   private info(rec: Rec): AgentStateInfo {
-    return rec.reason ? { state: rec.state, since: rec.since, reason: rec.reason } : { state: rec.state, since: rec.since };
+    return {
+      state: rec.state,
+      since: rec.since,
+      ...(rec.reason ? { reason: rec.reason } : {}),
+      ...(rec.trouble ? { trouble: rec.trouble } : {}),
+    };
   }
 
   private publish(surf: string, rec: Rec): void {
@@ -227,8 +298,13 @@ export class AgentStateTracker {
     // `since` moves only on a real transition; a reworded question keeps its clock
     // but is still published so the reason is current.
     const changedState = state !== rec.state || rec.since === 0;
-    if (!changedState && (state !== 'needs_you' || rec.reason === rec.published)) return;
+    // Stalled describes a working session; any other state has moved on.
+    if (rec.trouble?.kind === 'stalled' && state !== 'working') rec.trouble = null;
+    const trouble = rec.trouble ? `${rec.trouble.kind}:${rec.trouble.since}` : null;
+    const changedTrouble = trouble !== rec.publishedTrouble;
+    if (!changedState && !changedTrouble && (state !== 'needs_you' || rec.reason === rec.published)) return;
     rec.published = rec.reason;
+    rec.publishedTrouble = trouble;
     if (changedState) {
       rec.state = state;
       rec.since = this.now();

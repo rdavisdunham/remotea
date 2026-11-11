@@ -60,6 +60,8 @@ export interface HubConfig {
   ringBytes: number;
   defaultCols: number;
   defaultRows: number;
+  /** The inactivity watchdog: a working agent session silent this many minutes reads `stalled`. 0 turns it off. */
+  stallMinutes: number;
 }
 
 export const DEFAULT_HUB_CONFIG: HubConfig = {
@@ -69,6 +71,7 @@ export const DEFAULT_HUB_CONFIG: HubConfig = {
   ringBytes: 1024 * 1024,
   defaultCols: 120,
   defaultRows: 32,
+  stallMinutes: 15,
 };
 
 /** The command that reopens an agent conversation, or null when the provider has none. */
@@ -177,6 +180,7 @@ export class Hub {
     this.chatAttention.tick();
     this.agentState = new AgentStateTracker({
       now: this.now,
+      stallAfterMs: this.cfg.stallMinutes * 60_000,
       onChange: ({ surf, info }) => {
         const previous = this.registry.session(surf);
         const attention = previous?.chatAttention;
@@ -194,6 +198,7 @@ export class Hub {
           state: info.state,
           since: info.since,
           ...(info.reason ? { reason: info.reason } : {}),
+          ...(info.trouble ? { trouble: info.trouble } : {}),
           ...(rec.eridani?.execution === 'managed' ? { execution: 'managed' as const, controller: rec.eridani.controller ?? 'eridani', paused: !!rec.eridani.paused, pause_reason: rec.eridani.attention?.kind ?? null, ...(rec.eridani.attention ? { attention: rec.eridani.attention } : {}) } : {}),
           ...(rec.agent ? { provider: rec.agent.provider, provider_session_id: rec.agent.sessionId } : {}),
           ...(this.permissionMode.has(surf) ? { effective_permission_mode: this.permissionMode.get(surf) } : {}),
@@ -229,6 +234,11 @@ export class Hub {
   }
 
   setTea(tea: Tea): void { this.tea = tea; }
+
+  /** The inactivity watchdog's timer tick: a working session's terminal output counts as a sign of life. */
+  watchAgents(): void {
+    this.agentState.tick((surf) => this.sessions.get(surf as RemoteSurfaceId)?.lastActivityAt);
+  }
 
   setEridani(hooks: HubEridaniHooks | null): void {
     this.eridani = hooks ?? {};
