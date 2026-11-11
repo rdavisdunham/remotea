@@ -607,7 +607,7 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(`${fmtKeeper(status.server.ptyKeeper)}\n`);
       for (const s of status.sessions) {
         const what = s.agent ? `${s.agent.provider} ${s.agent.sessionId.slice(0, 8)}` : s.cmd ?? 'shell';
-        process.stdout.write(`${s.state.padEnd(6)} ${(s.groupName ?? '-').slice(0, 20).padEnd(20)} ${what.slice(0, 24).padEnd(24)} active ${fmtAge(s.lastActivityAt).padStart(4)}  ${s.lastCwd ?? s.cwd}  ${s.id}\n`);
+        process.stdout.write(`${s.state.padEnd(6)} ${(s.groupName ?? '-').slice(0, 20).padEnd(20)} ${what.slice(0, 24).padEnd(24)} active ${fmtAge(s.lastActivityAt).padStart(4)}  ${s.lastCwd ?? s.cwd}  ${s.id}${s.agentState?.trouble ? `  [${s.agentState.trouble.kind.replace('_', ' ')}${s.agentState.trouble.detail ? ': ' + s.agentState.trouble.detail : ''}]` : ''}\n`);
       }
       if (!status.sessions.length) process.stdout.write('no sessions\n');
       const u = status.uploads;

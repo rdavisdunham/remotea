@@ -581,6 +581,12 @@ export interface StatusBody extends OpFields {
   /** When this state began, epoch ms. */
   since: number;
   reason?: string;
+  /**
+   * The session is in trouble its state does not show: `stalled` (working, but silent past the host's
+   * stallMinutes), or a harness-reported `errored` / `rate_limited` / `auth_expired`. Absent when healthy.
+   * Additive: an Eridani that does not read it sees the state as before.
+   */
+  trouble?: { kind: 'stalled' | 'errored' | 'rate_limited' | 'auth_expired'; since: number; detail?: string };
   provider?: string;
   provider_session_id?: string;
   effective_permission_mode?: string;

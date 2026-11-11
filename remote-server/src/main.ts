@@ -62,7 +62,7 @@ async function main(): Promise<void> {
     bootId,
     serverId,
     hostname: os.hostname(),
-    config: { resumeAgents: config.resumeAgents, scrollback: config.scrollback, snapshotScrollback: config.snapshotScrollback, ringBytes: config.ringBytes },
+    config: { resumeAgents: config.resumeAgents, scrollback: config.scrollback, snapshotScrollback: config.snapshotScrollback, ringBytes: config.ringBytes, stallMinutes: Number.isFinite(config.stallMinutes) && config.stallMinutes >= 0 ? config.stallMinutes : 15 },
     log,
     sessionEnv: config.hookPort
       ? (id) => hookEnv(hookSecret, config.hookPort, id, { cliPath: path.join(defaultHookPaths().cliDir, 'wmux.js'), nodePath: process.execPath })
@@ -193,6 +193,7 @@ async function main(): Promise<void> {
   const reminderTimer = setInterval(() => hub.chatAttention.tick(), 1000);
   const lagTimer = setInterval(() => hub.pumpLagging(), 250);
   const probeTimer = setInterval(() => hub.probeAgents(), 5_000);
+  const watchTimer = setInterval(() => hub.watchAgents(), 30_000);
   const pruneTimer = setInterval(() => hub.prune(), 60 * 60 * 1000);
   const uploadTimer = setInterval(() => uploads.tick(), UPLOAD_SWEEP_MS);
 
@@ -205,6 +206,7 @@ async function main(): Promise<void> {
     clearInterval(reminderTimer);
     clearInterval(lagTimer);
     clearInterval(probeTimer);
+    clearInterval(watchTimer);
     clearInterval(pruneTimer);
     clearInterval(uploadTimer);
     tokenWatch.close();

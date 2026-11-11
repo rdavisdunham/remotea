@@ -221,3 +221,112 @@ describe('AgentStateTracker: everything else', () => {
     expect(t.get(surf)?.reason).toHaveLength(300);
   });
 });
+
+describe('AgentStateTracker: the inactivity watchdog and trouble', () => {
+  let at = 0;
+  let out: AgentStateChange[];
+  let w: AgentStateTracker;
+  const MIN = 60_000;
+  beforeEach(() => {
+    at = 1_000_000;
+    out = [];
+    w = new AgentStateTracker({ now: () => at, onChange: (c) => out.push(c), stallAfterMs: 15 * MIN });
+  });
+  const work = () => { w.hook(surf, { event: 'SessionStart' }); w.hook(surf, { event: 'UserPromptSubmit' }); };
+
+  it('flags a working session with no sign of life as stalled, once', () => {
+    work();
+    at += 14 * MIN;
+    w.tick();
+    expect(w.get(surf)?.trouble).toBeUndefined();
+    at += 2 * MIN;
+    w.tick();
+    expect(w.get(surf)).toMatchObject({ state: 'working', trouble: { kind: 'stalled', since: at, detail: 'no activity for 16 min' } });
+    const published = out.length;
+    at += 5 * MIN;
+    w.tick();
+    expect(out.length).toBe(published); // Still stalled: nothing new to say.
+  });
+
+  it('counts terminal output as a sign of life', () => {
+    work();
+    at += 20 * MIN;
+    w.tick(() => at - MIN);
+    expect(w.get(surf)?.trouble).toBeUndefined();
+  });
+
+  it('clears stalled when output or a hook arrives', () => {
+    work();
+    at += 16 * MIN;
+    w.tick();
+    const stalledAt = at;
+    at += MIN;
+    w.tick(() => stalledAt - 1); // Output older than the stall: still stalled.
+    expect(w.get(surf)?.trouble?.kind).toBe('stalled');
+    w.tick(() => at); // New output.
+    expect(w.get(surf)).toEqual({ state: 'working', since: expect.any(Number) });
+    at += 16 * MIN;
+    w.tick();
+    expect(w.get(surf)?.trouble?.kind).toBe('stalled');
+    w.hook(surf, { event: 'PostToolUse' });
+    expect(w.get(surf)?.trouble).toBeUndefined();
+  });
+
+  it('never stalls a session that is idle, waiting on a person, or exited', () => {
+    w.hook(surf, { event: 'SessionStart' });
+    at += 60 * MIN;
+    w.tick();
+    expect(w.get(surf)?.trouble).toBeUndefined();
+    w.hook(surf, { event: 'UserPromptSubmit' });
+    w.report(surf, { awaitingHuman: true, reason: 'Approve Bash?' });
+    at += 60 * MIN;
+    w.tick();
+    expect(w.get(surf)).toMatchObject({ state: 'needs_you' });
+    expect(w.get(surf)?.trouble).toBeUndefined();
+    w.exit(surf, 0);
+    at += 60 * MIN;
+    w.tick();
+    expect(w.get(surf)?.trouble).toBeUndefined();
+  });
+
+  it('drops stalled when the state stops being working', () => {
+    work();
+    at += 16 * MIN;
+    w.tick();
+    w.exit(surf, 1);
+    expect(w.get(surf)).toMatchObject({ state: 'exited' });
+    expect(w.get(surf)?.trouble).toBeUndefined();
+  });
+
+  it('a restart is not silence: a restored working session gets a fresh clock', () => {
+    w.seed(surf, { state: 'working', since: 5, trouble: { kind: 'stalled', since: 6 } });
+    expect(w.get(surf)?.trouble).toBeUndefined();
+    at += 14 * MIN;
+    w.tick();
+    expect(w.get(surf)?.trouble).toBeUndefined();
+    at += 2 * MIN;
+    w.tick();
+    expect(w.get(surf)?.trouble?.kind).toBe('stalled');
+  });
+
+  it('is off when no limit is set', () => {
+    const off = new AgentStateTracker({ now: () => at, onChange: (c) => out.push(c) });
+    off.hook(surf, { event: 'UserPromptSubmit' });
+    at += 600 * MIN;
+    off.tick();
+    expect(off.get(surf)?.trouble).toBeUndefined();
+  });
+
+  it('carries a harness-reported failure until the next sign of life', () => {
+    work();
+    w.setTrouble(surf, 'rate_limited', '  usage limit reached,\n resets 3pm ');
+    expect(w.get(surf)).toMatchObject({ state: 'working', trouble: { kind: 'rate_limited', detail: 'usage limit reached, resets 3pm' } });
+    at += 60 * MIN;
+    w.tick(); // A reported failure is not replaced by stalled.
+    expect(w.get(surf)?.trouble?.kind).toBe('rate_limited');
+    w.hook(surf, { event: 'UserPromptSubmit' });
+    expect(w.get(surf)?.trouble).toBeUndefined();
+    w.setTrouble('surf-unknown', 'errored');
+    expect(w.get('surf-unknown')).toBeUndefined();
+  });
+});

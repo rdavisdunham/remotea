@@ -282,11 +282,27 @@ export interface VerifyAttemptStatus {
 
 export type AgentStateName = 'working' | 'needs_you' | 'idle' | 'exited';
 
+/**
+ * Something is wrong with a session that its state alone does not say. `stalled` comes from the server's
+ * inactivity watchdog (working, but no hook event and no terminal output for the configured time); the other
+ * kinds are reserved for harness-reported failures. Additive: a client that does not know it ignores it.
+ */
+export type AgentTroubleKind = 'stalled' | 'errored' | 'rate_limited' | 'auth_expired';
+
+export interface AgentTrouble {
+  kind: AgentTroubleKind;
+  /** When the trouble was noticed, epoch ms. */
+  since: number;
+  detail?: string;
+}
+
 export interface AgentStateInfo {
   state: AgentStateName;
   /** When this state began, epoch ms. */
   since: number;
   reason?: string;
+  /** Set while the session is in trouble (see AgentTrouble); absent otherwise. */
+  trouble?: AgentTrouble;
 }
 
 export interface TurnCursor {
