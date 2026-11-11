@@ -70,6 +70,7 @@ import {
   type CiStatusCommand,
   type PrMergeCommand,
   type PrUpdateBranchCommand,
+  type RunChangesCommand,
 } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
@@ -92,7 +93,8 @@ import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
 import { sameWorktreeState, WorktreeManager, worktreeStateOf, writersByPath } from './worktrees';
 import { loadTargets } from './eridani-targets';
-import { branchWorktree, ciFolder, ciStatus, CiStatusError, type Exec } from './ci-status';
+import { branchWorktree, ciFolder, ciStatus, CiStatusError, execGh, type Exec } from './ci-status';
+import { runChanges, RunChangesError } from './run-changes';
 import { prMerge, prUpdateBranch } from './pr-actions';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
@@ -455,12 +457,13 @@ export class EridaniRuntime {
         'worktrees.scan': (c, ctx) => this.scanCommand(c, ctx),
         'terminal.focus': async (c, ctx) => this.focusCommand(c, ctx),
         'ci.status': (c, ctx) => this.ciCommand(c, ctx),
+        'run.changes': (c, ctx) => this.changesCommand(c, ctx),
         'pr.merge': (c, ctx) => this.prCommand(c, ctx),
         'pr.update_branch': (c, ctx) => this.prCommand(c, ctx),
       },
       precheck: (cmd) => this.dispatch.precheck(cmd),
       // A scan (or a focus) cut off by a restart already did whatever it did; Eridani's wait bounds it.
-      recover: (rec) => (rec.t === 'worktrees.scan' || rec.t === 'terminal.focus' || rec.t === 'ci.status'
+      recover: (rec) => (rec.t === 'worktrees.scan' || rec.t === 'terminal.focus' || rec.t === 'ci.status' || rec.t === 'run.changes'
         ? { state: 'failed', detail: 'interrupted by a server restart' }
         // A merge or update cut off mid-way may have happened on GitHub: Eridani reads the pull request again.
         : rec.t === 'pr.merge' || rec.t === 'pr.update_branch'
@@ -764,6 +767,29 @@ export class EridaniRuntime {
       return { state: 'executed', result: result as unknown as Record<string, unknown> };
     } catch (err) {
       const msg = err instanceof CiStatusError ? err.message : `ci status failed: ${(err as Error)?.message ?? String(err)}`;
+      return { state: 'failed', detail: msg.slice(0, ERIDANI_LIMITS.reasonChars) };
+    }
+  }
+
+  /**
+   * `run.changes`: what the run changed, read with `git` in the branch's
+   * worktree under the named target (else the live folder of a session bound
+   * to the run). Never the target's own repository: that is another checkout.
+   */
+  private async changesCommand(cmd: CommandBody, ctx: CommandContext): Promise<CommandResult> {
+    const c = cmd as unknown as RunChangesCommand;
+    const targets = loadTargets(this.deps.dir);
+    const bound = this.deps.registry.sessions().find((s) => s.eridani?.runId === c.run_id && s.state !== 'exited');
+    const live = bound ? (bound.lastCwd ?? bound.cwd) : null;
+    const cwd = branchWorktree(targets, c.branch, c.target ?? null) ?? (live && fs.existsSync(live) ? live : null);
+    if (!cwd) return { state: 'failed', detail: `no worktree for ${c.branch} on this host` };
+    const base = c.base ?? targets.find((t) => t.id === c.target)?.base ?? 'main';
+    ctx.begin();
+    try {
+      const result = await runChanges({ cwd, base, maxChars: c.max_chars, exec: this.deps.ciExec ?? execGh });
+      return { state: 'executed', result: result as unknown as Record<string, unknown> };
+    } catch (err) {
+      const msg = err instanceof RunChangesError ? err.message : `run.changes failed: ${(err as Error)?.message ?? String(err)}`;
       return { state: 'failed', detail: msg.slice(0, ERIDANI_LIMITS.reasonChars) };
     }
   }
