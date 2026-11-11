@@ -92,9 +92,8 @@ import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
 import { sameWorktreeState, WorktreeManager, worktreeStateOf, writersByPath } from './worktrees';
 import { loadTargets } from './eridani-targets';
-import { ciFolder, ciStatus, CiStatusError, type Exec } from './ci-status';
+import { branchWorktree, ciFolder, ciStatus, CiStatusError, type Exec } from './ci-status';
 import { prMerge, prUpdateBranch } from './pr-actions';
-import { branchDir } from './worktrees';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
 import { runPrepare, templateStatus, withTemplate } from './target-template';
@@ -780,7 +779,7 @@ export class EridaniRuntime {
     const bound = this.deps.registry.sessions().find((s) => s.eridani?.runId === c.run_id && s.state !== 'exited');
     const cwd = ciFolder(targets, c.branch, bound ? (bound.lastCwd ?? bound.cwd) : null, c.target ?? null);
     if (!cwd) return { state: 'failed', detail: `no clone of the repository for ${c.branch} on this host` };
-    const worktree = targets.map((t) => path.join(t.worktreeRoot, branchDir(c.branch))).find((d) => fs.existsSync(d)) ?? null;
+    const worktree = branchWorktree(targets, c.branch, c.target ?? null);
     ctx.begin();
     try {
       const o = { cwd, branch: c.branch, headSha: c.head_sha, exec: this.deps.ciExec };

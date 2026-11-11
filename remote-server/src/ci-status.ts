@@ -86,14 +86,26 @@ export function branchOk(branch: unknown): branch is string {
 }
 
 /**
- * Where to ask: the branch's managed worktree under a target's worktreeRoot (`<root>/<branchDir>`), else a
- * live folder the caller knows for the run, else null.
+ * The branch's managed worktree (`<worktreeRoot>/<branchDir>`), or null. A task's branch name is the same in every
+ * repository, so when the command names its target only that target's worktree counts: a leftover worktree of the
+ * same task under another target belongs to a different repository, and asking there finds no pull request.
  */
-export function ciFolder(targets: ExecutionTarget[], branch: string, runCwd?: string | null, targetId?: string | null): string | null {
-  for (const t of targets) {
+export function branchWorktree(targets: ExecutionTarget[], branch: string, targetId?: string | null): string | null {
+  const named = targetId ? targets.find((t) => t.id === targetId) : undefined;
+  for (const t of named ? [named] : targets) {
     const dir = path.join(t.worktreeRoot, branchDir(branch));
     if (fs.existsSync(dir)) return dir;
   }
+  return null;
+}
+
+/**
+ * Where to ask: the branch's managed worktree (the named target's, when one is named), else a live folder the
+ * caller knows for the run, else the named target's repository, else null.
+ */
+export function ciFolder(targets: ExecutionTarget[], branch: string, runCwd?: string | null, targetId?: string | null): string | null {
+  const worktree = branchWorktree(targets, branch, targetId);
+  if (worktree) return worktree;
   if (runCwd && fs.existsSync(runCwd)) return runCwd;
   // The worktree is gone (the run was cleaned up): gh only needs a clone of the same repository.
   const target = targetId ? targets.find((t) => t.id === targetId) : undefined;
