@@ -31,6 +31,8 @@ import { Hub } from '../src/hub';
 import { Registry } from '../src/registry';
 import { fakeSpawner, ManualTimers } from './helpers';
 import { hookVersion, loadBuildInfo } from '../src/build-info';
+import type { MainRefStatus } from '../src/main-ref';
+import type { GitRunner } from '../src/worktrees';
 import { defaultHookPaths } from '../src/hooks-install';
 import { saveEridaniConfig, writeEridaniToken } from '../src/config';
 import { saveTarget } from '../src/eridani-targets';
@@ -125,6 +127,34 @@ describe('doctor: evaluate', () => {
     const items = evaluate(facts({ running: { ...facts().running!, build: { sha: SHA, dirty: true, builtAt: null } }, diskBuild: { sha: 'b'.repeat(40), dirty: false, builtAt: null } }));
     expect(byId(items, 'build.running')).toMatchObject({ level: 'warn', summary: expect.stringContaining('+dirty') });
     expect(byId(items, 'build.disk')).toMatchObject({ level: 'warn', summary: expect.stringContaining('a restart would run it'), fix: expect.stringContaining('systemctl --user restart remotea') });
+  });
+
+  it('build.main: behind warns with the count and the fix; level, ahead and unknown are ok; absent without the fact', () => {
+    const remote = 'b'.repeat(40);
+    const m = (over: Partial<MainRefStatus>): MainRefStatus => ({ state: 'level', sha: SHA, remoteSha: remote, behind: 0, ahead: 0, reason: null, ...over });
+    const main = (f: DoctorFacts) => byId(evaluate(f), 'build.main');
+
+    const behind = main(facts({ mainRef: m({ state: 'behind', behind: 2 }) }))!;
+    expect(behind).toMatchObject({ section: 'build', level: 'warn', summary: `running ${SHA.slice(0, 12)} is 2 commits behind origin/main (${remote.slice(0, 12)})` });
+    for (const part of ['git pull', 'npm run build', 'remotea upgrade']) expect(behind.fix).toContain(part);
+    expect(main(facts({ mainRef: m({ state: 'behind', behind: 1, ahead: 3 }) }))!.summary).toBe(`running ${SHA.slice(0, 12)} is 1 commit behind origin/main (${remote.slice(0, 12)}), and 3 ahead of it`);
+    expect(main(facts({ mainRef: m({ state: 'behind', behind: null, ahead: null }) }))).toMatchObject({ level: 'warn', summary: expect.stringContaining('how many commits is unknown until that commit is fetched'), fix: expect.stringContaining('git pull') });
+
+    expect(main(facts({ mainRef: m({ remoteSha: SHA }) }))).toEqual({ id: 'build.main', section: 'build', level: 'ok', summary: `running ${SHA.slice(0, 12)} is level with origin/main` });
+    expect(main(facts({ mainRef: m({ state: 'ahead', ahead: 1 }) }))).toEqual({ id: 'build.main', section: 'build', level: 'ok', summary: `running ${SHA.slice(0, 12)} is 1 commit ahead of origin/main` });
+    expect(main(facts({ mainRef: m({ state: 'unknown', remoteSha: null, behind: null, ahead: null, reason: 'origin could not be asked (offline, no remote "origin", or not a git checkout)' }) })))
+      .toEqual({ id: 'build.main', section: 'build', level: 'ok', summary: 'not compared with origin/main: origin could not be asked (offline, no remote "origin", or not a git checkout)' });
+
+    // No running server: the build on disk is the one compared.
+    expect(main(facts({ running: null, mainRef: m({ state: 'behind', behind: 2 }) }))!.summary).toBe(`the build on disk ${SHA.slice(0, 12)} is 2 commits behind origin/main (${remote.slice(0, 12)})`);
+
+    expect(main(facts())).toBeUndefined();
+    expect(main(facts({ mainRef: null }))).toBeUndefined();
+    // Between build.disk and build.caps, and a behind build is in what Eridani gets.
+    const report = buildReport(facts({ mainRef: m({ state: 'behind', behind: 2 }) }));
+    const ids = report.items.filter((i) => i.section === 'build').map((i) => i.id);
+    expect(ids).toEqual(['build.running', 'build.disk', 'build.main', 'build.caps']);
+    expect(doctorSummary(report).items.map((i) => i.id)).toContain('build.main');
   });
 
   it('token: missing fails, readable by others warns; its value is never part of a fact', () => {
@@ -404,6 +434,58 @@ describe('doctor: gather and the command', () => {
   it('refuses an unknown option', async () => {
     const w = world();
     await expect(doctorCommand(w.dir, ['--fix'], { write: () => true } as unknown as NodeJS.WritableStream, w.opts)).rejects.toThrow(/usage: remotea doctor/);
+  });
+});
+
+describe('doctor: gathering the origin/main check', () => {
+  function world() {
+    const dir = tmp();
+    const calls: string[][] = [];
+    const git: GitRunner = async (args) => {
+      calls.push(args);
+      if (args[0] === 'ls-remote') return { code: 0, stdout: `${'b'.repeat(40)}\trefs/heads/main\n`, stderr: '' };
+      if (args[0] === 'rev-list') return { code: 0, stdout: '0\t2\n', stderr: '' };
+      return { code: 1, stdout: '', stderr: '' };
+    };
+    const opts = { dir, home: dir, env: { PATH: '/usr/bin:/bin' } as NodeJS.ProcessEnv, now: () => NOW, systemctl: async () => null, accepts: async () => false, healthz: async () => false, keeper: null, git };
+    const mainCalls = () => calls.filter((c) => ['ls-remote', 'rev-list', 'cat-file'].includes(c[0]));
+    return { dir, opts, calls, mainCalls };
+  }
+  const build = (sha: string) => ({ sha, dirty: false, builtAt: null });
+
+  it('an injected mainRef is passed through as is, and null leaves the check out; neither runs git', async () => {
+    const w = world();
+    const given: MainRefStatus = { state: 'behind', sha: SHA, remoteSha: 'b'.repeat(40), behind: 4, ahead: 0, reason: null };
+    const f = await gatherFacts({ ...w.opts, mainRef: given, checkoutDir: w.dir, diskBuild: build(SHA) });
+    expect(f.mainRef).toBe(given);
+    expect(byId(evaluate(f), 'build.main')).toMatchObject({ level: 'warn', summary: expect.stringContaining('4 commits behind origin/main') });
+    const none = await gatherFacts({ ...w.opts, mainRef: null, checkoutDir: w.dir, diskBuild: build(SHA) });
+    expect(none.mainRef).toBeNull();
+    expect(byId(evaluate(none), 'build.main')).toBeUndefined();
+    expect(w.mainCalls()).toEqual([]);
+  });
+
+  it('from sources (no dist/build-info.json) no git is run for it, whatever the build sha', async () => {
+    const w = world();
+    expect((await gatherFacts(w.opts)).mainRef).toMatchObject({ state: 'unknown', reason: 'the build has no git commit' });
+    const f = await gatherFacts({ ...w.opts, diskBuild: build(SHA) });
+    expect(f.mainRef).toMatchObject({ state: 'unknown', sha: SHA, reason: 'not running from a built checkout' });
+    expect(byId(evaluate(f), 'build.main')).toMatchObject({ level: 'ok', summary: 'not compared with origin/main: not running from a built checkout' });
+    expect(w.mainCalls()).toEqual([]);
+  });
+
+  it('with a checkout it compares the running build, else the one on disk, in that folder', async () => {
+    const w = world();
+    const disk = 'd'.repeat(40);
+    const stopped = await gatherFacts({ ...w.opts, checkoutDir: w.dir, diskBuild: build(disk) });
+    expect(stopped.mainRef).toMatchObject({ state: 'behind', sha: disk, behind: 2 });
+    expect(byId(evaluate(stopped), 'build.main')!.summary).toMatch(/^the build on disk d{12} is 2 commits behind origin\/main \(b{12}\)$/);
+
+    const running = await gatherFacts({ ...w.opts, checkoutDir: w.dir, diskBuild: build(disk), serverInfo: { pid: 1, bootId: 'b', startedAt: NOW, version: '0.1.0', build: build(SHA), proto: 1, capsVersion: 2 } });
+    expect(running.mainRef).toMatchObject({ state: 'behind', sha: SHA, behind: 2 });
+    expect(byId(evaluate(running), 'build.main')!.summary).toMatch(/^running a{12} is 2 commits behind/);
+    expect(w.mainCalls().map((c) => c[0])).toEqual(['ls-remote', 'rev-list', 'ls-remote', 'rev-list']);
+    expect(w.mainCalls()[3]).toEqual(['rev-list', '--left-right', '--count', `${SHA}...${'b'.repeat(40)}`]);
   });
 });
 

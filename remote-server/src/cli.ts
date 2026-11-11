@@ -2,7 +2,9 @@
 /**
  * `remotea` — the server-side CLI (runs in WSL next to the server).
  *
- *   remotea status [--json]        sessions, groups and server state (reads the registry; no token needed)
+ *   remotea status [--json]        sessions, groups and server state (reads the registry; no token needed);
+ *                                  the build, and whether origin/main has moved past it (main-ref.ts: one
+ *                                  `git ls-remote`, never a fetch)
  *   remotea doctor [--json] [--probe]
  *                                  one redacted readiness report: service, build, listener, collector, link,
  *                                  hooks, targets, disk, uploads, recovery (doctor.ts); exit 1 when a check fails
@@ -60,6 +62,8 @@ import { doctorCommand } from './doctor';
 import { launcherCommand } from './launcher-cli';
 import { fmtKeeper, observeKeeperStatus, type KeeperObservation } from './pty-backend';
 import { upgrade } from './upgrade';
+import { checkMainRef, defaultCheckoutDir, describeMainRef, mainRefSubject, type MainRefStatus } from './main-ref';
+import type { GitRunner } from './worktrees';
 import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord, type VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
 
 /** status --json while the collector is authoritative (the cutover interlock, above). */
@@ -131,6 +135,8 @@ export interface StatusOutput {
     hooks: HookVersion;
     /** S-Q5 (additive): the PTY keeper (docs/remotea/upgrade.md), as an observer sees it. */
     ptyKeeper: KeeperObservation;
+    /** Additive: the running build (else the one on disk) against origin's main; `state` is `unknown` when it could not be compared (main-ref.ts). */
+    mainRef: MainRefStatus;
   };
   groups: Array<{ id: string; name: string; color: string | null }>;
   sessions: StatusSession[];
@@ -159,7 +165,12 @@ function healthy(port: number): Promise<boolean> {
   });
 }
 
-export async function buildStatus(dir: string): Promise<StatusOutput> {
+/**
+ * `mainRef`: use this answer as is. Otherwise the build is compared in
+ * `checkoutDir` (default: the checkout this build came from; none when run
+ * from sources, so no git is run), with `git` (tests).
+ */
+export async function buildStatus(dir: string, o: { mainRef?: MainRefStatus; checkoutDir?: string | null; git?: GitRunner } = {}): Promise<StatusOutput> {
   const config = loadConfig(dir);
   const reg = readRegistry(dir);
   let serverId: string | null = null;
@@ -203,16 +214,20 @@ export async function buildStatus(dir: string): Promise<StatusOutput> {
   const running = await healthy(config.port);
   const collector = loadEridaniConfig(dir)?.collector ?? null;
   const info = running ? readServerInfo(dir) : null;
+  const diskBuild = loadBuildInfo();
+  // The same choice as doctor: the running server's build, else the one on disk.
+  const mainRef = o.mainRef ?? (await checkMainRef({ sha: info ? info.build.sha : diskBuild.sha, cwd: o.checkoutDir !== undefined ? o.checkoutDir : defaultCheckoutDir(), git: o.git }));
   return {
     version: statusVersion(collector),
     server: {
       serverId, hostname: os.hostname(), configDir: dir, port: config.port, running, epoch: reg?.epoch ?? null, eridani: statusBlock(dir, running), collector,
       build: info ? { ...info.build, pid: info.pid, startedAt: info.startedAt, version: info.version } : null,
-      diskBuild: loadBuildInfo(),
+      diskBuild,
       proto: ERIDANI_PROTO,
       capsVersion: ERIDANI_CAPS_VERSION,
       hooks: hookVersion(defaultHookPaths()),
       ptyKeeper,
+      mainRef,
     },
     groups: groups.map((g) => ({ id: g.id, name: g.name, color: g.color ?? null })),
     sessions,
@@ -237,6 +252,12 @@ export function fmtBuild(s: Pick<StatusOutput['server'], 'build' | 'diskBuild' |
   const disk = !s.build || s.build.sha !== s.diskBuild.sha || s.build.dirty !== s.diskBuild.dirty ? `; on disk ${short(s.diskBuild)}${s.build ? ' (restart to run it)' : ''}` : '';
   const hooks = s.hooks.installed ? `hooks ${s.hooks.installed}${s.hooks.current === false ? ' (stale: run `remotea hooks install`)' : ''}` : 'hooks not installed';
   return `${running}${disk}; proto ${s.proto} caps v${s.capsVersion}; ${hooks}`;
+}
+
+/** One line: the build against origin/main, as `remotea doctor` says it (build.main); the fix follows a warn. */
+export function fmtMainRef(s: Pick<StatusOutput['server'], 'build' | 'diskBuild' | 'mainRef'>): string {
+  const d = describeMainRef(s.mainRef, mainRefSubject(s.build, s.mainRef));
+  return d.level === 'warn' && d.fix ? `${d.summary}: ${d.fix}` : d.summary;
 }
 
 /** POSIX-shell quote one argument for typing into an interactive shell. */
@@ -604,6 +625,7 @@ export async function main(argv: string[]): Promise<number> {
       }
       process.stdout.write(`server ${status.server.running ? 'running' : 'NOT running'} on port ${status.server.port} (${status.server.hostname})\n`);
       process.stdout.write(`${fmtBuild(status.server)}\n`);
+      process.stdout.write(`${fmtMainRef(status.server)}\n`);
       process.stdout.write(`${fmtKeeper(status.server.ptyKeeper)}\n`);
       for (const s of status.sessions) {
         const what = s.agent ? `${s.agent.provider} ${s.agent.sessionId.slice(0, 8)}` : s.cmd ?? 'shell';
