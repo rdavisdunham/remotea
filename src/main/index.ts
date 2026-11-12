@@ -1786,15 +1786,10 @@ app.whenReady().then(() => {
     }
   }
 
-  // Everything wmux writes into ~/.claude and ~/.config/opencode now runs behind
-  // a stored consent decision, and asks for one on first launch (issue #132).
-  //
-  // Placed AFTER the windows exist, for two reasons. The prompt is a modal
-  // dialog, and an ownerless one opens with nothing behind it — a question about
-  // an app the user cannot yet see. And it is deliberately not awaited: startup
-  // must not block on an answer, so the rest of the launch proceeds and the
-  // integration lands whenever the user gets to it.
-  void initAgentIntegration(BrowserWindow.getAllWindows()[0]);
+  // Everything written into ~/.claude and ~/.config/opencode runs behind a
+  // stored decision. Nothing asks for one at launch: it is made in Settings →
+  // Agent integration, and until then nothing is written.
+  void initAgentIntegration();
 
   // `--smoke` (smoke.ts): drive the window just opened, write a result, exit.
   const smoke = parseSmokeArgs(process.argv, process.env);

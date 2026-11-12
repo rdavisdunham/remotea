@@ -49,6 +49,32 @@ describe('chat status and reminders', () => {
     expect(read()).toBe('Session disconnected');
   });
 
+  it('hides the strip for a plain shell and keeps it for anything with something to say', async () => {
+    setLatestRemoteViews(view({ agentState: undefined }));
+    await render();
+    const strip = () => container.querySelector('.chat-status')!;
+    expect(strip().getAttribute('data-quiet')).toBe('true');
+    await act(async () => setLatestRemoteViews(view({ agentState: undefined, chatAttention: { revision: 1, at: Date.now(), kind: 'unread', seenBy: {} } })));
+    expect(strip().hasAttribute('data-quiet')).toBe(false);
+  });
+
+  it('shows the Tea summary across the strip, its age, and opens it on click', async () => {
+    const tea = { title: 'Fix login', summary: 'Repairing the login redirect.', source: 'claude:chat', version: 'v1', sourceAt: 1, generatedAt: Date.now() - 5 * 60_000 };
+    setLatestRemoteViews(view({ agent: { provider: 'claude', sessionId: 'chat' }, tea, teaSourceVersion: 'v1' } as Partial<SessionRecord>));
+    await render();
+    const summary = container.querySelector<HTMLButtonElement>('.chat-status__summary')!;
+    expect(summary.textContent).toBe('Repairing the login redirect.');
+    expect(container.querySelector('.chat-status__age')?.textContent).toBe('5 min ago');
+    await act(async () => summary.click());
+    expect(container.querySelector('.chat-status')?.getAttribute('data-expanded')).toBe('true');
+    // New exchanges since the summary was written: say so instead of an age.
+    await act(async () => setLatestRemoteViews(view({ agent: { provider: 'claude', sessionId: 'chat' }, tea, teaSourceVersion: 'v2' } as Partial<SessionRecord>)));
+    expect(container.querySelector('.chat-status__age')?.textContent).toBe('new activity');
+    // A summary written for an earlier conversation in this terminal is not shown.
+    await act(async () => setLatestRemoteViews(view({ agent: { provider: 'claude', sessionId: 'other' }, tea } as Partial<SessionRecord>)));
+    expect(container.querySelector('.chat-status__summary')).toBeNull();
+  });
+
   it('shows green completion, then orange unread, without auto-reading a reply in the focused pane', async () => {
     await render(); expect(read()).toBe('Working on it…');
     await act(async () => setLatestRemoteViews(view(finish())));

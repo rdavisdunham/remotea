@@ -49,7 +49,7 @@
 
 .command-palette__item--selected {
   background: var(--ui-accent);
-  color: white;
+  color: var(--ui-accent-contrast);
 }
 
 .command-palette__item:hover:not(.command-palette__item--selected) {

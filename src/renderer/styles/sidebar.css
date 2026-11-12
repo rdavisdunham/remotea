@@ -8,7 +8,6 @@
   flex-direction: column;
   height: 100%;
   background: var(--ui-bg-0);
-  border-right: 1px solid rgba(var(--ui-overlay-rgb), 0.06);
   user-select: none;
   overflow: hidden;
   flex-shrink: 0;
@@ -68,7 +67,14 @@
   width: auto;
   border: none;
   border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ui-text-secondary);
 }
+.sidebar__new-plus { font-size: 1.15em; line-height: 1; opacity: 0.8; }
+.sidebar__new-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar__new-caret {
   display: inline-flex;
   align-items: center;
@@ -101,7 +107,7 @@
   position: relative;
   padding: 8px 10px;
   padding-left: 14px;
-  border-radius: 6px;
+  border-radius: var(--ui-radius-m);
   cursor: pointer;
   transition: background-color 0.12s ease, box-shadow 0.12s ease;
 
@@ -125,8 +131,8 @@
    survives being selected. `--fill` below restores the old look for anyone who
    sets sidebarPrefs.activeTabIndicator back to 'solidFill'. */
 .workspace-row--active {
-  background: color-mix(in srgb, var(--row-accent) 14%, var(--ui-bg-3));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--row-accent) 32%, transparent);
+  background: color-mix(in srgb, var(--row-accent) 12%, var(--ui-bg-3));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--row-accent) 22%, transparent);
 }
 
 /* 15% alpha tint for inactive coloured rows. The previous 5% was
@@ -492,7 +498,7 @@
 
 .workspace-context-menu__item:hover {
   background: var(--ui-accent);
-  color: white;
+  color: var(--ui-accent-contrast);
 }
 
 .workspace-context-menu__separator {
@@ -830,7 +836,7 @@
 .sidebar__footer-btn {
   background: none;
   border: none;
-  color: rgba(var(--ui-overlay-rgb), 0.4);
+  color: var(--ui-text-muted);
   cursor: pointer;
   font-size: calc(14px * var(--sidebar-text-scale, 1));
   padding: 4px 8px;
@@ -1694,9 +1700,16 @@
   font-size: calc(10px * var(--sidebar-text-scale, 1));
 }
 .workspace-terminal__status::before {
-  content: '●';
-  margin-right: 5px;
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
 }
+.workspace-terminal__status[data-quiet='true'] { display: none; }
 .workspace-terminal[data-tone='working'] .workspace-terminal__status { color: var(--ui-chat-working); }
 .workspace-terminal[data-tone='waiting'] .workspace-terminal__status { color: var(--ui-agent-blocked); }
 .workspace-terminal[data-tone='ready'] .workspace-terminal__status { color: var(--ui-chat-ready); }
@@ -1709,8 +1722,10 @@
 
 .workspace-terminal__summary {
   font-size: calc(11px * var(--sidebar-text-scale, 1));
-  color: var(--ui-text-secondary);
+  line-height: 1.35;
+  color: var(--ui-text-muted);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }

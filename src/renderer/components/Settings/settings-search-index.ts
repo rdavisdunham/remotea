@@ -284,16 +284,44 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Remove this host from this device? This does not request termination on the host. Open tabs here stop updating; offline process status is unknown."
     },
     {
+      "key": "remote.host.step.install",
+      "label": "On the host (Linux, or WSL on this PC), run"
+    },
+    {
+      "key": "remote.host.step.url",
+      "label": "Add the host here with the URL the installer prints."
+    },
+    {
+      "key": "remote.host.step.token",
+      "label": "Paste the token printed on the host by"
+    },
+    {
       "key": "settings.tab.hosts",
       "label": "Remote hosts"
     },
     {
-      "key": "remote.host.lifetime",
-      "label": "Host terminals run on that machine’s Remotea server and can continue while the desktop is disconnected, if the host and service stay available. WSL on this same PC is still a host; PC sleep or shutdown can stop it. Disconnected process status is unknown. Devices share host sessions; each keeps its own arrangement."
+      "key": "remote.host.intro",
+      "label": "A host is a machine running the Remotea server. Its terminals keep running while this app is closed, and every device you connect shares them."
     },
     {
-      "key": "remote.host.setup",
-      "label": "Server setup (in WSL on the host): run remote-server/scripts/install.sh, then copy its URL and the output of remotea token here. This desktop token differs from Eridani link/MCP credentials and phone pairing."
+      "key": "remote.host.emptyTitle",
+      "label": "Connect your first host"
+    },
+    {
+      "key": "remote.host.tokenNote",
+      "label": "This token is for the desktop app only. Eridani links and phone pairing each use their own."
+    },
+    {
+      "key": "remote.host.add",
+      "label": "Add a host"
+    },
+    {
+      "key": "remote.host.edit",
+      "label": "Edit"
+    },
+    {
+      "key": "remote.host.remove",
+      "label": "Remove"
     },
     {
       "key": "remote.host.notApplied",
@@ -305,23 +333,27 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "remote.host.default",
-      "label": "New terminals open here by default"
-    },
-    {
-      "key": "remote.host.edit",
-      "label": "Edit"
-    },
-    {
-      "key": "remote.host.remove",
-      "label": "Remove"
+      "label": "Open new terminals on this host"
     },
     {
       "key": "remote.host.shellSpec",
-      "label": "Compatibility shell specification for launch profiles and workspaces:"
+      "label": "In launch profiles and workspace files, this host is"
     },
     {
-      "key": "remote.host.add",
-      "label": "Add remote host"
+      "key": "remote.host.or",
+      "label": "or"
+    },
+    {
+      "key": "remote.host.aboutTitle",
+      "label": "How hosts behave"
+    },
+    {
+      "key": "remote.host.lifetime",
+      "label": "Host terminals run on that machine’s Remotea server and can continue while the desktop is disconnected, if the host and service stay available. WSL on this same PC is still a host; PC sleep or shutdown can stop it. Disconnected process status is unknown. Devices share host sessions; each keeps its own arrangement."
+    },
+    {
+      "key": "remote.host.setupTitle",
+      "label": "Setting up another host"
     },
     {
       "key": "remote.host.eridani",

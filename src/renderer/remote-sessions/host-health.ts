@@ -169,7 +169,7 @@ export function tabsHealth(view: RemoteRegistryView | undefined, t: Translator =
     .filter((s) => !closed.has(s.id) && !(s.hiddenBy as string[]).includes(view.deviceId))
     .map((s) => ({
       id: s.id,
-      title: s.title || s.agent?.provider || s.cmd || 'shell',
+      title: s.title || s.tea?.title || s.agent?.provider || s.cmd || (s.lastCwd || s.cwd ? `shell in ${s.lastCwd || s.cwd}` : 'shell'),
       process: processHealth(s, view, t),
       run: runHealth(s, view.connected, t),
     }))

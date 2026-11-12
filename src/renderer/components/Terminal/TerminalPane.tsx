@@ -147,6 +147,7 @@ export default function TerminalPane({
 
   return (
     <div className={`terminal-pane ${focused ? 'terminal-pane--focused' : ''}`}>
+      {surfaceId && <ChatStatus surfaceId={surfaceId} active={focused && visible} />}
       <div className="terminal-pane__viewport">
         <div ref={terminalRef} className="terminal-pane__container" />
         {remoteHostId && <RemoteOverlay hostId={remoteHostId} />}
@@ -176,7 +177,6 @@ export default function TerminalPane({
         <CopyMode active={copyModeActive} />
         {visible && surfaceId && <ResetNotice surfaceId={surfaceId} />}
       </div>
-      {surfaceId && <ChatStatus surfaceId={surfaceId} active={focused && visible} />}
       {remoteHostId && surfaceId && <ManagedControl surfaceId={surfaceId} hostId={remoteHostId} active={focused && visible} onTakenOver={focusAfterTakeover} />}
     </div>
   );

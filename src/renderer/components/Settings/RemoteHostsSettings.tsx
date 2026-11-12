@@ -234,18 +234,31 @@ export default function RemoteHostsSettings() {
     await refreshRemoteHosts();
   };
 
+  const setup = (
+    <ol className="remote-host-steps">
+      <li>{t('remote.host.step.install')} <span className="remote-host-code">remote-server/scripts/install.sh</span></li>
+      <li>{t('remote.host.step.url')}</li>
+      <li>{t('remote.host.step.token')} <span className="remote-host-code">remotea token</span></li>
+    </ol>
+  );
+
   return (
-    <div className="settings-section">
+    <div className="settings-section remote-hosts">
       <h3 className="settings-section-title">{t('settings.tab.hosts')}</h3>
-      <p className="settings-hint">
-        {t('remote.host.lifetime')}
-      </p>
-      <p className="settings-hint">
-        {t('remote.host.setup')}
-      </p>
+      <p className="settings-hint settings-hint--lead">{t('remote.host.intro')}</p>
+
+      {list.length === 0 && editing !== 'new' && (
+        <div className="remote-host-empty">
+          <div className="remote-host-empty__title">{t('remote.host.emptyTitle')}</div>
+          {setup}
+          <p className="settings-hint">{t('remote.host.tokenNote')}</p>
+          <button className="settings-button settings-button--primary" onClick={() => setEditing('new')}>{t('remote.host.add')}</button>
+        </div>
+      )}
 
       {list.map((h) => {
-        const st = status[h.id]?.state ?? 'disabled';
+        const hostStatus = status[h.id];
+        const st = hostStatus?.state ?? 'disabled';
         if (editing === h.id) {
           return (
             <HostEditor key={h.id} hasToken={h.hasToken}
@@ -253,48 +266,65 @@ export default function RemoteHostsSettings() {
               onDone={() => setEditing(null)} />
           );
         }
+        const hostPending = pending.find((p) => p.hostId === h.id);
         return (
-          <div key={h.id} className="remote-host-card">
+          <div key={h.id} className="remote-host-card" data-state={st}>
             <div className="remote-host-card__head">
-              <span className="remote-host-card__name">{h.name}</span>
-              <span className="remote-host-card__url">{h.url}</span>
+              <div className="remote-host-card__identity">
+                <span className="remote-host-card__name">{h.name}</span>
+                <span className="remote-host-card__url">{h.url}</span>
+              </div>
+              <div className="remote-host-card__head-actions">
+                <button className="settings-button" onClick={() => setEditing(h.id)}>{t('remote.host.edit')}</button>
+                <button className="settings-button settings-button--danger" onClick={() => void remove(h.id)}>{t('remote.host.remove')}</button>
+              </div>
             </div>
-            <RemoteHostHealth status={status[h.id]} view={views.find((v) => v.hostId === h.id)} now={now} />
-            <TeaSettings hostId={h.id} connected={st === 'ready'}/>
-            {status[h.id]?.error && st !== 'ready' && (
-              <div className="remote-host-message remote-host-message--error">{status[h.id]?.error}</div>
+            <RemoteHostHealth status={hostStatus} view={views.find((v) => v.hostId === h.id)} now={now} />
+            {hostStatus?.error && st !== 'ready' && (
+              <div className="remote-host-message remote-host-message--error">{hostStatus.error}</div>
             )}
-            {pending.find((p) => p.hostId === h.id) && (
-              <RemotePendingChanges host={pending.find((p) => p.hostId === h.id)!} onForget={forgetPendingChange} />
-            )}
-            {!!status[h.id]?.outbox?.failed.length && (
+            {hostPending && <RemotePendingChanges host={hostPending} onForget={forgetPendingChange} />}
+            {!!hostStatus?.outbox?.failed.length && (
               <div className="remote-host-message remote-host-message--error">
                 {t('remote.host.notApplied')}{' '}
-                {status[h.id]!.outbox!.failed.map((f) => `${OUTBOX_LABEL[f.t]} ${f.id} (${f.state === 'expired' ? 'gave up' : f.error ?? 'refused'})`).join('; ')}
+                {hostStatus.outbox.failed.map((f) => `${OUTBOX_LABEL[f.t]} ${f.id} (${f.state === 'expired' ? 'gave up' : f.error ?? 'refused'})`).join('; ')}
                 {' '}
                 <button className="settings-button" onClick={() => bridge()?.dismissOutboxFailures?.(h.id)}>{t('remote.host.dismiss')}</button>
               </div>
             )}
-            <div className="settings-row">
-              <label className="settings-label">{t('remote.host.default')}</label>
-              <input type="checkbox" className="settings-toggle" checked={defaultHost === h.id}
-                onChange={(e) => setWorkspacePrefs({ defaultShell: e.target.checked ? remoteShellSpec(h.id) : '' })} />
+            <div className="remote-host-card__section">
+              <div className="settings-row">
+                <label className="settings-label" htmlFor={`remote-default-${h.id}`}>
+                  {t('remote.host.default')}
+                  <span className="settings-hint">
+                    {t('remote.host.shellSpec')}{' '}<span className="remote-host-code">{remoteShellSpec(h.id)}</span>
+                    {' '}{t('remote.host.or')}{' '}<span className="remote-host-code">{remoteShellSpec(h.id, 'claude')}</span>
+                  </span>
+                </label>
+                <input id={`remote-default-${h.id}`} type="checkbox" className="settings-toggle" checked={defaultHost === h.id}
+                  onChange={(e) => setWorkspacePrefs({ defaultShell: e.target.checked ? remoteShellSpec(h.id) : '' })} />
+              </div>
             </div>
-            <div className="remote-host-actions">
-              <button className="settings-button" onClick={() => setEditing(h.id)}>{t('remote.host.edit')}</button>
-              <button className="settings-button" onClick={() => void remove(h.id)}>{t('remote.host.remove')}</button>
+            <div className="remote-host-card__section">
+              <TeaSettings hostId={h.id} connected={st === 'ready'}/>
             </div>
-            <p className="settings-hint">
-              {t('remote.host.shellSpec')}{' '}<span className="remote-host-code">{remoteShellSpec(h.id)}</span>
-              {' '}or <span className="remote-host-code">{remoteShellSpec(h.id, 'claude')}</span>
-            </p>
           </div>
         );
       })}
 
       {editing === 'new'
         ? <HostEditor initial={EMPTY} hasToken={false} onDone={() => setEditing(null)} />
-        : <button className="settings-button" onClick={() => setEditing('new')}>{t('remote.host.add')}</button>}
+        : list.length > 0 && <button className="settings-button" onClick={() => setEditing('new')}>{t('remote.host.add')}</button>}
+
+      <details className="remote-host-about">
+        <summary>{t('remote.host.aboutTitle')}</summary>
+        <p className="settings-hint">{t('remote.host.lifetime')}</p>
+        {list.length > 0 && <>
+          <p className="settings-hint remote-host-about__sub">{t('remote.host.setupTitle')}</p>
+          {setup}
+        </>}
+        <p className="settings-hint">{t('remote.host.tokenNote')}</p>
+      </details>
       <div className="settings-divider" />
       <h3 className="settings-section-title">{t('remote.host.eridani')}</h3>
       <div className="settings-row">

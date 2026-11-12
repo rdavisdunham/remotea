@@ -4,6 +4,7 @@ import type { SplitNode, SurfaceRef, WorkspaceInfo } from '../../../shared/types
 import { useStore } from '../../store';
 import { useT } from '../../i18n';
 import { chatActivityState, markChatRead, useChatAttention, useLocalChatAttention } from '../../remote-sessions/chat-attention';
+import { terminalInsight } from '../../remote-sessions/insight';
 import { useRemoteRegistry } from '../../remote-sessions/registry-cache';
 import { chatIsUnread } from '../../../shared/chat-attention';
 import { surfaceAgentState } from '../../store/agent-rollup';
@@ -41,16 +42,14 @@ function TerminalRow({
 }) {
   const t = useT();
   const agentLabel = useStore(state => state.agentMeta.get(surface.id)?.label);
-  const { host, session, state, unread, status } = useChatAttention(surface.id, reportedState(sessionControl));
+  const { host, session, state, unread, status, hasHarness } = useChatAttention(surface.id, reportedState(sessionControl));
   const uiMode = useStore(state => state.appearancePrefs.uiMode);
   const label = getSurfaceLabel(surface, agentLabel, workspace.shell, t, oscTitle);
   const activityLabel = sessionControl?.answerPending || (state === 'working' && sessionControl?.working)
     ? activityDetail || status.label : status.label;
   const statusLabel = `${activityLabel}${host && !host.connected ? ' · offline' : ''}`;
-  const insight = !session?.agent || session.tea?.source === `${session.agent.provider}:${session.agent.sessionId}` ? session?.tea : undefined;
-  const summary = host?.tea?.config.summaries === false ? undefined : insight?.summary || (host?.tea?.config.enabled && !session?.agent ? `Shell in ${session?.lastCwd || session?.cwd || surface.cwd || 'its current directory'}` : undefined);
-  const stale = !!insight && insight.version !== session?.teaSourceVersion;
-  const detail = [label, summary, stale ? 'New exchanges since this summary' : undefined, insight ? `Summary generated ${new Date(insight.generatedAt).toLocaleString()}` : undefined, statusLabel, activityDetail, session?.agentState?.reason, surface.currentCwd || surface.cwd].filter(Boolean).join('\n');
+  const { summary, stale, generatedAt } = terminalInsight(host, session, surface.cwd);
+  const detail = [label, summary, stale ? 'New exchanges since this summary' : undefined, generatedAt ? `Summary generated ${new Date(generatedAt).toLocaleString()}` : undefined, statusLabel, activityDetail, session?.agentState?.reason, surface.currentCwd || surface.cwd].filter(Boolean).join('\n');
   return <div className="workspace-terminal-entry">
     <button
     type="button"
@@ -71,7 +70,8 @@ function TerminalRow({
     <span className="workspace-terminal__content">
       <span className="workspace-terminal__name">{label}</span>
       {!compact && summary && <span className="workspace-terminal__summary">{summary}{stale ? ' · recent activity' : ''}</span>}
-      <span className="workspace-terminal__status">{statusLabel}</span>
+      {/* A plain shell has no state worth a line of its own; the tooltip keeps it. */}
+      <span className="workspace-terminal__status" data-quiet={!hasHarness && status.tone === 'idle' && !unread && session?.state !== 'lost' && !(host && !host.connected) ? 'true' : undefined}>{statusLabel}</span>
     </span>
     {unread && <span className="workspace-terminal__unread" role="img" aria-label="Unread">●</span>}
     </button>

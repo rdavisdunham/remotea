@@ -130,7 +130,7 @@
 
 .tutorial-btn--primary {
   background: var(--ui-accent);
-  color: white;
+  color: var(--ui-accent-contrast);
 }
 
 .tutorial-btn--primary:hover {

@@ -123,7 +123,8 @@ export default function NewWorkspaceButton({
   return (
     <div ref={groupRef} className="sidebar__new-group">
       <button className="sidebar__new-btn" onClick={onCreate} title={t('sidebar.newWorkspace', 'New workspace')}>
-        +
+        <span className="sidebar__new-plus" aria-hidden="true">+</span>
+        <span className="sidebar__new-label">{t('sidebar.newWorkspace', 'New workspace')}</span>
       </button>
       <button
         ref={caretRef}

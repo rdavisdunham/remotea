@@ -565,7 +565,7 @@
 .changelog__badge {
   background: var(--ui-accent);
   border-radius: 3px;
-  color: #fff;
+  color: var(--ui-accent-contrast);
   font-size: 9px;
   letter-spacing: .02em;
   padding: 1px 4px;

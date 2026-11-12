@@ -55,8 +55,8 @@ const ACCENT_LITERAL = /#0091ff|rgba\(\s*0,\s*145,\s*255/i;
 describe('accent token', () => {
   it('is defined for both themes in theme-vars.css', () => {
     const css = fs.readFileSync(THEME_VARS, 'utf-8');
-    expect(css).toMatch(/:root\s*\{[\s\S]*--ui-accent:\s*#0091ff/);
-    expect(css).toMatch(/\[data-ui-theme='light'\][\s\S]*--ui-accent:\s*#0067c0/);
+    expect(css).toMatch(/:root\s*\{[\s\S]*--ui-accent:\s*#6aa5ff/);
+    expect(css).toMatch(/\[data-ui-theme='light'\][\s\S]*--ui-accent:\s*#1f5fbf/);
   });
 
   // A sweep that rewrites `#0091ff` -> `var(--ui-accent)` across every stylesheet
