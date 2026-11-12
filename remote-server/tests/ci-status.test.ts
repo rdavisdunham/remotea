@@ -16,7 +16,7 @@ import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { commandShapeError, parseUpFrame, STAGE_F_CAPS, type UpFrame } from '../../src/shared/eridani-link-protocol';
-import { ciFolder, ciStatus, logTail, type Exec, type ExecResult } from '../src/ci-status';
+import { ciFolder, ciStatus, execGh, logTail, type Exec, type ExecResult } from '../src/ci-status';
 import { saveEridaniConfig, writeEridaniToken } from '../src/config';
 import { EridaniRuntime } from '../src/eridani-runtime';
 import { saveTarget } from '../src/eridani-targets';
@@ -276,6 +276,25 @@ describe('ci.status on the link', () => {
     expect(calls[0]).toEqual(['gh', 'pr', 'view', 'eri/task-1', ...VIEW]);
     expect(calls.every((c) => c.length > 1)).toBe(true);
     expect(fs.existsSync(path.join(worktreeRoot, 'eri--task-1'))).toBe(true);
+  });
+
+  it('run.changes is advertised and answers from the branch worktree; no worktree fails with the reason', async () => {
+    const { eri, worktreeRoot } = await runtime(execGh);
+    expect((eri.frames.find((f) => f.t === 'hello') as unknown as { caps: string[] }).caps).toContain('run.changes');
+    const wt = path.join(worktreeRoot, 'eri--task-1');
+    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false', ...args], { cwd: wt });
+    git('init', '-q', '-b', 'main');
+    fs.writeFileSync(path.join(wt, 'a.txt'), 'one\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'base');
+    git('checkout', '-q', '-b', 'eri/task-1');
+    fs.writeFileSync(path.join(wt, 'a.txt'), 'one\ntwo\n');
+    eri.send({ t: 'run.changes', op_id: 'op-ch-1', run_id: 'run-1', generation: 1, branch: 'eri/task-1', target: 'proj', turn_seq: 3, expires_at: Date.now() + 60_000 });
+    await until(() => !!eri.outcome('op-ch-1'));
+    expect(eri.outcome('op-ch-1')).toMatchObject({ state: 'executed', kind: 'run.changes', result: { base_ref: 'main', files: [{ path: 'a.txt', added: 1, removed: 0 }], uncommitted: true, patch: expect.stringContaining('+two') } });
+    eri.send({ t: 'run.changes', op_id: 'op-ch-2', run_id: 'run-1', generation: 1, branch: 'eri/elsewhere', target: 'proj', expires_at: Date.now() + 60_000 });
+    await until(() => !!eri.outcome('op-ch-2'));
+    expect(eri.outcome('op-ch-2')).toMatchObject({ state: 'failed', detail: 'no worktree for eri/elsewhere on this host' });
   });
 
   it('a branch with no worktree on this host fails with the reason, without running gh', async () => {

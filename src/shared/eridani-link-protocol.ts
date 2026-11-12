@@ -114,6 +114,8 @@ export type LinkCap =
   | 'terminal.focus'
   // The host takes `ci.status`: GitHub CI's view of a run's pull request (gh pr view/checks, failed-job log tails).
   | 'ci.status'
+  // The host takes `run.changes`: the files and patch of a run's worktree against its base (the judge's evidence).
+  | 'run.changes'
   // The host takes `pr.merge` and `pr.update_branch`: Eridani's Merge and Update branch buttons, done with its gh.
   | 'pr.merge' | 'pr.update_branch'
   // The host takes `spawn`'s `resume_session_id` (Restart run): a Claude spawn continues that conversation (`claude --resume`) when its
@@ -150,6 +152,7 @@ export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...
 /** Stage F: everything in D, plus `digest`, `context.scope`, live `prompt` frames, `worktrees.scan`, `terminal.focus`, the `doctor` summary, `run.reopen` and `spawn.resume`. */
 export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status', 'pr.merge', 'pr.update_branch', 'run.reopen',
   'spawn.resume',
+  'run.changes',
 ]);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
@@ -1072,6 +1075,30 @@ export interface CiStatusCommand extends OpFields {
 }
 
 /**
+ * What the run changed (run-changes.ts), read with `git` in the branch's
+ * worktree: `executed` with `result {head, base_ref, base_sha, files: [{path,
+ * added, removed}], files_total, untracked, untracked_total, uncommitted,
+ * patch, patch_truncated, patch_chars}`. The patch is the working tree
+ * against the merge base with `base` (the target's base branch when left
+ * out), lock files left out, secrets redacted, cut at `max_chars`
+ * (1,000..200,000, default 60,000). `failed` with the reason when the
+ * worktree is gone or git cannot answer. Read-only and short-lived:
+ * `expires_at` is required.
+ */
+export interface RunChangesCommand extends OpFields {
+  t: 'run.changes';
+  run_id: string;
+  generation: number;
+  branch: string;
+  base?: string | null;
+  turn_seq?: number | null;
+  max_chars?: number;
+  /** The host's execution target id: only its worktree of the branch is read. */
+  target?: string | null;
+  expires_at: number | string;
+}
+
+/**
  * Merge the run's pull request (Eridani's Merge button, or auto-merge), with
  * the host's logged-in `gh`, only if its head is still `head_sha` (the commit
  * Eridani saw CI pass on): `executed` with `result` = `{merged: true, already,
@@ -1483,6 +1510,16 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       if (!isStr(m.branch, 200) || !/^(?!-)[A-Za-z0-9._/-]+$/.test(m.branch) || m.branch.includes('..')) return 'bad branch';
       if (m.turn_seq !== undefined && m.turn_seq !== null && !isInt(m.turn_seq)) return 'bad turn_seq';
       if (m.log_lines !== undefined && !(isInt(m.log_lines) && m.log_lines >= 0 && m.log_lines <= 200)) return 'bad log_lines';
+      if (m.target !== undefined && m.target !== null && !(isStr(m.target, 64) && /^[A-Za-z0-9._-]+$/.test(m.target))) return 'bad target';
+      return null;
+    case 'run.changes':
+      // Read-only and short-lived: an answer nobody waits for any more is refused.
+      if (m.expires_at === undefined) return 'expires_at required';
+      if (!isStr(m.run_id, 128) || !isInt(m.generation)) return 'bad fence';
+      if (!isStr(m.branch, 200) || !/^(?!-)[A-Za-z0-9._/-]+$/.test(m.branch) || m.branch.includes('..')) return 'bad branch';
+      if (m.base !== undefined && m.base !== null && !(isStr(m.base, 200) && /^(?!-)[A-Za-z0-9._/-]+$/.test(m.base) && !m.base.includes('..'))) return 'bad base';
+      if (m.turn_seq !== undefined && m.turn_seq !== null && !isInt(m.turn_seq)) return 'bad turn_seq';
+      if (m.max_chars !== undefined && !(isInt(m.max_chars) && m.max_chars >= 1000 && m.max_chars <= 200000)) return 'bad max_chars';
       if (m.target !== undefined && m.target !== null && !(isStr(m.target, 64) && /^[A-Za-z0-9._-]+$/.test(m.target))) return 'bad target';
       return null;
     case 'pr.merge':
