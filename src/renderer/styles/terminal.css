@@ -274,6 +274,7 @@
   border-radius: 50%;
   background: currentColor;
 }
+.chat-status__label[data-plain='true'] { display: none; }
 .chat-status[data-tone='working'] .chat-status__label { color: var(--ui-chat-working); background: color-mix(in srgb, var(--ui-chat-working) 13%, transparent); }
 .chat-status[data-tone='waiting'] .chat-status__label { color: var(--ui-agent-blocked); background: rgba(var(--ui-agent-blocked-rgb), 0.14); }
 .chat-status[data-tone='ready'] .chat-status__label { color: var(--ui-chat-ready); background: color-mix(in srgb, var(--ui-chat-ready) 12%, transparent); }

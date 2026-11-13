@@ -1,3 +1,4 @@
+import { toggleTea } from '../Tea/tea-events';
 import React, { useState, useCallback, useEffect, useId } from 'react';
 import { WorkspaceInfo, WorkspaceId, PaneId } from '../../../shared/types';
 import WorkspaceRow from './WorkspaceRow';
@@ -21,7 +22,6 @@ import { useT } from '../../i18n';
 import { getStoredWorkspaceLabel } from '../SplitPane/use-osc-title';
 import '../../styles/sidebar.css';
 import '../../styles/trace.css';
-const TeaPanel = React.lazy(() => import('../Tea/TeaPanel'));
 
 interface ContextMenuState {
   x: number;
@@ -57,7 +57,6 @@ interface SidebarProps {
   onOpenAgentNavigator?: () => void;
   /** remotea: open Settings → Remote hosts (the host attention row's "unconfirmed" chip). */
   onOpenHostSettings?: () => void;
-  onOpenTeaSettings?: (hostId?: string) => void;
 }
 
 export default function Sidebar({
@@ -83,7 +82,6 @@ export default function Sidebar({
   onFocusAgent,
   onOpenAgentNavigator,
   onOpenHostSettings,
-  onOpenTeaSettings,
 }: SidebarProps) {
   const t = useT();
   const textScale = useStore((s) => sidebarTextScale(s.sidebarPrefs.textScale));
@@ -92,7 +90,6 @@ export default function Sidebar({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [sessionMenuMode, setSessionMenuMode] = useState<'load' | 'save' | null>(null);
   const [showWorktreeModal, setShowWorktreeModal] = useState(false);
-  const [teaOpen, setTeaOpen] = useState(false);
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const manualWorkspaces = workspaces.filter((workspace) => !workspace.eridaniTask);
   const eridaniWorkspaces = workspaces.filter((workspace) => workspace.eridaniTask);
@@ -433,7 +430,10 @@ export default function Sidebar({
       )}
 
       <div className="sidebar__footer">
-        <button type="button" className="sidebar__footer-btn" title="Tea assistant" aria-label="Open Tea assistant" onClick={() => setTeaOpen(value => !value)}>Tea</button>
+        <button type="button" className="sidebar__footer-btn sidebar__footer-btn--tea" title="Ask Tea about your terminals" aria-label="Open Tea assistant" onClick={toggleTea}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 6.5h8.5v3a4 4 0 0 1-4 4H6.5a4 4 0 0 1-4-4v-3z"/><path d="M11 7.5h1a1.75 1.75 0 0 1 0 3.5h-1.2"/><path d="M5 2.2c-.6.8.6 1.3 0 2.1M8 2.2c-.6.8.6 1.3 0 2.1"/></svg>
+          <span>Tea</span>
+        </button>
         <button
           className="sidebar__footer-btn"
           onClick={() => setSessionMenuMode(sessionMenuMode === 'save' ? null : 'save')}
@@ -468,7 +468,6 @@ export default function Sidebar({
       </div>
 
       <SidebarResizeHandle onWidthChange={handleResizeDelta} />
-      {teaOpen && <React.Suspense fallback={null}><TeaPanel onClose={() => setTeaOpen(false)} onSettings={onOpenTeaSettings}/></React.Suspense>}
 
       {contextMenu && (
         <WorkspaceContextMenu

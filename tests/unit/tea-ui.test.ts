@@ -459,6 +459,9 @@ describe('Tea conversation panel', () => {
     setLatestRemoteViews([current]);
     try {
       act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
+      // The reply names the terminal; its ID is for Tea, not for the reader.
+      expect(document.querySelector('.tea-message--assistant p')?.textContent)
+        .toBe('Here is Fixture terminal.');
       await act(async () => button('Open Fixture terminal').click());
       expect(useTerminalHighlight.getState().surfaceId).toBe('surf-fixture');
     } finally {

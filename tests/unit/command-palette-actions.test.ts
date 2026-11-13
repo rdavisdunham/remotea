@@ -123,9 +123,9 @@ describe('command palette executable choices', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('keeps keyboard selection visible across the ten-row boundary and executes that row', async () => {
+  it('lists every choice, moves selection past the tenth row and executes that row', async () => {
     const { onAction } = await renderPalette();
-    expect(container.querySelectorAll('.command-palette__item')).toHaveLength(10);
+    expect(container.querySelectorAll('.command-palette__item').length).toBeGreaterThan(12);
     for (let index = 0; index < 12; index++) {
       key('ArrowDown');
       expect(container.querySelectorAll('.command-palette__item--selected')).toHaveLength(1);
@@ -140,5 +140,33 @@ describe('command palette executable choices', () => {
     key('Enter');
     expect(onAction).toHaveBeenCalledExactlyOnceWith(mouseAction);
     expect(container.querySelector('.command-palette__item--selected')?.textContent).toContain(label);
+  });
+
+  it('jumps to a terminal in another workspace by its name', async () => {
+    useStore.setState({
+      workspaces: [{
+        id: 'ws-fixture', title: 'Fixture workspace', pinned: false, shell: 'bash', unreadCount: 0,
+        splitTree: {
+          type: 'leaf', paneId: 'pane-fixture', activeSurfaceIndex: 0,
+          surfaces: [{ id: 'surf-fixture', type: 'terminal', customTitle: 'Billing export fix' }],
+        },
+      }] as never,
+    });
+    const focused = vi.fn();
+    document.addEventListener('wmux:focus-surface', focused);
+    try {
+      const { onClose } = await renderPalette();
+      search('billing');
+      const first = container.querySelector('.command-palette__item')!;
+      expect(first.textContent).toContain('Billing export fix');
+      expect(first.textContent).toContain('Fixture workspace');
+      expect(container.querySelector('.command-palette__group-title')?.textContent).toBe('Terminals');
+      key('Enter');
+      expect(focused).toHaveBeenCalledOnce();
+      expect((focused.mock.calls[0][0] as CustomEvent).detail).toEqual({ workspaceId: 'ws-fixture', surfaceId: 'surf-fixture' });
+      expect(onClose).toHaveBeenCalledOnce();
+    } finally {
+      document.removeEventListener('wmux:focus-surface', focused);
+    }
   });
 });

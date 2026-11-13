@@ -842,6 +842,13 @@
   padding: 4px 8px;
   border-radius: 4px;
 }
+.sidebar__footer-btn--tea {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(12px * var(--sidebar-text-scale, 1));
+  vertical-align: middle;
+}
 .sidebar__footer-btn:hover {
   color: rgba(var(--ui-overlay-rgb), 0.8);
   background: rgba(var(--ui-overlay-rgb), 0.06);

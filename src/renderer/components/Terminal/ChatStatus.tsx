@@ -48,7 +48,8 @@ export default function ChatStatus({ surfaceId, active }: { surfaceId: string; a
   const quiet = !hasHarness && !summary && !unread && !reminder && !error && session?.state !== 'lost';
   const freshness = !generatedAt ? '' : stale ? 'New activity since this summary' : `Summarized ${insightAge(generatedAt, now)}`;
   return <div ref={root} className="chat-status" data-tone={status.tone} data-quiet={quiet ? 'true' : undefined} data-expanded={expanded ? 'true' : undefined}>
-    <span className="chat-status__label" role="status" title={session?.agentState?.reason}>{status.label}{host && !host.connected ? ' · offline' : ''}</span>
+    {/* A plain shell has no agent state to report; its summary stands alone. */}
+    <span className="chat-status__label" role="status" data-plain={!hasHarness && status.tone === 'idle' && session?.state !== 'lost' && !(host && !host.connected) ? 'true' : undefined} title={session?.agentState?.reason}>{status.label}{host && !host.connected ? ' · offline' : ''}</span>
     {summary
       ? <button
           type="button"
