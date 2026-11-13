@@ -75,7 +75,7 @@ export function useChatAttention(surfaceId: string, reportedState?: AgentStateNa
   const status = session?.state === 'lost'
     ? { tone: 'idle', label: 'Session disconnected' }
     : chatStatus(state, unread, attention?.kind, justFinished, hasHarness);
-  return { host, session, state, attention, unread, status };
+  return { host, session, state, attention, unread, status, hasHarness };
 }
 
 export async function actOnChat(surfaceId: string, action: ChatAttentionAction): Promise<{ ok: boolean; error?: string }> {

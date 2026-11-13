@@ -6,27 +6,46 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: var(--ui-bg-2);
+  background: var(--ui-bg-1);
+  border-left: 1px solid var(--ui-border);
 }
 
 .explorer-panel__header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  min-height: 34px;
-  background: var(--ui-bg-3);
+  gap: 2px;
+  padding: 4px 6px 4px 12px;
+  min-height: 36px;
+  border-bottom: 1px solid var(--ui-border);
   flex-shrink: 0;
 }
 
+/* The folder is the name of this panel; where it lives is a caption. */
 .explorer-panel__root {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.explorer-panel__folder {
+  font-family: var(--ui-font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ui-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(var(--ui-overlay-rgb),0.8);
+}
+
+.explorer-panel__where {
+  font-size: 11px;
+  color: var(--ui-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 2;
 }
 
 .explorer-panel__action {
@@ -37,16 +56,26 @@
   justify-content: center;
   border: none;
   background: transparent;
-  color: rgba(var(--ui-overlay-rgb),0.6);
-  border-radius: 8px;
+  color: var(--ui-text-muted);
+  border-radius: var(--ui-radius-s);
   cursor: pointer;
-  font-size: 14px;
   flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
 }
 
 .explorer-panel__action:hover {
   background: rgba(var(--ui-overlay-rgb),0.08);
-  color: rgba(var(--ui-overlay-rgb),0.9);
+  color: var(--ui-text-primary);
+}
+
+.explorer-panel__action:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -2px;
+}
+
+.explorer-panel__action--on {
+  color: var(--ui-accent);
+  background: rgba(var(--ui-accent-rgb), 0.14);
 }
 
 .explorer-panel__body {
@@ -55,25 +84,33 @@
 }
 
 .explorer-panel__message {
-  padding: 12px;
+  padding: 12px 14px;
   font-size: 12px;
-  color: rgba(var(--ui-overlay-rgb),0.5);
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+}
+
+.explorer-panel__message--empty {
+  padding-top: 28px;
+  text-align: center;
 }
 
 .explorer-tree {
   display: flex;
   flex-direction: column;
-  padding: 4px 0;
+  padding: 6px;
 }
 
 .explorer-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 22px;
+  gap: 5px;
+  height: 24px;
+  flex-shrink: 0;
   padding-right: 8px;
-  font-size: 12px;
-  color: rgba(var(--ui-overlay-rgb),0.85);
+  border-radius: var(--ui-radius-s);
+  font-size: 12.5px;
+  color: var(--ui-text-secondary);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -82,10 +119,13 @@
 
 .explorer-row:hover {
   background: rgba(var(--ui-overlay-rgb),0.06);
+  color: var(--ui-text-primary);
 }
 
-.explorer-row--selected {
-  background: rgba(var(--ui-overlay-rgb),0.12);
+.explorer-row--selected,
+.explorer-row--selected:hover {
+  background: rgba(var(--ui-accent-rgb), 0.16);
+  color: var(--ui-text-primary);
 }
 
 .explorer-row--dimmed { opacity: 0.45; }
@@ -100,11 +140,26 @@
 }
 
 .explorer-row__chevron {
-  width: 12px;
+  width: 10px;
+  height: 10px;
   flex-shrink: 0;
-  text-align: center;
-  color: rgba(var(--ui-overlay-rgb),0.5);
-  font-size: 10px;
+  display: flex;
+  color: var(--ui-text-muted);
+  transition: transform 0.12s ease;
+}
+
+.explorer-row__chevron--open { transform: rotate(90deg); }
+
+.explorer-row__icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--ui-text-muted);
+}
+
+.explorer-row__icon--dir { color: var(--ui-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .explorer-row__chevron { transition: none; }
 }
 
 .explorer-row__name {
@@ -128,7 +183,8 @@
   display: flex;
   gap: 4px;
   flex-shrink: 0;
-  font-size: 10px;
+  font-family: var(--ui-font-mono);
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   /* Numbers align in a column even at different widths, so the eye can compare
      magnitudes down the tree instead of re-reading each row. */
@@ -151,7 +207,7 @@
 /* A changed row's name lifts out of the dimmed default, so "what moved" is
    legible at a glance without the numbers having to be read. */
 .explorer-row--changed .explorer-row__name {
-  color: rgba(var(--ui-overlay-rgb), 1);
+  color: var(--ui-text-primary);
 }
 
 /* Agent attribution. Small, and in the accent colour rather than either diff
@@ -161,7 +217,7 @@
   flex-shrink: 0;
   font-size: 8px;
   line-height: 1;
-  color: var(--accent, #58a6ff);
+  color: var(--ui-accent);
 }
 
 /* ─── Totals bar ─────────────────────────────────────────────────────────── */
@@ -169,11 +225,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px;
-  font-size: 10px;
-  background: var(--ui-bg-2);
-  border-bottom: 1px solid rgba(var(--ui-overlay-rgb), 0.08);
-  color: rgba(var(--ui-overlay-rgb), 0.55);
+  padding: 5px 12px;
+  font-size: 11px;
+  background: transparent;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
   flex-shrink: 0;
 }
 
@@ -182,7 +238,7 @@
 button.explorer-panel__diffbar {
   width: 100%;
   border: none;
-  border-bottom: 1px solid rgba(var(--ui-overlay-rgb), 0.08);
+  border-bottom: 1px solid var(--ui-border);
   font-family: inherit;
   text-align: left;
   cursor: pointer;

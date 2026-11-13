@@ -39,8 +39,8 @@ export default function SettingsScope({ section }: { section: SettingsSection })
 
   return (
     <div className="settings-scope">
-      <p>{t(SECTION_SCOPE_KEYS[section])}</p>
-      <details>
+      <p className="settings-scope__lead">{t(SECTION_SCOPE_KEYS[section])}</p>
+      <details className="settings-scope__more">
         <summary>{t('settings.alignment.scopeDetails')}</summary>
         {effective ? (
           <>

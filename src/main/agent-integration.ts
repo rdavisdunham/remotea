@@ -104,7 +104,7 @@ const ALL_ON: Record<IntegrationFeature, boolean> = {
 
 export const DEFAULT_CONSENT: IntegrationConsent = { decision: 'unset', features: { ...ALL_ON } };
 
-/** Exact disclosure shown before wmux writes outside its own data directory. */
+/** Every file the local integration edits outside remotea's own data directory. */
 export const INTEGRATION_CONSENT_DETAIL =
   'remotea can teach your coding agents to drive its browser panel, markdown views ' +
   'and sidebar status. Doing so edits files in your home directory:\n\n' +
@@ -132,9 +132,9 @@ export const INTEGRATION_CONSENT_DETAIL =
   '      the remotea orchestrator plugin for OpenCode\n' +
   '  • ~/.claude/settings.json\n' +
   '      a pinned chrome-devtools-mcp pointed at the browser panel instead of its own Chrome\n\n' +
-  '"Not now" asks again next launch. "Never" writes nothing and removes anything ' +
-  'a previous version added. You can change this any time, feature by feature, ' +
-  'in Settings → General.';
+  'Nothing is written until this is turned on. Turning it off removes anything ' +
+  'remotea added. You can change this any time, feature by feature, ' +
+  'in Settings → Agent integration.';
 
 /**
  * Normalise whatever is on disk into a usable consent record.
@@ -239,65 +239,22 @@ export function applyConsent(consent: IntegrationConsent): void {
 }
 
 /**
- * The first-run prompt. Returns the decision the user made, or `null` when
- * asking was not possible (no Electron, or a dialog that failed) — in which case
- * the caller leaves the decision `unset` and asks again next launch rather than
- * assuming an answer.
+ * Startup entry point: apply the standing decision, if there is one.
  *
- * Deliberately enumerates the exact paths. "wmux would like to integrate with
- * Claude Code" is not consent; naming every file it will edit is.
+ * remotea does not ask at launch. Agents on a remote host are set up by that
+ * host's server, which the app offers once it is connected (RemoteHooksPrompt).
+ * This local integration, inherited from wmux, edits files in the home
+ * directory of the computer the app runs on, so it stays off until someone
+ * turns it on in Settings → Agent integration. `unset` writes nothing and
+ * removes nothing.
  */
-export async function promptForConsent(parent?: Electron.BrowserWindow): Promise<IntegrationDecision | null> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { dialog } = require('electron') as typeof import('electron');
-    const options: Electron.MessageBoxOptions = {
-      type: 'question',
-      buttons: ['Enable integration', 'Not now', 'Never'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'remotea — agent integration',
-      message: 'Let wmux set up Claude Code, Qwen Code, OpenCode, Kiro, omp, pi and Grok?',
-      detail: INTEGRATION_CONSENT_DETAIL,
-      noLink: true,
-    };
-    // Parent it to the app window when there is one, so the question arrives
-    // attached to the thing it is asking about rather than as a stray dialog.
-    const result = parent && !parent.isDestroyed()
-      ? await dialog.showMessageBox(parent, options)
-      : await dialog.showMessageBox(options);
-    if (result.response === 0) return 'granted';
-    if (result.response === 2) return 'declined';
-    return null; // "Not now" — leave it unset and ask again next launch
-  } catch (err) {
-    console.warn('[remotea] Could not ask about agent integration:', err);
-    return null;
-  }
-}
-
-/**
- * Startup entry point: apply the standing decision, and ask for one if there
- * isn't any.
- *
- * The `unset` case is the interesting one. An install that predates this gate
- * already HAS every integration written — silently, which is the bug — so on
- * first launch of 0.40.0 there is no honest default. Asking is the answer, and
- * until it is answered nothing further is written; if the user says Never, the
- * removal path takes back what the older version put there.
- */
-export async function initAgentIntegration(parent?: Electron.BrowserWindow): Promise<IntegrationConsent> {
-  let consent = readConsent();
+export async function initAgentIntegration(): Promise<IntegrationConsent> {
+  const consent = readConsent();
   // remotea: a test or scripted instance must neither ask nor reconcile. The
   // files this manages (~/.claude/settings.json, CLAUDE.md, …) are shared by
   // every instance on the machine, so even a "declined" here would strip the
   // hooks a real install put there.
   if (process.env.REMOTEA_SKIP_AGENT_INTEGRATION === '1') return consent;
-  if (consent.decision === 'unset') {
-    const decision = await promptForConsent(parent);
-    if (decision === null) return consent; // ask again next launch
-    consent = { decision, features: { ...consent.features }, decidedAt: Date.now() };
-    if (!writeConsent(consent)) return readConsent();
-  }
   applyConsent(consent);
   return consent;
 }

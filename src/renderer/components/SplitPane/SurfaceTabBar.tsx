@@ -3,6 +3,7 @@ import { executionLocationText } from '../../utils/execution-location-text';
 import { decodeLaunch } from '../../../shared/execution-location';
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import { hideRemoteSurface, isRemoteSurface } from '../../remote-sessions/sync';
+import { useRemoteHosts } from '../../remote-sessions/status';
 import { latestRemoteViews, subscribeRemoteViews } from '../../remote-sessions/registry-cache';
 import { eridaniLinkForSurface, eridaniTabTitle, type EridaniTabLink } from '../../../shared/eridani-deep-link';
 import { createPortal } from 'react-dom';
@@ -154,6 +155,7 @@ export default function SurfaceTabBar({
   // remotea: a tab Eridani started links back to its run (the server records
   // Eridani's web URL on the session's binding). Re-renders on every registry push.
   const remoteViews = useSyncExternalStore(subscribeRemoteViews, latestRemoteViews);
+  const hostRecords = useRemoteHosts((state) => state.hosts);
   const eridaniLink = (surfaceId: string): EridaniTabLink | null => eridaniLinkForSurface(remoteViews, surfaceId);
   const chatAttentionFor = (id: string) => {
     const host = remoteViews?.find(v => v.sessions.some(s => s.id === id));
@@ -399,6 +401,11 @@ export default function SurfaceTabBar({
           const currentState = chatActivityState(serverSession, tabAgentState(surface.id) ?? undefined);
           const agentState = currentState === 'needs_you' ? 'blocked' : currentState;
           const chat = chatAttentionFor(surface.id);
+          const tabLabel = getSurfaceLabel(surface, agentMeta?.label, workspaceShell, t, oscTitleFor(surface.id));
+          // The name leads. Where the tab runs is a short tag after it, and
+          // only for a host: "this computer" is the unmarked case.
+          const hostTag = (surface.type === 'terminal' || surface.type === 'code') && tabLocation.kind === 'remote'
+            ? hostRecords[tabLocation.hostId]?.name ?? tabLocation.hostId : null;
           return (
             <div
               key={surface.id}
@@ -412,7 +419,7 @@ export default function SurfaceTabBar({
               ].filter(Boolean).join(' ')}
               data-chat-unread={chat.unread ? "true" : undefined}
               data-agent-state={agentState ?? undefined}
-              title={`${surface.type === 'browser' ? t('execution.browser') : executionLocationText(t, tabLocation)}${surface.currentCwd || surface.cwd ? ` · ${surface.currentCwd || surface.cwd}` : ''}`}
+              title={[tabLabel, `${surface.type === 'browser' ? t('execution.browser') : executionLocationText(t, tabLocation, hostRecords)}${surface.currentCwd || surface.cwd ? ` · ${surface.currentCwd || surface.cwd}` : ''}`].join('\n')}
               role="tab"
               aria-selected={isActive}
               onClick={() => { markChatRead(surface.id); onSelect(index); }}
@@ -464,7 +471,6 @@ export default function SurfaceTabBar({
             >
               {chat.unread && <span className="chat-unread-dot" title="Unread chat" aria-label="Unread chat">●</span>}
               <span className="surface-tab__icon">{surfaceIcon(surface.type, isAgent)}</span>
-              {(surface.type === 'terminal' || surface.type === 'code') && <small className="surface-tab__location">{executionLocationText(t, tabLocation)}</small>}
               {isRenaming ? (
                 <input
                   ref={renameInputRef}
@@ -478,13 +484,14 @@ export default function SurfaceTabBar({
                   }}
                   onBlur={commitRename}
                   onClick={(e) => e.stopPropagation()}
-                  placeholder={getSurfaceLabel(surface, agentMeta?.label, workspaceShell, t, oscTitleFor(surface.id))}
+                  placeholder={tabLabel}
                 />
               ) : (
                 <span className={`surface-tab__label${surface.ephemeral ? ' surface-tab__label--ephemeral' : ''}`}>
-                  {getSurfaceLabel(surface, agentMeta?.label, workspaceShell, t, oscTitleFor(surface.id))}
+                  {tabLabel}
                 </span>
               )}
+              {hostTag && !isRenaming && <small className="surface-tab__location">{hostTag}</small>}
               {!isRenaming && (() => {
                 const link = eridaniLink(surface.id);
                 return link && (

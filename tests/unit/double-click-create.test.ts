@@ -127,7 +127,8 @@ describe('tab execution location with gesture fixtures', () => {
   it('keeps a remote tab owner visible while middle-click closes that exact tab', () => {
     const remoteSurface: SurfaceRef = { id: 'surf-host' as SurfaceId, type: 'terminal', shell: 'remote:desk', cwd: '/repo' };
     const props = renderTabs({ surfaces: [remoteSurface] });
-    expect(element('.surface-tab__location').textContent).toBe('Remote host: desk');
+    expect(element('.surface-tab__location').textContent).toBe('desk');
+    expect(element('.surface-tab').title).toContain('Remote host: desk');
     expect(element('.surface-tab').title).toContain('/repo');
     auxClick(element('.surface-tab'));
     expect(props.onClose).toHaveBeenCalledExactlyOnceWith(remoteSurface.id);

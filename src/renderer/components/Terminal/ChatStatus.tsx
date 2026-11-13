@@ -1,9 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { actOnChat, markChatRead, useChatAttention } from '../../remote-sessions/chat-attention';
+import { insightAge, terminalInsight } from '../../remote-sessions/insight';
 import ChatReminderDialog from './ChatReminderDialog';
 
+/**
+ * The pane brief: one strip across the top of a terminal that says what state
+ * the conversation is in and, when Tea has written one, what the terminal is
+ * working on. A plain shell with nothing to report shows no strip at all; its
+ * read state and reminders stay reachable from the tab's context menu.
+ */
 export default function ChatStatus({ surfaceId, active }: { surfaceId: string; active: boolean }) {
-  const { host, session, attention, unread, status } = useChatAttention(surfaceId);
+  const { host, session, attention, unread, status, hasHarness } = useChatAttention(surfaceId);
+  const { summary, stale, generatedAt } = terminalInsight(host, session);
+  const [expanded, setExpanded] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!generatedAt) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [generatedAt]);
   const root = useRef<HTMLDivElement>(null);
   const [remind, setRemind] = useState(false);
   const [error, setError] = useState('');
@@ -28,11 +44,27 @@ export default function ChatStatus({ surfaceId, active }: { surfaceId: string; a
       setError(result.ok ? '' : result.error ?? 'Could not update chat.');
     } catch { setError('Could not reach the server.'); }
   };
-  return <div ref={root} className="chat-status" data-tone={status.tone}>
-    <span className="chat-status__label" role="status" title={session?.agentState?.reason}>{status.label}{host && !host.connected ? ' · offline' : ''}</span>
-    {session?.chatReminder && (!session.chatReminder.firedAt || unread) && <span title={session.chatReminder.note}>{session.chatReminder.firedAt ? 'Reminder due' : `Reminder ${new Date(session.chatReminder.dueAt).toLocaleString()}`}</span>}
-    <button type="button" onClick={() => void change()}>{unread ? 'Mark read' : 'Mark unread'}</button>
-    {host && <button type="button" onClick={() => setRemind(true)}>{session?.chatReminder ? 'Edit reminder' : 'Remind me…'}</button>}
+  const reminder = session?.chatReminder && (!session.chatReminder.firedAt || unread) ? session.chatReminder : undefined;
+  const quiet = !hasHarness && !summary && !unread && !reminder && !error && session?.state !== 'lost';
+  const freshness = !generatedAt ? '' : stale ? 'New activity since this summary' : `Summarized ${insightAge(generatedAt, now)}`;
+  return <div ref={root} className="chat-status" data-tone={status.tone} data-quiet={quiet ? 'true' : undefined} data-expanded={expanded ? 'true' : undefined}>
+    {/* A plain shell has no agent state to report; its summary stands alone. */}
+    <span className="chat-status__label" role="status" data-plain={!hasHarness && status.tone === 'idle' && session?.state !== 'lost' && !(host && !host.connected) ? 'true' : undefined} title={session?.agentState?.reason}>{status.label}{host && !host.connected ? ' · offline' : ''}</span>
+    {summary
+      ? <button
+          type="button"
+          className="chat-status__summary"
+          aria-expanded={expanded}
+          title={[expanded ? 'Collapse the summary' : 'Show the whole summary', freshness].filter(Boolean).join(' · ')}
+          onClick={() => setExpanded(open => !open)}
+        >{summary}</button>
+      : <span className="chat-status__spacer" />}
+    {summary && generatedAt && <span className="chat-status__age" data-stale={stale ? 'true' : undefined}>{stale ? 'new activity' : insightAge(generatedAt, now)}</span>}
+    {reminder && <span className="chat-status__reminder" title={reminder.note}>{reminder.firedAt ? 'Reminder due' : `Reminder ${new Date(reminder.dueAt).toLocaleString()}`}</span>}
+    <span className="chat-status__actions">
+      <button type="button" onClick={() => void change()}>{unread ? 'Mark read' : 'Mark unread'}</button>
+      {host && <button type="button" onClick={() => setRemind(true)}>{session?.chatReminder ? 'Edit reminder' : 'Remind me…'}</button>}
+    </span>
     {error && <span role="alert">{error}</span>}
     {remind && <ChatReminderDialog surfaceId={surfaceId} onClose={() => setRemind(false)} />}
   </div>;

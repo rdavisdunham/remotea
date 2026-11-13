@@ -63,29 +63,100 @@
   .remote-overlay__dot { animation: none; }
 }
 
+.remote-hosts .settings-hint--lead { max-width: 62ch; font-size: 13px; color: var(--ui-text-secondary); }
+
 .remote-host-card {
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-l);
+  background: var(--ui-bg-2);
+  padding: 16px 18px;
+  margin-bottom: 14px;
 }
 
 .remote-host-card__head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.remote-host-card__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .remote-host-card__name {
+  font-family: var(--ui-font-display);
+  font-size: 17px;
   font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .remote-host-card__url {
-  opacity: 0.7;
-  font-family: var(--font-mono, monospace);
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
+
+.remote-host-card__head-actions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.remote-host-card__section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+.remote-host-card__section .settings-label { display: flex; flex-direction: column; gap: 3px; }
+
+.remote-host-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-l);
+}
+.remote-host-empty__title {
+  font-family: var(--ui-font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.remote-host-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ui-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.remote-host-about { margin-top: 16px; font-size: 12.5px; }
+.remote-host-about summary { cursor: pointer; color: var(--ui-text-secondary); padding: 4px 0; }
+.remote-host-about summary:hover { color: var(--ui-text-primary); }
+.remote-host-about > * + * { margin-top: 8px; }
+.remote-host-about .settings-hint { max-width: 70ch; }
+.remote-host-about__sub { color: var(--ui-text-secondary); font-weight: 600; }
+
+.settings-button--primary {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: var(--ui-accent-contrast);
+  font-weight: 600;
+}
+.settings-button--primary:hover { background: color-mix(in srgb, var(--ui-accent) 85%, white); border-color: var(--ui-accent); }
 
 .remote-host-actions {
   display: flex;
@@ -100,21 +171,20 @@
 }
 
 .remote-host-message--error { color: #e5534b; }
-.remote-host-message--ok { color: #3fb950; }
+.remote-host-message--ok { color: var(--ui-chat-ready); }
 
 .remote-host-code {
-  font-family: var(--font-mono, monospace);
-  font-size: 12px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(127, 127, 127, 0.18);
+  font-family: var(--ui-font-mono);
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(var(--ui-overlay-rgb), 0.08);
+  color: var(--ui-text-primary);
+  user-select: text;
 }
 
 /* Host health (Settings): connection, terminal process and Eridani run, each labelled on its own. */
-.remote-host-health {
-  margin: 4px 0 8px;
-  font-size: 12px;
-}
+.remote-host-health { font-size: 12.5px; }
 
 .remote-host-health__row {
   display: flex;
@@ -123,35 +193,33 @@
   flex-wrap: wrap;
 }
 
-.remote-host-health__kind {
-  opacity: 0.7;
-  min-width: 110px;
-}
+/* The connection chip carries its own label; the row needs no caption. */
+.remote-host-health__kind { display: none; }
 
-.remote-host-health__detail {
-  opacity: 0.7;
-}
+.remote-host-health__detail { color: var(--ui-text-muted); }
 
 .remote-host-health__tabs {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 12px;
   border-collapse: collapse;
 }
 
 .remote-host-health__tabs th {
   text-align: left;
-  font-weight: normal;
-  opacity: 0.7;
-  padding: 2px 8px 2px 0;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--ui-text-muted);
+  padding: 0 8px 4px 0;
 }
 
 .remote-host-health__tabs td {
-  padding: 2px 8px 2px 0;
+  padding: 4px 8px 4px 0;
   vertical-align: middle;
+  border-top: 1px solid rgba(var(--ui-overlay-rgb), 0.05);
 }
 
 .remote-host-health__title {
-  max-width: 220px;
+  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -162,19 +230,29 @@
   align-items: center;
   gap: 6px;
 }
+.remote-host-health__row .remote-host-chip {
+  padding: 2px 9px 2px 8px;
+  border-radius: 999px;
+  background: rgba(var(--ui-overlay-rgb), 0.06);
+  font-weight: 600;
+  font-size: 12px;
+}
+.remote-host-health__row .remote-host-chip--ok { color: var(--ui-chat-ready); background: color-mix(in srgb, var(--ui-chat-ready) 12%, transparent); }
+.remote-host-health__row .remote-host-chip--error { color: #e5534b; background: rgba(229, 83, 75, 0.12); }
+.remote-host-health__row .remote-host-chip--pending { color: var(--ui-chat-working); background: color-mix(in srgb, var(--ui-chat-working) 12%, transparent); }
 
 .remote-host-chip__dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #888;
+  background: var(--ui-text-muted);
 }
 
-.remote-host-chip--ok .remote-host-chip__dot { background: #3fb950; }
-.remote-host-chip--pending .remote-host-chip__dot { background: #e0a800; }
+.remote-host-chip--ok .remote-host-chip__dot { background: var(--ui-chat-ready); }
+.remote-host-chip--pending .remote-host-chip__dot { background: var(--ui-chat-working); }
 .remote-host-chip--error .remote-host-chip__dot { background: #e5534b; }
-.remote-host-chip--off .remote-host-chip__dot { background: #666; }
-.remote-host-chip--neutral .remote-host-chip__dot { background: transparent; border: 1px solid #888; }
+.remote-host-chip--off .remote-host-chip__dot { background: var(--ui-border-strong); }
+.remote-host-chip--neutral .remote-host-chip__dot { background: transparent; border: 1px solid var(--ui-text-muted); }
 
 /* Add / edit host: where the URL leads, and the plain ws:// acknowledgement. */
 .remote-host-url-hint {
@@ -244,11 +322,10 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  margin: 0 8px 6px 8px;
-  border: 1px solid var(--ui-border, rgba(255, 255, 255, 0.12));
-  border-radius: 6px;
+  margin: 0 8px 8px 8px;
+  border-radius: var(--ui-radius-m);
   overflow: hidden;
-  background: var(--ui-bg-3, transparent);
+  background: var(--ui-bg-2);
 }
 
 .host-attention__row {

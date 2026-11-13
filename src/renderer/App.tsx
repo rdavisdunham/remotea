@@ -46,6 +46,7 @@ import { activeHistoryUrl } from '../shared/browser-history';
 import { inactivePaneDimAlpha } from '../shared/inactive-pane-dim';
 import { ExplorerPanel } from './components/Explorer/ExplorerPanel';
 import Tutorial from './components/Tutorial/Tutorial';
+import { TOGGLE_TEA_EVENT } from './components/Tea/tea-events';
 import SplitPreviewOverlay from './components/SplitPane/SplitPreviewOverlay';
 import { initPipeBridge } from './pipe-bridge';
 import {
@@ -79,6 +80,8 @@ import { liveShortcutText, shortcutTooltip } from './shortcuts';
 import { DEFAULT_SHORTCUTS } from './store/settings-slice';
 import { useT } from './i18n';
 import type { TranslationKey } from './i18n';
+
+const TeaPanel = React.lazy(() => import('./components/Tea/TeaPanel'));
 
 const DEFAULT_SIDEBAR_WIDTH = 240;
 
@@ -618,6 +621,12 @@ export default function App() {
     else setSettingsOpen(false);
   }, [openSettings]);
   const [hostActivityOpen, setHostActivityOpen] = useState(false);
+  const [teaOpen, setTeaOpen] = useState(false);
+  useEffect(() => {
+    const toggle = () => setTeaOpen(open => !open);
+    document.addEventListener(TOGGLE_TEA_EVENT, toggle);
+    return () => document.removeEventListener(TOGGLE_TEA_EVENT, toggle);
+  }, []);
   const closeHostActivity = useCallback(() => setHostActivityOpen(false), []);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [agentNavigatorOpen, setAgentNavigatorOpen] = useState(false);
@@ -1709,8 +1718,9 @@ export default function App() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {tutorialOpen && <Tutorial onClose={handleTutorialClose} />}
+      {tutorialOpen && <Tutorial onClose={handleTutorialClose} onAddHost={() => { handleTutorialClose(); openSettings('Hosts'); }} />}
       {hostActivityOpen && <HostActivityDialog onClose={closeHostActivity} onSettings={openSettings} />}
+      {teaOpen && <React.Suspense fallback={null}><TeaPanel onClose={() => setTeaOpen(false)} onSettings={hostId => openSettings('Tea', hostId)} /></React.Suspense>}
       {settingsOpen && <SettingsWindow initialTab={settingsTab} initialHostId={settingsHostId} onClose={() => setSettingsOpen(false)} />}
       <Titlebar
         title={titlebarText}
@@ -1763,7 +1773,6 @@ export default function App() {
             onFocusAgent={focusAgent}
             onOpenAgentNavigator={() => setAgentNavigatorOpen(true)}
             onOpenHostSettings={() => setHostActivityOpen(true)}
-            onOpenTeaSettings={hostId => openSettings('Tea', hostId)}
           />
         ) : (
           <div

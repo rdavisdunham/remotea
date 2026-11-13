@@ -296,15 +296,15 @@ export default function TerminalSettings() {
           </select>
         </div>
       </div>
-      <div className="settings-row" style={{ opacity: 0.7, fontSize: '12px' }}>
+      <p className="settings-hint">
         {t('settings.terminalPanel.schemeHintPart1', 'Applied to new panes. Override per pane via ')}<code>wmux split --color-scheme NAME</code>{t('settings.terminalPanel.schemeHintPart2', ' or ')}<code>wmux set-color-scheme NAME</code>{t('settings.terminalPanel.schemeHintPart3', '.')}
-      </div>
+      </p>
 
       <div className="settings-divider" />
       <h3 className="settings-section-title">{t('settings.terminalPanel.importSection', 'Import')}</h3>
-      <div className="settings-row" style={{ opacity: 0.7, fontSize: '12px' }}>
+      <p className="settings-hint">
         {t('settings.terminalPanel.importHint', 'Bring colors, font and background opacity across from a terminal you already have set up. Saved as a custom scheme and selected.')}
-      </div>
+      </p>
       <div className="settings-row">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="settings-btn settings-btn--secondary" disabled={importing} onClick={() => runImport('wt')}>
@@ -316,7 +316,7 @@ export default function TerminalSettings() {
         </div>
       </div>
       {importStatus && (
-        <div className="settings-row" style={{ opacity: 0.7, fontSize: '12px' }}>{importStatus}</div>
+        <p className="settings-hint">{importStatus}</p>
       )}
       {importUndo && (
         <div className="settings-row" style={{ opacity: 0.7, fontSize: '12px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -329,9 +329,9 @@ export default function TerminalSettings() {
 
       <div className="settings-divider" />
       <h3 className="settings-section-title">{t('settings.terminalPanel.customSchemesSection', 'Custom schemes')}</h3>
-      <div className="settings-row" style={{ opacity: 0.7, fontSize: '12px' }}>
+      <p className="settings-hint">
         {t('settings.terminalPanel.customSchemesHint', 'Define named overrides (dev / staging / prod). Only the fields you set are overridden; the rest fall back to the bundled base theme.')}
-      </div>
+      </p>
 
       {userSchemeNames.map((name) => {
         const scheme = terminalPrefs.userColorSchemes[name];

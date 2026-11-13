@@ -6,7 +6,16 @@ import { actionLabel } from '../Settings/KeyboardSettings';
 import { formatAccelerator } from '../../shortcuts';
 import { useT } from '../../i18n';
 import { RESET_TERMINAL_LEAVE_ALT_ACTION } from '../../utils/alt-screen-owner';
-import { useWorkspaceLabels } from '../SplitPane/use-osc-title';
+import { useOscTitleLookup, useWorkspaceLabels } from '../SplitPane/use-osc-title';
+import { getSurfaceLabel } from '../SplitPane/surface-label';
+import { terminalSurfaces } from '../Sidebar/WorkspaceTerminals';
+import { requestFocusSurface } from '../Git/open-git';
+import { toggleTea } from '../Tea/tea-events';
+import { useRemoteRegistry } from '../../remote-sessions/registry-cache';
+import { chatActivityState, markChatRead, useLocalChatAttention } from '../../remote-sessions/chat-attention';
+import { terminalInsight } from '../../remote-sessions/insight';
+import { chatIsUnread, chatStatus } from '../../../shared/chat-attention';
+import { surfaceAgentState } from '../../store/agent-rollup';
 import '../../styles/command-palette.css';
 
 interface CommandPaletteProps {
@@ -19,6 +28,11 @@ interface PaletteItem {
   label: string;
   shortcut?: string;
   category: string;
+  /** A second, quieter line: what a terminal is doing, where a workspace is. */
+  detail?: string;
+  /** Right-hand note when there is no shortcut, e.g. a terminal's status. */
+  note?: string;
+  tone?: string;
   action: () => void;
 }
 
@@ -34,15 +48,32 @@ const formatBinding = (binding: ShortcutBinding): string => formatAccelerator(bi
 // labels ("Reset Terminal") in every locale — invisible while the action names
 // happened to read like prose, and wrong the moment one didn't.
 
-function fuzzyMatch(needle: string, haystack: string): boolean {
-  if (!needle) return true;
+/**
+ * How well `needle` fits `haystack`; 0 is no match. A literal hit beats letters
+ * scattered through the text, and a hit at the start of a word beats one inside
+ * it, so typing a terminal's name puts that terminal first.
+ */
+function matchScore(needle: string, haystack: string): number {
+  if (!needle) return 1;
   const n = needle.toLowerCase();
   const h = haystack.toLowerCase();
+  const at = h.indexOf(n);
+  if (at === 0) return 100;
+  if (at > 0) return /[\s:/\-_.(]/.test(h[at - 1]) ? 80 : 60;
   let ni = 0;
   for (let hi = 0; hi < h.length && ni < n.length; hi++) {
     if (h[hi] === n[ni]) ni++;
   }
-  return ni === n.length;
+  return ni === n.length ? 20 : 0;
+}
+
+function itemScore(query: string, item: PaletteItem): number {
+  const label = matchScore(query, item.label);
+  if (label || !query) return label;
+  // A summary or folder is searched literally: letters scattered through a
+  // paragraph match nearly anything.
+  if (item.detail?.toLowerCase().includes(query.toLowerCase())) return 30;
+  return matchScore(query, item.category) ? 10 : 0;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -64,6 +95,12 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     return () => { live = false; };
   }, []);
   const userSchemes = useStore((state) => state.terminalPrefs.userColorSchemes);
+  const oscTitleFor = useOscTitleLookup();
+  const agentMeta = useStore((state) => state.agentMeta);
+  const agentStates = useStore((state) => state.agentStates);
+  const agentDetections = useStore((state) => state.agentDetections);
+  const views = useRemoteRegistry((state) => state.views);
+  const localAttention = useLocalChatAttention((state) => state.entries);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +131,12 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     }
 
     items.push({ id: 'command:host-activity', label: t('activity.title'), category: t('palette.category.commands'), action: () => onAction('openHostActivity') });
+    items.push({
+      id: 'command:ask-tea',
+      label: t('palette.askTea', 'Ask Tea about your terminals'),
+      category: t('palette.category.commands'),
+      action: () => { onClose(); toggleTea(); },
+    });
 
     // Sidebar mode has no shortcut; update the same preference as Settings.
     {
@@ -199,6 +242,38 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
       });
     }
 
+    // Category: Terminals — jump to any terminal in any workspace by its name,
+    // by what Tea says it is doing, or by its folder.
+    for (const ws of workspaces) {
+      const workspaceName = workspaceLabels.get(ws.id) ?? ws.title;
+      for (const surface of terminalSurfaces(ws.splitTree)) {
+        const host = views?.find((view) => view.sessions.some((session) => session.id === surface.id));
+        const session = host?.sessions.find((item) => item.id === surface.id);
+        const declared = agentStates?.[surface.id];
+        const detected = agentDetections?.[surface.id];
+        const attention = session ? session.chatAttention : localAttention[surface.id];
+        const unread = chatIsUnread(attention, host?.deviceId ?? 'local');
+        const state = chatActivityState(session, surfaceAgentState(declared, detected)?.state);
+        const hasHarness = !!(detected?.agent || declared?.sessionId || declared?.sessionProvider || session?.agent || session?.eridani);
+        const status = chatStatus(state, unread, attention?.kind, false, hasHarness);
+        const { summary } = terminalInsight(host, session, surface.cwd);
+        const quiet = !hasHarness && status.tone === 'idle';
+        items.push({
+          id: `terminal:${surface.id}`,
+          label: getSurfaceLabel(surface, agentMeta.get(surface.id)?.label, ws.shell, t, oscTitleFor(surface.id)),
+          category: t('palette.category.terminals', 'Terminals'),
+          detail: [workspaceName, summary || surface.currentCwd || surface.cwd].filter(Boolean).join(' — '),
+          note: quiet ? undefined : status.label,
+          tone: quiet ? undefined : status.tone,
+          action: () => {
+            requestFocusSurface(ws.id, surface.id);
+            markChatRead(surface.id);
+            onClose();
+          },
+        });
+      }
+    }
+
     // Category: Workspaces — switch to each workspace by name
     for (const ws of workspaces) {
       const isCurrent = ws.id === activeWorkspaceId;
@@ -228,12 +303,33 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
   }, [
     shortcuts, workspaces, workspaceLabels, activeWorkspaceId, selectWorkspace, onAction, onClose, t,
     savedLayouts, createWorkspaceFromLayout, requestLayoutSave, themes, userSchemes,
+    oscTitleFor, agentMeta, agentStates, agentDetections, views, localAttention,
   ]);
 
-  // Filter based on query
-  const filteredItems = useMemo(() => {
-    return allItems.filter((item) => fuzzyMatch(query, item.label) || fuzzyMatch(query, item.category));
+  // Rank against the query, then keep each category together under one heading.
+  // With nothing typed the categories keep the order they were built in; once
+  // there is a query the category holding the best hit comes first.
+  const groups = useMemo(() => {
+    const scored = allItems
+      .map((item, order) => ({ item, order, score: itemScore(query.trim(), item) }))
+      .filter((entry) => entry.score > 0);
+    const byCategory = new Map<string, typeof scored>();
+    for (const entry of scored) {
+      const list = byCategory.get(entry.item.category);
+      if (list) list.push(entry);
+      else byCategory.set(entry.item.category, [entry]);
+    }
+    const best = (list: typeof scored) => Math.max(...list.map((entry) => entry.score));
+    return [...byCategory.entries()]
+      .map(([category, list]) => ({
+        category,
+        first: list[0].order,
+        best: best(list),
+        items: [...list].sort((x, y) => y.score - x.score || x.order - y.order).map((entry) => entry.item),
+      }))
+      .sort((x, y) => (query.trim() ? y.best - x.best : 0) || x.first - y.first);
   }, [allItems, query]);
+  const visibleItems = useMemo(() => groups.flatMap((group) => group.items), [groups]);
 
   // Reset selection when filter changes
   useEffect(() => {
@@ -250,18 +346,25 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
   }, [selectedIndex]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const last = visibleItems.length - 1;
     if (e.key === 'Escape') {
       onClose();
       return;
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((i) => Math.min(i + 1, Math.max(0, Math.min(filteredItems.length, 10) - 1)));
+      setSelectedIndex((i) => (i >= last ? 0 : i + 1));
       return;
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex((i) => Math.max(i - 1, 0));
+      setSelectedIndex((i) => (i <= 0 ? Math.max(0, last) : i - 1));
+      return;
+    }
+    if (e.key === 'PageDown' || e.key === 'PageUp') {
+      e.preventDefault();
+      const step = e.key === 'PageDown' ? 8 : -8;
+      setSelectedIndex((i) => Math.max(0, Math.min(last, i + step)));
       return;
     }
     if (e.key === 'Enter') {
@@ -277,38 +380,68 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     }
   };
 
-  const visibleItems = filteredItems.slice(0, 10);
-
+  let row = -1;
   return (
     <div className="command-palette-overlay" onMouseDown={handleOverlayClick}>
-      <div className="command-palette">
-        <input
-          ref={inputRef}
-          className="command-palette__input"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t('palette.placeholder')}
-        />
-        <div className="command-palette__results" ref={listRef}>
+      <div className="command-palette" role="dialog" aria-label={t('palette.title', 'Command palette')}>
+        <div className="command-palette__search">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.5" />
+            <path d="M10.5 10.5L14 14" />
+          </svg>
+          <input
+            ref={inputRef}
+            className="command-palette__input"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t('palette.placeholder')}
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="command-palette-results"
+            aria-activedescendant={visibleItems[selectedIndex] ? `palette-item-${selectedIndex}` : undefined}
+          />
+        </div>
+        <div className="command-palette__results" id="command-palette-results" role="listbox" ref={listRef}>
           {visibleItems.length === 0 ? (
             <div className="command-palette__empty">{t('palette.empty')}</div>
           ) : (
-            visibleItems.map((item, index) => (
-              <div
-                key={item.id}
-                className={`command-palette__item${index === selectedIndex ? ' command-palette__item--selected' : ''}`}
-                onMouseDown={() => item.action()}
-                onMouseEnter={() => setSelectedIndex(index)}
-              >
-                <span className="command-palette__item-label">{item.label}</span>
-                <span className="command-palette__item-category">{item.category}</span>
-                {item.shortcut && (
-                  <span className="command-palette__item-shortcut">{item.shortcut}</span>
-                )}
+            groups.map((group) => (
+              <div className="command-palette__group" role="group" aria-label={group.category} key={group.category}>
+                <div className="command-palette__group-title" aria-hidden="true">{group.category}</div>
+                {group.items.map((item) => {
+                  const index = ++row;
+                  return (
+                    <div
+                      key={item.id}
+                      id={`palette-item-${index}`}
+                      role="option"
+                      aria-selected={index === selectedIndex}
+                      className={`command-palette__item${index === selectedIndex ? ' command-palette__item--selected' : ''}`}
+                      onMouseDown={() => item.action()}
+                      onMouseMove={() => { if (index !== selectedIndex) setSelectedIndex(index); }}
+                    >
+                      <span className="command-palette__item-text">
+                        <span className="command-palette__item-label">{item.label}</span>
+                        {item.detail && <span className="command-palette__item-detail">{item.detail}</span>}
+                      </span>
+                      {item.note && (
+                        <span className="command-palette__item-note" data-tone={item.tone}>{item.note}</span>
+                      )}
+                      {item.shortcut && (
+                        <span className="command-palette__item-shortcut">{item.shortcut}</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ))
           )}
+        </div>
+        <div className="command-palette__footer">
+          <span><kbd>↑</kbd><kbd>↓</kbd> {t('palette.hint.move', 'move')}</span>
+          <span><kbd>Enter</kbd> {t('palette.hint.run', 'run')}</span>
+          <span><kbd>Esc</kbd> {t('palette.hint.close', 'close')}</span>
         </div>
       </div>
     </div>

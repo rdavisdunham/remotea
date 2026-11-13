@@ -110,7 +110,7 @@ Language choices: English/en, Français/fr, Español/es, Deutsch/de, Português/
 
 ## Agent integration (Agents)
 
-Main-owned `agentIntegration={decision,features,decidedAt?}`. New installs default `decision='unset'`; all four features default true **but are ineffective until granted**. `decision` choices in storage are unset/granted/declined; Settings master checkbox grants/declines. First-launch “Not now” retains unset and asks next launch; “Never” declines. `decidedAt` is bookkeeping. Changing settings writes/removes agent configuration files on **this desktop user's home**, not a remote server or Eridani installation (`agent-integration.ts:88–170`). Agent processes may need new sessions to consume changed files; this panel does not restart them.
+Main-owned `agentIntegration={decision,features,decidedAt?}`. New installs default `decision='unset'`; all four features default true **but are ineffective until granted**. `decision` choices in storage are unset/granted/declined; Settings master checkbox grants/declines. Nothing asks at launch: `unset` writes and removes nothing until the Settings checkbox is used. `decidedAt` is bookkeeping. Changing settings writes/removes agent configuration files on **this desktop user's home**, not a remote server or Eridani installation (`agent-integration.ts:88–170`). Agent processes may need new sessions to consume changed files; this panel does not restart them.
 
 | Label / compatibility name | Key / default after grant | Disclosure / behavior | Source |
 |---|---|---|---|

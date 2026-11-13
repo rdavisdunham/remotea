@@ -66,7 +66,8 @@ describe('titlebar sidebar toggle', () => {
     expect(button.getAttribute('aria-label')).toBe(button.title);
     expect(button.getAttribute('aria-pressed')).toBe('true');
     expect(button.className).toBe('titlebar__btn');
-    expect(button.nextElementSibling?.getAttribute('title')).toBe('titlebar.help');
+    // Help moved to the right-hand cluster; the toggle must not have replaced it.
+    expect(container.querySelector('button[title="titlebar.help"]')).not.toBeNull();
     expect(button.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
     act(() => button.click());
     expect(store.getState().sidebarVisible).toBe(false);
