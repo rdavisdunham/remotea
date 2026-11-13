@@ -32,6 +32,13 @@ interface ExplorerPanelProps {
   focusedPaneId: PaneId | null;
 }
 
+/** Shared attributes of the header's stroke icons. */
+const ICON = {
+  width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+  strokeWidth: 1.4, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+};
+
 export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): React.JSX.Element {
   const t = useT();
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId);
@@ -436,32 +443,52 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
     <div className="explorer-panel">
       <div className="explorer-panel__header">
         <span className="explorer-panel__root" title={absRoot}>
-          {t('execution.files').replace('{location}', executionLocationText(t, location, hosts))} · {rootLabel || t('explorer.title', 'Explorer')}
+          <span className="explorer-panel__folder">{rootLabel || t('explorer.title', 'Explorer')}</span>
+          <span className="explorer-panel__where">
+            {t('execution.files').replace('{location}', executionLocationText(t, location, hosts))}
+          </span>
         </span>
         <button
           className="explorer-panel__action"
           title={t('explorer.refresh', 'Refresh')}
+          aria-label={t('explorer.refresh', 'Refresh')}
           onClick={reloadTree}
-        >{'↻'}</button>
+        >
+          <svg {...ICON}><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" /><path d="M13.5 2.5v3h-3" /></svg>
+        </button>
         {diff.baseline === 'git' && activeWorkspaceId && (
           <button
             className="explorer-panel__action"
             title={t('shortcutAction.openGitPanel', 'Open Git view')}
+            aria-label={t('shortcutAction.openGitPanel', 'Open Git view')}
             onClick={() => location.kind === 'remote' ? setOpenError('remote') : openGitView(useStore.getState(), activeWorkspaceId, focusedPaneId)}
-          >{'⑂'}</button>
+          >
+            <svg {...ICON}><circle cx="4.5" cy="3.5" r="1.5" /><circle cx="4.5" cy="12.5" r="1.5" /><circle cx="11.5" cy="5.5" r="1.5" /><path d="M4.5 5v6M11.5 7c0 2.5-3.5 2-7 4" /></svg>
+          </button>
         )}
         <button
-          className="explorer-panel__action"
+          className={`explorer-panel__action${showHidden ? ' explorer-panel__action--on' : ''}`}
           title={showHidden
             ? t('explorer.hideHidden', 'Hide hidden files')
             : t('explorer.showHidden', 'Show hidden files')}
+          aria-label={t('explorer.showHidden', 'Show hidden files')}
+          aria-pressed={showHidden}
           onClick={toggleHidden}
-        >{showHidden ? '◉' : '○'}</button>
+        >
+          <svg {...ICON}>
+            <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8z" />
+            <circle cx="8" cy="8" r="1.8" />
+            {!showHidden && <path d="M2.5 13.5l11-11" />}
+          </svg>
+        </button>
         <button
           className="explorer-panel__action"
           title={t('explorer.close', 'Close explorer')}
+          aria-label={t('explorer.close', 'Close explorer')}
           onClick={onClose}
-        >{'×'}</button>
+        >
+          <svg {...ICON}><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" /></svg>
+        </button>
       </div>
       {/* The totals bar, present only when something has actually changed —
           an unchanged tree gets no bar rather than a row of zeroes.
@@ -507,7 +534,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
           <div className="explorer-panel__message">{t(explorerErrorKey(error), error)}</div>
         )}
         {!error && rows.length === 0 && !loading && (
-          <div className="explorer-panel__message">{t('explorer.empty', 'This folder is empty')}</div>
+          <div className="explorer-panel__message explorer-panel__message--empty">{t('explorer.empty', 'This folder is empty')}</div>
         )}
         {!error && (
           <ExplorerTree

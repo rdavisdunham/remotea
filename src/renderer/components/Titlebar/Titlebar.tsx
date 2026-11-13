@@ -106,46 +106,8 @@ export default function Titlebar({
         >
           <IconSidebar />
         </button>
-        <button className="titlebar__btn" onClick={onHelpClick} title={t('titlebar.help')}>
-          <IconHelp />
-        </button>
-        <button className="titlebar__btn" onClick={onDevToolsClick} title={t('titlebar.devtools')}>
-          <IconCode />
-        </button>
-        <NotificationBell
-          notifications={notifications}
-          workspaceNames={workspaceNames}
-          isOpen={notificationPanelOpen}
-          onToggle={onToggleNotificationPanel}
-          onJump={onNotificationJump}
-          onMarkAllRead={onMarkAllNotificationsRead}
-        />
-        <UpdateBadge />
-        {hubEnabled && (
-          <button
-            className="titlebar__btn"
-            onClick={onHubClick}
-            title={t('titlebar.hub', 'Agent office')}
-          >
-            <IconPixelAgent />
-          </button>
-        )}
-        <button
-          className="titlebar__btn"
-          onClick={onSettingsClick}
-          title={shortcutTooltip(t('titlebar.settings'), shortcuts.openSettings)}
-        >
-          <IconSettings />
-        </button>
-        <button
-          className={`titlebar__btn${focusMode ? ' titlebar__btn--active' : ''}`}
-          onClick={onToggleFocusMode}
-          title={t('titlebar.focusMode', 'Focus mode: dim every pane but the focused one')}
-          aria-pressed={!!focusMode}
-        >
-          <IconFocus />
-        </button>
-        <KeepAwakeMenu />
+        <span className="titlebar__sep" aria-hidden="true" />
+        {/* What the window shows: the panels beside the terminals. */}
         {onToggleExplorer && (
           <button
             className={`titlebar__btn${explorerOpen ? ' titlebar__btn--active' : ''}`}
@@ -168,8 +130,55 @@ export default function Titlebar({
             <IconGitBranch />
           </button>
         )}
+        <button
+          className={`titlebar__btn${focusMode ? ' titlebar__btn--active' : ''}`}
+          onClick={onToggleFocusMode}
+          title={t('titlebar.focusMode', 'Focus mode: dim every pane but the focused one')}
+          aria-label={t('titlebar.focusMode', 'Focus mode: dim every pane but the focused one')}
+          aria-pressed={!!focusMode}
+        >
+          <IconFocus />
+        </button>
       </div>
       <span className="titlebar__title">{title ?? ''}</span>
+      {/* The app itself: status, alerts, help and settings. */}
+      <div className="titlebar__actions">
+        <UpdateBadge />
+        <KeepAwakeMenu />
+        <NotificationBell
+          notifications={notifications}
+          workspaceNames={workspaceNames}
+          isOpen={notificationPanelOpen}
+          onToggle={onToggleNotificationPanel}
+          onJump={onNotificationJump}
+          onMarkAllRead={onMarkAllNotificationsRead}
+        />
+        {hubEnabled && (
+          <button
+            className="titlebar__btn"
+            onClick={onHubClick}
+            title={t('titlebar.hub', 'Agent office')}
+            aria-label={t('titlebar.hub', 'Agent office')}
+          >
+            <IconPixelAgent />
+          </button>
+        )}
+        <span className="titlebar__sep" aria-hidden="true" />
+        <button className="titlebar__btn" onClick={onDevToolsClick} title={t('titlebar.devtools')} aria-label={t('titlebar.devtools')}>
+          <IconCode />
+        </button>
+        <button className="titlebar__btn" onClick={onHelpClick} title={t('titlebar.help')} aria-label={t('titlebar.help')}>
+          <IconHelp />
+        </button>
+        <button
+          className="titlebar__btn"
+          onClick={onSettingsClick}
+          title={shortcutTooltip(t('titlebar.settings'), shortcuts.openSettings)}
+          aria-label={t('titlebar.settings')}
+        >
+          <IconSettings />
+        </button>
+      </div>
       <div className="titlebar__right">
         {frameless && <WindowControls />}
       </div>

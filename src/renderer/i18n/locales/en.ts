@@ -228,6 +228,7 @@ export const en = {
 
   // Settings — window chrome
   'settings.title': 'Settings',
+  'settings.close': 'Close settings',
   'settings.tab.general': 'General',
   'settings.tab.sidebar': 'Sidebar',
   'settings.tab.workspace': 'Workspace',

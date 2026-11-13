@@ -18,16 +18,43 @@
 }
 
 .titlebar__logo {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 6px;
   margin: 0 8px 0 2px;
-  opacity: 0.95;
   -webkit-app-region: no-drag;
+}
+
+/* The app's own controls, against the caption buttons. Mirrors
+   .titlebar__left so the title stays centred between two clusters. */
+.titlebar__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+/* Popovers hang from buttons on the right now, so they open leftwards. */
+.titlebar__actions .notif-panel,
+.titlebar__actions .keep-awake-panel {
+  left: auto;
+  right: 0;
+}
+
+.titlebar__sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: rgba(var(--ui-overlay-rgb), 0.12);
+  flex-shrink: 0;
 }
 
 .titlebar__title {
   flex: 1;
+  min-width: 0;
+  padding: 0 12px;
   text-align: center;
   font-family: var(--ui-font-display);
   font-size: 12.5px;
@@ -103,10 +130,15 @@
   justify-content: center;
   border-radius: 6px;
   -webkit-app-region: no-drag;
-  transition: all 0.15s ease;
+  transition: background 0.12s ease, color 0.12s ease;
   padding: 0;
   line-height: 1;
-  font-family: 'Cascadia Mono', 'Consolas', monospace;
+  font-family: var(--ui-font-mono);
+}
+
+.titlebar__btn:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -2px;
 }
 
 .titlebar__btn:hover {
@@ -236,8 +268,8 @@
 .keep-awake-panel {
   position: absolute; top: calc(100% + 6px); left: 0;
   width: 280px;
-  background: var(--ui-bg-1); border: 1px solid rgba(var(--ui-overlay-rgb), 0.08);
-  border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  background: var(--ui-bg-2); border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-m); box-shadow: var(--ui-shadow-pop);
   z-index: 1000; overflow: hidden;
 }
 .keep-awake-panel__header {

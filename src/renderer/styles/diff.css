@@ -344,3 +344,17 @@
 .diff-pane__content::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* Light theme: the line colours above are tuned for dark surfaces, where pale
+   green on a green tint reads. On paper it does not, so text goes dark and
+   only the tint carries the add/remove signal. */
+:root[data-ui-theme='light'] .diff-hunk__header { color: #1f5fbf; }
+:root[data-ui-theme='light'] .diff-hunk__context,
+:root[data-ui-theme='light'] .diff-line--context .diff-line__content { color: #4b4944; }
+:root[data-ui-theme='light'] .diff-line__gutter { color: #6f6c65; }
+:root[data-ui-theme='light'] .diff-line--add .diff-line__content { color: #0f5323; }
+:root[data-ui-theme='light'] .diff-line--add .diff-line__prefix,
+:root[data-ui-theme='light'] .diff-line--add .diff-line__gutter { color: #1a7f37; }
+:root[data-ui-theme='light'] .diff-line--remove .diff-line__content { color: #8a1f17; }
+:root[data-ui-theme='light'] .diff-line--remove .diff-line__prefix,
+:root[data-ui-theme='light'] .diff-line--remove .diff-line__gutter { color: #b3261e; }

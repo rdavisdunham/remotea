@@ -4,59 +4,146 @@
   position: fixed;
   inset: 0;
   z-index: 5000;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(3px);
 }
 
-/* ─── Window ──────────────────────────────────────────────────────────────── */
+/* ─── Window ──────────────────────────────────────────────────────────────
+   Two columns: the section list on the left, the chosen section on the right
+   under its own name. */
 
 .settings-window {
-  width: 740px;
+  width: 1040px;
   max-width: calc(100vw - 48px);
-  height: min(640px, calc(100vh - 80px));
+  height: min(780px, calc(100vh - 56px));
   background: var(--ui-bg-2);
-  border: 1px solid rgba(var(--ui-overlay-rgb), 0.1);
-  border-radius: 10px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-l);
+  box-shadow: var(--ui-shadow-pop);
   display: flex;
-  flex-direction: column;
   overflow: hidden;
 }
 
-/* ─── Header ──────────────────────────────────────────────────────────────── */
+/* ─── Section list ────────────────────────────────────────────────────────── */
+
+.settings-tabs {
+  width: 224px;
+  flex: 0 0 224px;
+  background: var(--ui-bg-1);
+  border-right: 1px solid var(--ui-border);
+  padding: 16px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.settings-title {
+  font-family: var(--ui-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ui-text-primary);
+  margin: 0 8px 12px;
+}
+
+.settings-global-search {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+}
+
+.settings-nav-group h3 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ui-text-muted);
+  margin: 14px 8px 4px;
+}
+
+.settings-tab {
+  position: relative;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--ui-radius-s);
+  transition: background 0.1s, color 0.1s;
+}
+
+.settings-tab:hover {
+  background: rgba(var(--ui-overlay-rgb), 0.06);
+  color: var(--ui-text-primary);
+}
+
+.settings-tab:focus-visible,
+.settings-close:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -2px;
+}
+
+.settings-tab--active,
+.settings-tab--active:hover {
+  background: rgba(var(--ui-accent-rgb), 0.14);
+  color: var(--ui-text-primary);
+  font-weight: 600;
+}
+
+.settings-tab--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--ui-accent);
+}
+
+/* ─── Chosen section ──────────────────────────────────────────────────────── */
+
+.settings-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 .settings-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(var(--ui-overlay-rgb), 0.08);
+  gap: 12px;
+  padding: 18px 20px 12px 32px;
   flex-shrink: 0;
 }
 
 .settings-header h2 {
-  font-size: 15px;
+  font-family: var(--ui-font-display);
+  font-size: 20px;
   font-weight: 600;
   color: var(--ui-text-primary);
-  letter-spacing: 0.01em;
+  margin: 0;
 }
 
 .settings-close {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   background: none;
   border: none;
-  color: rgba(var(--ui-overlay-rgb), 0.5);
-  font-size: 20px;
-  line-height: 1;
+  color: var(--ui-text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: var(--ui-radius-s);
   padding: 0;
   transition: background 0.1s, color 0.1s;
 }
@@ -66,63 +153,50 @@
   color: var(--ui-text-primary);
 }
 
-/* ─── Body ────────────────────────────────────────────────────────────────── */
-
-.settings-body {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* ─── Tabs (left rail) ────────────────────────────────────────────────────── */
-
-.settings-tabs {
-  width: 140px;
-  flex-shrink: 0;
-  background: var(--ui-bg-1);
-  border-right: 1px solid rgba(var(--ui-overlay-rgb), 0.06);
-  padding: 8px 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.settings-tab {
-  width: 100%;
-  padding: 7px 10px;
-  background: none;
-  border: none;
-  color: rgba(var(--ui-overlay-rgb), 0.55);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  border-radius: 6px;
-  transition: background 0.1s, color 0.1s;
-}
-
-.settings-tab:hover {
-  background: rgba(var(--ui-overlay-rgb), 0.08);
-  color: rgba(var(--ui-overlay-rgb), 0.9);
-}
-
-.settings-tab--active {
-  background: rgba(var(--ui-accent-rgb), 0.18);
-  color: var(--ui-accent);
-}
-
-.settings-tab--active:hover {
-  background: rgba(var(--ui-accent-rgb), 0.24);
-  color: var(--ui-accent);
-}
-
-/* ─── Content area ────────────────────────────────────────────────────────── */
-
 .settings-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 24px;
+  padding: 0 32px 28px;
+}
+
+/* A readable measure: the hints are prose, and prose at the full width of
+   the window runs past a hundred characters a line. */
+.settings-content > * {
+  max-width: 720px;
+}
+
+/* What the section governs, as a sentence under its name; the detail about
+   where it is stored stays folded away. */
+.settings-scope {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ui-text-muted);
+  margin-bottom: 22px;
+}
+.settings-scope p { margin: 0 0 6px; }
+.settings-scope__more > summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+}
+.settings-scope__more > summary:hover { color: var(--ui-text-primary); }
+.settings-scope__more[open] {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-m);
+}
+.settings-scope__more[open] > summary { margin-bottom: 8px; }
+.settings-effective {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 300px;
+  overflow: auto;
+  user-select: text;
+  font-family: var(--ui-font-mono);
+  font-size: 11.5px;
 }
 
 /* ─── Section ─────────────────────────────────────────────────────────────── */
@@ -134,19 +208,24 @@
 }
 
 .settings-section-title {
-  font-size: 11px;
+  font-family: var(--ui-font-display);
+  font-size: 13.5px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(var(--ui-overlay-rgb), 0.4);
-  margin-bottom: 10px;
-  margin-top: 4px;
+  color: var(--ui-text-primary);
+  margin: 4px 0 8px;
+}
+
+/* A group that follows a hint or a row needs air above its name; one that
+   follows a divider already has it. */
+.settings-hint + .settings-section-title,
+.settings-row + .settings-section-title {
+  margin-top: 26px;
 }
 
 .settings-divider {
   height: 1px;
-  background: rgba(var(--ui-overlay-rgb), 0.07);
-  margin: 16px 0 16px;
+  background: var(--ui-border);
+  margin: 18px 0;
 }
 
 /* ─── Row ─────────────────────────────────────────────────────────────────── */
@@ -155,9 +234,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   padding: 6px 0;
-  min-height: 34px;
+  min-height: 36px;
 }
 
 .settings-row--column {
@@ -173,53 +252,112 @@
 
 .settings-label {
   font-size: 13px;
-  color: rgba(var(--ui-overlay-rgb), 0.8);
+  color: var(--ui-text-primary);
   overflow-wrap: anywhere;
+}
+
+.settings-row:has(> input.settings-toggle) > label.settings-label {
+  cursor: pointer;
+  flex: 1;
 }
 
 .settings-value {
   font-size: 12px;
-  color: rgba(var(--ui-overlay-rgb), 0.45);
+  color: var(--ui-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* A hint explains the row above it, so it sits tight against that row and
+   keeps its distance from the next one. */
+.settings-row + .settings-hint {
+  margin-top: -2px;
+  margin-bottom: 8px;
 }
 
 /* ─── Controls ────────────────────────────────────────────────────────────── */
 
+/* On/off is a switch: the checkbox underneath is unchanged, so it still
+   answers Space and reports its state to assistive tech. */
 .settings-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
   width: 36px;
   height: 20px;
+  margin: 0;
+  border-radius: 10px;
+  background: rgba(var(--ui-overlay-rgb), 0.16);
+  border: 1px solid rgba(var(--ui-overlay-rgb), 0.14);
   cursor: pointer;
-  accent-color: var(--ui-accent);
   flex-shrink: 0;
+  transition: background 0.14s ease, border-color 0.14s ease;
 }
 
-.settings-select {
-  background: var(--ui-bg-4);
-  border: 1px solid rgba(var(--ui-overlay-rgb), 0.12);
-  border-radius: 6px;
-  color: var(--ui-text-primary);
-  font-size: 12.5px;
-  padding: 4px 8px;
-  cursor: pointer;
-  min-width: 160px;
-  outline: none;
-  transition: border-color 0.15s;
+.settings-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ui-text-secondary);
+  transition: transform 0.14s ease, background 0.14s ease;
 }
 
-.settings-select:focus {
+.settings-toggle:hover { border-color: rgba(var(--ui-overlay-rgb), 0.32); }
+
+.settings-toggle:checked {
+  background: var(--ui-accent);
   border-color: var(--ui-accent);
 }
 
+.settings-toggle:checked::before {
+  transform: translateX(16px);
+  background: var(--ui-accent-contrast);
+}
+
+.settings-toggle:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.settings-toggle:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.settings-select,
 .settings-input {
-  background: var(--ui-bg-4);
-  border: 1px solid rgba(var(--ui-overlay-rgb), 0.12);
-  border-radius: 6px;
+  background: var(--ui-bg-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-s);
   color: var(--ui-text-primary);
+  font-family: inherit;
   font-size: 12.5px;
-  padding: 5px 10px;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.settings-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 5px 28px 5px 10px;
+  cursor: pointer;
+  min-width: 160px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%237c848c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.settings-select option {
+  background: var(--ui-bg-3);
+  color: var(--ui-text-primary);
+}
+
+.settings-input {
+  padding: 5px 10px;
   min-width: 200px;
-  transition: border-color 0.15s;
 }
 
 .settings-input--narrow {
@@ -227,8 +365,17 @@
   width: 80px;
 }
 
+.settings-input::placeholder { color: var(--ui-text-muted); }
+
+.settings-select:hover,
+.settings-input:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.settings-select:focus,
 .settings-input:focus {
   border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px rgba(var(--ui-accent-rgb), 0.18);
 }
 
 .settings-slider {
@@ -238,60 +385,77 @@
   cursor: pointer;
 }
 
-/* ─── Buttons ─────────────────────────────────────────────────────────────── */
+.settings-content input[type='range'] { accent-color: var(--ui-accent); }
 
-.settings-btn {
+/* ─── Buttons ───────────────────────────────────────────────────────────────
+   .settings-btn and .settings-button are the same button under two names the
+   sections grew separately; they are drawn alike here. */
+
+.settings-btn,
+.settings-button {
   padding: 5px 12px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--ui-radius-s);
+  font-family: inherit;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  border: none;
-  transition: background 0.1s;
-}
-
-.settings-btn--secondary {
-  background: rgba(var(--ui-overlay-rgb), 0.08);
-  color: rgba(var(--ui-overlay-rgb), 0.75);
-  border: 1px solid rgba(var(--ui-overlay-rgb), 0.1);
-}
-
-.settings-btn--secondary:hover {
-  background: rgba(var(--ui-overlay-rgb), 0.14);
+  background: var(--ui-bg-4);
   color: var(--ui-text-primary);
+  border: 1px solid var(--ui-border);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.settings-btn:hover:not(:disabled),
+.settings-button:hover:not(:disabled) {
+  background: var(--ui-bg-5);
+  border-color: var(--ui-border-strong);
+}
+
+.settings-btn:focus-visible,
+.settings-button:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 1px;
+}
+
+.settings-btn:disabled,
+.settings-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .settings-btn--accent {
-  background: rgba(74, 222, 128, 0.12);
-  color: #4ade80;
-  border: 1px solid rgba(74, 222, 128, 0.35);
+  background: var(--ui-accent);
+  color: var(--ui-accent-contrast);
+  border-color: var(--ui-accent);
+  font-weight: 600;
 }
 
-.settings-btn--accent:hover {
-  background: rgba(74, 222, 128, 0.2);
-  color: #86efac;
-  border-color: rgba(74, 222, 128, 0.55);
+.settings-btn--accent:hover:not(:disabled) {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  filter: brightness(1.08);
 }
 
-.settings-btn:disabled {
-  opacity: 0.65;
-  cursor: default;
+.settings-btn--danger,
+.settings-button--danger {
+  color: #ff8a8a;
+}
+
+.settings-btn--danger:hover:not(:disabled),
+.settings-button--danger:hover:not(:disabled) {
+  background: rgba(255, 80, 80, 0.14);
+  border-color: rgba(255, 120, 120, 0.4);
+}
+
+:root[data-ui-theme='light'] .settings-btn--danger,
+:root[data-ui-theme='light'] .settings-button--danger {
+  color: #b3261e;
 }
 
 .settings-help-version {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.settings-btn--danger {
-  background: rgba(255, 80, 80, 0.15);
-  color: #ff6b6b;
-  border: 1px solid rgba(255, 80, 80, 0.2);
-}
-
-.settings-btn--danger:hover {
-  background: rgba(255, 80, 80, 0.25);
 }
 
 /* ─── Theme row ───────────────────────────────────────────────────────────── */
@@ -321,8 +485,8 @@
 }
 
 .shortcut-action-label {
-  font-size: 12.5px;
-  color: rgba(var(--ui-overlay-rgb), 0.75);
+  font-size: 13px;
+  color: var(--ui-text-primary);
   flex: 1;
 }
 
@@ -367,12 +531,10 @@
 }
 
 .shortcut-group-title {
-  margin: 0 0 6px;
-  font-size: 11px;
+  margin: 0 0 4px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ui-accent);
+  color: var(--ui-text-muted);
 }
 
 .shortcut-empty {
@@ -395,12 +557,12 @@
   padding: 3px 10px;
   min-width: 130px;
   text-align: center;
-  background: var(--ui-bg-4);
-  border: 1px solid rgba(var(--ui-overlay-rgb), 0.12);
-  border-radius: 5px;
-  color: rgba(var(--ui-overlay-rgb), 0.75);
+  background: var(--ui-bg-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-s);
+  color: var(--ui-text-secondary);
   font-size: 11.5px;
-  font-family: 'Consolas', 'Menlo', monospace;
+  font-family: var(--ui-font-mono);
   cursor: pointer;
   transition: border-color 0.1s, background 0.1s;
 }
@@ -433,7 +595,7 @@
 }
 
 .shortcut-filter-capture__btn--set {
-  font-family: 'Consolas', 'Menlo', monospace;
+  font-family: var(--ui-font-mono);
   border-color: rgba(var(--ui-accent-rgb), 0.5);
   color: var(--ui-accent);
 }
@@ -446,21 +608,8 @@
 }
 
 /* ─── Quick-launch profiles (issue #32) ─────────────────────────────────── */
-.settings-button {
-  background: var(--ui-bg-4);
-  border: 1px solid rgba(var(--ui-overlay-rgb), 0.14);
-  border-radius: 6px;
-  color: var(--ui-text-primary);
-  font-size: 12.5px;
-  padding: 5px 12px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.settings-button:hover { background: var(--ui-bg-5); border-color: rgba(var(--ui-overlay-rgb),0.24); }
-.settings-button--danger { color: #ff8a8a; }
-.settings-button--danger:hover { background: rgba(255,80,80,0.14); border-color: rgba(255,120,120,0.4); }
-.settings-hint { color: var(--ui-text-muted); font-size: 12px; line-height: 1.5; }
-.settings-hint code { background: rgba(var(--ui-overlay-rgb),0.08); padding: 0 4px; border-radius: 3px; }
+.settings-hint { color: var(--ui-text-muted); font-size: 12px; line-height: 1.55; }
+.settings-hint code { background: rgba(var(--ui-overlay-rgb),0.08); padding: 0 4px; border-radius: 3px; font-family: var(--ui-font-mono); font-size: 11.5px; }
 .settings-hint--lead { margin-bottom: 14px; }
 .ql-profile {
   border: 1px solid rgba(var(--ui-overlay-rgb),0.10);
@@ -586,13 +735,3 @@
 .changelog__notes .markdown-body pre,
 .changelog__notes .markdown-body table { overflow-x: auto; max-width: 100%; }
 .changelog__stale { color: var(--ui-text-muted); }
-
-.settings-window { width: 960px; }
-.settings-tabs { width: 220px; flex: 0 0 220px; overflow-y: auto; }
-.settings-global-search { width: 100%; box-sizing: border-box; margin-bottom: 12px; }
-.settings-nav-group h3 { font-size: 11px; color: var(--ui-text-secondary); margin: 12px 8px 4px; }
-.settings-nav-group .settings-tab { width: 100%; text-align: left; }
-.settings-scope { font-size: 12px; color: var(--ui-text-secondary); border: 1px solid rgba(var(--ui-overlay-rgb), .15); border-radius: 6px; padding: 10px; margin-bottom: 18px; }
-.settings-scope summary { cursor: pointer; }
-.settings-scope p { line-height: 1.5; margin: 8px 0; }
-.settings-effective { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; user-select: text; }

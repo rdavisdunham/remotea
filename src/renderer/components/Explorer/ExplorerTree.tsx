@@ -183,8 +183,6 @@ export function ExplorerTree({
         // A folder's dot means "something under here was touched", which is what
         // makes a collapsed tree still tell you where the agent has been.
         const agentTouched = isTouched(touched, row.relPath);
-        let chevron = '';
-        if (isDir) chevron = row.expanded ? '▾' : '▸';
         return (
           <div
             key={row.relPath}
@@ -237,7 +235,18 @@ export function ExplorerTree({
             }}
             onContextMenu={(e) => { e.preventDefault(); onContextMenu(row, e); }}
           >
-            <span className="explorer-row__chevron">{chevron}</span>
+            <span className={`explorer-row__chevron${isDir && row.expanded ? ' explorer-row__chevron--open' : ''}`} aria-hidden="true">
+              {isDir && (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 2l3 3-3 3" /></svg>
+              )}
+            </span>
+            <span className={`explorer-row__icon${isDir ? ' explorer-row__icon--dir' : ''}`} aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                {isDir
+                  ? <path d="M1.8 4.2a1 1 0 0 1 1-1h3l1.4 1.6h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H2.8a1 1 0 0 1-1-1z" />
+                  : <><path d="M4 1.8h5l3 3v8.4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.8a1 1 0 0 1 1-1z" /><path d="M9 1.8v3h3" /></>}
+              </svg>
+            </span>
             {agentTouched && (
               // Marks WHO changed it, which the numbers cannot say. Decorative
               // to the accessibility tree only because the row's aria-label

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import GeneralSettings from './GeneralSettings';
 import SidebarSettings from './SidebarSettings';
 import WorkspaceSettings from './WorkspaceSettings';
@@ -57,6 +57,33 @@ export default function SettingsWindow({ onClose, initialTab, initialHostId }: S
   const [query, setQuery] = useState('');
   const matches = searchSettings(query, (key, fallback) => t(key as TranslationKey, fallback));
 
+  // Escape closes the window, except from a field or a shortcut recorder:
+  // both use Escape themselves (clear, cancel) and must not lose the window.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.('input, textarea, select, [class*="--recording"], [class*="--listening"]')) return;
+      if (document.querySelector('.remote-settings__modal-overlay, [class*="--recording"], [class*="--listening"]')) return;
+      onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // A new section starts at its top, not wherever the last one was scrolled.
+  const content = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [activeTab]);
+
+  // Most rows pair a plain label with a switch and never link the two. A click
+  // on the label of such a row flips its switch, as a linked label would.
+  const toggleFromLabel = (event: MouseEvent<HTMLDivElement>) => {
+    const label = (event.target as HTMLElement).closest?.('label.settings-label');
+    if (!(label instanceof HTMLLabelElement) || label.htmlFor || label.querySelector('input')) return;
+    const toggles = label.closest('.settings-row')?.querySelectorAll<HTMLInputElement>('input.settings-toggle');
+    if (toggles?.length === 1 && !toggles[0].disabled) toggles[0].click();
+  };
+
   return (
     <div
       className="settings-overlay"
@@ -64,48 +91,58 @@ export default function SettingsWindow({ onClose, initialTab, initialHostId }: S
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="settings-window">
-        <div className="settings-header">
-          <h2>{t('settings.title')}</h2>
-          <button className="settings-close" onClick={onClose}>
-            ×
-          </button>
-        </div>
-        <div className="settings-body">
-          <div className="settings-tabs">
-            <input
-              className="settings-input settings-global-search"
-              aria-label={t('settings.alignment.searchLabel')}
-              placeholder={t('settings.alignment.searchPlaceholder')}
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-            />
-            {SETTINGS_GROUPS.map(group => {
-              const sections = group.sections.filter(section => matches.includes(section));
-              if (sections.length === 0) return null;
-              const labelKey = `settings.alignment.group.${group.sections[0]}` as TranslationKey;
-              return (
-                <div key={group.label} className="settings-nav-group">
-                  <h3>{t(labelKey, group.label)}</h3>
-                  {sections.map(tab => (
-                    <button
-                      key={tab}
-                      className={`settings-tab ${activeTab === tab ? 'settings-tab--active' : ''}`}
-                      onClick={() => setActiveTab(tab)}
-                    >
-                      {t(TAB_LABEL_KEYS[tab])}
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
-            {matches.length === 0 && (
-              <p className="settings-hint" role="status">
-                {t('settings.alignment.noMatch')}
-              </p>
-            )}
+      <div className="settings-window" role="dialog" aria-modal="true" aria-label={t('settings.title')}>
+        <nav className="settings-tabs" aria-label={t('settings.title')}>
+          <h2 className="settings-title">{t('settings.title')}</h2>
+          <input
+            className="settings-input settings-global-search"
+            type="search"
+            aria-label={t('settings.alignment.searchLabel')}
+            placeholder={t('settings.alignment.searchPlaceholder')}
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+          />
+          {SETTINGS_GROUPS.map(group => {
+            const sections = group.sections.filter(section => matches.includes(section));
+            if (sections.length === 0) return null;
+            const labelKey = `settings.alignment.group.${group.sections[0]}` as TranslationKey;
+            return (
+              <div key={group.label} className="settings-nav-group">
+                <h3>{t(labelKey, group.label)}</h3>
+                {sections.map(tab => (
+                  <button
+                    key={tab}
+                    className={`settings-tab ${activeTab === tab ? 'settings-tab--active' : ''}`}
+                    aria-current={activeTab === tab ? 'page' : undefined}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    {t(TAB_LABEL_KEYS[tab])}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+          {matches.length === 0 && (
+            <p className="settings-hint" role="status">
+              {t('settings.alignment.noMatch')}
+            </p>
+          )}
+        </nav>
+        <div className="settings-main">
+          <div className="settings-header">
+            <h2>{t(TAB_LABEL_KEYS[activeTab])}</h2>
+            <button
+              className="settings-close"
+              onClick={onClose}
+              aria-label={t('settings.close', 'Close settings')}
+              title={t('settings.close', 'Close settings')}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+              </svg>
+            </button>
           </div>
-          <div className="settings-content">
+          <div className="settings-content" ref={content} onClick={toggleFromLabel}>
             <SettingsScope section={activeTab} />
             {activeTab === 'Agents' && (
               <div className="settings-section">

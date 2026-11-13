@@ -207,7 +207,9 @@ export default function GitPane({ surfaceId, cwd, surface, onPatch }: Readonly<P
           >
             {t('git.goToTerminal', 'Go to terminal')}
           </button>
-          <button type="button" className="git-btn git-btn--icon" onClick={refresh} title={t('diffPane.refresh', 'Refresh')}>↻</button>
+          <button type="button" className="git-btn git-btn--icon" onClick={refresh} title={t('diffPane.refresh', 'Refresh')} aria-label={t('diffPane.refresh', 'Refresh')}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" /><path d="M13.5 2.5v3h-3" /></svg>
+          </button>
         </div>
         {!selected && <div className="git-empty">{t('git.noWorktree', 'No worktree to review')}</div>}
         {selected && mode === 'working' && (
