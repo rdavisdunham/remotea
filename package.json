@@ -1,6 +1,6 @@
 {
   "name": "remotea",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Desktop workspace for local and remote terminals, coding agents, files, and browsers",
   "license": "MIT",
   "main": "dist/main/index.js",
