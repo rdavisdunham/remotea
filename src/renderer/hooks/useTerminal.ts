@@ -54,7 +54,7 @@ import { trimTrailingWhitespace } from '../utils/copy-text';
 import { bellAction, normalizeBellStyle } from '../utils/terminal-bell';
 import { playBellSound } from '../notification-sound';
 import { normalizeRightClickMode, rightClickAction } from '../utils/terminal-right-click';
-import { handleShiftEnter, isLetterKey, isShiftEnter } from './terminal-keys';
+import { handleShiftEnter, isBareCtrlLetter, isShiftEnter } from './terminal-keys';
 import { applyKeyRemap } from '../key-remaps';
 import { claimsKeyEvent } from '../utils/shortcut-binding';
 import { installXtermCompositionClauses } from '../utils/ime-composition';
@@ -1818,7 +1818,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // pty.write so broadcast-input fans a remapped key out like any other.
       if (!managedInputBlocked(latestRemoteViews(), surfaceId) && applyKeyRemap(event, (data) => terminal.input(data, true))) return false;
 
-      if (event.type === 'keydown' && event.ctrlKey && isLetterKey(event, 'c', 'KeyC')) {
+      if (isBareCtrlLetter(event, 'c', 'KeyC')) {
         // ConPTY pads lines to full width with real spaces — trim them or
         // pasted blocks carry ragged trailing whitespace (issue #102).
         const selection = trimTrailingWhitespace(terminal.getSelection());
@@ -1841,8 +1841,11 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         event.preventDefault();
         return false;
       }
-      // Ctrl+V: main reads the clipboard and tells us what to type.
-      if (event.type === 'keydown' && event.ctrlKey && isLetterKey(event, 'v', 'KeyV')) {
+      // Ctrl+V: main reads the clipboard and tells us what to type. Bare Ctrl
+      // only, read off the modifier flags rather than the letter's case: with
+      // Caps Lock on, a case test let Ctrl+V through to the PTY as a raw ^V
+      // and claimed Ctrl+Shift+V, which the `paste` shortcut pasted again (#453).
+      if (isBareCtrlLetter(event, 'v', 'KeyV')) {
         // Prevent the browser 'paste' event — without this, xterm's built-in
         // paste handler ALSO writes the clipboard content through onData,
         // causing the text to appear twice in the terminal.
