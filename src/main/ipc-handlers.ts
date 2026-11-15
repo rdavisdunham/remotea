@@ -1021,6 +1021,10 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     if (effects.toast) {
       notificationManager.showToast(data.title || 'remotea', data.text, () => {
         if (window && !window.isDestroyed()) {
+          // A minimized or hidden window comes back on a toast click.
+          if (window.isMinimized()) window.restore();
+          if (!window.isVisible()) window.show();
+          window.moveTop();
           window.focus();
           window.webContents.send('notification:focus-surface', data.surfaceId);
         }
