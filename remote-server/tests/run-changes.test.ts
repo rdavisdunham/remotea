@@ -31,6 +31,17 @@ function repo(): { dir: string; git: (...args: string[]) => string; write: (file
 }
 
 describe('runChanges', () => {
+  it('does not call committed work uncommitted because running the code left untracked files behind', async () => {
+    const { dir, git, write } = repo();
+    write('app.txt', 'one\nTWO\nthree\n');
+    git('commit', '-q', '-am', 'work');
+    write('__pycache__/app.cpython-312.pyc', 'compiled\n'); // what a verify command leaves; nobody ignored it
+    const r = await runChanges({ cwd: dir, base: 'main', exec: execGh });
+    expect(r.uncommitted).toBe(false);
+    expect(r.untracked).toEqual(['__pycache__/']);
+    expect(r.files.map((f) => f.path)).toEqual(['app.txt']);
+  });
+
   it('reports committed and uncommitted edits against the merge base, with untracked files named', async () => {
     const { dir, git, write } = repo();
     write('app.txt', 'one\nTWO\nthree\n');
