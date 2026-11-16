@@ -7,6 +7,7 @@
  *   2. the base: `origin/<base>` when the clone has it, else the local `<base>`; `git merge-base HEAD <ref>` → `base_sha`
  *   3. `git diff --numstat -M <base_sha>` → `files` (the working tree against the base, so uncommitted edits count)
  *   4. `git status --porcelain` → `untracked` (new files not yet added: they are in no diff) and `uncommitted`
+ *      (edits to tracked files that are not committed; untracked files alone do not set it)
  *   5. `git diff -M <base_sha>` without lock files → `patch`, secrets redacted, cut at `maxChars`
  *
  * Read-only. A missing git, a folder that is no repository, or an unknown base is a failure with the reason.
@@ -38,7 +39,10 @@ export interface RunChanges {
   /** New files git does not track yet (paths, at most MAX_UNTRACKED): they are in neither `files` nor `patch`. */
   untracked: string[];
   untracked_total: number;
-  /** The worktree has changes that are not committed (tracked edits or untracked files). */
+  /**
+   * Tracked files have edits that are not committed. Untracked files do not count: running the code leaves some
+   * behind (caches, compiled files), and they are named in `untracked` for the reader to weigh.
+   */
   uncommitted: boolean;
   patch: string;
   patch_truncated: boolean;
@@ -95,7 +99,7 @@ export async function runChanges(o: { cwd: string; base: string; maxChars?: numb
     head, base_ref: baseRef, base_sha: baseSha,
     files: all.slice(0, MAX_FILES), files_total: all.length,
     untracked: untracked.slice(0, MAX_UNTRACKED), untracked_total: untracked.length,
-    uncommitted: status.length > 0,
+    uncommitted: status.some((l) => !l.startsWith('?? ')),
     patch: full.slice(0, cap), patch_truncated: full.length > cap || diff.code !== 0, patch_chars: full.length,
   };
 }
