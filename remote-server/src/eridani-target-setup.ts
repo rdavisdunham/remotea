@@ -88,13 +88,16 @@
  *      `mcpKeyFile`, `limits` and `migrations`.
  *
  * `--json` prints one object, runs no proposed check and writes nothing
- * unless `--yes` is also given, so another program (Eridani, later) can ask
- * for a proposal, show it to a person and call again with `--yes`, which runs
- * the check and saves:
+ * unless `--yes` is also given, so another program can ask for a proposal,
+ * show it to a person and call again with `--yes`, which runs the check and
+ * saves. Eridani does this over the link with the `target.setup` command
+ * (eridani-target-command.ts) through this same function; its confirm hands
+ * back the proposal the person saw (`confirmed`), so nothing is read again
+ * and `source` is "confirmed". The object:
  *
  *   {
  *     "saved": false,
- *     "source": "harness" | "heuristics",
+ *     "source": "harness" | "heuristics" | "confirmed",
  *     "harness": { "asked": "claude" | "codex" | null, "version": "2.1.326" | null,
  *                  "model": "opus" | null,            // null: the harness's configured model
  *                  "fallback_reason": "…" },          // fallback_reason only with source "heuristics"
@@ -152,6 +155,13 @@ export interface TargetSetupOptions {
   prepareTimeout: number;
   yes: boolean;
   json: boolean;
+  /**
+   * A proposal a person has already seen and confirmed (Eridani's
+   * `target.setup` with `confirm: true`, eridani-target-command.ts). No
+   * harness is asked and no heuristics run: a second reading could differ
+   * from what was shown. The CLI never sets it.
+   */
+  confirmed?: Proposal;
 }
 
 export const TARGET_SETUP_USAGE = `usage: remotea eridani targets setup <repo-path> [--id <id>] [--worktree-root <path>] [--harness claude|codex] [--model <name>] [--no-harness]
@@ -239,6 +249,8 @@ export interface ProposedStep {
   cwd?: string;
   /** Verify entries only: one line on what the check covers. Printed, never run. */
   why?: string;
+  /** Seconds, on the saved entry; absent: `--verify-timeout` / `--prepare-timeout`. Only a confirmed target carries it. */
+  timeout?: number;
 }
 
 export interface Proposal {
@@ -573,7 +585,8 @@ export interface CheckResult {
 
 export interface TargetSetupResult {
   saved: boolean;
-  source: 'harness' | 'heuristics';
+  /** `confirmed`: a proposal a person already saw (Eridani's confirm), not read again. */
+  source: 'harness' | 'heuristics' | 'confirmed';
   harness: { asked: SpawnHarness | null; version: string | null; model: string | null; fallback_reason?: string };
   target: ExecutionTarget;
   replaces: string | null;
@@ -600,6 +613,8 @@ export interface TargetSetupDeps {
   runCheck?: CheckFn;
   /** Where progress lines go (default: stderr), so stdout stays the report. */
   progress?: (line: string) => void;
+  /** Writes the target (default: `saveTarget`); a throw stops the setup with nothing written. */
+  save?: (dir: string, target: ExecutionTarget) => void;
 }
 
 const TAIL_SHOWN = 1500;
@@ -650,7 +665,7 @@ export function fmtTargetSetup(r: TargetSetupResult, o: { preview?: boolean; che
     fmtGate(r, lines);
     return lines;
   }
-  lines.push(r.source === 'harness'
+  lines.push(r.source === 'confirmed' ? 'Confirmed proposal:' : r.source === 'harness'
     ? `Proposed by ${r.harness.asked}${r.harness.version ? ` ${r.harness.version}` : ''}${r.harness.model ? ` (${r.harness.model})` : ''} after reading the repository:`
     : `Proposed from the repository's files, without a harness (${r.harness.fallback_reason ?? 'not asked'}):`);
   lines.push(`  id             ${t.id}${r.replaces ? `   (replaces the existing target ${r.replaces})` : ''}`);
@@ -731,7 +746,10 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
   let asked: SpawnHarness | null = null;
   let fallback: string | undefined;
   let proposal: Proposal | null = null;
-  if (o.noHarness) fallback = '--no-harness';
+  if (o.confirmed) {
+    proposal = o.confirmed;
+    source = 'confirmed';
+  } else if (o.noHarness) fallback = '--no-harness';
   else if (o.harness && !installed.includes(o.harness)) fallback = `${o.harness} is not installed: ${printable(probes.get(probeKey(o.harness, o.harness))?.error ?? 'not found', 200)}`;
   else if (!installed.length) fallback = 'neither claude nor codex is installed';
   else {
@@ -783,13 +801,14 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
   // 2. The target, from the proposal and what became of each check. Built
   // once for the preview and again after the trial.
   const ci = detectCi(repo);
-  const prepare: PrepareSpec[] = proposal.prepare.map((p) => ({ id: p.id, argv: [...p.argv], ...(p.cwd ? { cwd: p.cwd } : {}), timeout: o.prepareTimeout }));
+  const prepare: PrepareSpec[] = proposal.prepare.map((p) => ({ id: p.id, argv: [...p.argv], ...(p.cwd ? { cwd: p.cwd } : {}), timeout: p.timeout ?? o.prepareTimeout }));
+  const verifyTimeout = new Map(proposal.verify.map((v) => [v.id, v.timeout ?? o.verifyTimeout]));
   const launch: ExecutionTarget['launch'] = {};
   if (o.launch.length) for (const h of o.launch) launch[h] = prior?.launch[h] ?? {};
   else if (prior) Object.assign(launch, prior.launch);
   else for (const h of installed.length ? installed : (['claude'] as const)) launch[h] = {};
   const build = (checks: CheckResult[]): { result: TargetSetupResult; ready: boolean } => {
-    const verify: VerifySpec[] = checks.filter((c) => c.kept).map((c) => ({ id: c.id, argv: [...c.argv], ...(c.cwd ? { cwd: c.cwd } : {}), timeout: o.verifyTimeout }));
+    const verify: VerifySpec[] = checks.filter((c) => c.kept).map((c) => ({ id: c.id, argv: [...c.argv], ...(c.cwd ? { cwd: c.cwd } : {}), timeout: verifyTimeout.get(c.id) ?? o.verifyTimeout }));
     const target: ExecutionTarget = {
       id,
       repo,
@@ -843,6 +862,7 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
     }
   }
   const runCheck = d.runCheck ?? defaultCheck(home, env);
+  const save = d.save ?? saveTarget;
   const checks: CheckResult[] = [];
   for (const step of proposal.verify) {
     if (!o.noCheck && cwdOk(step) && trial === 'unconfirmed') {
@@ -874,7 +894,7 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
   // 4. Show, ask once, save.
   if (o.json) {
     if (o.yes) {
-      saveTarget(d.dir, target);
+      save(d.dir, target);
       result.saved = true;
     }
     say(JSON.stringify(result, null, 2));
@@ -893,7 +913,7 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
       return { code: 0, result };
     }
   }
-  saveTarget(d.dir, target);
+  save(d.dir, target);
   result.saved = true;
   say(`\ntarget ${id} saved; it applies to the next spawn (no restart)`);
   if (!ready) say(`warning: target ${id} is not ready, so Eridani will not be offered it until the NOT READY lines above are fixed`);
