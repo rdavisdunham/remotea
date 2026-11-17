@@ -48,7 +48,21 @@
  *      plus the lockfile's install command as `prepare`; the output says so,
  *      and why.
  *
- *   2. Try the check. Each proposed verify entry runs once through
+ *   2. Try the check, only once a person has seen it. Nothing proposed runs
+ *      before then: the harness's commands come from text the repository can
+ *      steer, and the heuristics' get the same rule so there is one rule.
+ *        - On a terminal the proposal (prepare and verify commands, CI, gate)
+ *          is printed first, then one question: "Run this check now in the
+ *          sandbox?" (default no). Only a yes runs it; a no leaves it out of
+ *          the target (`--keep-failing` keeps it unrun).
+ *        - `--yes` runs it without asking.
+ *        - No terminal, or `--json`, without `--yes`: it is not run. It is
+ *          reported `not_run` with `needs_confirmation: true` and the reason;
+ *          it stays in the proposed target (nothing is written in these
+ *          modes), and a later `--yes` runs it first and keeps it only if it
+ *          passes.
+ *        - `--no-check` never runs it and keeps it.
+ *      Once confirmed, each proposed verify entry runs once through
  *      verify-runner.ts, in the bubblewrap sandbox (verify-sandbox.ts) with
  *      no network, in the repository checkout as it stands, with the
  *      service's PATH. The sandbox is required here: the command was
@@ -66,16 +80,17 @@
  *      `pull_request`. With no local check, "CI is the gate" (or "nothing
  *      gates this target") is printed as an explicit choice.
  *
- *   4. Confirm and save. The proposal is printed; one y/N question; then
- *      `saveTarget`. `--yes` skips the question. Without a terminal on stdin
+ *   4. Confirm and save. The proposal and the check results are printed; one
+ *      y/N question ("Save target …?"); then `saveTarget`. `--yes` skips the question. Without a terminal on stdin
  *      nothing is asked and nothing is written unless `--yes` is given. An
  *      existing target with the same id, or (without `--id`) for the same
  *      repository, is replaced, keeping its `launch`, `worktreeRoot`,
  *      `mcpKeyFile`, `limits` and `migrations`.
  *
- * `--json` prints one object and writes nothing unless `--yes` is also
- * given, so another program (Eridani, later) can ask for a proposal, show it
- * and call again with `--yes`:
+ * `--json` prints one object, runs no proposed check and writes nothing
+ * unless `--yes` is also given, so another program (Eridani, later) can ask
+ * for a proposal, show it to a person and call again with `--yes`, which runs
+ * the check and saves:
  *
  *   {
  *     "saved": false,
@@ -89,6 +104,7 @@
  *                  "status": "passed" | "failed" | "timed_out" | "not_run",
  *                  "exit_code": 0, "duration_ms": 8123, "isolated": true,
  *                  "reason": "…",                     // why it was not run, or the runner's error
+ *                  "needs_confirmation": true,        // only when not run because nobody confirmed it
  *                  "tail": "…last output…",           // absent when it passed
  *                  "left_files": false,               // it left files git does not ignore
  *                  "kept": true }],                   // it is in target.verify
@@ -143,8 +159,9 @@ export const TARGET_SETUP_USAGE = `usage: remotea eridani targets setup <repo-pa
                                      [--verify-timeout <s>] [--prepare-timeout <s>] [--yes] [--json]
 
 Proposes an execution target for the repository (base branch, dependency
-install, a quick check), tries the check in the verify sandbox with no
-network, says whether pull requests have GitHub CI, asks once, and saves it.
+install, a quick check) and says whether pull requests have GitHub CI. Shows
+the proposed commands first: the check runs (in the verify sandbox, no
+network) only after you say yes, or with --yes. Then asks once and saves.
 
   --harness claude|codex   which installed harness reads the repository (default: claude, then codex)
   --model <name>           the model it reads with (default: opus for claude, codex's configured model)
@@ -153,8 +170,10 @@ network, says whether pull requests have GitHub CI, asks once, and saves it.
   --no-check               do not try the proposed check
   --check-timeout <s>      how long a trial check may run (default 600)
   --keep-failing           keep a check that failed or could not be run
-  --yes                    save without asking
-  --json                   print the proposal and the result as JSON; writes nothing without --yes`;
+  --yes                    run the check and save without asking
+  --json                   print the proposal and the result as JSON; without --yes runs no check and writes nothing
+
+Without a terminal and without --yes, the check is not run and nothing is written.`;
 
 /** A model name or alias as the harnesses take it (`opus`, `claude-opus-5-5[1m]`, `gpt-6.1`). */
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,99}$/;
@@ -542,6 +561,8 @@ export interface CheckResult {
   isolated: boolean;
   /** Why it was not run, or the runner's error. */
   reason?: string;
+  /** Not run because nobody confirmed it: no terminal to ask on, or `--json`, without `--yes`. */
+  needs_confirmation?: boolean;
   /** The end of its output; absent when it passed. */
   tail?: string;
   /** It left files git does not ignore: every later verification of such a tree is "stale". */
@@ -595,6 +616,9 @@ function branchExists(repo: string, branch: string): boolean {
   return false;
 }
 
+/** The reason on a check nobody confirmed. */
+export const NEEDS_CONFIRMATION = 'needs confirmation: nothing proposed runs before a person has seen it; run again with --yes (or on a terminal and answer yes)';
+
 function toCheck(step: ProposedStep, o: VerifyOutcome | null, notRun?: string): Omit<CheckResult, 'kept'> {
   const base = { id: step.id, argv: [...step.argv], ...(step.cwd ? { cwd: step.cwd } : {}), ...(step.why ? { why: step.why } : {}) };
   if (!o) return { ...base, status: 'not_run', exit_code: null, duration_ms: 0, isolated: false, reason: notRun ?? 'not run', left_files: false };
@@ -611,10 +635,21 @@ function toCheck(step: ProposedStep, o: VerifyOutcome | null, notRun?: string): 
 const fmtSeconds = (ms: number): string => (ms < 10_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 1000)} s`);
 const fmtCmd = (s: { argv: string[]; cwd?: string }): string => `${s.argv.join(' ')}${s.cwd ? `  (in ${s.cwd})` : ''}`;
 
-/** The proposal and the check results as a person reads them. */
-export function fmtTargetSetup(r: TargetSetupResult): string[] {
+/**
+ * The proposal and the check results as a person reads them. `preview`: the
+ * proposal before the trial, asked about next ("will run only if you say
+ * yes"). `checksOnly`: after the trial, only what it found (the proposal was
+ * printed just before the question).
+ */
+export function fmtTargetSetup(r: TargetSetupResult, o: { preview?: boolean; checksOnly?: boolean } = {}): string[] {
   const t = r.target;
   const lines: string[] = [];
+  if (o.checksOnly) {
+    lines.push('Check results:');
+    fmtChecks(r, lines, false);
+    fmtGate(r, lines);
+    return lines;
+  }
   lines.push(r.source === 'harness'
     ? `Proposed by ${r.harness.asked}${r.harness.version ? ` ${r.harness.version}` : ''}${r.harness.model ? ` (${r.harness.model})` : ''} after reading the repository:`
     : `Proposed from the repository's files, without a harness (${r.harness.fallback_reason ?? 'not asked'}):`);
@@ -625,28 +660,43 @@ export function fmtTargetSetup(r: TargetSetupResult): string[] {
   lines.push(`  harnesses      ${(['claude', 'codex'] as const).filter((h) => t.launch[h]).join(', ') || 'none'}`);
   if (t.prepare?.length) for (const p of t.prepare) lines.push(`  prepare ${p.id.padEnd(7)} ${fmtCmd(p)}   (not run here; runs in each new worktree, ${p.timeout} s limit)`);
   else lines.push('  prepare        none');
+  fmtChecks(r, lines, !!o.preview);
+  lines.push(`  GitHub CI      ${r.ci.pull_request ? `runs on pull requests (${r.ci.workflows.join(', ')})` : 'no workflow runs on pull requests'}`);
+  fmtGate(r, lines);
+  for (const n of r.notes) lines.push(`  note           ${n}`);
+  for (const p of r.problems ?? []) lines.push(`  ${p.level === 'fail' ? 'NOT READY' : 'warn'}      ${p.check}: ${p.reason}`);
+  return lines;
+}
+
+function fmtChecks(r: TargetSetupResult, lines: string[], preview: boolean): void {
   if (!r.checks.length) lines.push('  verify         none proposed');
   for (const c of r.checks) {
+    if (preview && c.status === 'not_run' && c.needs_confirmation) {
+      lines.push(`  verify ${c.id.padEnd(7)} ${fmtCmd(c)}`);
+      if (c.why) lines.push(`                 ${c.why}`);
+      lines.push('                 check: not run yet; it runs only if you say yes below');
+      continue;
+    }
     const res = c.status === 'passed' ? `passed in ${fmtSeconds(c.duration_ms)}`
       : c.status === 'failed' ? `FAILED (exit ${c.exit_code}) after ${fmtSeconds(c.duration_ms)}`
         : c.status === 'timed_out' ? `TIMED OUT after ${fmtSeconds(c.duration_ms)}`
-          : `not run: ${c.reason}`;
+          : `NOT RUN: ${c.reason}`;
     lines.push(`  verify ${c.id.padEnd(7)} ${fmtCmd(c)}`);
     if (c.why) lines.push(`                 ${c.why}`);
-    lines.push(`                 check: ${res}${c.status !== 'not_run' ? (c.isolated ? ', sandboxed, no network' : ', NOT sandboxed') : ''}; ${c.kept ? 'kept' : 'LEFT OUT of the target (--keep-failing keeps it)'}`);
+    lines.push(`                 check: ${res}${c.status !== 'not_run' ? (c.isolated ? ', sandboxed, no network' : ', NOT sandboxed') : ''}; ${c.kept ? (c.needs_confirmation ? 'in the proposed target; with --yes it runs first and stays only if it passes' : 'kept') : 'LEFT OUT of the target (--keep-failing keeps it)'}`);
     if (c.left_files) lines.push('                 it left files git does not ignore: a verification of such a tree is reported stale (add them to .gitignore)');
     if (c.tail) {
       lines.push('                 last output:');
       for (const l of c.tail.split('\n').slice(-20)) lines.push(`                   | ${l}`);
     }
   }
-  lines.push(`  GitHub CI      ${r.ci.pull_request ? `runs on pull requests (${r.ci.workflows.join(', ')})` : 'no workflow runs on pull requests'}`);
+}
+
+function fmtGate(r: TargetSetupResult, lines: string[]): void {
+  const t = r.target;
   lines.push(r.gate === 'local' ? `  gate           the local check${t.verify.length > 1 ? 's' : ''} (${t.verify.map((v) => v.id).join(', ')})${r.ci.pull_request ? ', then CI on the pull request' : ''}`
     : r.gate === 'ci' ? '  gate           CI IS THE GATE: no local check, so only the pull request\'s CI tells whether a change is sound'
       : '  gate           NOTHING: no local check and no CI on pull requests; work on this target is not checked by anything');
-  for (const n of r.notes) lines.push(`  note           ${n}`);
-  for (const p of r.problems ?? []) lines.push(`  ${p.level === 'fail' ? 'NOT READY' : 'warn'}      ${p.check}: ${p.reason}`);
-  return lines;
 }
 
 /** The default trial: verify-runner in the sandbox (required), no network, the service's PATH. */
@@ -730,14 +780,79 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
   for (const s of [...proposal.prepare, ...proposal.verify]) if (!cwdOk(s)) notes.push(`${s.id}: its folder ${s.cwd} does not exist in the repository`);
   if (proposal.notes) notes.push(proposal.notes);
 
-  // 2. Try each proposed check.
+  // 2. The target, from the proposal and what became of each check. Built
+  // once for the preview and again after the trial.
   const ci = detectCi(repo);
+  const prepare: PrepareSpec[] = proposal.prepare.map((p) => ({ id: p.id, argv: [...p.argv], ...(p.cwd ? { cwd: p.cwd } : {}), timeout: o.prepareTimeout }));
+  const launch: ExecutionTarget['launch'] = {};
+  if (o.launch.length) for (const h of o.launch) launch[h] = prior?.launch[h] ?? {};
+  else if (prior) Object.assign(launch, prior.launch);
+  else for (const h of installed.length ? installed : (['claude'] as const)) launch[h] = {};
+  const build = (checks: CheckResult[]): { result: TargetSetupResult; ready: boolean } => {
+    const verify: VerifySpec[] = checks.filter((c) => c.kept).map((c) => ({ id: c.id, argv: [...c.argv], ...(c.cwd ? { cwd: c.cwd } : {}), timeout: o.verifyTimeout }));
+    const target: ExecutionTarget = {
+      id,
+      repo,
+      worktreeRoot: o.worktreeRoot ?? prior?.worktreeRoot ?? path.join(path.dirname(repo), `${path.basename(repo)}-worktrees`),
+      base,
+      launch,
+      verify,
+      ...(prepare.length ? { prepare } : {}),
+      ...(prior?.mcpKeyFile ? { mcpKeyFile: prior.mcpKeyFile } : {}),
+      ...(prior?.limits ? { limits: prior.limits } : {}),
+      ...(prior?.migrations ? { migrations: prior.migrations } : {}),
+    };
+    const err = targetError(target);
+    if (err) throw new Error(`the proposed target is not valid: ${err}`);
+    const tpl = templateStatus(target, { env: serviceEnv(home, env).env });
+    return {
+      ready: tpl.ready,
+      result: {
+        saved: false,
+        source,
+        harness: { asked, version: asked ? probes.get(probeKey(asked, asked))?.version ?? null : null, model: asked ? inspectModel(asked, o.model) : null, ...(source === 'heuristics' && fallback ? { fallback_reason: fallback } : {}) },
+        target,
+        replaces: prior?.id ?? null,
+        checks,
+        ci,
+        gate: verify.length ? 'local' : ci.pull_request ? 'ci' : 'none',
+        notes,
+        problems: tpl.problems ?? [],
+      },
+    };
+  };
+
+  // 3. The trial. Nothing proposed runs before a person has seen it: the
+  // harness's commands come from text the repository can steer, and the
+  // heuristics get the same rule so there is one rule. On a terminal the
+  // proposal is printed and one question asked; `--yes` runs it unasked;
+  // without a terminal, or with `--json`, and without `--yes`, it is not run.
+  // A check that cannot run (`--no-check`, a missing folder) is never asked about.
+  const pending = (step: ProposedStep): CheckResult => ({ ...toCheck(step, null, NEEDS_CONFIRMATION), needs_confirmation: true, kept: true });
+  const runnable = o.noCheck ? [] : proposal.verify.filter(cwdOk);
+  let trial: 'run' | 'unconfirmed' | 'declined' = 'run';
+  let previewed = false;
+  if (runnable.length && !o.yes) {
+    if (o.json || !d.prompt.interactive) trial = 'unconfirmed';
+    else {
+      const preview = build(proposal.verify.map((step) => (runnable.includes(step) ? pending(step) : { ...toCheck(step, null, o.noCheck ? '--no-check' : `its folder ${step.cwd} does not exist`), kept: o.noCheck || o.keepFailing })));
+      for (const line of fmtTargetSetup(preview.result, { preview: true })) say(line);
+      previewed = true;
+      const what = runnable.length === 1 ? `this check (${fmtCmd(runnable[0])})` : `these ${runnable.length} checks`;
+      trial = (await d.prompt.confirm(`\nRun ${what} now in the sandbox (no network, in ${repo})?`, false)) ? 'run' : 'declined';
+    }
+  }
   const runCheck = d.runCheck ?? defaultCheck(home, env);
   const checks: CheckResult[] = [];
   for (const step of proposal.verify) {
+    if (!o.noCheck && cwdOk(step) && trial === 'unconfirmed') {
+      checks.push(pending(step));
+      continue;
+    }
     let res: Omit<CheckResult, 'kept'>;
     if (o.noCheck) res = toCheck(step, null, '--no-check');
     else if (!cwdOk(step)) res = toCheck(step, null, `its folder ${step.cwd} does not exist`);
+    else if (trial === 'declined') res = toCheck(step, null, 'you chose not to run it');
     else {
       progress(`trying ${step.id}: ${fmtCmd(step)} (sandboxed, no network, up to ${o.checkTimeout} s)…`);
       // The sandbox is required for the trial: `bwrap` refuses to run where bwrap does not work.
@@ -753,41 +868,8 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
   if (proposal.prepare.length && checks.some((c) => c.status === 'failed')) {
     notes.push(`prepare (${proposal.prepare.map((p) => fmtCmd(p)).join('; ')}) was not run here: if a check failed because dependencies are missing, run it in ${repo} and try again, or keep the check with --keep-failing`);
   }
-
-  // 3. The target.
-  const verify: VerifySpec[] = checks.filter((c) => c.kept).map((c) => ({ id: c.id, argv: [...c.argv], ...(c.cwd ? { cwd: c.cwd } : {}), timeout: o.verifyTimeout }));
-  const prepare: PrepareSpec[] = proposal.prepare.map((p) => ({ id: p.id, argv: [...p.argv], ...(p.cwd ? { cwd: p.cwd } : {}), timeout: o.prepareTimeout }));
-  const launch: ExecutionTarget['launch'] = {};
-  if (o.launch.length) for (const h of o.launch) launch[h] = prior?.launch[h] ?? {};
-  else if (prior) Object.assign(launch, prior.launch);
-  else for (const h of installed.length ? installed : (['claude'] as const)) launch[h] = {};
-  const target: ExecutionTarget = {
-    id,
-    repo,
-    worktreeRoot: o.worktreeRoot ?? prior?.worktreeRoot ?? path.join(path.dirname(repo), `${path.basename(repo)}-worktrees`),
-    base,
-    launch,
-    verify,
-    ...(prepare.length ? { prepare } : {}),
-    ...(prior?.mcpKeyFile ? { mcpKeyFile: prior.mcpKeyFile } : {}),
-    ...(prior?.limits ? { limits: prior.limits } : {}),
-    ...(prior?.migrations ? { migrations: prior.migrations } : {}),
-  };
-  const err = targetError(target);
-  if (err) throw new Error(`the proposed target is not valid: ${err}`);
-  const tpl = templateStatus(target, { env: serviceEnv(home, env).env });
-  const result: TargetSetupResult = {
-    saved: false,
-    source,
-    harness: { asked, version: asked ? probes.get(probeKey(asked, asked))?.version ?? null : null, model: asked ? inspectModel(asked, o.model) : null, ...(source === 'heuristics' && fallback ? { fallback_reason: fallback } : {}) },
-    target,
-    replaces: prior?.id ?? null,
-    checks,
-    ci,
-    gate: verify.length ? 'local' : ci.pull_request ? 'ci' : 'none',
-    notes,
-    problems: tpl.problems ?? [],
-  };
+  const { result, ready } = build(checks);
+  const target = result.target;
 
   // 4. Show, ask once, save.
   if (o.json) {
@@ -798,7 +880,8 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
     say(JSON.stringify(result, null, 2));
     return { code: 0, result };
   }
-  for (const line of fmtTargetSetup(result)) say(line);
+  if (previewed) say('');
+  for (const line of fmtTargetSetup(result, { checksOnly: previewed })) say(line);
   const p = o.yes ? noPrompter : d.prompt;
   if (!o.yes) {
     if (!p.interactive) {
@@ -813,6 +896,6 @@ export async function runTargetSetup(o: TargetSetupOptions, d: TargetSetupDeps):
   saveTarget(d.dir, target);
   result.saved = true;
   say(`\ntarget ${id} saved; it applies to the next spawn (no restart)`);
-  if (!tpl.ready) say(`warning: target ${id} is not ready, so Eridani will not be offered it until the NOT READY lines above are fixed`);
+  if (!ready) say(`warning: target ${id} is not ready, so Eridani will not be offered it until the NOT READY lines above are fixed`);
   return { code: 0, result };
 }

@@ -242,13 +242,13 @@ describe('runTargetSetup', () => {
     const h = fakeInspect(JSON.stringify(GOOD));
     const c = fakeCheck({ duration_ms: 8123 });
     const d = deps({ dir, inspect: h.fn, runCheck: c.fn });
-    const { code, result } = await runTargetSetup(parseTargetSetupArgs([repo, '--json']), d);
+    const { code, result } = await runTargetSetup(parseTargetSetupArgs([repo, '--json', '--yes']), d);
     expect(code).toBe(0);
     expect(h.calls).toEqual([expect.objectContaining({ harness: 'claude', model: 'opus' })]);
     expect(c.calls).toHaveLength(1);
     expect(c.calls[0].spec).toMatchObject({ id: 'test', argv: ['npm', 'test'], isolation: 'bwrap', network: false });
     expect(c.calls[0].repo).toBe(repo);
-    expect(result).toMatchObject({ saved: false, source: 'harness', harness: { asked: 'claude', model: 'opus', version: '9.9.9' }, gate: 'local' });
+    expect(result).toMatchObject({ saved: true, source: 'harness', harness: { asked: 'claude', model: 'opus', version: '9.9.9' }, gate: 'local' });
     expect(result.checks).toEqual([expect.objectContaining({ id: 'test', status: 'passed', duration_ms: 8123, isolated: true, kept: true })]);
     expect(result.target).toMatchObject({ id: 'app', repo, base: 'main', verify: [{ id: 'test', argv: ['npm', 'test'], timeout: 7200 }], prepare: [{ id: 'deps', argv: ['npm', 'ci'], timeout: 900 }] });
     expect(result.notes).toContain('needs node 22');
@@ -355,7 +355,7 @@ describe('runTargetSetup', () => {
     const d = deps({ dir, inspect: fakeInspect(JSON.stringify(GOOD)).fn, runCheck: fakeCheck().fn, prompt });
     const { code, result } = await runTargetSetup(parseTargetSetupArgs([repo]), d);
     expect(code).toBe(0);
-    expect(prompt.asked).toEqual(['\nSave target app?']);
+    expect(prompt.asked).toEqual([expect.stringMatching(/^\nRun this check \(npm test\) now in the sandbox/), '\nSave target app?']);
     expect(d.text()).toMatch(/target app saved/);
     // The same file `targets add` would leave: saveTarget into an empty dir.
     const viaAdd = tmpDir();
@@ -370,7 +370,7 @@ describe('runTargetSetup', () => {
     const d = deps({ dir, inspect: fakeInspect(JSON.stringify(GOOD)).fn, runCheck: fakeCheck().fn, prompt });
     const { code, result } = await runTargetSetup(parseTargetSetupArgs([repoWith(NODE_REPO)]), d);
     expect(code).toBe(0);
-    expect(prompt.asked).toHaveLength(1);
+    expect(prompt.asked).toHaveLength(2);
     expect(result.saved).toBe(false);
     expect(d.text()).toMatch(/nothing written/);
     expect(fs.existsSync(path.join(dir, 'eridani.json'))).toBe(false);
@@ -409,9 +409,93 @@ describe('runTargetSetup', () => {
     expect(r1.result.checks).toEqual([expect.objectContaining({ status: 'not_run', reason: '--no-check', kept: true })]);
 
     const refused = fakeCheck({ exit_code: null, isolated: false, error: 'isolation "bwrap" is required but bwrap (bubblewrap) is not installed on the service PATH' });
-    const r2 = await runTargetSetup(parseTargetSetupArgs([repoWith(NODE_REPO), '--json']), deps({ dir: tmpDir(), inspect: fakeInspect(JSON.stringify(GOOD)).fn, runCheck: refused.fn }));
+    const r2 = await runTargetSetup(parseTargetSetupArgs([repoWith(NODE_REPO), '--json', '--yes']), deps({ dir: tmpDir(), inspect: fakeInspect(JSON.stringify(GOOD)).fn, runCheck: refused.fn }));
     expect(r2.result.checks).toEqual([expect.objectContaining({ status: 'not_run', kept: false, reason: expect.stringMatching(/bwrap/) })]);
     expect(r2.result.target.verify).toEqual([]);
+  });
+
+  describe('never runs a proposed check before a person has confirmed it', () => {
+    // Both sources: the harness's answer, and the heuristics (same rule).
+    const SOURCES = [['the harness', [] as string[]], ['the heuristics', ['--no-harness']]] as const;
+
+    it.each(SOURCES)('--json without --yes (%s): not run, needs confirmation, nothing written', async (_s, extra) => {
+      const dir = tmpDir();
+      const c = fakeCheck();
+      const d = deps({ dir, inspect: fakeInspect(JSON.stringify(GOOD)).fn, runCheck: c.fn, prompt: yesPrompter(true) });
+      const { code, result } = await runTargetSetup(parseTargetSetupArgs([repoWith(NODE_REPO), '--json', ...extra]), d);
+      expect(c.calls).toEqual([]);
+      expect(code).toBe(0);
+      expect(result.checks).toEqual([expect.objectContaining({ id: 'test', status: 'not_run', needs_confirmation: true, reason: expect.stringMatching(/^needs confirmation/), kept: true })]);
+      // The proposal still shows the check it would keep if it passes.
+      expect(result.target.verify.map((v) => v.id)).toEqual(['test']);
+      expect(JSON.parse(d.text()).checks[0]).toMatchObject({ status: 'not_run', needs_confirmation: true, reason: expect.any(String) });
+      expect(fs.existsSync(path.join(dir, 'eridani.json'))).toBe(false);
+    });
+
+    it.each(SOURCES)('no terminal and no --yes (%s): not run, reported, nothing written', async (_s, extra) => {
+      const dir = tmpDir();
+      const c = fakeCheck();
+      const d = deps({ dir, inspect: fakeInspect(JSON.stringify(GOOD)).fn, runCheck: c.fn, prompt: noPrompter });
+      const { code, result } = await runTargetSetup(parseTargetSetupArgs([repoWith(NODE_REPO), ...extra]), d);
+      expect(c.calls).toEqual([]);
+      expect(code).toBe(1);
+      expect(result.checks[0]).toMatchObject({ status: 'not_run', needs_confirmation: true });
+      expect(d.text()).toMatch(/check: NOT RUN: needs confirmation/);
+      expect(d.text()).toMatch(/nothing written/);
+      expect(fs.existsSync(path.join(dir, 'eridani.json'))).toBe(false);
+    });
+
+    it.each(SOURCES)('on a terminal (%s): the commands are shown first, and a no runs nothing', async (_s, extra) => {
+      const dir = tmpDir();
+      const c = fakeCheck();
+      let shownBeforeQuestion = '';
+      const asked: string[] = [];
+      const d = deps({ dir, inspect: fakeInspect(JSON.stringify(GOOD)).fn, runCheck: c.fn });
+      d.prompt = { interactive: true, text: async (_q, def) => def ?? '', secret: async () => '', confirm: async (q) => {
+        if (!asked.length) shownBeforeQuestion = d.text();
+        asked.push(q);
+        return false;
+      } };
+      const { result } = await runTargetSetup(parseTargetSetupArgs([repoWith(NODE_REPO), ...extra]), d);
+      expect(c.calls).toEqual([]);
+      expect(shownBeforeQuestion).toMatch(/prepare deps\s+npm ci/);
+      expect(shownBeforeQuestion).toMatch(/verify test\s+npm test/);
+      expect(shownBeforeQuestion).toMatch(/not run yet; it runs only if you say yes below/);
+      expect(asked[0]).toMatch(/Run this check \(npm test\) now in the sandbox/);
+      expect(result.checks[0]).toMatchObject({ status: 'not_run', reason: 'you chose not to run it', kept: false });
+      expect(result.checks[0].needs_confirmation).toBeUndefined();
+      expect(result.target.verify).toEqual([]);
+    });
+
+    it('on a terminal, a yes runs it after the commands were shown', async () => {
+      const textAtRun: string[] = [];
+      const d = deps({ dir: tmpDir(), inspect: fakeInspect(JSON.stringify(GOOD)).fn, prompt: yesPrompter(true) });
+      d.runCheck = async () => {
+        textAtRun.push(d.text());
+        return outcome();
+      };
+      const { result } = await runTargetSetup(parseTargetSetupArgs([repoWith(NODE_REPO)]), d);
+      expect(textAtRun).toHaveLength(1);
+      expect(textAtRun[0]).toMatch(/verify test\s+npm test/);
+      expect(result.checks[0]).toMatchObject({ status: 'passed', kept: true });
+      expect(d.text()).toMatch(/Check results:\n {2}verify test/);
+    });
+
+    it.each([['--yes'], ['--json', '--yes']])('%s runs it without asking', async (...flags) => {
+      const c = fakeCheck();
+      const prompt = yesPrompter(false);
+      const { result } = await runTargetSetup(parseTargetSetupArgs([repoWith(NODE_REPO), ...flags]), deps({ dir: tmpDir(), inspect: fakeInspect(JSON.stringify(GOOD)).fn, runCheck: c.fn, prompt }));
+      expect(prompt.asked).toEqual([]);
+      expect(c.calls).toHaveLength(1);
+      expect(result.checks[0]).toMatchObject({ status: 'passed', kept: true });
+      expect(result.saved).toBe(true);
+    });
+
+    it('asks nothing about a check when none is proposed', async () => {
+      const prompt = yesPrompter(true);
+      await runTargetSetup(parseTargetSetupArgs([repoWith()]), deps({ dir: tmpDir(), inspect: fakeInspect(JSON.stringify({ base: 'main', prepare: [], verify: [], notes: '' })).fn, runCheck: fakeCheck().fn, prompt }));
+      expect(prompt.asked).toEqual(['\nSave target app?']);
+    });
   });
 
   it('refuses a folder that is not a git repository', async () => {

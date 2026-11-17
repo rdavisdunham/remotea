@@ -498,20 +498,29 @@ flag and the `--json` shape):
    `--no-harness`, with no harness installed, or with an unusable answer, the
    proposal comes from the same file-name heuristics `setup --add-repo` uses,
    and the output says so and why.
-2. **Try the check.** Each proposed verify entry runs once in the repository
-   checkout through the verify runner, in the bubblewrap sandbox (required
-   here) with no network. The result (passed, failed, timed out, not run) and
-   how long it took are printed; a check that did not pass is shown and left
-   out of the target unless `--keep-failing`. `prepare` is not run here.
+2. **Try the check, once confirmed.** Nothing proposed runs before a person
+   has seen it (the heuristics' commands included, so there is one rule). On
+   a terminal the proposed prepare and verify commands are printed first,
+   then one question, "Run this check now in the sandbox?" (default no);
+   `--yes` runs it without asking. Without a terminal, or with `--json`, and
+   without `--yes`, it is not run: it is reported `not_run` with
+   `needs_confirmation: true` and a reason. `--no-check` never runs it. Once
+   confirmed, each proposed verify entry runs once in the repository checkout
+   through the verify runner, in the bubblewrap sandbox (required here) with
+   no network. The result (passed, failed, timed out, not run) and how long
+   it took are printed; a check that did not pass, or that you chose not to
+   run, is left out of the target unless `--keep-failing`. `prepare` is not
+   run here.
 3. **CI.** Whether a `.github/workflows/*.yml` runs on `pull_request`; with no
    local check, "CI is the gate" (or "nothing gates this target") is printed
    as an explicit choice.
 4. **Confirm and save.** The proposed target is printed and one y/N question
    asked (`--yes` skips it); it is saved through the same path as `targets
    add`. Without a terminal and without `--yes` nothing is written.
-   `--json` prints the proposal and the check results as one object and
+   `--json` prints the proposal as one object, runs no proposed check and
    writes nothing unless `--yes` is also given, so another program can ask
-   for a proposal, show it, and call again with `--yes`.
+   for a proposal, show it to a person, and call again with `--yes`, which
+   runs the check and saves.
 
 Targets are read on every use: adding one needs no restart and does not
 reconnect the link. `hello` lists them (`targets: [{id, repo, worktree_root,

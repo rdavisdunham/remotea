@@ -20,8 +20,9 @@
  *       --dry-run); without it, asks the running server for a scan now
  *   targets list | add | remove | setup <repo-path>
  *       where Eridani may start work (eridani-targets.ts). `setup` is the
- *       guided way to add one: it proposes the target with a harness, tries
- *       the check in the verify sandbox and asks once (eridani-target-setup.ts)
+ *       guided way to add one: it proposes the target with a harness, shows
+ *       it, tries the check in the verify sandbox only once confirmed, and
+ *       asks before saving (eridani-target-setup.ts)
  *   collector [parity|authoritative]
  *   collector scope [remotea|all]
  *       shows or switches the collector mode and prints what to do around
