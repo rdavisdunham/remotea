@@ -174,7 +174,10 @@ export class AgentStateTracker {
     }
     rec.exited = false;
     rec.lastActivity = this.now();
-    rec.trouble = null;
+    // Any report ends a stall. A failure the harness reported (errored, rate_limited, auth_expired) outlives the
+    // turn-end report that follows it in the same breath; only new work clears it.
+    const starts = (p.runDepth ?? 0) > 0 || (p.runDelta ?? 0) > 0;
+    if (rec.trouble && (rec.trouble.kind === 'stalled' || starts)) rec.trouble = null;
     if (p.awaitingHuman !== undefined) {
       rec.awaitingHuman = p.awaitingHuman;
       rec.reason = p.awaitingHuman ? clipReason(p.reason ?? null) : null;
@@ -227,8 +230,9 @@ export class AgentStateTracker {
   }
 
   /**
-   * A failure the harness itself reported (errored, rate_limited, auth_expired). It stays until the next sign of
-   * life: a hook report, the process exiting, or the agent letting go. Ignored for a surface with no agent state.
+   * A failure the harness itself reported (errored, rate_limited, auth_expired). It stays until the session starts
+   * work again, the process exits, or the agent lets go; the report that merely ends the failed turn does not
+   * clear it. Ignored for a surface with no agent state.
    */
   setTrouble(surf: string, kind: AgentTroubleKind, detail?: string | null): void {
     const rec = this.recs.get(surf);

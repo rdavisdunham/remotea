@@ -130,7 +130,7 @@ export type LinkCap =
   // Hyperplan: `spawn` takes `role` and `mode` (read-only sessions beside the run's
   // writer), `runs.snapshot` entries may name one surface, and `verify` never
   // lands on a reviewer. Eridani refuses hyperplan / split-worker starts without it.
-  | 'spawn.roles' | 'managed.sessions' | 'decisions.durable' | 'commands.durable' | 'role.options' | 'run.pause' | 'activity' | 'model_catalog'
+  | 'spawn.roles' | 'managed.sessions' | 'decisions.durable' | 'commands.durable' | 'role.options' | 'run.pause' | 'activity' | 'model_catalog' | 'input.model' | 'trouble.reported'
   // The host takes `run.reopen`: an exited run surface is resumed in place (`claude --resume`) as its next incarnation.
   | 'run.reopen';
 
@@ -964,6 +964,8 @@ export interface InputCommand extends OpFields, AutomationHoldFields {
   text: string;
   /** queue: delivered when the agent is next at its prompt. steer: interrupt now, then deliver (generation advances). */
   mode: 'queue' | 'steer' | 'direct';
+  /** Change the session's model before delivering this input (cap `input.model`; managed sessions only). */
+  model?: string;
   expires_at?: number | string;
 }
 
@@ -1461,6 +1463,7 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       if (!isPasteSafe(m.text)) return 'text may not contain control characters (only newline and tab)';
       // A leading `/` is a slash command and `!` is Claude Code's shell mode: input is a message, never either.
       if (/^[/!]/.test(m.text.trimStart())) return 'text may not start with "/" or "!"';
+      if (m.model !== undefined && !(isStr(m.model, 80) && /^[A-Za-z0-9._:\[\]-]+$/.test(m.model as string))) return 'bad model';
       return null;
     case 'answer':
       if (!isStr(m.question_id, 200) || !isStr(m.provider_request_id, 200)) return 'bad question';

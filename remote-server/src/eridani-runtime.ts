@@ -470,7 +470,7 @@ export class EridaniRuntime {
         ? { state: 'uncertain', detail: 'interrupted by a server restart' }
         : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
-      caps: () => !Object.values(this.harnesses()).some((h) => h?.managed) ? linkCaps(mode) : [...linkCaps(mode), 'managed.sessions', 'input.direct', 'output.live', 'decisions.durable', 'commands.durable', 'role.options', 'run.pause', 'activity', 'model_catalog'],
+      caps: () => !Object.values(this.harnesses()).some((h) => h?.managed) ? linkCaps(mode) : [...linkCaps(mode), 'managed.sessions', 'input.direct', 'output.live', 'decisions.durable', 'commands.durable', 'role.options', 'run.pause', 'activity', 'model_catalog', 'input.model', 'trouble.reported'],
       modelCatalog: () => [...(this.codexModels.length ? this.codexModels : hostModelCatalog(path.join(os.homedir(), '.codex', 'models_cache.json'))), ...this.claudeModels],
       targets: () => this.helloTargets(),
       doctor: () => this.doctor,

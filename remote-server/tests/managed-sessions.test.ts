@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { ManagedSessions, type ManagedSpec } from '../src/managed-sessions';
+import { ManagedSessions, type ManagedSpec, assistantFailure, resultFailure } from '../src/managed-sessions';
 import type { RuntimeAdapter, HarnessRequest } from '../src/managed-harness';
 import type { AnswerCommand } from '../../src/shared/eridani-link-protocol';
 
@@ -120,6 +120,42 @@ describe('managed durable ownership', () => {
     adapter.emit('event', { id: 2, method: 'item/permissions/requestApproval', params: { threadId: 'conversation', turnId: 'turn', itemId: 'tool', permissions: { network: { enabled: true } } } });
     await manager.answer(answer(events.find((e) => e.t === 'question')), () => {});
     expect(adapter.responses).toEqual([{ permissions: { network: { enabled: true } }, scope: 'turn', strictAutoReview: true }]);
+  });
+  it('reports a failure the harness names, once the failed turn has ended', async () => {
+    const adapter = new Adapter(); const troubles: any[] = []; const order: string[] = [];
+    const manager = new ManagedSessions({ dir: null, factory: () => adapter, emit: () => {}, changed: () => {}, hook: (_s, p) => order.push(String(p.event)),
+      trouble: (surf, kind, detail) => { troubles.push({ surf, kind, detail }); order.push('trouble'); } });
+    manager.prepare({ ...spec }); manager.spawn(spec.surf); await manager.ready(spec.surf);
+    // A usage limit: Claude Code marks the assistant message, then ends the turn.
+    adapter.emit('event', { type: 'assistant', error: 'rate_limit', message: { content: [{ type: 'text', text: "You've hit your limit · resets 3pm" }] } });
+    expect(troubles).toEqual([]);
+    adapter.emit('event', { type: 'result', subtype: 'success', is_error: true, result: "You've hit your limit · resets 3pm" });
+    expect(troubles).toEqual([{ surf: spec.surf, kind: 'rate_limited', detail: "rate_limit: You've hit your limit · resets 3pm" }]);
+    expect(order.slice(-2)).toEqual(['Stop', 'trouble']);
+    // A turn that recovers after a retry reports nothing.
+    adapter.emit('event', { type: 'assistant', error: 'overloaded', message: { content: [] } });
+    adapter.emit('event', { type: 'assistant', message: { content: [{ type: 'text', text: 'Done.' }] } });
+    adapter.emit('event', { type: 'result', subtype: 'success', is_error: false, result: 'Done.' });
+    expect(troubles).toHaveLength(1);
+    // A turn that dies outside a model reply is still an error, read from the result.
+    adapter.emit('event', { type: 'result', subtype: 'error_during_execution', is_error: true, errors: ['spawn ENOMEM'] });
+    expect(troubles.at(-1)).toMatchObject({ kind: 'errored', detail: 'error_during_execution: spawn ENOMEM' });
+  });
+  it('names sign-in, usage and model failures by kind', () => {
+    expect(assistantFailure('authentication_failed').kind).toBe('auth_expired');
+    expect(assistantFailure('account_on_hold').kind).toBe('auth_expired');
+    expect(assistantFailure('billing_error').kind).toBe('rate_limited');
+    expect(assistantFailure('model_not_found', 'There is an issue with the selected model')).toEqual({ kind: 'errored', detail: 'model_not_found: There is an issue with the selected model' });
+    expect(resultFailure({ type: 'result', subtype: 'success', is_error: true, api_error_status: 429, result: 'slow down' })).toEqual({ kind: 'rate_limited', detail: 'http_429: slow down' });
+    expect(resultFailure({ type: 'result', subtype: 'success', is_error: true, api_error_status: 401 })?.kind).toBe('auth_expired');
+    expect(resultFailure({ type: 'result', subtype: 'success', is_error: false })).toBeNull();
+  });
+  it('changes a live session model in place when the harness can', async () => {
+    const { manager, adapter } = fixture(); await manager.ready(spec.surf);
+    await expect(manager.setModel(spec.surf, 'other-model')).rejects.toThrow(/cannot change its model/);
+    const set: string[] = []; (adapter as any).setModel = async (m: string) => { set.push(m); };
+    await manager.setModel(spec.surf, 'other-model'); await manager.setModel(spec.surf, 'other-model');
+    expect(set).toEqual(['other-model']);
   });
   it('surfaces coordination tool failures and stops automatic continuation', async () => {
     const { manager, adapter, events } = fixture(); await manager.ready(spec.surf);

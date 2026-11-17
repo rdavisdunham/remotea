@@ -27,6 +27,8 @@ export interface RuntimeAdapter {
   send(text: string, operationId: string): Promise<void>;
   sendDirect?(text: string, operationId: string, context: DirectInputContext): Promise<DirectInputReceipt>;
   interrupt(): Promise<void>;
+  /** Change the session's model in place, keeping its conversation; absent when the harness cannot. */
+  setModel?(model: string): Promise<void>;
   resume(): Promise<string>;
   respond(request: HarnessRequest, response: unknown): Promise<void>;
   stop(): Promise<void>;
@@ -260,6 +262,8 @@ export class ClaudeRuntimeAdapter extends HarnessProcess implements RuntimeAdapt
     await this.send(`A host restart interrupted an UNAPPROVED request. Recreate only this exact request for fresh human review. Do not execute unrelated work or replay any uncertain action. Pending request: ${canonicalJson({ method: request.method, params: request.params })}`, randomUUID());
   }
   async interrupt(): Promise<void> { this.write({ type: 'control_request', request_id: `interrupt-${Date.now()}`, request: { subtype: 'interrupt' } }); }
+  // Claude Code's `set_model` control request (the Agent SDK's setModel): takes effect from the next turn.
+  async setModel(model: string): Promise<void> { await this.call('control:set_model', { model }); this.spec.model = model; }
   async respond(request: HarnessRequest, response: unknown): Promise<void> {
     if (request.method === 'claude/deferred') {
       this.deferredAnswer = { id: String(request.id), input: request.params.input, response };
