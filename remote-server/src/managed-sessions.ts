@@ -21,8 +21,35 @@ export interface ManagedSpec extends HarnessSpec { surf: string; runId: string; 
 interface Decision { planRevision?: number; id: string; digest: string; request: HarnessRequest; items: QuestionItem[]; kind: 'ask' | 'approval'; state: 'pending' | 'submitted' | 'uncertain' | 'resolved'; sessionId: string; turnId: string | null; generation: number; response?: unknown; action?: QuestionBody['action'] }
 interface DirectRecord { nativeStarted?: boolean; assignedTurn?: string; text: string; generation: number; revision: number; stage: 'waiting' | 'executing' | 'handed_to_harness' | 'provider_acknowledged' | 'uncertain' | 'rejected'; turnId: string | null; active: boolean; displayed: boolean; at: number }
 interface Saved { inputs: Record<string, DirectRecord>; output: OutputState; claudeTurnSerial?: number; attention?: ManagedAttention; pausedBy?: 'operator' | 'attention'; initialization?: 'executing' | 'ready'; sessionId: string; turnId: string | null; sequence: number; paused: boolean; active: boolean; decisions: Decision[]; operations: Record<string, 'queued' | 'executing' | 'delivered' | 'uncertain' | 'rejected'>; queue: Array<{ text: string; op: string; generation: number; origin?: 'human' | 'automation'; revision?: number }> }
-interface Entry { spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; transcript: ManagedTranscript; output: ManagedOutput; directTail?: Promise<void>; directPending: Set<string>; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; receiptTimers: Map<string, NodeJS.Timeout>; receiptRequests: Map<string, HarnessRequest>; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
+interface Entry { failure?: HarnessFailure; spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; transcript: ManagedTranscript; output: ManagedOutput; directTail?: Promise<void>; directPending: Set<string>; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; receiptTimers: Map<string, NodeJS.Timeout>; receiptRequests: Map<string, HarnessRequest>; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
+/** A failure a harness reports about its own session, as the trouble the host publishes (agent-state.ts). */
+export interface HarnessFailure { kind: 'errored' | 'rate_limited' | 'auth_expired'; detail: string }
+/** Eridani's link accepts a trouble detail of at most 200 characters; a longer one would fail the whole frame. */
+const TROUBLE_DETAIL = 200;
+const AUTH_ERRORS = ['authentication_failed', 'oauth_org_not_allowed', 'account_on_hold', 'cloud_credential_error'];
+const LIMIT_ERRORS = ['rate_limit', 'billing_error'];
+/**
+ * Claude Code's `error` on an assistant message (the Agent SDK's SDKAssistantMessageError) as a failure. The
+ * detail leads with the code, so the other side can tell `model_not_found` from an overloaded API, then what the
+ * agent said (a usage limit says when it resets).
+ */
+export function assistantFailure(code: string, said = ''): HarnessFailure {
+  const kind = AUTH_ERRORS.includes(code) ? 'auth_expired' : LIMIT_ERRORS.includes(code) ? 'rate_limited' : 'errored';
+  const text = said.replace(/\s+/g, ' ').trim();
+  return { kind, detail: text ? `${code}: ${text}`.slice(0, TROUBLE_DETAIL) : code };
+}
+/** A `result` that ended in an error with no assistant error before it (the turn died outside a model reply). */
+export function resultFailure(m: any): HarnessFailure | null {
+  if (m?.type !== 'result' || !(m.is_error || String(m.subtype ?? '').startsWith('error_'))) return null;
+  const status = Number(m.api_error_status ?? 0);
+  const said = (Array.isArray(m.errors) && m.errors.length ? String(m.errors[0]) : typeof m.result === 'string' ? m.result : '').replace(/\s+/g, ' ').trim();
+  const code = status ? `http_${status}` : String(m.subtype ?? 'error');
+  const kind = status === 401 || status === 403 ? 'auth_expired' : status === 429 ? 'rate_limited' : 'errored';
+  return { kind, detail: (said ? `${code}: ${said}` : code).slice(0, TROUBLE_DETAIL) };
+}
 export interface ManagedDeps {
+  /** A session's own harness reported a failure (after the turn that failed has ended). */
+  trouble?: (surf: string, kind: HarnessFailure['kind'], detail: string) => void;
   dir: string | null; emit(body: Up): void; changed(surf: string, sessionId: string, paused: boolean, attention?: ManagedAttention | null): void;
   decisionReceiptMs?: number;
   factory?: (spec: HarnessSpec) => RuntimeAdapter;
@@ -166,6 +193,9 @@ export class ManagedSessions {
     if (m.type === 'user' && typeof m.uuid === 'string' && e.state.inputs[m.uuid] && (!m.session_id || m.session_id === e.state.sessionId)) this.inputAcknowledged(e, m.uuid);
     if (m.type === 'user' && m.uuid === e.prompt?.op) this.promptAccepted(e);
     if (m.type === 'assistant') { e.finalText = (m.message?.content ?? []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(''); }
+    // The harness says its own turn failed (usage limit, sign-in, model or API error). Kept until the turn ends.
+    if (m.type === 'assistant' && typeof m.error === 'string' && m.error) e.failure = assistantFailure(m.error, e.finalText ?? '');
+    if (m.type === 'assistant' && !m.error && (m.message?.content ?? []).length) e.failure = undefined; // It recovered within the turn.
     if (m.type === 'user') for (const block of m.message?.content ?? []) if (block.type === 'tool_result') { this.confirm(e, String(block.tool_use_id), true); if (block.is_error && String(e.items.get(block.tool_use_id)?.name ?? '').startsWith('mcp__eridani__')) this.toolFailed(e, { ...block, id: block.tool_use_id, name: e.items.get(block.tool_use_id)?.name }); }
     if (m.method === 'turn/started') { this.promptAccepted(e); e.state.active = true; this.activity(e, 'thinking'); }
     if (m.method?.startsWith('item/reasoning/')) this.activity(e, 'thinking');
@@ -174,7 +204,11 @@ export class ManagedSessions {
     if (m.method === 'item/completed' && p.item?.type === 'agentMessage' && typeof p.item.text === 'string') e.finalText = p.item.text;
     if (m.method === 'item/started' && p.item?.id) e.items.set(p.item.id, p.item);
     if (m.method === 'item/started') this.toolActivity(e, p.item?.type ?? '', p.item?.command ?? '');
-    if (m.method === 'turn/completed' || m.type === 'result') { e.state.active = false; e.busy = false; this.hook(e, 'Stop', { turnId: e.state.turnId ?? `${e.state.sessionId}:${e.prompt?.op ?? 'recovered'}`, lastAssistantMessage: m.type === 'result' && typeof m.result === 'string' ? m.result : e.finalText ?? '' }); this.activity(e, e.state.paused ? 'waiting' : 'idle', e.state.paused ? 'Paused; review required' : undefined); void this.pump(e); }
+    if (m.method === 'turn/completed' || m.type === 'result') { e.state.active = false; e.busy = false; this.hook(e, 'Stop', { turnId: e.state.turnId ?? `${e.state.sessionId}:${e.prompt?.op ?? 'recovered'}`, lastAssistantMessage: m.type === 'result' && typeof m.result === 'string' ? m.result : e.finalText ?? '' }); this.activity(e, e.state.paused ? 'waiting' : 'idle', e.state.paused ? 'Paused; review required' : undefined);
+      // After the turn-end reports above, so they do not clear it: what went wrong, for whoever watches the run.
+      const failure = e.failure ?? resultFailure(m); e.failure = undefined;
+      if (failure) this.deps.trouble?.(e.spec.surf, failure.kind, failure.detail);
+      void this.pump(e); }
     if (m.type === 'stream_event') {
       const ev = m.event;
       if (ev?.delta?.type === 'thinking_delta') this.activity(e, 'thinking');
@@ -396,6 +430,13 @@ export class ManagedSessions {
     if (pending.length !== 1 || e.state.paused || e.handingOff || e.recovering || !e.adapter.recreate || e.state.decisions.some((q) => q.state === 'uncertain' || q.state === 'submitted')) return;
     e.recovering = true; this.activity(e, 'thinking', 'Recreating the pending request for review');
     try { await e.adapter.recreate(pending[0].request); } catch { e.recovering = false; this.attention(e, 'Pending request recreation stalled; review the provider connection'); }
+  }
+  /** Change a live session's model, keeping its conversation (an `input` with `model`). Throws when it cannot. */
+  async setModel(surf: string, model: string): Promise<void> {
+    const e = this.entries.get(surf); if (!e) throw new Error('unknown managed session');
+    if (e.spec.model === model) return;
+    if (!e.adapter.setModel) throw new Error(`${e.spec.harness} cannot change its model in a running session`);
+    await e.adapter.setModel(model); e.spec.model = model; this.save(e);
   }
   async pause(surf: string, paused: boolean): Promise<void> {
     const e = this.entries.get(surf); if (!e) throw new Error('unknown managed session');

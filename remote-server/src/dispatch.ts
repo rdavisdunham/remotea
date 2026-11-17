@@ -472,7 +472,9 @@ export class Dispatch {
     this.timing = { ...DEFAULT_TIMING, ...deps.timing };
     this.mcpDir = deps.mcpDir ?? (deps.dir ? path.join(deps.dir, ERIDANI_MCP_DIR) : path.join(os.tmpdir(), `remotea-eridani-mcp-${process.getuid?.() ?? 'user'}`));
     this.secrets = this.loadSecrets();
-    this.managed = new ManagedSessions({ dir: deps.dir, factory: deps.managedFactory, hook: (surf, params) => { deps.hub.relayRpc(surf, 'hook.event', params); }, emit: (body) => deps.managedEmit?.(body), changed: (surf, sessionId, paused, attention) => {
+    this.managed = new ManagedSessions({ dir: deps.dir, factory: deps.managedFactory, hook: (surf, params) => { deps.hub.relayRpc(surf, 'hook.event', params); },
+      // Deferred a tick: the turn-end hook above is relayed first, and new work is what clears a reported failure.
+      trouble: (surf, kind, detail) => { setImmediate(() => deps.hub.agentState.setTrouble(surf, kind, detail)); }, emit: (body) => deps.managedEmit?.(body), changed: (surf, sessionId, paused, attention) => {
       const rec = deps.registry.session(surf);
       if (rec?.eridani) { const { attention: previousAttention, ...binding } = rec.eridani; const nextAttention = attention === undefined ? previousAttention : attention; deps.hub.updateRecord(surf, { eridani: { ...binding, paused, ...(nextAttention ? { attention: nextAttention } : {}) }, ...(sessionId ? { agent: { provider: rec.eridani.harness, sessionId, seenAt: Date.now() } } : {}) }); deps.registry.saveNow(); }
     } });
@@ -1352,12 +1354,18 @@ export class Dispatch {
       let rec = this.deps.registry.session(cmd.surf)!;
       if (cmd.plan_revision !== undefined && cmd.plan_revision !== rec.eridani!.planRevision) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, planRevision: cmd.plan_revision } }); this.managed.planRevision(cmd.surf, cmd.plan_revision); rec = this.deps.registry.session(cmd.surf)!; }
       if (cmd.generation > rec.eridani!.generation) { this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, generation: cmd.generation } }); this.managed.generation(cmd.surf, cmd.generation); }
+      if (cmd.model && cmd.model !== rec.eridani!.model) {
+        // Carry on under another model (Eridani's fallback when the first one's usage ran out): same conversation.
+        try { await this.managed.setModel(cmd.surf, cmd.model); } catch (e) { return { state: 'rejected', detail: `model not changed: ${(e as Error).message}` }; }
+        rec = this.deps.registry.session(cmd.surf)!; this.deps.hub.updateRecord(cmd.surf, { eridani: { ...rec.eridani!, model: cmd.model } });
+      }
       if (cmd.mode === 'steer') { ctx.begin(); await this.managed.interrupt(cmd.surf); }
       const result = cmd.mode === 'direct'
         ? await this.managed.sendDirect(cmd.surf, cmd.text, cmd.op_id, cmd.automation_hold_revision!, () => ctx.begin())
         : await this.managed.send(cmd.surf, cmd.text, cmd.op_id, false, () => ctx.begin(), cmd);
       return result.state === 'executed' ? { ...result, result: { managed: true, ...result.result, ...this.surfaceFacts(cmd.surf) } } : result;
     }
+    if (cmd.model) return { state: 'rejected', detail: 'model not changed: only a managed session can change its model' };
     if (cmd.mode === 'steer') return this.steer(cmd, ctx);
     return new Promise<CommandResult>((resolve) => {
       const list = this.queues.get(cmd.surf) ?? [];

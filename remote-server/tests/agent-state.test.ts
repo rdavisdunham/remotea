@@ -317,13 +317,19 @@ describe('AgentStateTracker: the inactivity watchdog and trouble', () => {
     expect(off.get(surf)?.trouble).toBeUndefined();
   });
 
-  it('carries a harness-reported failure until the next sign of life', () => {
+  it('carries a harness-reported failure until the session starts work again', () => {
     work();
     w.setTrouble(surf, 'rate_limited', '  usage limit reached,\n resets 3pm ');
     expect(w.get(surf)).toMatchObject({ state: 'working', trouble: { kind: 'rate_limited', detail: 'usage limit reached, resets 3pm' } });
     at += 60 * MIN;
     w.tick(); // A reported failure is not replaced by stalled.
     expect(w.get(surf)?.trouble?.kind).toBe('rate_limited');
+    // The report that ends the failed turn does not clear it: that turn is what failed.
+    w.hook(surf, { event: 'Stop' });
+    expect(w.get(surf)?.trouble?.kind).toBe('rate_limited');
+    w.report(surf, { awaitingHuman: false, runDepth: 0 });
+    expect(w.get(surf)?.trouble?.kind).toBe('rate_limited');
+    // New work does.
     w.hook(surf, { event: 'UserPromptSubmit' });
     expect(w.get(surf)?.trouble).toBeUndefined();
     w.setTrouble('surf-unknown', 'errored');
