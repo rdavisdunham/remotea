@@ -1,6 +1,7 @@
 import * as pty from 'node-pty';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { execFileSync, spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { SurfaceId } from '../shared/types';
@@ -475,7 +476,7 @@ export function resolveShellForCwd(shell: string, cwd: string | undefined): stri
 // that distro cannot open.
 export function resolveSpawnCwd(raw: string | undefined): string {
   const cwd = expandPathVars(raw ?? '', process.env);
-  const fallback = process.env.USERPROFILE || 'C:\\';
+  const fallback = process.env.USERPROFILE || os.homedir();
   if (!cwd) return fallback;
 
   // POSIX/WSL cwd: not a valid Win32 working dir at all (issue #60).

@@ -23,6 +23,16 @@
   "asarUnpack": [
     "node_modules/node-pty/prebuilds/**"
   ],
+  "afterPack": "build/after-pack.cjs",
+  "mac": {
+    "icon": "resources/icons/icon.png",
+    "target": [
+      { "target": "dir", "arch": ["arm64"] }
+    ],
+    "identity": "-",
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false
+  },
   "win": {
     "icon": "resources/icons/icon.ico",
     "target": [

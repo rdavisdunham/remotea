@@ -7,6 +7,7 @@
 // machine produced, already absolute.
 
 import { describe, it, expect } from 'vitest';
+import * as os from 'os';
 import { expandPathVars } from '../../src/shared/paths';
 import { resolveSpawnCwd } from '../../src/main/pty-manager';
 import { DEFAULT_WORKSPACE_PREFS } from '../../src/renderer/store/settings-slice';
@@ -68,7 +69,7 @@ describe('expandPathVars', () => {
 
 describe('resolveSpawnCwd with a user-typed starting path', () => {
   it('spawns in the home directory for ~', () => {
-    expect(resolveSpawnCwd('~')).toBe(process.env.USERPROFILE || 'C:\\');
+    expect(resolveSpawnCwd('~')).toBe(process.env.USERPROFILE || os.homedir());
   });
 
   it('expands %USERPROFILE% to the same directory the literal path gives', () => {
@@ -76,7 +77,7 @@ describe('resolveSpawnCwd with a user-typed starting path', () => {
   });
 
   it('falls back rather than spawning in a drive root for an unset var', () => {
-    expect(resolveSpawnCwd('%WMUX_NO_SUCH_VAR%\\projects')).toBe(process.env.USERPROFILE || 'C:\\');
+    expect(resolveSpawnCwd('%WMUX_NO_SUCH_VAR%\\projects')).toBe(process.env.USERPROFILE || os.homedir());
   });
 
   // Was `toBeUndefined()` — node-pty's default, which is "inherit wmux.exe's own
@@ -86,7 +87,7 @@ describe('resolveSpawnCwd with a user-typed starting path', () => {
   // transcripts under system32. A directory nobody chose is not a better answer
   // than the home directory every other branch here already falls back to.
   it('falls back to the home directory for no cwd at all, never wmux\'s own', () => {
-    const home = process.env.USERPROFILE || 'C:\\';
+    const home = process.env.USERPROFILE || os.homedir();
     expect(resolveSpawnCwd('')).toBe(home);
     expect(resolveSpawnCwd(undefined)).toBe(home);
     // Whitespace-only is "the user cleared the field", not a directory.

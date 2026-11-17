@@ -619,7 +619,35 @@ describe('comparePackageVersion (WindowsApps package ordering)', () => {
  * before `git worktree add` finished), so it cannot be trusted to still exist.
  */
 describe('resolveSpawnCwd', () => {
-  const home = process.env.USERPROFILE || 'C:\\';
+  const home = process.env.USERPROFILE || os.homedir();
+
+  // macOS and Linux have no %USERPROFILE%: a terminal opened with no usable cwd
+  // must start in the user's home, not in a Windows drive root that does not
+  // exist there (node-pty then fails to spawn the shell at all).
+  describe('without USERPROFILE (macOS, Linux)', () => {
+    const saved = process.env.USERPROFILE;
+    beforeEach(() => { delete process.env.USERPROFILE; });
+    afterEach(() => {
+      if (saved === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = saved;
+    });
+
+    it('falls back to the OS home directory when no cwd is given', () => {
+      expect(resolveSpawnCwd(undefined)).toBe(os.homedir());
+      expect(resolveSpawnCwd('')).toBe(os.homedir());
+    });
+
+    it('falls back to the OS home directory when the cwd is not a folder', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-cwd-'));
+      const file = path.join(dir, 'not-a-dir.txt');
+      fs.writeFileSync(file, 'x');
+      try {
+        expect(resolveSpawnCwd(file)).toBe(os.homedir());
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
 
   it('keeps a cwd that exists', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-cwd-'));

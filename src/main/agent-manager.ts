@@ -1,3 +1,4 @@
+import * as os from 'os';
 import { v4 as uuid } from 'uuid';
 import { PtyManager } from './pty-manager';
 import { AgentId, AgentInfo, AgentSpawnParams, PaneId, SurfaceId, WorkspaceId } from '../shared/types';
@@ -53,7 +54,7 @@ export class AgentManager {
     // a blind timer; one delivery path means one idea of "ready".
     const created = this.ptyManager.create({
       shell: '',  // Use default shell (resolves to pwsh/powershell/bash, not hardcoded cmd.exe)
-      cwd: params.cwd || process.env.USERPROFILE || 'C:\\',
+      cwd: params.cwd || process.env.USERPROFILE || os.homedir(),
       env: { ...(params.env || {}), WMUX_AGENT_ID: agentId, WMUX_AGENT_LABEL: params.label },
       startupCommands: [params.cmd],
     });
