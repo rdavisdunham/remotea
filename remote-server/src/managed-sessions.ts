@@ -24,6 +24,8 @@ interface Saved { inputs: Record<string, DirectRecord>; output: OutputState; cla
 interface Entry { failure?: HarnessFailure; spec: ManagedSpec; state: Saved; adapter: RuntimeAdapter; terminal: ManagedTerminal; transcript: ManagedTranscript; output: ManagedOutput; directTail?: Promise<void>; directPending: Set<string>; ready: Promise<void>; liveRequests: Map<string, HarnessRequest>; busy: boolean; receiptTimers: Map<string, NodeJS.Timeout>; receiptRequests: Map<string, HarnessRequest>; persistenceError?: boolean; recovering?: boolean; pumping?: boolean; started?: boolean; finalText?: string; prompt?: { text: string; op: string; published: boolean }; waiters: Map<string, { resolve: (result: CommandResult) => void; begin: () => void }>; items: Map<string, any>; startupError?: Error; lastActivity?: { kind: string; label?: string; at: number }; handingOff?: boolean }
 /** A failure a harness reports about its own session, as the trouble the host publishes (agent-state.ts). */
 export interface HarnessFailure { kind: 'errored' | 'rate_limited' | 'auth_expired'; detail: string }
+/** Eridani's link accepts a trouble detail of at most 200 characters; a longer one would fail the whole frame. */
+const TROUBLE_DETAIL = 200;
 const AUTH_ERRORS = ['authentication_failed', 'oauth_org_not_allowed', 'account_on_hold', 'cloud_credential_error'];
 const LIMIT_ERRORS = ['rate_limit', 'billing_error'];
 /**
@@ -34,7 +36,7 @@ const LIMIT_ERRORS = ['rate_limit', 'billing_error'];
 export function assistantFailure(code: string, said = ''): HarnessFailure {
   const kind = AUTH_ERRORS.includes(code) ? 'auth_expired' : LIMIT_ERRORS.includes(code) ? 'rate_limited' : 'errored';
   const text = said.replace(/\s+/g, ' ').trim();
-  return { kind, detail: text ? `${code}: ${text}`.slice(0, 300) : code };
+  return { kind, detail: text ? `${code}: ${text}`.slice(0, TROUBLE_DETAIL) : code };
 }
 /** A `result` that ended in an error with no assistant error before it (the turn died outside a model reply). */
 export function resultFailure(m: any): HarnessFailure | null {
@@ -43,7 +45,7 @@ export function resultFailure(m: any): HarnessFailure | null {
   const said = (Array.isArray(m.errors) && m.errors.length ? String(m.errors[0]) : typeof m.result === 'string' ? m.result : '').replace(/\s+/g, ' ').trim();
   const code = status ? `http_${status}` : String(m.subtype ?? 'error');
   const kind = status === 401 || status === 403 ? 'auth_expired' : status === 429 ? 'rate_limited' : 'errored';
-  return { kind, detail: (said ? `${code}: ${said}` : code).slice(0, 300) };
+  return { kind, detail: (said ? `${code}: ${said}` : code).slice(0, TROUBLE_DETAIL) };
 }
 export interface ManagedDeps {
   /** A session's own harness reported a failure (after the turn that failed has ended). */
