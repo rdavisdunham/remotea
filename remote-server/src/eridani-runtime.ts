@@ -37,6 +37,12 @@
  *     `gh pr merge --match-head-commit` and GitHub's update-branch API, with
  *     this host's `gh` (pr-actions.ts). Journaled; a restart mid-way reports
  *     `uncertain` and Eridani reads the pull request again.
+ *   - `target.setup` (Eridani's "Add a target"): the guided target setup run
+ *     for Eridani (eridani-target-command.ts), one at a time; a confirm that
+ *     saves probes the new target's launchers and sends a new hello so the
+ *     target is offered at once. Journaled; a restart mid-way settles a
+ *     proposal as `failed` (nothing was written) and a confirm as
+ *     `uncertain` (it may have saved; the next hello says).
  *   - `terminal.focus` (Eridani's "Open terminal in remotea"): the hub asks
  *     every connected app that understands `focus` to bring the run's tab to
  *     the front. `executed` when at least one app was told, `rejected`
@@ -71,6 +77,7 @@ import {
   type PrMergeCommand,
   type PrUpdateBranchCommand,
   type RunChangesCommand,
+  type TargetSetupCommand,
 } from '../../src/shared/eridani-link-protocol';
 import {
   ERIDANI_COLLECT_REQUEST,
@@ -96,6 +103,7 @@ import { loadTargets } from './eridani-targets';
 import { branchWorktree, ciFolder, ciStatus, CiStatusError, execGh, type Exec } from './ci-status';
 import { runChanges, RunChangesError } from './run-changes';
 import { prMerge, prUpdateBranch } from './pr-actions';
+import { recoverTargetSetup, runTargetSetupCommand, TARGET_SETUP_BUSY, targetSetupRefusal, type TargetSetupCommandDeps } from './eridani-target-command';
 import { mcpStatus, resolveMcp } from './eridani-mcp';
 import { withIsolation } from './verify-sandbox';
 import { runPrepare, templateStatus, withTemplate } from './target-template';
@@ -169,6 +177,8 @@ export interface EridaniRuntimeDeps {
    */
   doctor?: false | Partial<GatherOptions>;
   doctorMs?: number;
+  /** Tests: how `target.setup` asks a harness, tries a check and finds the sandbox (default: the real ones). */
+  targetSetup?: Pick<TargetSetupCommandDeps, 'inspect' | 'runCheck' | 'sandbox' | 'home'>;
 }
 
 /** How often the server recomputes the doctor summary while the link is up. */
@@ -252,6 +262,8 @@ export class EridaniRuntime {
   private doctor: DoctorSummary | null = null;
   private doctorAt = 0;
   private doctorBusy = false;
+  /** A `target.setup` is running: one at a time per host. */
+  private targetSetupBusy = false;
   readonly dispatch: Dispatch;
   readonly questions: QuestionBroker;
   readonly context: ContextService;
@@ -460,14 +472,17 @@ export class EridaniRuntime {
         'run.changes': (c, ctx) => this.changesCommand(c, ctx),
         'pr.merge': (c, ctx) => this.prCommand(c, ctx),
         'pr.update_branch': (c, ctx) => this.prCommand(c, ctx),
+        'target.setup': (c, ctx) => this.targetSetupCommand(c, ctx),
       },
-      precheck: (cmd) => this.dispatch.precheck(cmd),
+      precheck: (cmd) => (cmd.t === 'target.setup' ? this.targetSetupPrecheck(cmd) : this.dispatch.precheck(cmd)),
       // A scan (or a focus) cut off by a restart already did whatever it did; Eridani's wait bounds it.
       recover: (rec) => (rec.t === 'worktrees.scan' || rec.t === 'terminal.focus' || rec.t === 'ci.status' || rec.t === 'run.changes'
         ? { state: 'failed', detail: 'interrupted by a server restart' }
         // A merge or update cut off mid-way may have happened on GitHub: Eridani reads the pull request again.
         : rec.t === 'pr.merge' || rec.t === 'pr.update_branch'
         ? { state: 'uncertain', detail: 'interrupted by a server restart' }
+        : rec.t === 'target.setup'
+        ? recoverTargetSetup(rec.body)
         : this.dispatch.recover(rec)),
       acceptFacts: (cmd) => this.dispatch.acceptFacts(cmd),
       caps: () => !Object.values(this.harnesses()).some((h) => h?.managed) ? linkCaps(mode) : [...linkCaps(mode), 'managed.sessions', 'input.direct', 'output.live', 'decisions.durable', 'commands.durable', 'role.options', 'run.pause', 'activity', 'model_catalog', 'input.model', 'trouble.reported'],
@@ -814,6 +829,42 @@ export class EridaniRuntime {
     } catch (err) {
       const msg = err instanceof CiStatusError ? err.message : `${c.t} failed: ${(err as Error)?.message ?? String(err)}`;
       return { state: 'failed', detail: msg.slice(0, ERIDANI_LIMITS.reasonChars) };
+    }
+  }
+
+  /** `target.setup` at acceptance: one at a time, and what can be checked without running anything. */
+  private targetSetupPrecheck(cmd: CommandBody): string | null {
+    if (this.targetSetupBusy) return TARGET_SETUP_BUSY;
+    return targetSetupRefusal(cmd as unknown as TargetSetupCommand);
+  }
+
+  /**
+   * `target.setup` (eridani-target-command.ts): the guided setup for Eridani.
+   * Long-running, so `executing` is journaled at once. A saved target's
+   * launchers are probed (a bin not probed yet would show as not ready) and a
+   * new hello is sent, so Eridani has the target before it reads the outcome.
+   */
+  private async targetSetupCommand(cmd: CommandBody, ctx: CommandContext): Promise<CommandResult> {
+    if (this.targetSetupBusy) return { state: 'failed', detail: TARGET_SETUP_BUSY };
+    this.targetSetupBusy = true;
+    try {
+      ctx.begin();
+      const probe = this.deps.probe ?? defaultProbe;
+      const { outcome, saved } = await runTargetSetupCommand(cmd as unknown as TargetSetupCommand, {
+        dir: this.deps.dir,
+        env: this.deps.verifyEnv,
+        // The launchers hello already probed answer from the cache; the setup asks only for the bare names.
+        probe: async (h, bin) => this.probes.get(probeKey(h, bin)) ?? probe(h, bin),
+        ...this.deps.targetSetup,
+      });
+      if (saved) {
+        const missing = launchersToProbe(loadTargets(this.deps.dir)).filter((l) => !this.probes.has(probeKey(l.harness, l.bin)));
+        if (missing.length) await this.probeAll(missing);
+        this.link?.rehello(`target ${saved} saved from Eridani`);
+      }
+      return outcome;
+    } finally {
+      this.targetSetupBusy = false;
     }
   }
 

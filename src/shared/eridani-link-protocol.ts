@@ -132,7 +132,10 @@ export type LinkCap =
   // lands on a reviewer. Eridani refuses hyperplan / split-worker starts without it.
   | 'spawn.roles' | 'managed.sessions' | 'decisions.durable' | 'commands.durable' | 'role.options' | 'run.pause' | 'activity' | 'model_catalog' | 'input.model' | 'trouble.reported'
   // The host takes `run.reopen`: an exited run surface is resumed in place (`claude --resume`) as its next incarnation.
-  | 'run.reopen';
+  | 'run.reopen'
+  // The host takes `target.setup`: the guided target setup (`remotea eridani targets setup`) run for Eridani,
+  // a proposal first, then the confirmed target tried in the sandbox and saved.
+  | 'target.setup';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -153,6 +156,7 @@ export const STAGE_E_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...
 export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 'digest', 'context.scope', 'prompt', 'worktrees.scan', 'terminal.focus', 'doctor', 'spawn.roles', 'run.cleanup', 'run.cleanup.handoff', 'ci.status', 'pr.merge', 'pr.update_branch', 'run.reopen',
   'spawn.resume',
   'run.changes',
+  'target.setup',
 ]);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
@@ -1159,6 +1163,41 @@ export interface TerminalFocusCommand extends OpFields {
   expires_at: number | string;
 }
 
+/**
+ * Add an execution target from Eridani (remote-server/src/eridani-target-command.ts):
+ * the guided setup of `remotea eridani targets setup`, without a terminal.
+ * Not bound to a run. Long-running (a harness read takes minutes, a check up
+ * to 10): `accepted` at once, the result later as `command.outcome`; one at
+ * a time per host.
+ *
+ *   confirm: false  propose only, as `targets setup <repo> --json`: a harness
+ *                   reads the repository (or the heuristics answer), CI is
+ *                   read, no proposed check runs, nothing is written.
+ *   confirm: true   a person saw that proposal and said yes: `target` is the
+ *                   proposal's `target` as returned. No harness is asked
+ *                   again; each verify entry runs once in the sandbox, the
+ *                   passing ones are kept, the target is saved, and the host
+ *                   sends a new hello that lists it.
+ *
+ * `executed` with `result` = the `--json` object (`saved` true on a confirm);
+ * `failed` / `rejected` with a plain `detail`. The target id travels as
+ * `target_id`: `id` is the frame's own id. `expires_at` is required.
+ */
+export interface TargetSetupCommand extends OpFields {
+  t: 'target.setup';
+  /** Absolute path of the repository on the host (≤ 1000 characters). */
+  repo: string;
+  /** The target id; null lets the setup derive it (as the CLI without --id). */
+  target_id: string | null;
+  /** The harness that reads the repository; null: Claude Code, then Codex. */
+  harness: 'claude' | 'codex' | null;
+  model: string | null;
+  confirm: boolean;
+  /** Only with `confirm: true`: the proposal's `target`, as a `confirm: false` outcome returned it. */
+  target?: Record<string, unknown>;
+  expires_at: number | string;
+}
+
 export const SESSION_TOOLS: ReadonlySet<string> = new Set<SessionTool>(['claude_code', 'claude_desktop', 'codex_cli', 'codex_desktop']);
 
 /** Eridani's answer to sessions.snapshot: what each run should be doing. */
@@ -1543,6 +1582,16 @@ export function commandShapeError(m: Record<string, unknown>): string | null {
       if ((m.tool === undefined) !== (m.session_id === undefined)) return 'tool and session_id go together';
       if (m.tool !== undefined && !(typeof m.tool === 'string' && SESSION_TOOLS.has(m.tool))) return 'bad tool';
       if (m.session_id !== undefined && !(isStr(m.session_id, 200) && /^[A-Za-z0-9._:-]+$/.test(m.session_id))) return 'bad session_id';
+      return null;
+    case 'target.setup':
+      // Long-running but not durable: a setup nobody waits for any more is refused.
+      if (m.expires_at === undefined) return 'expires_at required';
+      if (!isStr(m.repo, 1000) || !/^(?:\/|[A-Za-z]:[\\/])/.test(m.repo) || !noControl(m.repo) || /[\r\n]/.test(m.repo)) return 'repo: an absolute path on the host';
+      if (m.target_id !== undefined && m.target_id !== null && !(typeof m.target_id === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(m.target_id))) return 'target_id: letters, digits, . _ - (≤64)';
+      if (m.harness !== undefined && m.harness !== null && m.harness !== 'claude' && m.harness !== 'codex') return 'harness: claude, codex or null';
+      if (m.model !== undefined && m.model !== null && !(isStr(m.model, 80) && MODEL_RE.test(m.model))) return 'bad model';
+      if (typeof m.confirm !== 'boolean') return 'confirm: true or false';
+      if (m.confirm ? !isObj(m.target) : m.target !== undefined && m.target !== null) return m.confirm ? 'confirm needs the proposed target' : 'target only with confirm';
       return null;
     default:
       return null; // a kind this module does not describe: its handler validates it
