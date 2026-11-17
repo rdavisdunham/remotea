@@ -1,4 +1,4 @@
-name: Windows smoke
+name: Packaged smoke
 
 # Builds the app the way release.yml does (electron-builder, NSIS), then runs the
 # PACKAGED binary's `--smoke` self-test (src/main/smoke.ts): main window opens,
@@ -8,6 +8,9 @@ name: Windows smoke
 # uninstalled). Unit tests cannot see any of this — a preload that fails to load
 # in the sandbox, a file missing from the asar, a renderer that throws on first
 # paint all pass `npm test`. README "Releases" describes it.
+#
+# `smoke-macos` runs the same self-test on an unsigned (ad-hoc signed) Apple
+# silicon build, so every change shows whether the app still starts on a Mac.
 on:
   pull_request:
     paths:
@@ -21,6 +24,7 @@ on:
       - 'tsconfig*.json'
       - 'scripts/bundle-preload.mjs'
       - 'scripts/smoke-windows.ps1'
+      - 'scripts/smoke-mac.sh'
       - '.github/workflows/smoke.yml'
   push:
     tags: ['v*']
@@ -146,6 +150,96 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-smoke
+          path: smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
+  smoke-macos:
+    name: Packaged app smoke (macOS)
+    # Pinned: macos-latest now means macOS 26, and macos-14 is retired.
+    runs-on: macos-15
+    timeout-minutes: 15
+    # Report-only until the first run passes; then this line goes and a red
+    # result blocks the pull request like any other check.
+    continue-on-error: true
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      SHELL: /bin/bash
+      ELECTRON_ENABLE_LOGGING: '1'
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node_modules
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: smoke-modules-${{ runner.os }}-${{ runner.arch }}-node20-${{ hashFiles('package-lock.json') }}
+
+      - name: Cache Electron and electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/electron
+            .cache/electron-builder
+          key: smoke-electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: smoke-electron-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        if: steps.modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Build main + preload + CLI
+        run: npm run build:main
+
+      - name: Build renderer
+        run: npx vite build
+
+      # Ad-hoc signed (`identity: "-"` in electron-builder.json): Apple silicon
+      # refuses to run an unsigned binary at all. build/after-pack.cjs makes
+      # node-pty's spawn-helper executable.
+      - name: Package with electron-builder
+        run: npx electron-builder --mac dir --publish never
+
+      - name: Smoke the packaged app
+        run: |
+          set -o pipefail
+          mkdir -p smoke
+          scripts/smoke-mac.sh release/mac-arm64/remotea.app/Contents/MacOS/remotea \
+            smoke/mac.json smoke-mac 90000 2>&1 | tee smoke/mac.log
+
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p smoke/diagnostics smoke/appdata
+          app=release/mac-arm64/remotea.app
+          if [ -d "$app" ]; then
+            codesign -dv --verbose=4 "$app" > smoke/diagnostics/codesign.txt 2>&1 || true
+            file "$app/Contents/MacOS/remotea" > smoke/diagnostics/file.txt 2>&1 || true
+            lipo -info "$app/Contents/MacOS/remotea" >> smoke/diagnostics/file.txt 2>&1 || true
+            ls -l "$app"/Contents/Resources/app.asar.unpacked/node_modules/node-pty/prebuilds/darwin-*/ \
+              > smoke/diagnostics/node-pty.txt 2>&1 || true
+          fi
+          cp ~/Library/Logs/DiagnosticReports/*.ips smoke/diagnostics/ 2>/dev/null || true
+          # Logs only: never settings, session or token files.
+          src="$HOME/AppData/Roaming/remotea-smoke-mac"
+          if [ -d "$src" ]; then
+            (cd "$src" && find . \( -name '*.log' -o -name '*.jsonl' \) -type f \
+              -not -path '*/chromium/*' -not -path '*/Partitions/*' -not -path '*Cache*' \
+              -exec rsync -R {} "$GITHUB_WORKSPACE/smoke/appdata/" \;) || true
+          fi
+
+      - name: Upload smoke results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-smoke
           path: smoke/
           if-no-files-found: warn
           retention-days: 14
