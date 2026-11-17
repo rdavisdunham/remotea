@@ -15,10 +15,15 @@ describe('settings navigation compatibility and discovery', () => {
     expect(new Set(sections).size).toBe(sections.length);
     expect(sections).toEqual(expect.arrayContaining(['General', 'Hosts', 'Sidebar', 'Workspace', 'Terminal', 'Prompts', 'Notifications', 'Browser', 'Profiles', 'Shortcuts', 'Remote', 'Changelog', 'Help', 'Agents']));
   });
-  it('finds Tea directly by provider and credential settings', () => {
-    for (const query of ['Tea', 'API key', 'Anthropic', 'OpenAI', 'base URL', 'background models']) {
+  it('finds the Dani section (section ID Tea) by its name, its old name, and provider and credential settings', () => {
+    for (const query of ['Dani', 'Tea', 'API key', 'Anthropic', 'OpenAI', 'base URL', 'background models']) {
       expect(searchSettings(query)).toContain('Tea');
     }
+  });
+  it('says Dani, not Tea, in every English string a person reads', () => {
+    expect(en['settings.tab.tea']).toBe('Dani');
+    expect(en['palette.askTea']).toBe('Ask Dani about your terminals');
+    expect(Object.entries(en).filter(([, value]) => /\bTea\b/.test(value))).toEqual([]);
   });
   it('indexes every current preference field from the interfaces', () => {
     const source = ts.createSourceFile('settings.ts', readFileSync('src/renderer/store/settings-slice.ts', 'utf8'), ts.ScriptTarget.Latest, true);

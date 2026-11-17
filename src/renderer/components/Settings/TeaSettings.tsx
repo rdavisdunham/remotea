@@ -119,7 +119,7 @@ export default function TeaSettings({
     }
   };
   const save = async (): Promise<TeaReply> => {
-    if (!draft) return { ok: false, error: 'Load Tea settings first.' };
+    if (!draft) return { ok: false, error: 'Load Dani settings first.' };
     const reply = await requestTea(hostId, {
       action: 'configure',
       expectedRevision: revision,
@@ -304,10 +304,10 @@ export default function TeaSettings({
   const Container = expanded ? 'section' : 'details';
   return (
     <Container className="tea-settings">
-      {!expanded && <summary>Tea assistant</summary>}
+      {!expanded && <summary>Dani assistant</summary>}
       <p className="settings-hint">
         Shared by Remotea apps connected to this host. The host stores
-        credentials and runs Tea.
+        credentials and runs Dani.
       </p>
       {!draft ? (
         <button
@@ -316,7 +316,7 @@ export default function TeaSettings({
           disabled={!connected}
           onClick={() => void act(load)}
         >
-          Load Tea settings
+          Load Dani settings
         </button>
       ) : (
         <fieldset disabled={busy || !connected}>
@@ -326,7 +326,7 @@ export default function TeaSettings({
               checked={draft.enabled}
               onChange={(event) => change({ enabled: event.target.checked })}
             />
-            Enable Tea on this host
+            Enable Dani on this host
           </label>
           <label className="tea-switch">
             <input
@@ -388,7 +388,7 @@ export default function TeaSettings({
                 </label>
                 <p className="settings-hint">
                   The name is a label. API format selects which provider
-                  protocol Tea uses.
+                  protocol Dani uses.
                 </p>
                 <label>
                   Base URL
@@ -545,7 +545,7 @@ export default function TeaSettings({
           >
             Add provider connection
           </button>
-          {roleEditor('chat', 'Tea conversation and actions')}
+          {roleEditor('chat', 'Dani conversation and actions')}
           {roleEditor('background', 'Names and quick summaries')}
           <div className="tea-actions">
             <button
@@ -553,7 +553,7 @@ export default function TeaSettings({
               className="settings-button"
               onClick={() => void act(save)}
             >
-              Save Tea settings
+              Save Dani settings
             </button>
             <button
               type="button"

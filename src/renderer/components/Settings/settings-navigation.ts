@@ -24,7 +24,7 @@ const fieldSections: Record<keyof typeof PREFERENCE_FIELDS, SettingsSection> = {
 };
 const aliases: Partial<Record<SettingsSection, string>> = {
   Hosts: 'connection ssh server remote host eridani recovery activity',
-  Tea: 'tea assistant api key provider connection base url anthropic openai model effort naming names summaries background',
+  Tea: 'dani tea assistant api key provider connection base url anthropic openai model effort naming names summaries background',
   Remote: 'phone access remote console pairing mobile',
   Agents: 'eridani integration consent hooks detection readiness manual status agent',
   Profiles: 'quick launch profiles commands shell location',

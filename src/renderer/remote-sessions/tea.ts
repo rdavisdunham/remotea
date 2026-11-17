@@ -8,12 +8,12 @@ export function requestTea(
   if (!api)
     return Promise.resolve({
       ok: false,
-      error: 'Update the Remotea desktop app to use Tea.',
+      error: 'Update the Remotea desktop app to use Dani.',
     });
   return api(hostId, command).catch(() => ({
     ok: false,
     uncertain: true,
     error:
-      'The host did not confirm this request. Refresh Tea before retrying.',
+      'The host did not confirm this request. Refresh Dani before retrying.',
   }));
 }

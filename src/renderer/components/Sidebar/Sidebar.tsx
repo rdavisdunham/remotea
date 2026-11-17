@@ -430,9 +430,9 @@ export default function Sidebar({
       )}
 
       <div className="sidebar__footer">
-        <button type="button" className="sidebar__footer-btn sidebar__footer-btn--tea" title="Ask Tea about your terminals" aria-label="Open Tea assistant" onClick={toggleTea}>
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 6.5h8.5v3a4 4 0 0 1-4 4H6.5a4 4 0 0 1-4-4v-3z"/><path d="M11 7.5h1a1.75 1.75 0 0 1 0 3.5h-1.2"/><path d="M5 2.2c-.6.8.6 1.3 0 2.1M8 2.2c-.6.8.6 1.3 0 2.1"/></svg>
-          <span>Tea</span>
+        <button type="button" className="sidebar__footer-btn sidebar__footer-btn--tea" title={t('palette.askTea', 'Ask Dani about your terminals')} aria-label="Open Dani assistant" onClick={toggleTea}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.5 3.5a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5H7l-3 2.5V11H4a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M8 4.2l.55 1.25 1.25.55-1.25.55L8 7.8l-.55-1.25L6.2 6l1.25-.55z"/></svg>
+          <span>Dani</span>
         </button>
         <button
           className="sidebar__footer-btn"
