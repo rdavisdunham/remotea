@@ -57,12 +57,12 @@ it('shows section-owned snapshots and separates host, phone and integration owne
   expect(container.textContent).toContain('immediately write or remove integration files');
 });
 
-it('opens the dedicated Tea tab and forwards its host deep link', async () => {
+it('opens the dedicated Dani tab (section ID Tea) and forwards its host deep link', async () => {
   const container=document.createElement('div');document.body.append(container);
   const root=createRoot(container);
   cleanup=()=>{act(()=>root.unmount());container.remove();};
   await act(async()=>root.render(createElement(SettingsWindow,{initialTab:'Tea',initialHostId:'selected-host',onClose:vi.fn()})));
-  expect(container.querySelector('.settings-tab--active')?.textContent).toBe('Tea');
+  expect(container.querySelector('.settings-tab--active')?.textContent).toBe('Dani');
   expect(container.textContent).toContain('Tea API key controls');
   expect(mounted.tea).toHaveBeenCalledWith(expect.objectContaining({initialHostId:'selected-host'}));
   expect(mounted.integration).not.toHaveBeenCalled();

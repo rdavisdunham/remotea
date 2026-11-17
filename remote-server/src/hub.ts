@@ -209,7 +209,7 @@ export class Hub {
       session: (id) => this.registry.session(id),
       update: (id, patch) => void this.registry.updateSession(id, patch),
       emit: (t) => {
-        try { this.tea?.capture(t); } catch { this.log('Tea could not checkpoint captured context.'); }
+        try { this.tea?.capture(t); } catch { this.log('Dani could not checkpoint captured context.'); }
         this.sink?.turn(t);
         this.eridani.turn?.(t);
       },
@@ -303,7 +303,7 @@ export class Hub {
     const device = conn.device.id;
     switch (msg.t) {
       case 'tea':
-        if (!this.tea) { conn.sendJson({ t: 'teaResult', rid: msg.rid, result: { ok: false, error: 'Tea is unavailable on this host.' } }); return; }
+        if (!this.tea) { conn.sendJson({ t: 'teaResult', rid: msg.rid, result: { ok: false, error: 'Dani is unavailable on this host.' } }); return; }
         void this.tea.request(msg.command, device).then(result => conn.sendJson({ t: 'teaResult', rid: msg.rid, result }));
         return;
       case 'open': return this.open(conn, msg);
@@ -449,7 +449,7 @@ export class Hub {
         const rec = this.registry.session(id);
         if (rec?.agent) {
           try { this.tea?.observe(id, `${rec.agent.provider}:${rec.agent.sessionId}`, params.prompt, '', this.now()); }
-          catch { this.log('Tea could not checkpoint captured context.'); }
+          catch { this.log('Dani could not checkpoint captured context.'); }
         }
       }
       const captured = this.turns.hook(id, params);

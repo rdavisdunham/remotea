@@ -317,18 +317,18 @@ export class RemoteHostClient {
   }
 
   tea(command: TeaCommand): Promise<TeaReply> {
-    if (!this.teaAvailable) return Promise.resolve({ ok: false, error: 'Update the Remotea server to use Tea.' });
+    if (!this.teaAvailable) return Promise.resolve({ ok: false, error: 'Update the Remotea server to use Dani.' });
     const rid = this.nextRid++;
     return new Promise(resolve => {
       const timer = this.timers.setTimeout(() => {
         this.teaWaiters.delete(rid);
-        resolve({ ok: false, uncertain: true, error: 'The host did not confirm this Tea request. Refresh its state before retrying.' });
+        resolve({ ok: false, uncertain: true, error: 'The host did not confirm this Dani request. Refresh its state before retrying.' });
       }, 120000);
       this.teaWaiters.set(rid, result => { this.timers.clearTimeout(timer); resolve(result); });
       if (!this.sendJson({ t: 'tea', rid, command })) {
         this.teaWaiters.delete(rid);
         this.timers.clearTimeout(timer);
-        resolve({ ok: false, error: 'Connect to this host to use Tea.' });
+        resolve({ ok: false, error: 'Connect to this host to use Dani.' });
       }
     });
   }
@@ -552,7 +552,7 @@ export class RemoteHostClient {
     }
     for (const [rid, waiter] of this.teaWaiters) {
       this.teaWaiters.delete(rid);
-      waiter({ ok: false, uncertain: true, error: 'Disconnected before the host confirmed the Tea request. Refresh before retrying.' });
+      waiter({ ok: false, uncertain: true, error: 'Disconnected before the host confirmed the Dani request. Refresh before retrying.' });
     }
   }
 

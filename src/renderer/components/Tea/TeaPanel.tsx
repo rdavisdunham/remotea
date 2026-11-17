@@ -49,7 +49,7 @@ export default function TeaPanel({
   useEffect(() => {
     following.current = true;
   }, [hostId]);
-  // Opening the panel is asking to type; the field is disabled until Tea is ready.
+  // Opening the panel is asking to type; the field is disabled until Dani is ready.
   const usable = !!(view?.connected && tea?.config.enabled);
   useEffect(() => {
     if (usable) composer.current?.focus();
@@ -125,12 +125,12 @@ export default function TeaPanel({
     composer.current?.focus();
   };
   return createPortal(
-    <section className="tea-panel" role="dialog" aria-label="Tea assistant">
+    <section className="tea-panel" role="dialog" aria-label="Dani assistant">
       <header>
-        <strong>Tea</strong>
+        <strong>Dani</strong>
         {hostList.length > 1 ? (
           <select
-            aria-label="Tea host"
+            aria-label="Dani host"
             disabled={busy}
             value={hostId}
             onChange={(event) => {
@@ -167,7 +167,7 @@ export default function TeaPanel({
         <button
           type="button"
           className="tea-panel__icon"
-          title="Configure Tea"
+          title="Configure Dani"
           onClick={() => {
             onClose();
             onSettings?.(hostId);
@@ -178,12 +178,12 @@ export default function TeaPanel({
             <circle cx="11" cy="4.5" r="1.5" />
             <circle cx="5" cy="11.5" r="1.5" />
           </svg>
-          <span className="tea-panel__sr">Configure Tea</span>
+          <span className="tea-panel__sr">Configure Dani</span>
         </button>
         <button
           type="button"
           className="tea-panel__icon"
-          aria-label="Close Tea"
+          aria-label="Close Dani"
           title="Close (Esc)"
           onClick={onClose}
         >
@@ -204,14 +204,14 @@ export default function TeaPanel({
       >
         {!hostList.length && (
           <div className="tea-panel__empty">
-            <h3>Tea runs on a host</h3>
-            <p>Add a host in Settings → Remote hosts, then set Tea up there.</p>
+            <h3>Dani runs on a host</h3>
+            <p>Add a host in Settings → Remote hosts, then set Dani up there.</p>
           </div>
         )}
         {!!hostList.length && !tea?.config.enabled && (
           <div className="tea-panel__empty">
-            <h3>Tea is off on this host</h3>
-            <p>Enable Tea and configure its provider models in Settings → Tea.</p>
+            <h3>Dani is off on this host</h3>
+            <p>Enable Dani and configure its provider models in Settings → Dani.</p>
             <button
               type="button"
               onClick={() => {
@@ -219,7 +219,7 @@ export default function TeaPanel({
                 onSettings?.(hostId);
               }}
             >
-              Open Tea settings
+              Open Dani settings
             </button>
           </div>
         )}
@@ -227,7 +227,7 @@ export default function TeaPanel({
           <div className="tea-panel__empty">
             <h3>One more step</h3>
             <p>
-              Test Tea’s conversational model in Settings → Tea before sending
+              Test Dani’s conversational model in Settings → Dani before sending
               messages.
             </p>
             <button
@@ -237,7 +237,7 @@ export default function TeaPanel({
                 onSettings?.(hostId);
               }}
             >
-              Open Tea settings
+              Open Dani settings
             </button>
           </div>
         )}
@@ -247,7 +247,7 @@ export default function TeaPanel({
             <div className="tea-panel__empty">
               <h3>Ask about your terminals</h3>
               <p>
-                Tea can find where you were working, say which terminals need
+                Dani can find where you were working, say which terminals need
                 you, rename a terminal or set a reminder.
               </p>
               <div className="tea-panel__suggestions">
@@ -274,7 +274,7 @@ export default function TeaPanel({
           const ids = [
             ...new Set(message.text.match(/surf-[A-Za-z0-9_-]{1,96}/g) || []),
           ].filter((id) => view?.sessions.some((session) => session.id === id));
-          // Tea refers to terminals by ID; people know them by name.
+          // Dani refers to terminals by ID; people know them by name.
           const shown =
             message.role === 'assistant'
               ? ids.reduce((value, id) => {
@@ -296,7 +296,7 @@ export default function TeaPanel({
               key={message.id}
             >
               <strong className="tea-panel__sr">
-                {message.role === 'user' ? 'You' : 'Tea'}
+                {message.role === 'user' ? 'You' : 'Dani'}
               </strong>
               {message.delivery === 'interrupted' && (
                 <span className="tea-message__partial">
@@ -354,7 +354,7 @@ export default function TeaPanel({
           <div
             className="tea-thinking"
             role="status"
-            aria-label={responding ? 'Tea is responding' : 'Tea is thinking'}
+            aria-label={responding ? 'Dani is responding' : 'Dani is thinking'}
           >
             <span className="tea-thinking__dots" aria-hidden="true">
               <span />
@@ -411,7 +411,7 @@ export default function TeaPanel({
       >
         <div className="tea-composer">
           <label htmlFor="tea-message" className="tea-panel__sr">
-            Message Tea
+            Message Dani
           </label>
           <textarea
             id="tea-message"
@@ -433,7 +433,7 @@ export default function TeaPanel({
             }}
             aria-describedby="tea-message-hint"
             placeholder={
-              ready ? 'Where was I fixing the login settings?' : 'Tea is not ready on this host'
+              ready ? 'Where was I fixing the login settings?' : 'Dani is not ready on this host'
             }
             disabled={busy || !view?.connected || !tea?.config.enabled}
           />
@@ -459,9 +459,9 @@ export default function TeaPanel({
               : !view?.connected
                 ? 'Host disconnected'
                 : !tea?.config.enabled
-                  ? 'Tea disabled'
+                  ? 'Dani disabled'
                   : active
-                    ? `Tea · ${active.phase || 'Working'}`
+                    ? `Dani · ${active.phase || 'Working'}`
                     : recovery.length
                       ? 'Needs you · continue or cancel a saved turn'
                       : queued

@@ -133,7 +133,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     items.push({ id: 'command:host-activity', label: t('activity.title'), category: t('palette.category.commands'), action: () => onAction('openHostActivity') });
     items.push({
       id: 'command:ask-tea',
-      label: t('palette.askTea', 'Ask Tea about your terminals'),
+      label: t('palette.askTea', 'Ask Dani about your terminals'),
       category: t('palette.category.commands'),
       action: () => { onClose(); toggleTea(); },
     });
@@ -243,7 +243,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     }
 
     // Category: Terminals — jump to any terminal in any workspace by its name,
-    // by what Tea says it is doing, or by its folder.
+    // by what Dani says it is doing, or by its folder.
     for (const ws of workspaces) {
       const workspaceName = workspaceLabels.get(ws.id) ?? ws.title;
       for (const surface of terminalSurfaces(ws.splitTree)) {

@@ -5,7 +5,7 @@ import ChatReminderDialog from './ChatReminderDialog';
 
 /**
  * The pane brief: one strip across the top of a terminal that says what state
- * the conversation is in and, when Tea has written one, what the terminal is
+ * the conversation is in and, when Dani has written one, what the terminal is
  * working on. A plain shell with nothing to report shows no strip at all; its
  * read state and reminders stay reachable from the tab's context menu.
  */

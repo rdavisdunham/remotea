@@ -98,6 +98,7 @@ import { statusFromRegistry } from './collector/report';
 import { Dispatch, type DispatchTimers } from './dispatch';
 import { QuestionBroker } from './questions-claude';
 import { ContextService } from './context';
+import { lookup, type LookupOutcome, type LookupQuery } from './eridani-lookup';
 import { sameWorktreeState, WorktreeManager, worktreeStateOf, writersByPath } from './worktrees';
 import { loadTargets } from './eridani-targets';
 import { branchWorktree, ciFolder, ciStatus, CiStatusError, execGh, type Exec } from './ci-status';
@@ -373,6 +374,11 @@ export class EridaniRuntime {
 
   get current(): EridaniLink | null {
     return this.link;
+  }
+
+  /** The host assistant's read-only question to Eridani (eridani-lookup.ts). */
+  lookup(query: LookupQuery): Promise<LookupOutcome> {
+    return lookup(this.link, query);
   }
 
   /** Re-read the config when it changed; serve a pending collect request. */

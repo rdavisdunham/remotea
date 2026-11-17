@@ -703,7 +703,7 @@ export default function PaneWrapper({
     >
       {teaHighlighted && (
         <div className="pane-wrapper__tea-highlight" role="status">
-          <span>Tea found this terminal · click to dismiss</span>
+          <span>Dani found this terminal · click to dismiss</span>
         </div>
       )}
       <SurfaceTabBar

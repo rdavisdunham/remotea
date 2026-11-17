@@ -22,7 +22,9 @@
  * commands Eridani sends down (spawn, input, answer, stop, verify), their
  * `command.outcome`, the reconcile answer `runs.snapshot`, questions
  * (`question`, `question.resolved`), `verify.result`, and the correlated
- * `context.request` / `context.response` pair.
+ * `context.request` / `context.response` pair. The host assistant's read-only
+ * `lookup.request` / `lookup.response` pair (runs, tasks, Needs you) has the
+ * same ephemeral shape.
  *
  * Pure: no Node or DOM imports (the digest itself is computed by the server
  * with node:crypto over `canonicalJson(semanticPayload(frame))`).
@@ -71,6 +73,8 @@ export const ERIDANI_TIMING = Object.freeze({
   probeMs: 10_000,
   /** SessionStart waits this long for context.response; a later answer is dropped. */
   contextMs: 2_500,
+  /** The host assistant waits this long for lookup.response; a later answer is dropped. */
+  lookupMs: 15_000,
   /** Claude's AskUserQuestion hook timeout (claude-hooks.ts) and how long remotea holds before it. */
   questionHookTimeoutS: 600,
   questionHoldMs: 570_000,
@@ -135,7 +139,10 @@ export type LinkCap =
   | 'run.reopen'
   // The host takes `target.setup`: the guided target setup (`remotea eridani targets setup`) run for Eridani,
   // a proposal first, then the confirmed target tried in the sandbox and saved.
-  | 'target.setup';
+  | 'target.setup'
+  // The host assistant asks read-only questions (`lookup.request`: runs, one run, tasks, Needs you).
+  // remotea sends it only to an Eridani whose welcome advertised `lookup`.
+  | 'lookup';
 
 export const STAGE_B_CAPS: readonly LinkCap[] = Object.freeze([
   'session.report', 'session.report.parity', 'turn', 'status', 'exit', 'sessions.snapshot', 'chunking', 'journal',
@@ -157,6 +164,7 @@ export const STAGE_F_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_D_CAPS, 
   'spawn.resume',
   'run.changes',
   'target.setup',
+  'lookup',
 ]);
 export const STAGE_F_AUTHORITATIVE_CAPS: readonly LinkCap[] = Object.freeze([...STAGE_F_CAPS, 'collector.authoritative']);
 
@@ -665,6 +673,44 @@ export interface ContextRequestBody {
   run_id: string | null;
   generation: number;
   task_id: string | null;
+}
+
+/** What the host assistant may ask Eridani about (read-only). */
+export type LookupWhat = 'runs' | 'run' | 'tasks' | 'needs_you';
+
+/**
+ * The host assistant reads Eridani (runs, one run, tasks, Needs you).
+ * Correlated by `req_id`; remotea waits ERIDANI_TIMING.lookupMs and drops a
+ * later answer. Ephemeral like context.request: never spooled, never acked,
+ * never resent. Sent only when the welcome advertised `lookup`.
+ */
+export interface LookupRequestBody {
+  t: 'lookup.request';
+  req_id: string;
+  what: LookupWhat;
+  /** what = 'run'. */
+  run_id?: string;
+  /** what = 'runs': only runs that have not finished (Eridani's default: true). */
+  active?: boolean;
+  /** what = 'tasks': title search, at most 200 characters. */
+  query?: string;
+  /** what = 'tasks' (Eridani's default: 'open'). */
+  status?: 'open' | 'done' | 'all';
+  /** runs/tasks: 1..25 (Eridani's default: 10). */
+  limit?: number;
+}
+
+/**
+ * Eridani's answer to lookup.request. `data` is opaque JSON (runs → `{runs}`,
+ * run → `{run}`, tasks → `{tasks, total}`, needs_you → `{total, items, summary}`);
+ * its strings are untrusted data.
+ */
+export interface LookupResponseBody {
+  t: 'lookup.response';
+  req_id: string;
+  ok: boolean;
+  data?: unknown;
+  error?: string;
 }
 
 export type CommandOutcomeState = 'executed' | 'failed' | 'rejected' | 'uncertain';
@@ -1281,6 +1327,7 @@ export type UpBody =
   | ExitBody
   | SessionsSnapshotBody
   | ContextRequestBody
+  | LookupRequestBody
   | CommandOutcomeBody
   | LiveOutputBody
   | InputReceiptBody
@@ -1301,7 +1348,7 @@ export interface CommandBody extends OpFields {
   [k: string]: unknown;
 }
 
-export type DownBody = WelcomeBody | AckBody | ByeBody | ContextResponseBody | RunsSnapshotBody | CommandBody;
+export type DownBody = WelcomeBody | AckBody | ByeBody | ContextResponseBody | LookupResponseBody | RunsSnapshotBody | CommandBody;
 export type DownFrame = Envelope & DownBody;
 
 // ── Guards ─────────────────────────────────────────────────────────────────
@@ -1343,6 +1390,9 @@ export function parseDownFrame(raw: unknown): DownFrame | null {
     case 'context.response':
       return isStr(m.req_id, 200) && typeof m.text === 'string' && m.text.length <= ERIDANI_LIMITS.contextChars
         && (m.run_token === undefined || isStr(m.run_token, 512)) ? (m as unknown as DownFrame) : null;
+    case 'lookup.response':
+      return isStr(m.req_id, 200) && typeof m.ok === 'boolean' && (m.error === undefined || typeof m.error === 'string')
+        ? ({ ...(m as unknown as DownFrame), ...(typeof m.error === 'string' ? { error: m.error.slice(0, ERIDANI_LIMITS.reasonChars) } : {}) } as DownFrame) : null;
     case 'runs.snapshot':
       return Array.isArray(m.runs) && m.runs.every(isRunsEntry) ? (m as unknown as DownFrame) : null;
     default:
@@ -1381,6 +1431,12 @@ export function parseUpFrame(raw: unknown): UpFrame | null {
       return isStr(m.acked_id, 200) && typeof m.ok === 'boolean' ? (m as unknown as UpFrame) : null;
     case 'context.request':
       return isStr(m.req_id, 200) && isStr(m.surf, 120) && isNum(m.incarnation) && isNum(m.generation) ? (m as unknown as UpFrame) : null;
+    case 'lookup.request':
+      return isStr(m.req_id, 200) && ['runs', 'run', 'tasks', 'needs_you'].includes(m.what as string)
+        && (m.what !== 'run' || isStr(m.run_id, 200)) && (m.query === undefined || (typeof m.query === 'string' && m.query.length <= 200))
+        && (m.status === undefined || ['open', 'done', 'all'].includes(m.status as string))
+        && (m.limit === undefined || (Number.isInteger(m.limit) && (m.limit as number) >= 1 && (m.limit as number) <= 25))
+        && (m.active === undefined || typeof m.active === 'boolean') ? (m as unknown as UpFrame) : null;
     case 'command.outcome':
       return op && isStr(m.command_id, 200) && ['executed', 'failed', 'rejected', 'uncertain'].includes(m.state as string) ? (m as unknown as UpFrame) : null;
     case 'output.live':

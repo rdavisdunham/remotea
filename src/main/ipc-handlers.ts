@@ -792,7 +792,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   ipcMain.handle(IPC_CHANNELS.RHOST_LIST, () => remoteHosts.list());
   ipcMain.handle(IPC_CHANNELS.RHOST_TEA, (_event, hostId: unknown, command: unknown) =>
-    typeof hostId === 'string' && isTeaCommand(command) ? remoteHosts.tea(hostId, command) : { ok: false, error: 'Invalid Tea request.' });
+    typeof hostId === 'string' && isTeaCommand(command) ? remoteHosts.tea(hostId, command) : { ok: false, error: 'Invalid Dani request.' });
   ipcMain.handle(IPC_CHANNELS.RHOST_SAVE, (_event, req: HostSaveRequest) => {
     try {
       return { ok: true, host: remoteHosts.save(req) };

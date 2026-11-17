@@ -298,8 +298,8 @@ export class EridaniLink {
   private stopped = true;
   private readonly inflightMax: number;
   private readonly maxFrameBytes: number;
-  /** Correlated requests (context.request) waiting for their response, by req_id. */
-  private readonly waiting = new Map<string, { resolve: (f: Record<string, unknown> | null) => void; timer: unknown }>();
+  /** Correlated requests (context.request, lookup.request) waiting for their response, by req_id. */
+  private readonly waiting = new Map<string, { resolve: (f: Record<string, unknown> | null) => void; timer: unknown; reply: string }>();
   /** runs.snapshot parts being assembled, by `part.of`. */
   private readonly runParts = new Map<string, Array<{ i: number; runs: RunsSnapshotBody['runs'] }>>();
   /** Commands running now, so a duplicate arriving mid-effect is not run twice. */
@@ -759,7 +759,8 @@ export class EridaniLink {
         this.waiting.delete(body.req_id);
         resolve(null);
       }, ms);
-      this.waiting.set(body.req_id, { resolve, timer });
+      // `x.request` is answered by `x.response`; any other kind with this req_id is dropped.
+      this.waiting.set(body.req_id, { resolve, timer, reply: body.t.replace(/\.request$/, '.response') });
       if (!this.sendFrame(body)) {
         this.timers.clearTimeout(timer);
         this.waiting.delete(body.req_id);
@@ -844,10 +845,11 @@ export class EridaniLink {
       case 'bye':
         this.log(`eridani: bye (${(f as { reason?: string }).reason || 'no reason'})`);
         return;
-      case 'context.response': {
+      case 'context.response':
+      case 'lookup.response': {
         const r = f as DownFrame & { req_id: string };
         const w = this.waiting.get(r.req_id);
-        if (!w) return; // late or unknown: dropped
+        if (!w || w.reply !== f.t) return; // late, unknown or the wrong kind: dropped
         this.waiting.delete(r.req_id);
         this.timers.clearTimeout(w.timer);
         w.resolve(r as unknown as Record<string, unknown>);

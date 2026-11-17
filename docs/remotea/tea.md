@@ -1,26 +1,28 @@
-# Tea research and implementation design
+# Dani, the host assistant: research and implementation design
 
-Research date 2026-11-07.
+Research date 2026-11-07. Renamed from Tea to Dani on 2026-11-17.
 
-Tea is Remotea's server-backed assistant. Its first release covers terminal discovery, concise work summaries, automatic terminal names and ordinary workspace management. The user selected a separate assistant identity, API-key connections and independently configurable conversational and background models. Anthropic Sonnet and Haiku are the initial model choices.
+Dani is one assistant across Eridani and Remotea. In Remotea it is the host assistant: it sees the terminals on its host and, when the host is linked to Eridani, the owner's tasks, runs and what needs them (see [Eridani lookups](#eridani-lookups)). Until 2026-11-17 the Remotea side was a separate identity called Tea; [what kept the old name](#what-kept-the-old-name) lists the identifiers that did not change.
+
+The host assistant is Remotea's server-backed assistant. Its first release covers terminal discovery, concise work summaries, automatic terminal names and ordinary workspace management. It uses API-key connections and independently configurable conversational and background models. (The first release used a separate assistant identity, Tea; it became Dani.) Anthropic Sonnet and Haiku are the initial model choices.
 
 ## Research method
 
-Exa returned 45 candidate search hits across provider behavior, harness and context design, durable execution, and evaluation and security. Eighteen primary source pages were fetched. First-party documentation and engineering reports carried the decisions. Framework documentation supplied replay and checkpointing principles. Coding-agent studies were treated as evidence about long-lived state and evaluation, with Tea's smaller application-management workload assessed separately.
+Exa returned 45 candidate search hits across provider behavior, harness and context design, durable execution, and evaluation and security. Eighteen primary source pages were fetched. First-party documentation and engineering reports carried the decisions. Framework documentation supplied replay and checkpointing principles. Coding-agent studies were treated as evidence about long-lived state and evaluation, with Dani's smaller application-management workload assessed separately.
 
 ## Findings and their application
 
 ### Keep the execution model understandable
 
-Anthropic describes successful agents as composable model-and-tool loops and recommends increasing orchestration complexity when measured outcomes justify it. Its later application-building research adds structured handoffs, incremental progress and independent outcome checks for longer work. Tea can use a server-owned loop over official provider APIs, backed by Remotea's existing persistence and operations. Background naming and summarization have a fixed input/output contract and fit a single bounded request. Conversational actions use a small iterative tool loop. [Agent design](https://www.anthropic.com/research/building-effective-agents), [Long-running application harnesses](https://www.anthropic.com/research/harness-design-long-running-apps)
+Anthropic describes successful agents as composable model-and-tool loops and recommends increasing orchestration complexity when measured outcomes justify it. Its later application-building research adds structured handoffs, incremental progress and independent outcome checks for longer work. Dani can use a server-owned loop over official provider APIs, backed by Remotea's existing persistence and operations. Background naming and summarization have a fixed input/output contract and fit a single bounded request. Conversational actions use a small iterative tool loop. [Agent design](https://www.anthropic.com/research/building-effective-agents), [Long-running application harnesses](https://www.anthropic.com/research/harness-design-long-running-apps)
 
 ### Treat tools as an application interface
 
-Tool descriptions should explain purpose, inputs, scope and useful outputs. Overlapping tools and oversized results make correct selection harder. Tea tools should use stable session and workspace IDs, descriptive results and bounded excerpts. The same underlying registry operations should serve desktop actions and Tea actions. Each successful mutation returns the resulting server state so the assistant can ground its reply in an observed outcome. [Tool design](https://www.anthropic.com/research/writing-tools-for-agents)
+Tool descriptions should explain purpose, inputs, scope and useful outputs. Overlapping tools and oversized results make correct selection harder. Dani tools should use stable session and workspace IDs, descriptive results and bounded excerpts. The same underlying registry operations should serve desktop actions and Dani actions. Each successful mutation returns the resulting server state so the assistant can ground its reply in an observed outcome. [Tool design](https://www.anthropic.com/research/writing-tools-for-agents)
 
 ### Retrieve terminal detail when needed
 
-Context engineering guidance favors compact references and targeted retrieval. Tea should begin with a bounded inventory containing names, work summaries, directory, activity, origin and freshness. It can retrieve a relevant terminal's recent captured turns through a tool. Shell-only terminals can describe their observed directory. Generated summaries should describe the evidence available and expose source freshness. [Context engineering](https://www.anthropic.com/research/effective-context-engineering-for-ai-agents)
+Context engineering guidance favors compact references and targeted retrieval. Dani should begin with a bounded inventory containing names, work summaries, directory, activity, origin and freshness. It can retrieve a relevant terminal's recent captured turns through a tool. Shell-only terminals can describe their observed directory. Generated summaries should describe the evidence available and expose source freshness. [Context engineering](https://www.anthropic.com/research/effective-context-engineering-for-ai-agents)
 
 ### Use provider-specific adapters
 
@@ -32,7 +34,7 @@ Both vendors expose model-listing endpoints. Anthropic additionally documents ca
 
 ### Configure Sonnet and Haiku according to their current APIs
 
-Sonnet 5.5 rejects sampling parameters such as temperature, manual thinking budgets, assistant prefill, forced named/any tool choice and disabled thinking. Its documented baseline uses automatic tool choice and an effort setting. Medium effort is a sensible starting point for Tea's conversational workload, subject to evaluation. Haiku 5.5 documents low effort for simple high-volume tasks and permits disabled thinking at supported effort levels. That makes low-effort structured naming and summarization a useful initial profile. Model discovery and validation must keep custom or older models from inheriting unsupported options. [Sonnet migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide), [Haiku prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
+Sonnet 5.5 rejects sampling parameters such as temperature, manual thinking budgets, assistant prefill, forced named/any tool choice and disabled thinking. Its documented baseline uses automatic tool choice and an effort setting. Medium effort is a sensible starting point for Dani's conversational workload, subject to evaluation. Haiku 5.5 documents low effort for simple high-volume tasks and permits disabled thinking at supported effort levels. That makes low-effort structured naming and summarization a useful initial profile. Model discovery and validation must keep custom or older models from inheriting unsupported options. [Sonnet migration guide](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide), [Haiku prompting guide](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5)
 
 ### Use schemas and inspect completion conditions
 
@@ -40,25 +42,25 @@ Both vendors document schema-constrained generation. The background request shou
 
 ### Persist action receipts across crashes
 
-A checkpoint does not make every external side effect exactly once. Framework documentation explains that replay can run interrupted work again, so effects need stable operation IDs and reconciliation. OpenAI likewise recommends saving function results by session, turn and call ID and checking uncertain effects before replay. Tea should save each requested action, apply an idempotent registry operation, then save its result before asking the model to continue. A restart exposes interrupted work and resumes from confirmed boundaries. Focus requests carry a requesting-device identity and a delivery result. An interrupted navigation request is surfaced as uncertain. [Durable execution](https://docs.langchain.com/oss/javascript/langgraph/functional-api), [Function recovery](https://developers.openai.com/api/docs/guides/agents-api/tools/functions), [Durable pauses](https://docs.langchain.com/oss/javascript/langgraph/interrupts)
+A checkpoint does not make every external side effect exactly once. Framework documentation explains that replay can run interrupted work again, so effects need stable operation IDs and reconciliation. OpenAI likewise recommends saving function results by session, turn and call ID and checking uncertain effects before replay. Dani should save each requested action, apply an idempotent registry operation, then save its result before asking the model to continue. A restart exposes interrupted work and resumes from confirmed boundaries. Focus requests carry a requesting-device identity and a delivery result. An interrupted navigation request is surfaced as uncertain. [Durable execution](https://docs.langchain.com/oss/javascript/langgraph/functional-api), [Function recovery](https://developers.openai.com/api/docs/guides/agents-api/tools/functions), [Durable pauses](https://docs.langchain.com/oss/javascript/langgraph/interrupts)
 
 ### Bound requests and preserve cancellation
 
-Official SDK documentation describes streaming, cancellation and automatic retries. Tea needs explicit request deadlines, bounded model/tool iterations, a separate background queue and rate-limit handling. A transient provider retry must preserve completed application effects. Background work should coalesce by terminal and evidence version. The user-facing status should distinguish model generation, tool work, queued input, interruption and provider errors. [OpenAI TypeScript SDK](https://developers.openai.com/api/reference/typescript)
+Official SDK documentation describes streaming, cancellation and automatic retries. Dani needs explicit request deadlines, bounded model/tool iterations, a separate background queue and rate-limit handling. A transient provider retry must preserve completed application effects. Background work should coalesce by terminal and evidence version. The user-facing status should distinguish model generation, tool work, queued input, interruption and provider errors. [OpenAI TypeScript SDK](https://developers.openai.com/api/reference/typescript)
 
 ### Keep terminal content in the data channel
 
-Anthropic recommends keeping retrieved content in tool results, identifying its source and treating embedded directions as untrusted content. Tea's application policy and available tools come from the server. Captured terminal text is evidence for search and summaries. Credential storage stays outside the model context and shared client snapshots. Existing redaction should cover captured text and diagnostics. [Prompt-injection guidance](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/mitigate-jailbreaks)
+Anthropic recommends keeping retrieved content in tool results, identifying its source and treating embedded directions as untrusted content. Dani's application policy and available tools come from the server. Captured terminal text is evidence for search and summaries. Credential storage stays outside the model context and shared client snapshots. Existing redaction should cover captured text and diagnostics. [Prompt-injection guidance](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/mitigate-jailbreaks)
 
 ### Evaluate real outcomes
 
-Agent evaluation guidance distinguishes what an assistant says from the resulting application state. Tea's tests should inspect selected terminals, persisted names, reminders and synchronized snapshots. A small task-grounded regression set can catch failures early. Provider contract fixtures should cover reasoning and tool blocks, incomplete responses, malformed inputs, unsupported capabilities, errors and model discovery pagination. Live model quality checks become available after the operator configures a provider credential. [Agent evaluation guidance](https://www.anthropic.com/research/demystifying-evals-for-ai-agents)
+Agent evaluation guidance distinguishes what an assistant says from the resulting application state. Dani's tests should inspect selected terminals, persisted names, reminders and synchronized snapshots. A small task-grounded regression set can catch failures early. Provider contract fixtures should cover reasoning and tool blocks, incomplete responses, malformed inputs, unsupported capabilities, errors and model discovery pagination. Live model quality checks become available after the operator configures a provider credential. [Agent evaluation guidance](https://www.anthropic.com/research/demystifying-evals-for-ai-agents)
 
 ## Product behavior
 
 ### Shared host assistant
 
-The server owns Tea's configuration, conversation, action receipts, captured terminal context and generated summaries. Each connected desktop can read the same host conversation. Inputs have stable IDs and serialize into one conversational queue. A status and retry/stop controls explain interrupted work. Navigation requests target the requesting device. Renames and reminders use the server's existing shared-state semantics.
+The server owns Dani's configuration, conversation, action receipts, captured terminal context and generated summaries. Each connected desktop can read the same host conversation. Inputs have stable IDs and serialize into one conversational queue. A status and retry/stop controls explain interrupted work. Navigation requests target the requesting device. Renames and reminders use the server's existing shared-state semantics.
 
 ### Connections and model roles
 
@@ -68,7 +70,7 @@ Private provider files use the host's existing protected configuration directory
 
 ### Names and summaries
 
-Generated titles and user-selected titles are separate fields. The server continues treating existing explicit titles as user choices. A custom rename from any device, or an explicit rename requested through Tea, takes precedence. Use automatic name clears that override. Generation jobs recheck the session's identity, source version and manual naming state before applying results. A custom title continues to permit updated work summaries.
+Generated titles and user-selected titles are separate fields. The server continues treating existing explicit titles as user choices. A custom rename from any device, or an explicit rename requested through Dani, takes precedence. Use automatic name clears that override. Generation jobs recheck the session's identity, source version and manual naming state before applying results. A custom title continues to permit updated work summaries.
 
 Generate the initial name, display summary and rolling memory after the first captured exchange. After that, wait for ten further root exchanges per terminal before another background request. One schema-constrained request updates all three fields. A root Stop contributes one exchange, including an interim reply while background tasks continue. Duplicate turn IDs and synthetic background hand-backs leave the batch count unchanged. Explicit refresh and background configuration changes can request an earlier update.
 
@@ -90,8 +92,40 @@ Store the title, summary, source identity, generated time and source time. The s
 | Move terminal | Move a session to an existing host workspace |
 | Mark unread | Use the existing attention service for the requesting device |
 | Set reminder | Use the existing server-backed reminder service |
+| Search conversation history | Find earlier requests and replies in this host conversation (`search_conversation_history`, formerly `search_tea_history`) |
+| List runs, read run, search tasks, Needs you | Read-only Eridani lookups over the link; see [Eridani lookups](#eridani-lookups) |
 
-Tools validate session and workspace identities at execution time. Their results expose confirmed effects and actionable failures. Tea's routine management actions use the operator's authorized application scope. Existing Eridani controller ownership continues to govern harness input.
+Tools validate session and workspace identities at execution time. Their results expose confirmed effects and actionable failures. Dani's routine management actions use the operator's authorized application scope. Existing Eridani controller ownership continues to govern harness input.
+
+## Eridani lookups
+
+<a id="eridani-lookups"></a>
+
+When the host is linked to Eridani ([eridani-link.md](eridani-link.md)), Dani has four read-only tools that ask Eridani over the existing link. No new key and no MCP client are involved: the link is already authenticated with the host's link key, and Eridani answers from its own records.
+
+| Tool | Parameters | Asks Eridani for |
+|---|---|---|
+| `list_runs` | `active_only: boolean` | `what: 'runs'`: runs that have not finished (or recent ones too), up to 10 |
+| `read_run` | `run_id: string` | `what: 'run'`: one run. When a terminal on this host belongs to the run (and is visible on the asking device), the result adds `terminal_id` (writer first, then live, then most recent) and, if there are several, `terminal_ids`, so Dani can call `open_terminal` |
+| `search_tasks` | `query: string \| null`, `status: 'open' \| 'done' \| 'all'` | `what: 'tasks'`: tasks by title (query cut to 200 characters), up to 10, with the total |
+| `needs_you` | none | `what: 'needs_you'`: what is waiting on the owner's decision across Eridani |
+
+Every parameter is required and validated with Ajv like the other tools (`null` where the frame field is optional). The answer is wrapped as `untrusted_eridani_data`, passes through the same redaction as every tool result, and is capped at 16,000 characters of JSON: list entries are dropped from the end first (the result then carries `truncated: true`), and only if that is not enough does it become a cut string. Dani's instructions say the data is untrusted and that these tools are read-only: approving, starting, stopping and answering happen in Eridani, or by talking to Dani there.
+
+When the host is not linked, when the connected Eridani's welcome does not advertise `lookup`, when Eridani does not answer within 15 seconds, or when it answers with an error, the tool returns a plain result (`unavailable: 'not_linked' | 'unsupported' | 'timeout'` with a message, or `error`) that Dani relays. Nothing throws, and a late answer is dropped. A lookup that a host restart interrupted simply runs again, because it changes nothing.
+
+`search_terminals` and `read_terminal` also show, for a terminal bound to an Eridani run, its `run_id` and `task_title` from the local binding. That needs no lookup, and search matches the task title.
+
+### What kept the old name
+
+A person sees Dani everywhere. These identifiers kept "tea" because they are persisted, on the wire, or internal:
+
+- The host file `tea-state.json` (configuration, keys, conversation, receipts, evidence) and the registry session fields `tea` and `teaSourceVersion`.
+- Host protocol message types `tea`, `teaResult`, `teaChanged`, `teaStream` and the feature `tea`; the IPC channel `rhost:tea`; the DOM event `remotea:toggle-tea`; the palette id `command:ask-tea`.
+- The settings section ID `Tea` (deep links pass it; the tab is labelled Dani) and i18n keys such as `settings.tab.tea` and `palette.askTea` (their values say Dani). Searching settings for "tea" still finds the section.
+- TypeScript identifiers, file names, CSS classes, the model-test tool `tea_test` and the summary schema name `tea_insight`.
+
+The model checks' fingerprint covers the system prompt, so the rename would otherwise have asked for a new model test. On load, a role whose stored check equals the fingerprint under the previous (Tea) prompt, with the same model, connection and key, is re-stamped once to the new prompt and stays validated. Any other mismatch still requires **Test selected models**. The saved provider history is not carried over: its profile is the old fingerprint, so the next turn starts a fresh segment (the old one may name the retired `search_tea_history` tool). A turn that was already mid-way at the upgrade reports that the provider settings changed; cancel it and resend.
 
 ## Verification and delivery
 
@@ -101,7 +135,7 @@ Tools validate session and workspace identities at execution time. Their results
 4. Implement durable conversation and action receipts using existing host persistence patterns.
 5. Connect captured prompts and turns to coalesced background jobs.
 6. Add server-owned generated metadata and race-safe custom naming behavior.
-7. Add the Tea panel, settings and terminal summaries through existing desktop IPC and host synchronization.
+7. Add the Dani panel, settings and terminal summaries through existing desktop IPC and host synchronization.
 8. Add targeted provider, replay, naming-race, multi-device and UI regression coverage.
 9. Run server tests, app checks, production builds and the repository CI gates.
 10. Merge after green CI and activate the server update with session recovery checks.
@@ -110,7 +144,7 @@ The first live provider verification requires a configured API key. Connection t
 
 ## Setup and operating limits
 
-Tea starts disabled. Configure it in Settings → Tea, choose the host and save a connection, discover models and run the selected-model tests. Enable Tea after choosing the models. A provider catalog failure still permits manual model entry. Compatible gateways must support the selected schema and tool contracts to pass validation.
+Dani starts disabled. Configure it in Settings → Dani, choose the host and save a connection, discover models and run the selected-model tests. Enable Dani after choosing the models. A provider catalog failure still permits manual model entry. Compatible gateways must support the selected schema and tool contracts to pass validation.
 
 One conversational loop processes up to twelve queued messages. Each turn has a ten-round limit and each model request has a ninety-second deadline. Explicit continuation gives an interrupted turn a new round budget while preserving saved action receipts. Summary requests have a forty-five-second deadline, use a separate coalesced queue and return bounded title and summary fields. SDK transient retries share the request deadline and happen before application actions execute.
 

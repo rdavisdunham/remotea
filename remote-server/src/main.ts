@@ -72,15 +72,22 @@ async function main(): Promise<void> {
     fs: runFsOp,
   });
   let tea: Tea | undefined;
+  // The Eridani runtime is created below; until then (and while unlinked) a lookup answers "not linked".
+  let eridaniRt: EridaniRuntime | null = null;
   try {
-    tea = new Tea({ dir, hub, registry, log });
+    tea = new Tea({
+      dir,
+      hub,
+      registry,
+      log,
+      lookup: (query) => eridaniRt?.lookup(query) ?? Promise.resolve({ status: 'not_linked' }),
+    });
     hub.setTea(tea);
     tea.start();
   } catch {
-    log('Tea state could not be opened. Terminal hosting remains available.');
+    log('Dani (host assistant) state could not be opened. Terminal hosting remains available.');
   }
   // The bridge comes up before the Eridani runtime exists; its held methods answer as "not remote" until then.
-  let eridaniRt: EridaniRuntime | null = null;
   const bridge = new HookBridge({
     secret: hookSecret,
     relay: (id, method, params) => hub.relayRpc(id, method, params),
