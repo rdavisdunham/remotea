@@ -1195,6 +1195,8 @@ export interface TargetSetupCommand extends OpFields {
   confirm: boolean;
   /** Only with `confirm: true`: the proposal's `target`, as a `confirm: false` outcome returned it. */
   target?: Record<string, unknown>;
+  /** Eridani's bookkeeping on a confirm: the op_id of the proposal it confirms. Accepted and not used. */
+  proposal?: string;
   expires_at: number | string;
 }
 

@@ -113,6 +113,7 @@ describe('target.setup command shape', () => {
     expect(commandShapeError(base)).toBeNull();
     expect(commandShapeError({ ...base, target_id: 'app', harness: 'codex', model: 'gpt-6.1' })).toBeNull();
     expect(commandShapeError({ ...base, confirm: true, target: { id: 'app' } })).toBeNull();
+    expect(commandShapeError({ ...base, confirm: true, target: { id: 'app' }, proposal: 'op-p' })).toBeNull();
     expect(commandShapeError({ ...base, expires_at: undefined })).toBe('expires_at required');
     expect(commandShapeError({ ...base, repo: 'relative/app' })).toBe('repo: an absolute path on the host');
     expect(commandShapeError({ ...base, repo: `/${'x'.repeat(1000)}` })).toBe('repo: an absolute path on the host');
@@ -405,7 +406,7 @@ describe('target.setup on the link', () => {
     expect(proposed).toMatchObject({ state: 'executed', kind: 'target.setup', result: { saved: false, target: { id: 'app' } } });
     expect(loadTargets(dir)).toEqual([]);
 
-    eri.send({ t: 'target.setup', op_id: 'op-c', repo, target_id: 'app', harness: null, model: null, confirm: true, target: proposed.result.target, expires_at: Date.now() + 600_000 });
+    eri.send({ t: 'target.setup', op_id: 'op-c', repo, target_id: 'app', harness: null, model: null, confirm: true, target: proposed.result.target, proposal: 'op-p', expires_at: Date.now() + 600_000 });
     await until(() => !!eri.outcome('op-c') && eri.hellos().length === 2);
     expect(eri.outcome('op-c')).toMatchObject({ state: 'executed', kind: 'target.setup', result: { saved: true, source: 'confirmed' } });
     expect(eri.hellos()[1].targets.map((t) => t.id)).toEqual(['app']);
