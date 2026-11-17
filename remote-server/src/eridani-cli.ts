@@ -18,6 +18,10 @@
  *   collect [--dry-run] [--days N]
  *       --dry-run prints what the collector would report (like collector.py
  *       --dry-run); without it, asks the running server for a scan now
+ *   targets list | add | remove | setup <repo-path>
+ *       where Eridani may start work (eridani-targets.ts). `setup` is the
+ *       guided way to add one: it proposes the target with a harness, tries
+ *       the check in the verify sandbox and asks once (eridani-target-setup.ts)
  *   collector [parity|authoritative]
  *   collector scope [remotea|all]
  *       shows or switches the collector mode and prints what to do around
@@ -59,6 +63,7 @@ import { templateStatus } from './target-template';
 import { WorktreeManager, cleanupCommands, writersByPath } from './worktrees';
 import { defaultHookPaths } from './hooks-install';
 import { defaultProbe, launchersToProbe, probeKey, type LauncherProbe } from './launch-caps';
+import { TARGET_SETUP_USAGE, parseTargetSetupArgs, runTargetSetup } from './eridani-target-setup';
 import { DEFAULT_VERIFY_TIMEOUT, fmtReadiness, fmtWiring, localReadiness, mcpWiring, parseSetupArgs, readSecret, runSetup, serviceEnv, SETUP_USAGE, stdinLinesOnce, ttyPrompter, noPrompter } from './eridani-setup';
 
 export interface EridaniSummary {
@@ -452,6 +457,7 @@ export async function eridaniCommand(dir: string, args: string[], serverRunning:
     default:
       process.stderr.write(`usage: remotea eridani setup [--help | <flags>] | connect [--url <wss://…>] [--machine <name>] | status [--json] [--probe] | disconnect [--forget] | collect [--dry-run] [--days N]
        remotea eridani collector [parity|authoritative] | collector scope [remotea|all]
+       remotea eridani targets setup <repo-path> [--id <id>] [--worktree-root <path>] [--harness claude|codex] [--model <name>] [--no-harness] [--yes] [--json]   (guided; --help for all flags)
        remotea eridani targets list [--json] | add --id <id> --repo <path> --worktree-root <path> [--base <branch>] [--claude] [--codex] [--verify <id>=<command>]… [--verify-timeout <s>] [--prepare <id>=<command>]… [--prepare-timeout <s>] [--max-runs <n>] | add --json '<target>' | remove <id>
        remotea eridani worktrees [--json]\n`);
       return sub === undefined ? 0 : 2;
@@ -472,10 +478,11 @@ function flags(args: string[], name: string): string[] {
 
 /**
  * `remotea eridani targets`: where Eridani may start work (eridani-targets.ts).
- * A verify command is split on spaces into a fixed argv and runs with no
+ * `setup <repo-path>` is the guided way (eridani-target-setup.ts); `add` takes
+ * everything by hand. A verify command is split on spaces into a fixed argv and runs with no
  * shell; for quoting or anything unusual, `add --json` takes the whole target.
  */
-function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream): number {
+function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream): number | Promise<number> {
   const [sub, ...rest] = args;
   switch (sub) {
     case undefined:
@@ -542,6 +549,15 @@ function targetsCommand(dir: string, args: string[], out: NodeJS.WritableStream)
       if (tpl && !tpl.ready) out.write(`warning: target ${target.id} is not ready, so Eridani will not be offered it until this is fixed:\n`);
       for (const p of tpl?.problems ?? []) out.write(`  ${p.level === 'fail' ? 'NOT READY' : 'warn'} ${p.check}: ${p.reason}\n`);
       return 0;
+    }
+    case 'setup': {
+      if (rest.includes('--help') || rest.includes('-h')) {
+        out.write(`${TARGET_SETUP_USAGE}\n`);
+        return 0;
+      }
+      const o = parseTargetSetupArgs(rest);
+      // Asked only on a terminal; without one nothing is written unless --yes.
+      return runTargetSetup(o, { dir, out, prompt: process.stdin.isTTY && process.stderr.isTTY ? ttyPrompter() : noPrompter }).then((r) => r.code);
     }
     case 'remove': {
       const id = rest[0];

@@ -857,7 +857,8 @@ export function detectBase(repo: string): string {
   return head || 'main';
 }
 
-function targetId(repo: string, taken: Set<string>): string {
+/** A target id from the folder name, numbered when taken. */
+export function targetId(repo: string, taken: Set<string>): string {
   const base = (path.basename(repo).replace(/[^A-Za-z0-9._-]/g, '-').replace(/^[-.]+/, '') || 'repo').slice(0, 60);
   let id = base;
   for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
