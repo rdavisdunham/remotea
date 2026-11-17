@@ -7,8 +7,7 @@
 #   scripts/smoke-mac.sh release/mac-arm64/remotea.app/Contents/MacOS/remotea smoke/mac.json smoke-mac
 #
 # The binary is run directly, never through `open`, so its exit code and output
-# come back here. Each run uses its own WMUX_INSTANCE, so it never shares a
-# pipe, data folder or single-instance lock with another copy of the app.
+# come back here.
 set -uo pipefail
 
 exe="${1:?usage: smoke-mac.sh <exe> <out.json> [instance] [timeout-ms]}"
@@ -29,12 +28,11 @@ echo "smoke: $exe --smoke --smoke-out=$out_full --smoke-timeout=$timeout_ms (ins
 "$exe" --smoke "--smoke-out=$out_full" "--smoke-timeout=$timeout_ms" &
 pid=$!
 
-# The app enforces its own budget and exits 2 if it wedges past it; this is the
-# backstop for a process that never gets that far (stuck before app ready).
-deadline=$(( $(date +%s) + timeout_ms / 1000 + 30 ))
+backstop_s=$(( timeout_ms / 1000 + 30 ))
+deadline=$(( $(date +%s) + backstop_s ))
 while kill -0 "$pid" 2>/dev/null; do
   if [ "$(date +%s)" -ge "$deadline" ]; then
-    echo "::error::smoke: $exe did not exit within $(( timeout_ms / 1000 + 30 )) s"
+    echo "::error::smoke: $exe did not exit within $backstop_s s"
     kill -9 "$pid" 2>/dev/null
     wait "$pid" 2>/dev/null
     exit 1
@@ -49,7 +47,6 @@ if [ ! -f "$out_full" ]; then
   exit 1
 fi
 
-# Print each step, and write the same table to the job summary when there is one.
 node -e '
 const fs = require("fs");
 const r = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));

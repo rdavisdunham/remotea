@@ -8,9 +8,6 @@ name: Packaged smoke
 # uninstalled). Unit tests cannot see any of this — a preload that fails to load
 # in the sandbox, a file missing from the asar, a renderer that throws on first
 # paint all pass `npm test`. README "Releases" describes it.
-#
-# `smoke-macos` runs the same self-test on an unsigned (ad-hoc signed) Apple
-# silicon build, so every change shows whether the app still starts on a Mac.
 on:
   pull_request:
     paths:
@@ -159,8 +156,6 @@ jobs:
     # Pinned: macos-latest now means macOS 26, and macos-14 is retired.
     runs-on: macos-15
     timeout-minutes: 15
-    # Report-only until the first run passes; then this line goes and a red
-    # result blocks the pull request like any other check.
     continue-on-error: true
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
