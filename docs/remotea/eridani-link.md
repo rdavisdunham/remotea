@@ -334,6 +334,8 @@ Eridani sends:
   "send it again later" (after 30 s). `ok:false` without it is a permanent
   refusal: the event is dropped and counted in `status.rejected`.
 - `bye {reason}`
+- `context.response` and `lookup.response`: answers to remotea's correlated
+  requests (see [Context](#context-sessionstart) and [Lookup](#lookup)).
 - Any other `t` with an `op_id` is a command. In stage B every command is
   journaled, acked, and answered with `command.outcome` `rejected` /
   `unsupported`. A repeated `op_id` with the same digest gets the recorded
@@ -1322,6 +1324,35 @@ surface. The handling of an unscoped answer depends on Eridani's welcome:
   surface is dropped too.
 - If it did not (an older Eridani), the answer is printed as before. This keeps
   the two sides able to lag one release apart.
+
+### Lookup (the host assistant)
+
+<a id="lookup"></a>
+
+Dani, the host assistant ([tea.md](tea.md#eridani-lookups)), reads Eridani over
+the link with a second correlated pair, the same shape as context:
+
+```
+remotea → Eridani
+{ t: 'lookup.request', req_id: string, what: 'runs' | 'run' | 'tasks' | 'needs_you',
+  run_id?: string,                    // what = 'run'
+  active?: boolean,                   // what = 'runs' (default true: runs not finished)
+  query?: string,                     // what = 'tasks' (title search, ≤ 200 chars)
+  status?: 'open' | 'done' | 'all',   // what = 'tasks' (default 'open')
+  limit?: number }                    // runs/tasks, 1..25, default 10
+
+Eridani → remotea
+{ t: 'lookup.response', req_id: string, ok: boolean, data?: unknown, error?: string }
+```
+
+remotea advertises `lookup` in hello and sends the request only when Eridani's
+welcome advertised `lookup`. Like context it is ephemeral: no `op_id`, never
+spooled, never acked, never resent. remotea waits 15 s; a late response is
+dropped, and so is a response of the wrong kind for that `req_id`. `data` is
+opaque JSON (runs: `{runs: [...]}`; run: `{run: {...}}`; tasks:
+`{tasks: [...], total}`; needs_you: `{total, items: [...], summary}`) and every
+string in it is untrusted data. `error` is cut to 300 characters. remotea sends
+`limit: 10` for runs and tasks.
 
 ### Other frames
 

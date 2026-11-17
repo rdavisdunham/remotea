@@ -8,6 +8,7 @@ import { STAGE_F_CAPS, parseUpFrame, type UpFrame } from '../../src/shared/erida
 import { AUTH_RETRY_MS } from '../../src/main/remote-hosts/connection-fsm';
 import { EridaniLink, OUTBOX_FILE, digestOf, type EridaniLinkDeps } from '../src/eridani-link';
 import { Spool } from '../src/eridani-spool';
+import { capLookupData, lookup, LOOKUP_DATA_CHARS, LOOKUP_LIMIT } from '../src/eridani-lookup';
 import { ManualTimers } from './helpers';
 
 /** A fake Eridani: answers hello with welcome and acks everything unless told otherwise. */
@@ -765,5 +766,113 @@ describe('EridaniLink: draining for a restart (S-Q5)', () => {
     next.link.setDraining(true, 'restart');
     await until(() => next.eri.of('host.state').length === 2);
     expect(next.eri.of('host.state')[1]).toMatchObject({ draining: true, reason: 'restart' });
+  });
+});
+
+describe('EridaniLink: the host assistant lookup (lookup.request → lookup.response)', () => {
+  /** Answer each lookup.request with `answer(frame)` (null: stay silent). */
+  function answering(eri: FakeEridani, answer: (f: Record<string, unknown>) => Record<string, unknown> | null, delayMs = 0) {
+    eri.wss.on('connection', (ws) => ws.on('message', (data) => {
+      const f = JSON.parse(String(data)) as Record<string, unknown>;
+      if (f.t !== 'lookup.request') return;
+      const body = answer(f);
+      if (body) setTimeout(() => eri.send(ws, body), delayMs);
+    }));
+  }
+
+  it('advertises lookup in hello, correlates by req_id, and never spools or acks the pair', async () => {
+    const { eri, link } = await setup({ caps: () => STAGE_F_CAPS });
+    eri.welcomeCaps = ['lookup'];
+    // Answer a decoy (another req_id, then the wrong kind) before the real response.
+    answering(eri, (f) => {
+      const ws = eri.sockets.at(-1)!;
+      eri.send(ws, { t: 'lookup.response', req_id: 'someone-else', ok: true, data: { runs: ['decoy'] } });
+      eri.send(ws, { t: 'context.response', req_id: f.req_id as string, text: 'not a lookup' });
+      return { t: 'lookup.response', req_id: f.req_id as string, ok: true, data: { runs: [{ id: 'run-1' }] } };
+    });
+    link.start();
+    await until(() => link.ready);
+    expect((eri.of('hello')[0] as UpFrame & { caps: string[] }).caps).toContain('lookup');
+    const outcome = await lookup(link, { what: 'runs', active: true });
+    expect(outcome).toEqual({ status: 'ok', data: { runs: [{ id: 'run-1' }] } });
+    const sent = eri.of('lookup.request') as unknown as Array<Record<string, unknown>>;
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ t: 'lookup.request', what: 'runs', active: true, limit: LOOKUP_LIMIT });
+    expect(sent[0].op_id).toBeUndefined();
+    expect(link.spool.size).toBe(0);
+    expect(eri.of('ack')).toHaveLength(0);
+  });
+
+  it('sends the frame shapes of the contract for run, tasks and needs_you, and relays an Eridani error', async () => {
+    const { eri, link } = await setup({ caps: () => STAGE_F_CAPS });
+    eri.welcomeCaps = ['lookup'];
+    answering(eri, (f) => f.what === 'needs_you'
+      ? { t: 'lookup.response', req_id: f.req_id as string, ok: false, error: 'Not allowed for this key' }
+      : { t: 'lookup.response', req_id: f.req_id as string, ok: true, data: {} });
+    link.start();
+    await until(() => link.ready);
+    await lookup(link, { what: 'run', runId: 'run-9' });
+    await lookup(link, { what: 'tasks', query: 'x'.repeat(300), status: 'done' });
+    await lookup(link, { what: 'tasks', query: null, status: 'open' });
+    expect(await lookup(link, { what: 'needs_you' })).toEqual({ status: 'error', error: 'Not allowed for this key' });
+    const sent = (eri.of('lookup.request') as unknown as Array<Record<string, unknown>>).map(({ v: _v, id: _id, conn_epoch: _c, at: _a, req_id: _r, ...rest }) => rest);
+    expect(sent).toEqual([
+      { t: 'lookup.request', what: 'run', run_id: 'run-9' },
+      { t: 'lookup.request', what: 'tasks', query: 'x'.repeat(200), status: 'done', limit: LOOKUP_LIMIT },
+      { t: 'lookup.request', what: 'tasks', status: 'open', limit: LOOKUP_LIMIT },
+      { t: 'lookup.request', what: 'needs_you' },
+    ]);
+  });
+
+  it('times out, drops a late reply, and answers a later lookup normally', async () => {
+    const { eri, link } = await setup({ caps: () => STAGE_F_CAPS });
+    eri.welcomeCaps = ['lookup'];
+    let first = true;
+    answering(eri, (f) => {
+      const late = first;
+      first = false;
+      return { t: 'lookup.response', req_id: f.req_id as string, ok: true, data: { late } };
+    }, 0);
+    // The first answer arrives only after the asker gave up.
+    const original = eri.send.bind(eri);
+    eri.send = (ws, body) => (body.t === 'lookup.response' && (body.data as { late?: boolean })?.late
+      ? void setTimeout(() => original(ws, body), 150)
+      : original(ws, body));
+    link.start();
+    await until(() => link.ready);
+    expect(await lookup(link, { what: 'needs_you' }, 50)).toEqual({ status: 'timeout' });
+    await new Promise((r) => setTimeout(r, 200)); // the late reply lands and is dropped
+    expect(await lookup(link, { what: 'needs_you' }, 2000)).toEqual({ status: 'ok', data: { late: false } });
+  });
+
+  it('is not sent when Eridani lacks the capability or the link is not up', async () => {
+    const { eri, link } = await setup({ caps: () => STAGE_F_CAPS });
+    eri.welcomeCaps = ['prompt'];
+    expect(await lookup(null, { what: 'needs_you' })).toEqual({ status: 'not_linked' });
+    expect(await lookup(link, { what: 'needs_you' })).toEqual({ status: 'not_linked' });
+    link.start();
+    await until(() => link.ready);
+    expect(await lookup(link, { what: 'needs_you' })).toEqual({ status: 'unsupported' });
+    expect(eri.of('lookup.request')).toHaveLength(0);
+  });
+});
+
+describe('capLookupData', () => {
+  it('keeps small data, drops trailing list entries to fit, and cuts to a string as a last resort', () => {
+    expect(capLookupData({ total: 1, items: [1] })).toEqual({ data: { total: 1, items: [1] }, truncated: false });
+    expect(capLookupData(undefined)).toEqual({ data: null, truncated: false });
+    const big = { total: 50, items: Array.from({ length: 50 }, (_, i) => ({ i, text: 'y'.repeat(1000) })), summary: 'ok' };
+    const capped = capLookupData(big);
+    expect(capped.truncated).toBe(true);
+    expect(JSON.stringify(capped.data).length).toBeLessThanOrEqual(LOOKUP_DATA_CHARS);
+    const items = (capped.data as typeof big).items;
+    expect(items.length).toBeGreaterThan(0);
+    expect(items[0].i).toBe(0);
+    expect((capped.data as typeof big).summary).toBe('ok');
+    expect(big.items).toHaveLength(50); // the input is not changed
+    const flat = capLookupData({ text: 'z'.repeat(LOOKUP_DATA_CHARS * 2) });
+    expect(flat.truncated).toBe(true);
+    expect(typeof flat.data).toBe('string');
+    expect((flat.data as string).length).toBe(LOOKUP_DATA_CHARS);
   });
 });
