@@ -2,7 +2,7 @@ import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
 import type { SessionRecord } from '../../shared/remote-host-protocol';
 
 /**
- * What Tea last wrote about one terminal, as the sidebar readout and the pane
+ * What Dani (the host assistant) last wrote about one terminal, as the sidebar readout and the pane
  * brief both show it. A summary written for an earlier conversation in the same
  * terminal is not shown; one that predates the latest exchanges is `stale`.
  */

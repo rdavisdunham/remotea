@@ -135,6 +135,22 @@ describe('eridani link protocol', () => {
       expect(parseDownFrame(env({ t: 'runs.snapshot', runs: [{ run_id: 'r', generation: 1, desired: 'explode' }] }))).toBeNull();
     });
 
+    it('parses lookup.response (opaque data, error capped) and validates lookup.request', () => {
+      expect(parseDownFrame(env({ t: 'lookup.response', req_id: 'r', ok: true, data: { runs: [] } }))).toMatchObject({ ok: true, data: { runs: [] } });
+      expect(parseDownFrame(env({ t: 'lookup.response', req_id: 'r', ok: false, error: 'e'.repeat(1000) }))).toMatchObject({ ok: false, error: 'e'.repeat(ERIDANI_LIMITS.reasonChars) });
+      expect(parseDownFrame(env({ t: 'lookup.response', req_id: 'r', data: {} }))).toBeNull();
+      expect(parseDownFrame(env({ t: 'lookup.response', ok: true }))).toBeNull();
+      expect(parseDownFrame(env({ t: 'lookup.response', req_id: 'r', ok: false, error: 7 }))).toBeNull();
+      expect(parseUpFrame(env({ t: 'lookup.request', req_id: 'r', what: 'runs', active: true, limit: 10 }))).not.toBeNull();
+      expect(parseUpFrame(env({ t: 'lookup.request', req_id: 'r', what: 'run', run_id: 'run-1' }))).not.toBeNull();
+      expect(parseUpFrame(env({ t: 'lookup.request', req_id: 'r', what: 'run' }))).toBeNull();
+      expect(parseUpFrame(env({ t: 'lookup.request', req_id: 'r', what: 'tasks', query: 'q', status: 'all', limit: 25 }))).not.toBeNull();
+      expect(parseUpFrame(env({ t: 'lookup.request', req_id: 'r', what: 'tasks', limit: 26 }))).toBeNull();
+      expect(parseUpFrame(env({ t: 'lookup.request', req_id: 'r', what: 'tasks', query: 'q'.repeat(201) }))).toBeNull();
+      expect(parseUpFrame(env({ t: 'lookup.request', req_id: 'r', what: 'needs_you' }))).not.toBeNull();
+      expect(parseUpFrame(env({ t: 'lookup.request', req_id: 'r', what: 'secrets' }))).toBeNull();
+    });
+
     it('validates the stage C frames remotea sends', () => {
       const op = { op_id: 'o', digest: 'd' };
       const item = { id: 'q1', text: 'Which?', choices: [{ id: 'c1', label: 'A' }], multi: false };

@@ -608,7 +608,7 @@ export default function App() {
   focusedPaneIdRef.current = focusedPaneId;
   useEffect(() => setFocusedPaneReader(() => focusedPaneIdRef.current), []);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Deep links choose a tab and optionally the host whose Tea settings to show.
+  // Deep links choose a tab and optionally the host whose Dani (host assistant) settings to show.
   const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(undefined);
   const [settingsHostId, setSettingsHostId] = useState<string | undefined>(undefined);
   const openSettings = useCallback((tab?: SettingsTab, hostId?: string) => {

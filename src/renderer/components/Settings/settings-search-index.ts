@@ -379,11 +379,11 @@ export const SETTINGS_SEARCH_TERMS = {
   "Tea": [
     {
       "key": "settings.tea.title",
-      "label": "Tea assistant"
+      "label": "Dani assistant"
     },
     {
       "key": "settings.tea.description",
-      "label": "Configure API keys, provider connections and models for Tea on your selected host."
+      "label": "Configure API keys, provider connections and models for Dani on your selected host."
     },
     {
       "key": "settings.tea.loadError",
@@ -395,7 +395,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.tea.noHosts",
-      "label": "Add a Remotea host to set up Tea."
+      "label": "Add a Remotea host to set up Dani."
     },
     {
       "key": "settings.tea.host",
@@ -403,7 +403,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.tea.disconnected",
-      "label": "Connect to this host to change Tea settings."
+      "label": "Connect to this host to change Dani settings."
     },
     {
       "key": "settings.tea.manageHosts",

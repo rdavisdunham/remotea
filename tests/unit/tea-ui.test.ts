@@ -143,7 +143,7 @@ describe('Tea provider settings', () => {
         ?.textContent,
     ).toContain('Found 2 models');
     const picker = container.querySelector<HTMLSelectElement>(
-      'select[aria-label="Tea conversation and actions discovered model"]',
+      'select[aria-label="Dani conversation and actions discovered model"]',
     )!;
     expect(picker.disabled).toBe(false);
     expect(Array.from(picker.options).map((option) => option.value)).toContain(
@@ -194,7 +194,7 @@ describe('Tea provider settings', () => {
     saved.config.revision = 2;
     saved.config.connections[0].hasKey = false;
     request.mockResolvedValue({ ok: true, state: saved });
-    await act(async () => button('Save Tea settings').click());
+    await act(async () => button('Save Dani settings').click());
     expect(request).toHaveBeenCalledWith(
       'desk',
       expect.objectContaining({
@@ -229,7 +229,7 @@ describe('Tea provider settings', () => {
       )?.value,
     ).toBe('https://api.openai.com/v1');
     request.mockResolvedValue({ ok: true });
-    await act(async () => button('Save Tea settings').click());
+    await act(async () => button('Save Dani settings').click());
     expect(request).toHaveBeenCalledWith(
       'desk',
       expect.objectContaining({
@@ -333,7 +333,7 @@ describe('Tea provider settings', () => {
     saved.config.revision = 2;
     saved.config.connections[0].name = 'Updated provider';
     request.mockResolvedValue({ ok: true, state: saved });
-    await act(async () => button('Save Tea settings').click());
+    await act(async () => button('Save Dani settings').click());
     expect(name.value).toBe('Updated provider');
     expect(request).toHaveBeenCalledWith(
       'desk',
@@ -367,7 +367,7 @@ describe('Tea provider settings', () => {
 });
 
 describe('Tea settings discovery', () => {
-  it('shows provider and key controls immediately on the Tea page', () => {
+  it('shows provider and key controls immediately on the Dani page', () => {
     act(() =>
       root.render(
         React.createElement(TeaAssistantSettings, { onManageHosts: vi.fn() }),
@@ -459,7 +459,7 @@ describe('Tea conversation panel', () => {
     setLatestRemoteViews([current]);
     try {
       act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
-      // The reply names the terminal; its ID is for Tea, not for the reader.
+      // The reply names the terminal; its ID is for Dani, not for the reader.
       expect(document.querySelector('.tea-message--assistant p')?.textContent)
         .toBe('Here is Fixture terminal.');
       await act(async () => button('Open Fixture terminal').click());
@@ -467,6 +467,19 @@ describe('Tea conversation panel', () => {
     } finally {
       useStore.setState({ workspaces: previous });
     }
+  });
+
+  it('names the assistant Dani in the panel a person sees', () => {
+    const current = view();
+    current.tea!.messages = [{ id: 'reply-name', role: 'assistant', text: 'Hello.', at: 1 }];
+    setLatestRemoteViews([current]);
+    act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
+    const panel = document.querySelector('.tea-panel')!;
+    expect(panel.getAttribute('aria-label')).toBe('Dani assistant');
+    expect(panel.querySelector('header strong')?.textContent).toBe('Dani');
+    expect(panel.querySelector('[aria-label="Close Dani"]')).not.toBeNull();
+    expect(button('Configure Dani')).toBeTruthy();
+    expect(panel.textContent).not.toMatch(/\bTea\b/);
   });
 
   it('sends with Enter and keeps Shift+Enter and IME confirmation available', async () => {
@@ -542,7 +555,7 @@ describe('Tea conversation panel', () => {
     setLatestRemoteViews([view(current)]);
     act(() => root.render(React.createElement(TeaPanel, { onClose: vi.fn() })));
     expect(
-      document.querySelector('[aria-label="Tea is thinking"]'),
+      document.querySelector('[aria-label="Dani is thinking"]'),
     ).not.toBeNull();
     const partial = {
       ...current,
@@ -562,7 +575,7 @@ describe('Tea conversation panel', () => {
     );
     expect(document.querySelector('.tea-message__cursor')).not.toBeNull();
     expect(
-      document.querySelector('[aria-label="Tea is responding"]'),
+      document.querySelector('[aria-label="Dani is responding"]'),
     ).not.toBeNull();
     const scroll = document.querySelector<HTMLDivElement>(
       '.tea-panel__messages',
@@ -616,7 +629,7 @@ describe('Tea conversation panel', () => {
     expect(document.querySelector('.tea-message__cursor')).toBeNull();
   });
 
-  it('opens Tea settings for the currently selected host', async () => {
+  it('opens Dani settings for the currently selected host', async () => {
     const close = vi.fn(),
       settings = vi.fn();
     act(() =>
@@ -624,7 +637,7 @@ describe('Tea conversation panel', () => {
         React.createElement(TeaPanel, { onClose: close, onSettings: settings }),
       ),
     );
-    await act(async () => button('Configure Tea').click());
+    await act(async () => button('Configure Dani').click());
     expect(close).toHaveBeenCalledOnce();
     expect(settings).toHaveBeenCalledExactlyOnceWith('desk');
   });

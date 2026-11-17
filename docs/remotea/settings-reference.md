@@ -451,27 +451,27 @@ Sources: [hidden sessions](https://github.com/rdavisdunham/remotea/blob/b31f92c4
 
 The host introduction and hidden-session help now distinguish ownership from liveness: desktop exit does not request host-process termination, host/service availability is required, same-PC WSL depends on that PC, and offline process status is unknown. Hiding alone is not evidence that a process is running.
 
-### Tea host settings
+### Dani (host assistant) settings
 
-Tea has a dedicated **Settings → Tea** tab with a host selector and visible provider controls. **Configure Tea** opens that tab for the host selected in the conversation panel. Host cards also expose the same settings under **Tea assistant**. The host persists them in private `tea-state.json` alongside conversation checkpoints and redacted evidence. All connected apps share these values. Saving uses a configuration revision and rejects conflicting edits from another device.
+Dani has a dedicated **Settings → Dani** tab (internal section ID `Tea`) with a host selector and visible provider controls. **Configure Dani** opens that tab for the host selected in the conversation panel. Host cards also expose the same settings under **Dani assistant**. The host persists them in private `tea-state.json` alongside conversation checkpoints and redacted evidence. All connected apps share these values. Saving uses a configuration revision and rejects conflicting edits from another device.
 
 | Setting | Default | Behavior |
 |---|---|---|
-| Enable Tea on this host | Off | Enables conversational and background work. Disabling interrupts pending turns and stops new capture |
+| Enable Dani on this host | Off | Enables conversational and background work. Disabling interrupts pending turns and stops new capture |
 | Automatic names for unnamed terminals | On | Generated names yield to custom names and explicit agent labels |
 | Quick terminal summaries | On | Shows short work descriptions in expanded workspace terminal lists |
 | Connection name | Anthropic suggestion | Display label for one of up to eight provider profiles |
 | API format | Anthropic Messages suggestion | Anthropic Messages, native OpenAI Responses, or OpenAI-compatible Chat Completions |
 | Base URL | Provider default | HTTPS endpoint, with HTTP supported for loopback gateways |
 | API key | Empty | Write-only field. Blank preserves a saved key. Remove saved key clears it on Save. Removing the profile and saving also removes its key |
-| Conversation connection and model | Sonnet 5.5 suggestion | Model for Tea replies and application actions |
+| Conversation connection and model | Sonnet 5.5 suggestion | Model for Dani replies and application actions |
 | Background connection and model | Haiku 5.5 suggestion | Model for automatic names and summaries |
 | Effort per role | Medium for Sonnet, low for Haiku | Model default, low, medium, high. Capability tests verify the chosen API options |
 | Test connection and find models | Explicit action | Saves edits, authenticates and fetches the catalog into visible model dropdowns. Results appear beside the connection. Manual model IDs remain supported |
 | Test selected models | Explicit action | Makes real schema and tool-result replay requests. Success is tied to the selected connection, credential, model and effort |
 | Reload settings | Explicit action | Replaces local unsaved edits with current host settings |
 
-Model tests and normal Tea work use the configured provider's API billing. The complete design and source research are in [Tea](tea.md).
+Model tests and normal Dani work use the configured provider's API billing. The complete design and source research are in [Dani](tea.md).
 
 ## Phone access (Remote): pairing and device administration
 

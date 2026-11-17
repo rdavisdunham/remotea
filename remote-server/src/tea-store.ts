@@ -1,4 +1,4 @@
-/** Private, atomic host persistence for Tea credentials, evidence and execution checkpoints. */
+/** Private, atomic host persistence for the host assistant's (Dani's) credentials, evidence and execution checkpoints. The file keeps its old name, tea-state.json. */
 import fs from 'fs';
 import path from 'path';
 import type {
@@ -101,7 +101,7 @@ export class TeaStore {
         !saved.keys ||
         !Array.isArray(saved.history)
       )
-        throw new Error('Invalid Tea state');
+        throw new Error('Invalid assistant state');
       this.data = saved;
       for (const message of this.data.messages)
         if (message.delivery === 'streaming') message.delivery = 'interrupted';
@@ -114,7 +114,7 @@ export class TeaStore {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         throw new Error(
-          'Tea state is unreadable. Restore its private state file before enabling Tea.',
+          'Dani state is unreadable. Restore its private state file (tea-state.json) before enabling Dani.',
         );
     }
   }
@@ -157,7 +157,7 @@ export class TeaStore {
     const apiKey = this.data.keys[role.connectionId];
     if (!connection || !apiKey)
       throw new Error(
-        'Configure a provider connection and API key in Tea settings.',
+        'Configure a provider connection and API key in Dani settings.',
       );
     return {
       id: connection.id,
@@ -171,7 +171,7 @@ export class TeaStore {
   configure(input: TeaConfigurationInput, expectedRevision: number): void {
     if (expectedRevision !== this.data.config.revision)
       throw new Error(
-        'Tea settings changed on another device. Reload them before saving.',
+        'Dani settings changed on another device. Reload them before saving.',
       );
     if (
       !input ||
@@ -179,13 +179,13 @@ export class TeaStore {
       !Array.isArray(input.connections) ||
       input.connections.length > 8
     )
-      throw new Error('Use up to eight Tea connections.');
+      throw new Error('Use up to eight provider connections.');
     if (
       typeof input.enabled !== 'boolean' ||
       typeof input.autoName !== 'boolean' ||
       typeof input.summaries !== 'boolean'
     )
-      throw new Error('Invalid Tea switches.');
+      throw new Error('Invalid assistant switches.');
     const keys: Record<string, string> = {};
     const ids = new Set<string>();
     const connections = input.connections.map((connection) => {
