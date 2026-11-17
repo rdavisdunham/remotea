@@ -595,6 +595,7 @@ usage:
   remotea eridani collector [parity|authoritative]              show or switch the collector mode (prints the cutover checklist)
   remotea eridani collector scope [remotea|all]                 report only remotea sessions (default) or every session on the machine
   remotea eridani targets list [--json] | add … | remove <id>     where Eridani may start work
+  remotea eridani targets setup <repo-path> [--yes] [--json]      guided: a harness proposes a target; its check runs only once confirmed
   remotea eridani worktrees [--json]                            managed worktrees and unmerged work (never removes)
   remotea launcher probe [claude|codex] [--bin <path>] [--no-turns] [--json]
                                                                 probe the launchers for managed runs now (re-probes unchanged binaries)
