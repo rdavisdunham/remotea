@@ -166,9 +166,19 @@ export function freshnessNote(wt: Pick<EnsuredWorktree, 'branch' | 'base' | 'bas
  * `task_interview` instead of AskUserQuestion. Bash rules are matched on the
  * command text and are not a security boundary; the worktree is shared with
  * the writer, so what a reviewer can read is what the writer can.
+ *
+ * Research (CLAUDE_RESEARCH_TOOLS): a planner is only as good as what it can
+ * find out, so a read-only session may also search and fetch the web, send
+ * sub-agents to look things up, and load installed skills (Compound
+ * Engineering's ce-brainstorm, ce-ideate and ce-plan, which Eridani's
+ * planning prompts point to). None of these can change the worktree: the
+ * deny list holds for sub-agents and skills too, and Bash stays the short
+ * read-only list.
  */
+export const CLAUDE_RESEARCH_TOOLS: readonly string[] = Object.freeze(['WebSearch', 'WebFetch', 'Agent', 'Task', 'Skill', 'ToolSearch']);
 export const CLAUDE_READ_ONLY_TOOLS: readonly string[] = Object.freeze([
   'Read', 'Grep', 'Glob',
+  ...CLAUDE_RESEARCH_TOOLS,
   'Bash(git status *)', 'Bash(git log *)', 'Bash(git diff *)', 'Bash(git show *)',
   'Bash(git ls-files *)', 'Bash(git ls-tree *)', 'Bash(git rev-parse *)',
   'Bash(pwd)', 'Bash(ls *)', 'Bash(cat *)', 'Bash(rg *)',
@@ -850,7 +860,7 @@ export class Dispatch {
     if (b.harness === 'codex') scoped.push('-c', `mcp_servers.${MCP_SERVER_NAME}.enabled_tools=${JSON.stringify(scope)}`, '-c', `mcp_servers.${MCP_SERVER_NAME}.tool_timeout_sec=120`, ...scope.flatMap((tool) => ['-c', `mcp_servers.${MCP_SERVER_NAME}.tools.${tool}.approval_mode="auto"`]));
     else {
       scoped.push('--allowedTools', ...scope.map((tool) => `mcp__${MCP_SERVER_NAME}__${tool}`));
-      if (b.mode || b.permissionProfile === 'read-only') scoped.push('Read', 'Grep', 'Glob', ...CLAUDE_READ_ONLY_TOOLS.filter((t) => t.startsWith('Bash(')), '--disallowedTools', ...CLAUDE_READ_ONLY_DENIED);
+      if (b.mode || b.permissionProfile === 'read-only') scoped.push(...CLAUDE_READ_ONLY_TOOLS, '--disallowedTools', ...CLAUDE_READ_ONLY_DENIED);
       scoped.push('--strict-mcp-config');
     }
     return scoped;

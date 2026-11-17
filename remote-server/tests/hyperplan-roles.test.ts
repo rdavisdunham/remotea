@@ -99,13 +99,17 @@ const spawn = (over: Record<string, unknown> = {}) => ({
 const PLANNER = surfFor('run-1', 1, 1);
 const REVIEWER = surfFor('run-1', 1, 2);
 
-const CLAUDE_LISTS = `--allowedTools 'Read' 'Grep' 'Glob' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(git ls-files *)' 'Bash(git ls-tree *)' 'Bash(git rev-parse *)' 'Bash(pwd)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' --disallowedTools 'Edit' 'Write' 'NotebookEdit'`;
+const CLAUDE_LISTS = `--allowedTools 'Read' 'Grep' 'Glob' 'WebSearch' 'WebFetch' 'Agent' 'Task' 'Skill' 'ToolSearch' 'Bash(git status *)' 'Bash(git log *)' 'Bash(git diff *)' 'Bash(git show *)' 'Bash(git ls-files *)' 'Bash(git ls-tree *)' 'Bash(git rev-parse *)' 'Bash(pwd)' 'Bash(ls *)' 'Bash(cat *)' 'Bash(rg *)' --disallowedTools 'Edit' 'Write' 'NotebookEdit'`;
 
 describe('hyperplan: read-only launch lines', () => {
   it('claude mode: review swaps auto for dontAsk with the allow and deny lists, before --model so the prompt is never a list value', () => {
     expect(MCP_SERVER_NAME).toBe('eridani');
     expect(CLAUDE_READ_ONLY_TOOLS).not.toContain(`mcp__${MCP_SERVER_NAME}__*`);
     expect(CLAUDE_READ_ONLY_DENIED).toEqual(['Edit', 'Write', 'NotebookEdit']);
+    // A planner may research (web, sub-agents, installed skills) but still cannot change a file or run arbitrary shell.
+    expect(CLAUDE_READ_ONLY_TOOLS).toEqual(expect.arrayContaining(['WebSearch', 'WebFetch', 'Agent', 'Task', 'Skill']));
+    expect(CLAUDE_READ_ONLY_TOOLS.filter((t) => t.startsWith('Bash')).every((t) => /^Bash\((git (status|log|diff|show|ls-files|ls-tree|rev-parse) \*|pwd|ls \*|cat \*|rg \*)\)$/.test(t))).toBe(true);
+    expect(CLAUDE_READ_ONLY_TOOLS).not.toContain('Bash');
     expect(launchCommand('claude', 'sonnet', {}, true, [], 'review')).toBe(`'claude' ${CLAUDE_LISTS} --model 'sonnet' --permission-mode dontAsk "$ERIDANI_PROMPT"`);
     // With the MCP config and target args: the config stays right after the program, the extra args stay before the prompt.
     expect(launchCommand('claude', 'opus', { args: ['--verbose'] }, true, ['--mcp-config', '/c/x.json'], 'plan'))

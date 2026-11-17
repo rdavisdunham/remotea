@@ -175,6 +175,8 @@ describe('dispatch: managed integration', () => {
     expect(spec.env.ERIDANI_RUN_TOKEN).toBe('tok-123');
     for (const tool of spec.preapprovedEridaniTools!) expect(spec.args).toContain(tool);
     if (role !== 'worker') expect(spec.args).toEqual(expect.arrayContaining(['--disallowedTools', 'Edit', 'Write', 'NotebookEdit']));
+    // Read-only roles of a managed session may research; the worker's tools are not narrowed here.
+    if (role !== 'worker') expect(spec.args).toEqual(expect.arrayContaining(['WebSearch', 'Agent', 'Skill']));
   });
 
   it('launches through the structured adapter with role options and no native terminal writer', async () => {
