@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
+  BARE_F5_REFRESH,
   DEFAULT_SHORTCUTS,
   PRE_249_SURFACE_CYCLE,
   SHORTCUT_DEFAULT_REV,
@@ -111,5 +112,28 @@ describe('shortcut default promotion (#249)', () => {
       [SHORTCUTS_KEY]: legacyTable({ nextSurface: { key: 'n', ctrl: true, alt: true }, prevSurface: { key: 'p', ctrl: true, alt: true } }),
     });
     expect(writes[REV_KEY]).toEqual({ shortcutDefaultRev: SHORTCUT_DEFAULT_REV });
+  });
+});
+
+describe('shortcut default promotion: refresh off bare F5 (rev 2)', () => {
+  const BARE_F5 = BARE_F5_REFRESH.refreshSurface!;
+  const REV_1 = { shortcutDefaultRev: 1 };
+
+  it('moves a stored bare F5 to Ctrl+Shift+F5', async () => {
+    const { shortcuts, writes } = await loadWith({
+      [SHORTCUTS_KEY]: { ...DEFAULT_SHORTCUTS, refreshSurface: BARE_F5 },
+      [REV_KEY]: REV_1,
+    });
+    expect(shortcuts.refreshSurface).toEqual({ key: 'F5', ctrl: true, shift: true });
+    expect(writes[REV_KEY]).toEqual({ shortcutDefaultRev: SHORTCUT_DEFAULT_REV });
+  });
+
+  it('keeps a refresh binding the user chose', async () => {
+    const mine = { key: 'r', ctrl: true, alt: true };
+    const { shortcuts } = await loadWith({
+      [SHORTCUTS_KEY]: { ...DEFAULT_SHORTCUTS, refreshSurface: mine },
+      [REV_KEY]: REV_1,
+    });
+    expect(shortcuts.refreshSurface).toEqual(mine);
   });
 });

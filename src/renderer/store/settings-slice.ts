@@ -325,7 +325,9 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, ShortcutBinding> = {
   togglePromptOutline:    { key: 'l', ctrl: true, shift: true },
   togglePinnedPrompt:     { key: 'k', ctrl: true, shift: true },
   followOutput:           { key: 'End', ctrl: true, shift: true },
-  refreshSurface:         { key: 'F5' },
+  // Not bare F5, as wmux ships it: a bare F5 would never reach the terminal,
+  // where TUIs use it (Midnight Commander's copy, among others).
+  refreshSurface:         { key: 'F5', ctrl: true, shift: true },
 };
 
 // ─── Shortcut default promotions (#249) ──────────────────────────────────────
@@ -353,8 +355,9 @@ export interface ShortcutDefaultsState {
 /**
  * 0 — every release through 2.13.x. No promotion has ever run.
  * 1 — #249: nextSurface/prevSurface Ctrl+Shift+] / [ → Ctrl+Tab / Ctrl+Shift+Tab.
+ * 2 — refreshSurface bare F5 (as ported from wmux) → Ctrl+Shift+F5.
  */
-export const SHORTCUT_DEFAULT_REV = 1;
+export const SHORTCUT_DEFAULT_REV = 2;
 
 /** The pre-#249 surface-cycling defaults, which the rev-1 promotion replaces. */
 export const PRE_249_SURFACE_CYCLE: Readonly<Partial<Record<ShortcutAction, ShortcutBinding>>> = {
@@ -390,8 +393,14 @@ interface ShortcutPromotion {
   apply: (shortcuts: Record<ShortcutAction, ShortcutBinding>) => void;
 }
 
+/** refreshSurface's bare F5 from the wmux port, which the rev-2 promotion replaces. */
+export const BARE_F5_REFRESH: Readonly<Partial<Record<ShortcutAction, ShortcutBinding>>> = {
+  refreshSurface: { key: 'F5' },
+};
+
 const SHORTCUT_PROMOTIONS: ReadonlyArray<ShortcutPromotion> = [
   { current: 1, apply: (s) => promoteUnchosen(s, PRE_249_SURFACE_CYCLE) },
+  { current: 2, apply: (s) => promoteUnchosen(s, BARE_F5_REFRESH) },
 ];
 
 /**

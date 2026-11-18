@@ -181,7 +181,9 @@ describe('claimsKeyEvent', () => {
   });
 
   it('still ignores function keys that are NOT bound', () => {
-    expect(claims(key('F5'))).toBe(true);
+    // Refresh focused tab is Ctrl+Shift+F5, so a bare F5 reaches the TUI.
+    expect(claims(key('F5'))).toBe(false);
+    expect(claims(key('F5', { ctrl: true, shift: true }))).toBe(true);
     expect(claims(key('F7'))).toBe(false);
   });
 
