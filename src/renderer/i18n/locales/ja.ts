@@ -447,15 +447,6 @@ export const ja: Translation = {
   'errorBoundary.somethingWrong': '問題が発生しました',
   'errorBoundary.retry': '再試行',
   // サイドバー — オーケストレーションパネル
-  'orchestrationPanel.expand': 'オーケストレーションを展開',
-  'orchestrationPanel.collapse': 'オーケストレーションを折りたたみ',
-  'orchestrationPanel.reviewer': 'レビュアー',
-  'orchestrationPanel.dismiss': '閉じる',
-  'orchestrationPanel.waiting': '待機中',
-  'orchestrationPanel.status.running': '実行中',
-  'orchestrationPanel.status.complete': '完了',
-  'orchestrationPanel.status.failed': '失敗',
-  'orchestrationPanel.status.queued': 'キュー待ち',
   // キーボードショートカットの早見表
   'cheatSheet.selectWorkspace': 'ワークスペース 1–9 を選択',
   'cheatSheet.selectTab': 'タブ 1–9 を選択',

@@ -447,15 +447,6 @@ export const uk: Translation = {
   'errorBoundary.somethingWrong': 'Щось пішло не так',
   'errorBoundary.retry': 'повторити',
   // Бічна панель — панель оркестрації
-  'orchestrationPanel.expand': 'Розгорнути оркестрацію',
-  'orchestrationPanel.collapse': 'Згорнути оркестрацію',
-  'orchestrationPanel.reviewer': 'рев\'юер',
-  'orchestrationPanel.dismiss': 'сховати',
-  'orchestrationPanel.waiting': 'очікування',
-  'orchestrationPanel.status.running': 'виконується',
-  'orchestrationPanel.status.complete': 'завершено',
-  'orchestrationPanel.status.failed': 'не вдалося',
-  'orchestrationPanel.status.queued': 'у черзі',
   // Шпаргалка зі сполучень клавіш
   'cheatSheet.selectWorkspace': 'Вибрати робочий простір 1–9',
   'cheatSheet.selectTab': 'Вибрати вкладку 1–9',

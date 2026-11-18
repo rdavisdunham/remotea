@@ -1,5 +1,5 @@
 import { toggleTea } from '../Tea/tea-events';
-import React, { useState, useCallback, useEffect, useId } from 'react';
+import React, { useState, useCallback, useId } from 'react';
 import { WorkspaceInfo, WorkspaceId, PaneId } from '../../../shared/types';
 import WorkspaceRow from './WorkspaceRow';
 import SidebarResizeHandle from './SidebarResizeHandle';
@@ -7,7 +7,6 @@ import WorkspaceContextMenu from './WorkspaceContextMenu';
 import SessionMenu from './SessionMenu';
 import NewWorkspaceButton from './NewWorkspaceButton';
 import NewWorktreeModal from './NewWorktreeModal';
-import OrchestrationPanel from './OrchestrationPanel';
 import AgentRosterBanner from './AgentRosterBanner';
 import HostAttentionBar from './HostAttentionBar';
 import TaskRunChip from './TaskRunChip';
@@ -99,26 +98,6 @@ export default function Sidebar({
   );
   const eridaniExpanded = useStore((state) => state.sidebarPrefs.eridaniRunsExpanded === true);
   const eridaniSectionId = useId();
-
-  // ── Orchestration IPC subscription ──────────────────────────────────────
-  // Main process pushes wmux-orchestrator state.json updates; we mirror them
-  // in the Zustand store so OrchestrationPanel re-renders on each change.
-  useEffect(() => {
-    const setOrchestration = useStore.getState().setOrchestration;
-    const clearOrchestration = useStore.getState().clearOrchestration;
-    const api = (window as any).wmux?.orchestration;
-    if (!api) return;
-    const offUpdate = api.onUpdate?.((state: any) => {
-      if (state) setOrchestration(state);
-    });
-    const offClear = api.onClear?.(() => {
-      clearOrchestration();
-    });
-    return () => {
-      offUpdate?.();
-      offClear?.();
-    };
-  }, []);
 
   // ── Resize ───────────────────────────────────────────────────────────────
   const handleResizeDelta = useCallback(
@@ -374,10 +353,6 @@ export default function Sidebar({
       <button className="sidebar__connections" onClick={onOpenHostSettings}>{t('activity.title')}</button>
       <ErrorBoundary label="host-attention" silent>
         <HostAttentionBar onOpenHosts={onOpenHostSettings} />
-      </ErrorBoundary>
-
-      <ErrorBoundary label="orchestration" silent>
-        <OrchestrationPanel />
       </ErrorBoundary>
 
       <div

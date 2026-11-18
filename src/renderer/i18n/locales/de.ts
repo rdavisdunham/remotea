@@ -436,15 +436,6 @@ export const de: Translation = {
   'errorBoundary.somethingWrong': 'Etwas ist schiefgelaufen',
   'errorBoundary.retry': 'erneut versuchen',
   // Seitenleiste — Orchestrierungs-Panel
-  'orchestrationPanel.expand': 'Orchestrierung erweitern',
-  'orchestrationPanel.collapse': 'Orchestrierung einklappen',
-  'orchestrationPanel.reviewer': 'Reviewer',
-  'orchestrationPanel.dismiss': 'verwerfen',
-  'orchestrationPanel.waiting': 'wartet',
-  'orchestrationPanel.status.running': 'läuft',
-  'orchestrationPanel.status.complete': 'abgeschlossen',
-  'orchestrationPanel.status.failed': 'fehlgeschlagen',
-  'orchestrationPanel.status.queued': 'in Warteschlange',
   // Tastenkürzel-Übersicht
   'cheatSheet.selectWorkspace': 'Arbeitsbereich 1–9 auswählen',
   'cheatSheet.selectTab': 'Tab 1–9 auswählen',

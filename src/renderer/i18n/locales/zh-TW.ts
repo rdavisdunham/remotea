@@ -606,15 +606,6 @@ export const zhTW: Translation = {
   'errorBoundary.somethingWrong': '發生錯誤',
   'errorBoundary.retry': '重試',
   // 側邊欄 — 編排面板
-  'orchestrationPanel.expand': '展開編排面板',
-  'orchestrationPanel.collapse': '收合編排面板',
-  'orchestrationPanel.reviewer': '審查者',
-  'orchestrationPanel.dismiss': '關閉',
-  'orchestrationPanel.waiting': '等待中',
-  'orchestrationPanel.status.running': '執行中',
-  'orchestrationPanel.status.complete': '已完成',
-  'orchestrationPanel.status.failed': '失敗',
-  'orchestrationPanel.status.queued': '排隊中',
   // 快速鍵速查表
   'cheatSheet.selectWorkspace': '選擇工作區 1–9',
   'cheatSheet.selectTab': '選擇分頁 1–9',

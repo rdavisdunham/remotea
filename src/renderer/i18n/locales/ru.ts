@@ -447,15 +447,6 @@ export const ru: Translation = {
   'errorBoundary.somethingWrong': 'Что-то пошло не так',
   'errorBoundary.retry': 'повторить',
   // Боковая панель — панель оркестрации
-  'orchestrationPanel.expand': 'Развернуть оркестрацию',
-  'orchestrationPanel.collapse': 'Свернуть оркестрацию',
-  'orchestrationPanel.reviewer': 'рецензент',
-  'orchestrationPanel.dismiss': 'скрыть',
-  'orchestrationPanel.waiting': 'ожидание',
-  'orchestrationPanel.status.running': 'выполняется',
-  'orchestrationPanel.status.complete': 'завершено',
-  'orchestrationPanel.status.failed': 'не удалось',
-  'orchestrationPanel.status.queued': 'в очереди',
   // Шпаргалка по горячим клавишам
   'cheatSheet.selectWorkspace': 'Выбрать рабочую область 1–9',
   'cheatSheet.selectTab': 'Выбрать вкладку 1–9',

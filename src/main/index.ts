@@ -86,7 +86,6 @@ import {
 } from './claude-observer';
 import { handleAgentStateV2, setAnswerWriter, deliverAnswer } from './agent-state-rpc';
 import { applyHookToAgentState, hookEventName, type HookOrigin } from './agent-hook-bridge';
-import { startOrchestrationWatcher } from './orchestration-watcher';
 import { readMarkdownFile } from './markdown-file';
 import { grantFilePath, clearFileGrants } from './file-grants';
 import { directoryFromArgv } from './shell-context-menu';
@@ -1917,9 +1916,6 @@ app.whenReady().then(() => {
   // a runtime that has not been created; off by default, in which case start()
   // loads the config and listens on nothing.
   startRemoteConsole();
-
-  // Watch TMPDIR for wmux-orchestrator runs and push state to the sidebar.
-  startOrchestrationWatcher();
 
   portScanner.onResults((portsByPid) => {
     BrowserWindow.getAllWindows().forEach(win => {

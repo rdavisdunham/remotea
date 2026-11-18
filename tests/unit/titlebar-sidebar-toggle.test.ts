@@ -19,7 +19,6 @@ const toggleSidebar = vi.fn(() => store.setState(s => ({ sidebarVisible: !s.side
 vi.mock('../../src/renderer/store', () => ({ get useStore() { return store; } }));
 vi.mock('../../src/renderer/i18n', () => ({ useT: () => (key: string, fallback?: string) => fallback ?? key }));
 vi.mock('../../src/renderer/components/Titlebar/UpdateBadge', () => ({ default: () => null }));
-vi.mock('../../src/renderer/components/Sidebar/OrchestrationPanel', () => ({ default: () => null }));
 vi.mock('../../src/renderer/components/Sidebar/AgentRosterBanner', () => ({ default: () => null }));
 
 let container: HTMLDivElement;

@@ -514,15 +514,6 @@ export const fr: Translation = {
   'errorBoundary.somethingWrong': "Quelque chose s'est mal passé",
   'errorBoundary.retry': 'réessayer',
   // Barre latérale — panneau d'orchestration
-  'orchestrationPanel.expand': "Développer l'orchestration",
-  'orchestrationPanel.collapse': "Réduire l'orchestration",
-  'orchestrationPanel.reviewer': 'relecteur',
-  'orchestrationPanel.dismiss': 'ignorer',
-  'orchestrationPanel.waiting': 'en attente',
-  'orchestrationPanel.status.running': 'en cours',
-  'orchestrationPanel.status.complete': 'terminé',
-  'orchestrationPanel.status.failed': 'échoué',
-  'orchestrationPanel.status.queued': 'en file',
   // Aide-mémoire des raccourcis clavier
   'cheatSheet.selectWorkspace': 'Sélectionner l’espace de travail 1–9',
   'cheatSheet.selectTab': 'Sélectionner l’onglet 1–9',

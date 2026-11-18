@@ -436,15 +436,6 @@ export const sv: Translation = {
   'errorBoundary.somethingWrong': 'Något gick fel',
   'errorBoundary.retry': 'försök igen',
   // Sidopanel — orkestreringspanel
-  'orchestrationPanel.expand': 'Expandera orkestrering',
-  'orchestrationPanel.collapse': 'Fäll ihop orkestrering',
-  'orchestrationPanel.reviewer': 'granskare',
-  'orchestrationPanel.dismiss': 'avfärda',
-  'orchestrationPanel.waiting': 'väntar',
-  'orchestrationPanel.status.running': 'körs',
-  'orchestrationPanel.status.complete': 'klar',
-  'orchestrationPanel.status.failed': 'misslyckades',
-  'orchestrationPanel.status.queued': 'i kö',
   // Kortkommandoöversikt
   'cheatSheet.selectWorkspace': 'Välj arbetsyta 1–9',
   'cheatSheet.selectTab': 'Välj flik 1–9',

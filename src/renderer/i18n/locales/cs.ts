@@ -504,15 +504,6 @@ export const cs: Translation = {
   'errorBoundary.somethingWrong': 'Něco se pokazilo',
   'errorBoundary.retry': 'zkusit znovu',
   // Postranní panel — panel orchestrace
-  'orchestrationPanel.expand': 'Rozbalit orchestraci',
-  'orchestrationPanel.collapse': 'Sbalit orchestraci',
-  'orchestrationPanel.reviewer': 'recenzent',
-  'orchestrationPanel.dismiss': 'zavřít',
-  'orchestrationPanel.waiting': 'čeká',
-  'orchestrationPanel.status.running': 'běží',
-  'orchestrationPanel.status.complete': 'dokončeno',
-  'orchestrationPanel.status.failed': 'selhalo',
-  'orchestrationPanel.status.queued': 've frontě',
   // Přehled klávesových zkratek
   'cheatSheet.selectWorkspace': 'Vybrat pracovní prostor 1–9',
   'cheatSheet.selectTab': 'Vybrat kartu 1–9',

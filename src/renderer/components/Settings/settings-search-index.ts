@@ -2169,7 +2169,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "help.task.customize.body",
-      "label": "Settings search finds controls and their scope. User TOML configuration can override UI preferences after reload; custom locale files fall back to English. F1 shows live shortcuts; Settings → Shortcuts and the command palette reflect rebinding. TRACE, agent navigator/office, prompt outline, browser engines and snapshots remain available. Legacy local orchestration is wmux-orchestrator compatibility, separate from OpenCode integration and Eridani. Report desktop/host versions and redacted diagnostics; never include tokens. Windows desktop and Linux/WSL host are current support boundaries."
+      "label": "Settings search finds controls and their scope. User TOML configuration can override UI preferences after reload; custom locale files fall back to English. F1 shows live shortcuts; Settings → Shortcuts and the command palette reflect rebinding. TRACE, agent navigator/office, prompt outline, browser engines and snapshots remain available. Report desktop/host versions and redacted diagnostics; never include tokens. Windows desktop and Linux/WSL host are current support boundaries."
     }
   ],
   "Agents": [

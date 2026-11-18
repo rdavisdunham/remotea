@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createRequire } from 'node:module';
 import {
   ensureOmpContext,
   removeOmpContext,
@@ -13,10 +12,6 @@ import {
 } from '../../src/main/omp-context';
 import { CLI_BIN_PLACEHOLDER, injectWmuxBlock } from '../../src/main/agent-instructions';
 
-const require_ = createRequire(import.meta.url);
-const { AGENTS } = require_('../../resources/wmux-orchestrator/scripts/launch-agent.js') as {
-  AGENTS: Record<string, { bin: string; args: (p: string) => string[] }>;
-};
 
 /**
  * Issue #165: a team running omp (Oh My Pi) on Windows 11 read wmux as
@@ -217,21 +212,4 @@ describe('#165 omp context', () => {
     expect(fs.readFileSync(extension, 'utf-8')).toBe('export default function mine() {}');
   });
 
-});
-
-describe('#165 orchestrator can launch omp workers', () => {
-  it('knows omp alongside claude and opencode', () => {
-    expect(Object.keys(AGENTS)).toEqual(expect.arrayContaining(['claude', 'opencode', 'omp']));
-    expect(AGENTS.omp.bin).toBe('omp');
-  });
-
-  it('keeps the prompt out of the flag parser', () => {
-    // A prompt starting with '-' would otherwise be read as a flag by every one
-    // of the three.
-    for (const agent of Object.values(AGENTS)) {
-      const args = agent.args('--not-a-flag');
-      expect(args[args.length - 2]).toBe('--');
-      expect(args[args.length - 1]).toBe('--not-a-flag');
-    }
-  });
 });

@@ -8,10 +8,7 @@ import { clearIntegrationFailures } from './integration-failures';
  * context file, writes ~/.kiro/steering/wmux.md, registers eight hook families
  * in ~/.claude/settings.json, installs a status extension into
  * ~/.pi/agent/extensions/, points chrome-devtools-mcp at its own CDP proxy, and
- * installs an OpenCode orchestrator plugin.
- *
- * It also used to install a Claude Code plugin, which is deprecated and gone
- * (issue #239). Its uninstall is not: see `removeOrchestratorPlugin`.
+ * installs an OpenCode status plugin.
  *
  * All of that used to happen unconditionally on every launch, with no prompt and
  * no record of a decision — so deleting any of it was futile, because the next
@@ -37,7 +34,6 @@ import {
   removeClaudeContext,
   removeClaudeHooks,
   removeChromeDevtoolsConfig,
-  removeOrchestratorPlugin,
 } from './claude-context';
 import {
   ensureOpencodeContext,
@@ -129,7 +125,7 @@ export const INTEGRATION_CONSENT_DETAIL =
   '  • ~/.gemini/config/plugins/wmux/ (only if the Antigravity CLI is installed)\n' +
   '      an agy plugin of remotea\'s own that reports each pane\'s conversation\n' +
   '  • ~/.config/opencode/plugin/wmux.js\n' +
-  '      the remotea orchestrator plugin for OpenCode\n' +
+  '      the remotea status plugin for OpenCode\n' +
   '  • ~/.claude/settings.json\n' +
   '      a pinned chrome-devtools-mcp pointed at the browser panel instead of its own Chrome\n\n' +
   'Nothing is written until this is turned on. Turning it off removes anything ' +
@@ -199,15 +195,10 @@ function applyFeature(feature: IntegrationFeature, enabled: boolean): void {
       else { removeClaudeHooks(); removePiExtension(); removeOmpExtension(); removeGrokHooks(); removeAgyPlugin(); removeQwenHooks(); }
       break;
     case 'orchestrator':
-      // The Claude Code half of this feature is DEPRECATED (issue #239) and has
-      // no `enabled` branch left: the bundled plugin never loaded — wmux wrote
-      // Claude Code's `installed_plugins.json` in a shape it does not read — and
-      // parallel orchestration is now something Claude Code does natively and
-      // better. Its removal runs in BOTH branches on purpose: a retired
-      // integration that cleans up only when you switch it off leaves its
-      // wreckage on every machine where the toggle is still on, which is exactly
-      // where it already is. Only OpenCode's plugin still has an `enabled` side.
-      removeOrchestratorPlugin();
+      // The OpenCode status plugin. The key keeps its old name because renaming
+      // it would switch the plugin back on for anyone who turned it off. The
+      // Claude Code orchestrator plugin it once also controlled is gone; see
+      // docs/remotea/orchestrator-architecture.md.
       if (enabled) ensureOpencodePlugin();
       else removeOpencodePlugin();
       break;

@@ -436,15 +436,6 @@ export const nl: Translation = {
   'errorBoundary.somethingWrong': 'Er is iets misgegaan',
   'errorBoundary.retry': 'opnieuw proberen',
   // Zijbalk — orkestratiepaneel
-  'orchestrationPanel.expand': 'Orkestratie uitklappen',
-  'orchestrationPanel.collapse': 'Orkestratie inklappen',
-  'orchestrationPanel.reviewer': 'reviewer',
-  'orchestrationPanel.dismiss': 'sluiten',
-  'orchestrationPanel.waiting': 'wachten',
-  'orchestrationPanel.status.running': 'actief',
-  'orchestrationPanel.status.complete': 'voltooid',
-  'orchestrationPanel.status.failed': 'mislukt',
-  'orchestrationPanel.status.queued': 'in wachtrij',
   // Sneltoetsenoverzicht
   'cheatSheet.selectWorkspace': 'Werkruimte 1–9 selecteren',
   'cheatSheet.selectTab': 'Tabblad 1–9 selecteren',

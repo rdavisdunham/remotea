@@ -455,15 +455,6 @@ export const ko: Translation = {
   'errorBoundary.somethingWrong': '문제가 발생했습니다',
   'errorBoundary.retry': '다시 시도',
   // 사이드바 — 오케스트레이션 패널
-  'orchestrationPanel.expand': '오케스트레이션 펼치기',
-  'orchestrationPanel.collapse': '오케스트레이션 접기',
-  'orchestrationPanel.reviewer': '검토자',
-  'orchestrationPanel.dismiss': '닫기',
-  'orchestrationPanel.waiting': '대기 중',
-  'orchestrationPanel.status.running': '실행 중',
-  'orchestrationPanel.status.complete': '완료',
-  'orchestrationPanel.status.failed': '실패',
-  'orchestrationPanel.status.queued': '대기열',
   // 단축키 요약표
   'cheatSheet.selectWorkspace': '작업 공간 1–9 선택',
   'cheatSheet.selectTab': '탭 1–9 선택',

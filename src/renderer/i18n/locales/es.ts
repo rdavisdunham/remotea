@@ -437,15 +437,6 @@ export const es: Translation = {
   'errorBoundary.somethingWrong': 'Algo salió mal',
   'errorBoundary.retry': 'reintentar',
   // Barra lateral — panel de orquestación
-  'orchestrationPanel.expand': 'Expandir orquestación',
-  'orchestrationPanel.collapse': 'Contraer orquestación',
-  'orchestrationPanel.reviewer': 'revisor',
-  'orchestrationPanel.dismiss': 'descartar',
-  'orchestrationPanel.waiting': 'en espera',
-  'orchestrationPanel.status.running': 'en ejecución',
-  'orchestrationPanel.status.complete': 'completado',
-  'orchestrationPanel.status.failed': 'fallido',
-  'orchestrationPanel.status.queued': 'en cola',
   // Chuleta de atajos de teclado
   'cheatSheet.selectWorkspace': 'Seleccionar espacio de trabajo 1–9',
   'cheatSheet.selectTab': 'Seleccionar pestaña 1–9',

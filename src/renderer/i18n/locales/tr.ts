@@ -447,15 +447,6 @@ export const tr: Translation = {
   'errorBoundary.somethingWrong': 'Bir şeyler ters gitti',
   'errorBoundary.retry': 'tekrar dene',
   // Kenar çubuğu — orkestrasyon paneli
-  'orchestrationPanel.expand': 'Orkestrasyonu genişlet',
-  'orchestrationPanel.collapse': 'Orkestrasyonu daralt',
-  'orchestrationPanel.reviewer': 'inceleyen',
-  'orchestrationPanel.dismiss': 'kapat',
-  'orchestrationPanel.waiting': 'bekleniyor',
-  'orchestrationPanel.status.running': 'çalışıyor',
-  'orchestrationPanel.status.complete': 'tamamlandı',
-  'orchestrationPanel.status.failed': 'başarısız',
-  'orchestrationPanel.status.queued': 'sırada',
   // Kısayol sayfası
   'cheatSheet.selectWorkspace': '1–9 çalışma alanını seç',
   'cheatSheet.selectTab': '1–9 sekmeyi seç',

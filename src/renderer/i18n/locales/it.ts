@@ -436,15 +436,6 @@ export const it: Translation = {
   'errorBoundary.somethingWrong': 'Qualcosa è andato storto',
   'errorBoundary.retry': 'riprova',
   // Barra laterale — pannello di orchestrazione
-  'orchestrationPanel.expand': 'Espandi orchestrazione',
-  'orchestrationPanel.collapse': 'Comprimi orchestrazione',
-  'orchestrationPanel.reviewer': 'revisore',
-  'orchestrationPanel.dismiss': 'ignora',
-  'orchestrationPanel.waiting': 'in attesa',
-  'orchestrationPanel.status.running': 'in corso',
-  'orchestrationPanel.status.complete': 'completato',
-  'orchestrationPanel.status.failed': 'fallito',
-  'orchestrationPanel.status.queued': 'in coda',
   // Foglio scorciatoie da tastiera
   'cheatSheet.selectWorkspace': 'Seleziona area di lavoro 1–9',
   'cheatSheet.selectTab': 'Seleziona scheda 1–9',

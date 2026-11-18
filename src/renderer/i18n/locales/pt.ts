@@ -436,15 +436,6 @@ export const pt: Translation = {
   'errorBoundary.somethingWrong': 'Algo deu errado',
   'errorBoundary.retry': 'tentar novamente',
   // Barra lateral — painel de orquestração
-  'orchestrationPanel.expand': 'Expandir orquestração',
-  'orchestrationPanel.collapse': 'Recolher orquestração',
-  'orchestrationPanel.reviewer': 'revisor',
-  'orchestrationPanel.dismiss': 'dispensar',
-  'orchestrationPanel.waiting': 'aguardando',
-  'orchestrationPanel.status.running': 'em execução',
-  'orchestrationPanel.status.complete': 'concluído',
-  'orchestrationPanel.status.failed': 'falhou',
-  'orchestrationPanel.status.queued': 'na fila',
   // Cartão de atalhos de teclado
   'cheatSheet.selectWorkspace': 'Selecionar espaço de trabalho 1–9',
   'cheatSheet.selectTab': 'Selecionar aba 1–9',

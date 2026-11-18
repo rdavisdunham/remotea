@@ -48,7 +48,7 @@ Closing a local terminal ends its process. Hiding a host tab only hides it on th
 | Remote files | Source-bound file routing, optimistic save protection and change statistics retained |
 | Prompt history, resume and detection | Retained; help describes what is saved, restarted or inferred |
 | Browser engines and automation | Retained as desktop-owned services, including their existing capability boundaries |
-| Legacy orchestration | Existing watcher/sidebar functionality retained and distinguished from Eridani and the OpenCode integration plugin |
+| Legacy orchestration | Removed (2026-11-18). Its design is recorded in `docs/remotea/orchestrator-architecture.md`. The OpenCode status plugin keeps the `orchestrator` consent key |
 | Phone console | Default-off listener, pairing, viewer/control permissions and separate input dispatch retained |
 
 There is no new credential sharing: desktop-to-host tokens, host-to-Eridani link keys, agent MCP credentials, desktop CLI access and phone pairing still have different purposes. Read-only role labels do not imply universal OS isolation: provider restrictions, run modes and verifier sandbox policy are separate facts.

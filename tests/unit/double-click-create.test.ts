@@ -35,7 +35,6 @@ vi.mock('../../src/renderer/i18n', async () => {
   return { useT: () => makeT('en') };
 });
 // These independent panels are unrelated to workspace-list gestures.
-vi.mock('../../src/renderer/components/Sidebar/OrchestrationPanel', () => ({ default: () => null }));
 vi.mock('../../src/renderer/components/Sidebar/AgentRosterBanner', () => ({ default: () => null }));
 
 const paneId = 'pane-1' as PaneId;

@@ -447,15 +447,6 @@ export const hi: Translation = {
   'errorBoundary.somethingWrong': 'कुछ गलत हो गया',
   'errorBoundary.retry': 'पुनः प्रयास करें',
   // साइडबार — ऑर्केस्ट्रेशन पैनल
-  'orchestrationPanel.expand': 'ऑर्केस्ट्रेशन विस्तृत करें',
-  'orchestrationPanel.collapse': 'ऑर्केस्ट्रेशन छोटा करें',
-  'orchestrationPanel.reviewer': 'समीक्षक',
-  'orchestrationPanel.dismiss': 'खारिज करें',
-  'orchestrationPanel.waiting': 'प्रतीक्षा',
-  'orchestrationPanel.status.running': 'चालू',
-  'orchestrationPanel.status.complete': 'पूर्ण',
-  'orchestrationPanel.status.failed': 'विफल',
-  'orchestrationPanel.status.queued': 'कतारबद्ध',
   // कीबोर्ड शॉर्टकट चीट-शीट
   'cheatSheet.selectWorkspace': 'वर्कस्पेस 1–9 चुनें',
   'cheatSheet.selectTab': 'टैब 1–9 चुनें',

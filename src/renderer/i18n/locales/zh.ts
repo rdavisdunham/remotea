@@ -435,15 +435,6 @@ export const zh: Translation = {
   'errorBoundary.somethingWrong': '出现了问题',
   'errorBoundary.retry': '重试',
   // 侧边栏 — 编排面板
-  'orchestrationPanel.expand': '展开编排',
-  'orchestrationPanel.collapse': '收起编排',
-  'orchestrationPanel.reviewer': '审阅者',
-  'orchestrationPanel.dismiss': '关闭',
-  'orchestrationPanel.waiting': '等待中',
-  'orchestrationPanel.status.running': '运行中',
-  'orchestrationPanel.status.complete': '已完成',
-  'orchestrationPanel.status.failed': '已失败',
-  'orchestrationPanel.status.queued': '排队中',
   // 键盘快捷键速查表
   'cheatSheet.selectWorkspace': '选择工作区 1–9',
   'cheatSheet.selectTab': '选择标签页 1–9',

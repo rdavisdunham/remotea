@@ -447,15 +447,6 @@ export const pl: Translation = {
   'errorBoundary.somethingWrong': 'Coś poszło nie tak',
   'errorBoundary.retry': 'spróbuj ponownie',
   // Panel boczny — panel orkiestracji
-  'orchestrationPanel.expand': 'Rozwiń orkiestrację',
-  'orchestrationPanel.collapse': 'Zwiń orkiestrację',
-  'orchestrationPanel.reviewer': 'recenzent',
-  'orchestrationPanel.dismiss': 'ukryj',
-  'orchestrationPanel.waiting': 'oczekiwanie',
-  'orchestrationPanel.status.running': 'uruchomiony',
-  'orchestrationPanel.status.complete': 'ukończony',
-  'orchestrationPanel.status.failed': 'nieudany',
-  'orchestrationPanel.status.queued': 'w kolejce',
   // Ściąga skrótów klawiszowych
   'cheatSheet.selectWorkspace': 'Wybierz obszar roboczy 1–9',
   'cheatSheet.selectTab': 'Wybierz kartę 1–9',
