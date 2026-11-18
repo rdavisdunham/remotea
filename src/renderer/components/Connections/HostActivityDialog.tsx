@@ -135,7 +135,7 @@ export default function HostActivityDialog({ onClose, onSettings }: {
             return (
               <section key={host.id} className="host-activity__card" data-host={host.id}>
                 <h3>{host.name}</h3>
-                <RemoteHostHealth status={status[host.id]} view={view} now={now} />
+                <RemoteHostHealth status={status[host.id]} view={view} now={now} hostName={host.name} />
                 {pending && <RemotePendingChanges host={pending} onForget={forgetPendingChange} />}
                 {!!status[host.id]?.outbox?.failed.length && <p role="status">{t('activity.failed').replace('{count}', String(status[host.id].outbox!.failed.length))}</p>}
                 {hidden.length > 0 && <div className="host-activity__hidden">

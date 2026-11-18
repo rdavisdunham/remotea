@@ -9,7 +9,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import RemoteHostHealth from '../../src/renderer/components/Settings/RemoteHostHealth';
-import { connectionHealth, processHealth, runHealth, tabsHealth } from '../../src/renderer/remote-sessions/host-health';
+import { connectionHealth, processHealth, runHealth, serverNotice, tabsHealth } from '../../src/renderer/remote-sessions/host-health';
 import { INBOX_GROUP_ID, type EridaniBinding, type SessionRecord } from '../../src/shared/remote-host-protocol';
 import type { HostStatus, RemoteRegistryView } from '../../src/shared/remote-hosts-types';
 
@@ -102,9 +102,25 @@ describe('tabsHealth', () => {
   });
 });
 
+describe('host server older than the rename', () => {
+  it('names the host and `remotea upgrade` when the server lacks remoteaNames', () => {
+    const n = serverNotice({ ...READY, serverHostname: 'desk-wsl', serverPredatesRename: true }, 'Desk');
+    expect(n).toMatchObject({ label: 'Update needed', tone: 'pending' });
+    expect(n!.detail).toBe('This host (Desk) runs an older remotea server. Run `remotea upgrade` on it.');
+    // Without a configured name, the server's own hostname names it.
+    expect(serverNotice({ ...READY, serverHostname: 'desk-wsl', serverPredatesRename: true }, undefined)!.detail).toContain('(desk-wsl)');
+  });
+
+  it('says nothing for a renamed server, or before a status arrives', () => {
+    expect(serverNotice(READY, 'Desk')).toBeNull();
+    expect(serverNotice({ ...READY, serverPredatesRename: false }, 'Desk')).toBeNull();
+    expect(serverNotice(undefined, 'Desk')).toBeNull();
+  });
+});
+
 describe('RemoteHostHealth (render)', () => {
-  function render(status: HostStatus | undefined, v: RemoteRegistryView | undefined): HTMLElement {
-    const html = renderToStaticMarkup(createElement(RemoteHostHealth, { status, view: v, now: NOW }));
+  function render(status: HostStatus | undefined, v: RemoteRegistryView | undefined, hostName?: string): HTMLElement {
+    const html = renderToStaticMarkup(createElement(RemoteHostHealth, { status, view: v, now: NOW, hostName }));
     const el = document.createElement('div');
     el.innerHTML = html;
     return el;
@@ -134,6 +150,15 @@ describe('RemoteHostHealth (render)', () => {
     expect(el.textContent).toContain('Host connection');
     expect(el.textContent).toContain('Terminal process');
     expect(el.textContent).toContain('Eridani run');
+  });
+
+  it('an older host server gets its own row, beside a connection that stays green', () => {
+    const el = render({ ...READY, serverPredatesRename: true }, view([]), 'Desk');
+    expect(chips(el, 'connection')[0].textContent).toBe('Connected');
+    const row = el.querySelector('[data-kind="server-version"]')!;
+    expect(row.textContent).toContain('This host (Desk) runs an older remotea server.');
+    expect(row.textContent).toContain('`remotea upgrade`');
+    expect(render(READY, view([]), 'Desk').querySelector('[data-kind="server-version"]')).toBeNull();
   });
 
   it('a dropped host keeps its tabs as last known, and shows when it was last seen', () => {

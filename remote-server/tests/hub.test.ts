@@ -37,6 +37,8 @@ describe('Hub', () => {
     const { hub, connect } = setup();
     const a = connect(DEV_A);
     expect(a.json('welcome')[0]).toMatchObject({ bootId: 'boot-1', serverId: 'srv-1', you: DEV_A, sessions: [] });
+    // Apps tell the user to upgrade a host whose welcome lacks this.
+    expect(a.json('welcome')[0].features).toContain('remoteaNames');
     const bad = new FakeConn(50);
     hub.connect(bad);
     hub.handle(bad, { t: 'hello', proto: 999, device: { id: DEV_B, name: 'b' }, app: { name: 't', version: '0' } });

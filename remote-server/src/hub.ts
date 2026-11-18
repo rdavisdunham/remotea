@@ -358,6 +358,8 @@ export class Hub {
     // This server may send `focus` (Eridani's terminal.focus) to apps whose hello listed it.
     f.push('focus');
     if (this.eridani.takeover) f.push('managedSessions');
+    // This server uses the remotea names on its machine; apps warn about hosts that lack this.
+    f.push('remoteaNames');
     return f;
   }
 

@@ -1461,6 +1461,8 @@ export const en = {
   "health.tab": "Tab",
   "health.terminalProcess": "Terminal process",
   "health.none": "none",
+  "health.serverUpdate": "Update needed",
+  "health.serverPredatesRename": "This host ({host}) runs an older remotea server. Run `remotea upgrade` on it.",
   "health.connection.disabled": "Off",
   "health.connection.connecting": "Connecting…",
   "health.connection.ready": "Connected",

@@ -263,6 +263,7 @@ export class RemoteHostClient {
         prompt: this.ready && !(this.deps.hooksPromptDeclined?.() ?? false) && this.hooks.some((a) => a.present && !a.installed),
       },
       outbox: this.deps.intents.summary(this.hostId),
+      serverPredatesRename: this.ready && !this.features.has('remoteaNames') ? true : undefined,
     };
   }
 
