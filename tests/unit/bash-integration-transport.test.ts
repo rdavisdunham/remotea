@@ -144,7 +144,8 @@ describe.skipIf(!hasGitBash)('transport resolution', () => {
     const out = resolvedTransport([
       'OSTYPE=linux-gnu',
       `export WSL_DISTRO_NAME=Ubuntu REMOTEA_WSL_NODE='${node}' REMOTEA_CLI=/mnt/c/wmux/remotea.js`,
-      'wslpath() { [ "$1" = -w ] && printf "C:\\\\wmux\\\\remotea.js\\n"; }',
+      // %s, not the format string: printf would read the `\\r` of `\\remotea` as a carriage return.
+      'wslpath() { [ "$1" = -w ] && printf "%s\\n" "C:\\\\wmux\\\\remotea.js"; }',
     ]);
     expect(out).toBe(`|${node}|C:\\wmux\\remotea.js`);
   });

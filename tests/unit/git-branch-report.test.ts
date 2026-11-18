@@ -140,7 +140,7 @@ async function workerReports(shell: string, cwd: string): Promise<{ taken: strin
     socket.on('end', () => { messages.push(buf.trim()); });
     socket.on('error', () => {});
   });
-  await new Promise<void>((resolve) => server.listen(`\\\\.\\pipe\\wmux-${instance}`, resolve));
+  await new Promise<void>((resolve) => server.listen(`\\\\.\\pipe\\remotea-${instance}`, resolve));
   const ps = (s: string) => `'${s.replace(/'/g, "''")}'`;
   const script = [
     `. ${ps(PS1)}`,

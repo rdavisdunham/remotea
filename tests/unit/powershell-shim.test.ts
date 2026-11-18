@@ -123,12 +123,12 @@ describe.skipIf(!powershell)('a shim invoked from PowerShell (issue #154)', () =
   fs.writeFileSync(path.join(dir, 'remotea.cmd'), '@echo off\r\nnode "%REMOTEA_CLI%" %*\r\n');
   fs.copyFileSync(path.join(SHIM_DIR, 'remotea.ps1'), path.join(dir, 'remotea.ps1'));
 
-  /** Run `wmux <args>` the way a user types it, letting PATH pick the shim. */
+  /** Run `remotea <args>` the way a user types it, letting PATH pick the shim. */
   function callThroughPath(args: string[]): string {
     const quoted = args.map((a) => `'${a.replace(/'/g, "''")}'`).join(' ');
     return execFileSync(
       powershell!,
-      ['-NoProfile', '-NonInteractive', '-Command', `$env:PATH = '${dir};' + $env:PATH; wmux ${quoted}`],
+      ['-NoProfile', '-NonInteractive', '-Command', `$env:PATH = '${dir};' + $env:PATH; remotea ${quoted}`],
       {
         encoding: 'utf-8',
         timeout: 30000,
@@ -206,21 +206,21 @@ describe.skipIf(installedHosts.length === 0)('embedded quotes survive the shim (
   for (const host of installedHosts) {
     for (const args of ROUND_TRIPS) {
       it(`${host}: ${JSON.stringify(args)}`, () => {
-        expect(JSON.parse(run(host, `wmux ${psQuote(args)}`))).toEqual(args);
+        expect(JSON.parse(run(host, `remotea ${psQuote(args)}`))).toEqual(args);
       });
     }
   }
 
   it.skipIf(!installedHosts.includes('pwsh.exe'))('pwsh with Legacy argument passing forced', () => {
     for (const args of ROUND_TRIPS) {
-      const out = run('pwsh.exe', `$PSNativeCommandArgumentPassing = 'Legacy'; wmux ${psQuote(args)}`);
+      const out = run('pwsh.exe', `$PSNativeCommandArgumentPassing = 'Legacy'; remotea ${psQuote(args)}`);
       expect(JSON.parse(out)).toEqual(args);
     }
   });
 
-  it('still feeds the pipeline, so `$x = wmux ...` captures the reply', () => {
+  it('still feeds the pipeline, so `$x = remotea ...` captures the reply', () => {
     for (const host of installedHosts) {
-      expect(run(host, `$x = wmux 'a b'; "captured=" + $x`).trim()).toBe('captured=["a b"]');
+      expect(run(host, `$x = remotea 'a b'; "captured=" + $x`).trim()).toBe('captured=["a b"]');
     }
   });
 });
