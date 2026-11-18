@@ -14,7 +14,7 @@ Every ruling follows one of these rules:
 
 The owner kept the browser panel and all languages on 2026-11-18. Before that, browser-only fixes were skipped, a fix that also touched the browser kept only its non-browser part, and only the English, Czech, French and Traditional Chinese hunks were taken. The browser fixes and the browser parts of mixed fixes were then ported, as the rows below say. The other languages still lack the strings the earlier ports added, so those strings show in English there.
 
-Totals: 54 ported, 39 skipped, 82 not applicable.
+Totals: 55 ported, 38 skipped, 82 not applicable.
 
 The **ported as** column names the remotea commit. Each port's message ends with `(cherry picked from commit …)` and, where the port differs from upstream, a "remotea port notes" list saying what was left out or resolved by hand.
 
@@ -29,7 +29,7 @@ These rows needed a call the rules don't settle. The owner confirmed all four on
 
 ## Features
 
-Features are skipped unless the owner flags them. In the 2026-11-18 review the owner chose six to port: e95e883, a661ab7, 017cc13, 72d246b, fa97b16 and 1266792. The features inside fix 4a529c7 (last row) come with that fix.
+Features are skipped unless the owner flags them. In the 2026-11-18 review the owner chose six to port: e95e883, a661ab7, 017cc13, 72d246b, fa97b16 and 1266792. Later that day the owner also asked for close to tray from 5a9cf39. The features inside fix 4a529c7 (last row) come with that fix.
 
 | sha | date | feature | note |
 |---|---|---|---|
@@ -57,7 +57,7 @@ Features are skipped unless the owner flags them. In the 2026-11-18 review the o
 | `a3b4450` | 2026-11-04 | feat(titlebar): add browser panel toggle (#437) | Browser panel feature. The panel stays (2026-11-18), so it can be ported if flagged. |
 | `bbe4fb3` | 2026-11-04 | feat(diagnostics): count live terminals and WebGL renderers in shipped builds (#421) |  |
 | `cd1e4f7` | 2026-11-06 | feat(titlebar): ChatGPT Web dictation, opt-in (#438) |  |
-| `5a9cf39` | 2026-11-07 | feat: browser link menu and hover URL (#439), close to tray (#442) | Either part can be ported if flagged; the panel stays (2026-11-18). e89ebe2 builds on the link menu. |
+| `5a9cf39` | 2026-11-07 | feat: browser link menu and hover URL (#439), close to tray (#442) | Close to tray ported at the owner's request (2026-11-18). The link menu waits for the browser ergonomics step; e89ebe2 builds on it. |
 | `fa97b16` | 2026-11-10 | feat(tabs): resume the just-closed tab's agent session on Ctrl+Shift+T (#447) | **Ported.** |
 | `73b7980` | 2026-11-13 | feat(diff): wrap long lines toggle in the Diff tab and Git view (#450) |  |
 | `1266792` | 2026-11-15 | feat(panes): show no focused pane in an unfocused window (#459) | **Ported.** |
@@ -207,7 +207,7 @@ Oldest first.
 | `18376ac` | 2026-11-07 | fix | fix(opencode): harden the server-half session reporter (#444) | ported | Fix. | `822379b` |
 | `01f538d` | 2026-11-07 | fix | fix(cli): retry idempotent reports when the pipe is busy (#445) | ported | Fix. | `4a60401` |
 | `98b4f66` | 2026-11-07 | fix | fix(diff): open the diff tab for any agent's edit tool, tint rows past the viewport (#440, #441) | ported | Fix. | `d39daea` |
-| `5a9cf39` | 2026-11-07 | feat | feat: browser link menu and hover URL (#439), close to tray (#442) | skipped | Feature. Port only if flagged. |  |
+| `5a9cf39` | 2026-11-07 | feat | feat: browser link menu and hover URL (#439), close to tray (#442) | ported | Close to tray (#442) only, at the owner's request (2026-11-18). The browser link menu (#439) waits for the browser ergonomics step. | `423af97` |
 | `0c02de5` | 2026-11-07 | chore | chore(release): bump to 2.59.0 | not applicable | Release version bump. |  |
 | `1f2ffa9` | 2026-11-07 | chore | chore(scoop): bucket manifest for 2.59.0 | not applicable | Scoop manifest. |  |
 | `e89ebe2` | 2026-11-09 | fix | fix(browser): open Ctrl+click and middle-click links in a new tab (#446) | skipped | Builds on feature 5a9cf39 (the browser link menu, #439), which remotea does not have. Port the two together if the owner flags #439. |  |

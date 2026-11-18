@@ -35,7 +35,6 @@ vi.mock('../../src/renderer/i18n', async () => {
   const { makeT } = await import('../../src/renderer/i18n/core');
   return { useT: () => makeT('en') };
 });
-vi.mock('../../src/renderer/components/Sidebar/OrchestrationPanel', () => ({ default: () => null }));
 vi.mock('../../src/renderer/components/Sidebar/AgentRosterBanner', () => ({ default: () => null }));
 
 const TASK: EridaniTaskRef = { hostId: 'desk', target: 'jarvis', taskId: 'task-1', runId: 'run-a' };

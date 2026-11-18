@@ -427,20 +427,14 @@ export const zh: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': '默认 Shell',
   'settings.workspacePanel.shell.systemDefault': '系统默认',
+  'settings.workspacePanel.closeToTray': '关闭时最小化到托盘',
+  'settings.workspacePanel.closeToTrayHint':
+    '窗口的 × 按钮或 Alt+F4 不再退出 remotea，而是把最后一个 remotea 窗口隐藏到系统托盘，终端会话和 agent 继续运行。点击托盘图标即可恢复；托盘菜单中的“退出 remotea”才会真正退出。优先于上面的确认设置。',
   // ErrorBoundary 回退卡片
   'errorBoundary.labelFailed': '{label} 失败',
   'errorBoundary.somethingWrong': '出现了问题',
   'errorBoundary.retry': '重试',
   // 侧边栏 — 编排面板
-  'orchestrationPanel.expand': '展开编排',
-  'orchestrationPanel.collapse': '收起编排',
-  'orchestrationPanel.reviewer': '审阅者',
-  'orchestrationPanel.dismiss': '关闭',
-  'orchestrationPanel.waiting': '等待中',
-  'orchestrationPanel.status.running': '运行中',
-  'orchestrationPanel.status.complete': '已完成',
-  'orchestrationPanel.status.failed': '已失败',
-  'orchestrationPanel.status.queued': '排队中',
   // 键盘快捷键速查表
   'cheatSheet.selectWorkspace': '选择工作区 1–9',
   'cheatSheet.selectTab': '选择标签页 1–9',

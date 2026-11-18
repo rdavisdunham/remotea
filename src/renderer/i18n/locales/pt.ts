@@ -428,20 +428,14 @@ export const pt: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Shell padrão',
   'settings.workspacePanel.shell.systemDefault': 'Padrão do sistema',
+  'settings.workspacePanel.closeToTray': 'Fechar para a bandeja',
+  'settings.workspacePanel.closeToTrayHint':
+    'O botão × da janela ou Alt+F4 oculta a última janela do remotea na bandeja do sistema em vez de sair, então as sessões de terminal e os agentes continuam em execução. Clique no ícone da bandeja para trazê-la de volta; "Sair do remotea" no menu dele sai de verdade. Tem prioridade sobre a confirmação acima.',
   // Cartão de fallback do ErrorBoundary
   'errorBoundary.labelFailed': '{label} falhou',
   'errorBoundary.somethingWrong': 'Algo deu errado',
   'errorBoundary.retry': 'tentar novamente',
   // Barra lateral — painel de orquestração
-  'orchestrationPanel.expand': 'Expandir orquestração',
-  'orchestrationPanel.collapse': 'Recolher orquestração',
-  'orchestrationPanel.reviewer': 'revisor',
-  'orchestrationPanel.dismiss': 'dispensar',
-  'orchestrationPanel.waiting': 'aguardando',
-  'orchestrationPanel.status.running': 'em execução',
-  'orchestrationPanel.status.complete': 'concluído',
-  'orchestrationPanel.status.failed': 'falhou',
-  'orchestrationPanel.status.queued': 'na fila',
   // Cartão de atalhos de teclado
   'cheatSheet.selectWorkspace': 'Selecionar espaço de trabalho 1–9',
   'cheatSheet.selectTab': 'Selecionar aba 1–9',

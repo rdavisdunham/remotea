@@ -15,8 +15,8 @@ import type { AgentRosterEntry } from '../../store/agent-rollup';
  * had to read ten rows to find the one that had stopped, which is the exact
  * scan the declared-state protocol was built to remove.
  *
- * Auto-hides when no agent is running anywhere, on the same contract as
- * OrchestrationPanel: a user who never runs an agent never sees it.
+ * Auto-hides when no agent is running anywhere: a user who never runs an agent
+ * never sees it.
  */
 export default function AgentRosterBanner({ onFocusAgent, onOpenNavigator }: {
   onFocusAgent?: (entry: AgentRosterEntry) => void;

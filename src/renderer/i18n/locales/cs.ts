@@ -504,15 +504,6 @@ export const cs: Translation = {
   'errorBoundary.somethingWrong': 'Něco se pokazilo',
   'errorBoundary.retry': 'zkusit znovu',
   // Postranní panel — panel orchestrace
-  'orchestrationPanel.expand': 'Rozbalit orchestraci',
-  'orchestrationPanel.collapse': 'Sbalit orchestraci',
-  'orchestrationPanel.reviewer': 'recenzent',
-  'orchestrationPanel.dismiss': 'zavřít',
-  'orchestrationPanel.waiting': 'čeká',
-  'orchestrationPanel.status.running': 'běží',
-  'orchestrationPanel.status.complete': 'dokončeno',
-  'orchestrationPanel.status.failed': 'selhalo',
-  'orchestrationPanel.status.queued': 've frontě',
   // Přehled klávesových zkratek
   'cheatSheet.selectWorkspace': 'Vybrat pracovní prostor 1–9',
   'cheatSheet.selectTab': 'Vybrat kartu 1–9',
@@ -986,6 +977,9 @@ export const cs: Translation = {
   'settings.workspacePanel.detectAgentScreens': 'Odhadovat stav agentů podle obsahu obrazovky',
   'settings.workspacePanel.detectAgentScreensHint':
     'U agentů, kteří sami nehlásí stav (Codex, Gemini, Aider…), porovnává obsah jejich obrazovky s přiloženými pravidly a rozlišuje čekání na vás od probíhající práce. Vše probíhá pouze na tomto počítači a nikdy nepřepisuje stav oznámený agentem — pouze upřesňuje nečinnost, pokud na obrazovce zůstala otázka. Panely, jejichž agent hlásí práci nebo čekání na vás, se vůbec nečtou. Pravidla můžete upravit v %APPDATA%\\remotea\\agent-detection; příkaz „wmux detect explain“ ukáže, které pravidlo se použilo.',
+  'settings.workspacePanel.closeToTray': 'Zavírat do oznamovací oblasti',
+  'settings.workspacePanel.closeToTrayHint':
+    'Tlačítko × okna nebo Alt+F4 skryje poslední okno remotea do oznamovací oblasti místo ukončení, takže relace terminálu i agenti dál běží. Kliknutím na ikonu ho vrátíte; „Ukončit remotea“ v její nabídce aplikaci skutečně ukončí. Má přednost před potvrzením výše.',
   'agentNavigator.silentProbed': 'rozpoznán — nehlásí stav',
   'agentNavigator.hint': '↑↓ pohyb · enter přejít · a/b/q/w/i/u filtr · esc zavřít',
   'agentNavigator.workspacesWithAgents': 'pracovní prostory',

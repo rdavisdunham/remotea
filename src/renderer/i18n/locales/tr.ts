@@ -439,20 +439,14 @@ export const tr: Translation = {
   'settings.workspacePanel.shellSection': 'Kabuk',
   'settings.workspacePanel.defaultShell': 'Varsayılan kabuk',
   'settings.workspacePanel.shell.systemDefault': 'Sistem varsayılanı',
+  'settings.workspacePanel.closeToTray': 'Sistem tepsisine kapat',
+  'settings.workspacePanel.closeToTrayHint':
+    'Pencerenin × düğmesi veya Alt+F4, remotea’tan çıkmak yerine son remotea penceresini sistem tepsisine gizler; terminal oturumları ve agent’lar çalışmaya devam eder. Geri getirmek için tepsi simgesine tıklayın; menüsündeki "remotea’tan çık" gerçekten çıkar. Yukarıdaki onaya göre önceliklidir.',
   // ErrorBoundary yedek kartı
   'errorBoundary.labelFailed': '{label} başarısız oldu',
   'errorBoundary.somethingWrong': 'Bir şeyler ters gitti',
   'errorBoundary.retry': 'tekrar dene',
   // Kenar çubuğu — orkestrasyon paneli
-  'orchestrationPanel.expand': 'Orkestrasyonu genişlet',
-  'orchestrationPanel.collapse': 'Orkestrasyonu daralt',
-  'orchestrationPanel.reviewer': 'inceleyen',
-  'orchestrationPanel.dismiss': 'kapat',
-  'orchestrationPanel.waiting': 'bekleniyor',
-  'orchestrationPanel.status.running': 'çalışıyor',
-  'orchestrationPanel.status.complete': 'tamamlandı',
-  'orchestrationPanel.status.failed': 'başarısız',
-  'orchestrationPanel.status.queued': 'sırada',
   // Kısayol sayfası
   'cheatSheet.selectWorkspace': '1–9 çalışma alanını seç',
   'cheatSheet.selectTab': '1–9 sekmeyi seç',

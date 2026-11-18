@@ -433,18 +433,6 @@ contextBridge.exposeInMainWorld('wmux', {
     manifests: (): Promise<{ manifests: unknown[]; warnings: string[] }> =>
       ipcRenderer.invoke(IPC_CHANNELS.AGENT_DETECTION_MANIFESTS),
   },
-  orchestration: {
-    onUpdate: (callback: (state: any) => void) => {
-      const handler = (_event: any, state: any) => callback(state);
-      ipcRenderer.on(IPC_CHANNELS.ORCHESTRATION_UPDATE, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.ORCHESTRATION_UPDATE, handler);
-    },
-    onClear: (callback: () => void) => {
-      const handler = () => callback();
-      ipcRenderer.on(IPC_CHANNELS.ORCHESTRATION_CLEAR, handler);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.ORCHESTRATION_CLEAR, handler);
-    },
-  },
   // Workspace manifests (#284): takes nothing — the path comes from a native
   // picker in main, so a renderer cannot point it at a file of its choosing.
   workspaceFile: {

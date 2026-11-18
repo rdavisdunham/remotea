@@ -439,20 +439,14 @@ export const ru: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Shell по умолчанию',
   'settings.workspacePanel.shell.systemDefault': 'Системный по умолчанию',
+  'settings.workspacePanel.closeToTray': 'Сворачивать в трей',
+  'settings.workspacePanel.closeToTrayHint':
+    'Кнопка × окна или Alt+F4 скрывает последнее окно remotea в системный трей вместо выхода, поэтому сеансы терминала и агенты продолжают работать. Щёлкните значок в трее, чтобы вернуть окно; «Выйти из remotea» в его меню завершает работу по-настоящему. Имеет приоритет над подтверждением выше.',
   // Запасная карточка ErrorBoundary
   'errorBoundary.labelFailed': '{label} не работает',
   'errorBoundary.somethingWrong': 'Что-то пошло не так',
   'errorBoundary.retry': 'повторить',
   // Боковая панель — панель оркестрации
-  'orchestrationPanel.expand': 'Развернуть оркестрацию',
-  'orchestrationPanel.collapse': 'Свернуть оркестрацию',
-  'orchestrationPanel.reviewer': 'рецензент',
-  'orchestrationPanel.dismiss': 'скрыть',
-  'orchestrationPanel.waiting': 'ожидание',
-  'orchestrationPanel.status.running': 'выполняется',
-  'orchestrationPanel.status.complete': 'завершено',
-  'orchestrationPanel.status.failed': 'не удалось',
-  'orchestrationPanel.status.queued': 'в очереди',
   // Шпаргалка по горячим клавишам
   'cheatSheet.selectWorkspace': 'Выбрать рабочую область 1–9',
   'cheatSheet.selectTab': 'Выбрать вкладку 1–9',

@@ -428,20 +428,14 @@ export const nl: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Standaardshell',
   'settings.workspacePanel.shell.systemDefault': 'Systeemstandaard',
+  'settings.workspacePanel.closeToTray': 'Sluiten naar systeemvak',
+  'settings.workspacePanel.closeToTrayHint':
+    'De ×-knop van het venster of Alt+F4 verbergt het laatste remotea-venster in het systeemvak in plaats van af te sluiten, zodat terminalsessies en agents blijven draaien. Klik op het pictogram om het terug te halen; "remotea afsluiten" in het menu sluit echt af. Gaat voor op de bevestiging hierboven.',
   // ErrorBoundary-terugvalkaart
   'errorBoundary.labelFailed': '{label} mislukt',
   'errorBoundary.somethingWrong': 'Er is iets misgegaan',
   'errorBoundary.retry': 'opnieuw proberen',
   // Zijbalk — orkestratiepaneel
-  'orchestrationPanel.expand': 'Orkestratie uitklappen',
-  'orchestrationPanel.collapse': 'Orkestratie inklappen',
-  'orchestrationPanel.reviewer': 'reviewer',
-  'orchestrationPanel.dismiss': 'sluiten',
-  'orchestrationPanel.waiting': 'wachten',
-  'orchestrationPanel.status.running': 'actief',
-  'orchestrationPanel.status.complete': 'voltooid',
-  'orchestrationPanel.status.failed': 'mislukt',
-  'orchestrationPanel.status.queued': 'in wachtrij',
   // Sneltoetsenoverzicht
   'cheatSheet.selectWorkspace': 'Werkruimte 1–9 selecteren',
   'cheatSheet.selectTab': 'Tabblad 1–9 selecteren',

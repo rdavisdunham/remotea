@@ -439,20 +439,14 @@ export const uk: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Shell за замовчуванням',
   'settings.workspacePanel.shell.systemDefault': 'Системний за замовчуванням',
+  'settings.workspacePanel.closeToTray': 'Згортати в трей',
+  'settings.workspacePanel.closeToTrayHint':
+    'Кнопка × вікна або Alt+F4 ховає останнє вікно remotea у системний трей замість виходу, тож сеанси терміналу й агенти продовжують працювати. Клацніть значок у треї, щоб повернути вікно; «Вийти з remotea» у його меню справді завершує роботу. Має пріоритет над підтвердженням вище.',
   // Запасна картка ErrorBoundary
   'errorBoundary.labelFailed': '{label} не працює',
   'errorBoundary.somethingWrong': 'Щось пішло не так',
   'errorBoundary.retry': 'повторити',
   // Бічна панель — панель оркестрації
-  'orchestrationPanel.expand': 'Розгорнути оркестрацію',
-  'orchestrationPanel.collapse': 'Згорнути оркестрацію',
-  'orchestrationPanel.reviewer': 'рев\'юер',
-  'orchestrationPanel.dismiss': 'сховати',
-  'orchestrationPanel.waiting': 'очікування',
-  'orchestrationPanel.status.running': 'виконується',
-  'orchestrationPanel.status.complete': 'завершено',
-  'orchestrationPanel.status.failed': 'не вдалося',
-  'orchestrationPanel.status.queued': 'у черзі',
   // Шпаргалка зі сполучень клавіш
   'cheatSheet.selectWorkspace': 'Вибрати робочий простір 1–9',
   'cheatSheet.selectTab': 'Вибрати вкладку 1–9',

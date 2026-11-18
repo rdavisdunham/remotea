@@ -992,9 +992,6 @@ export const IPC_CHANNELS = {
   // payload: main parses and gates it, so the allow-list sits on the trusted
   // side. Answers the accepted Windows path, or null.
   EXPLORER_REPORT_OSC7: 'explorer:report-osc7',
-  // Orchestration (wmux-orchestrator plugin state broadcast)
-  ORCHESTRATION_UPDATE: 'orchestration:update',
-  ORCHESTRATION_CLEAR: 'orchestration:clear',
   // In-app release notes (issue #211). Distinct from the UPDATE_* family below:
   // that one answers "is there a newer version", this one answers "what changed",
   // including in the versions already installed.
@@ -1054,60 +1051,6 @@ export type NotificationSoundPickResult =
   | { canceled: true }
   | { error: 'unsupported_type' | 'unreadable' | 'too_large' }
   | { dataUrl: string; extension: string; name: string };
-
-// ─── Orchestration state (wmux-orchestrator plugin) ────────────────────────
-// Mirrors the shape written by the plugin into {TMPDIR}/wmux-orch-*/state.json.
-
-export type OrchAgentStatus = 'pending' | 'running' | 'exited' | 'failed';
-export type OrchWaveStatus = 'pending' | 'running' | 'complete' | 'failed';
-export type OrchRunStatus = 'pending' | 'running' | 'complete' | 'failed';
-
-export interface OrchestrationAgent {
-  id: string;
-  label: string;
-  group?: string | null;
-  subtask?: string;
-  files?: string[];
-  excludeFiles?: string[];
-  paneId?: string | null;
-  surfaceId?: string | null;
-  status: OrchAgentStatus;
-  exitCode?: number | null;
-  toolUses?: number;
-  resultFile?: string;
-  startedAt?: string | null;
-  finishedAt?: string | null;
-  lastTool?: string;
-}
-
-export interface OrchestrationWave {
-  index: number;
-  status: OrchWaveStatus;
-  blockedBy?: number[];
-  agents: OrchestrationAgent[];
-}
-
-export interface OrchestrationReviewer {
-  status: OrchRunStatus;
-  agentId?: string | null;
-  reportFile?: string;
-}
-
-export interface OrchestrationState {
-  id: string;
-  task: string;
-  status: OrchRunStatus;
-  startedAt: string;
-  finishedAt?: string;
-  cwd?: string;
-  workspaceId?: string | null;
-  dashboardSurfaceId?: string | null;
-  useWorktrees?: boolean;
-  waves: OrchestrationWave[];
-  reviewer?: OrchestrationReviewer;
-  // Client-side only — populated by the watcher so the renderer knows where to dismiss from.
-  _orchDir?: string;
-}
 
 /**
  * The engine a surface actually runs on. Never trust the raw field: it is

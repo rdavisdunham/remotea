@@ -72,7 +72,6 @@
     { "from": "src/cli-bin-ps", "to": "cli-bin-ps" },
     { "from": "src/codex-bin", "to": "codex-bin" },
     { "from": "src/codex-bin-ps", "to": "codex-bin-ps" },
-    { "from": "resources/wmux-orchestrator", "to": "wmux-orchestrator" },
     { "from": "resources/opencode-plugin", "to": "opencode-plugin" },
     { "from": "resources/agy-plugin", "to": "agy-plugin" },
     { "from": "resources/pi-extension", "to": "pi-extension" },

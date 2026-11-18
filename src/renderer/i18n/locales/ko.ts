@@ -447,20 +447,14 @@ export const ko: Translation = {
   'settings.workspacePanel.shellSection': '셸',
   'settings.workspacePanel.defaultShell': '기본 셸',
   'settings.workspacePanel.shell.systemDefault': '시스템 기본값',
+  'settings.workspacePanel.closeToTray': '닫을 때 트레이로 숨기기',
+  'settings.workspacePanel.closeToTrayHint':
+    '창의 × 버튼이나 Alt+F4를 누르면 remotea를 종료하는 대신 마지막 remotea 창을 시스템 트레이로 숨겨, 터미널 세션과 에이전트가 계속 실행됩니다. 트레이 아이콘을 클릭하면 다시 나타나고, 메뉴의 "remotea 종료"를 누르면 실제로 종료됩니다. 위의 확인보다 우선합니다.',
   // ErrorBoundary 대체 카드
   'errorBoundary.labelFailed': '{label} 실패',
   'errorBoundary.somethingWrong': '문제가 발생했습니다',
   'errorBoundary.retry': '다시 시도',
   // 사이드바 — 오케스트레이션 패널
-  'orchestrationPanel.expand': '오케스트레이션 펼치기',
-  'orchestrationPanel.collapse': '오케스트레이션 접기',
-  'orchestrationPanel.reviewer': '검토자',
-  'orchestrationPanel.dismiss': '닫기',
-  'orchestrationPanel.waiting': '대기 중',
-  'orchestrationPanel.status.running': '실행 중',
-  'orchestrationPanel.status.complete': '완료',
-  'orchestrationPanel.status.failed': '실패',
-  'orchestrationPanel.status.queued': '대기열',
   // 단축키 요약표
   'cheatSheet.selectWorkspace': '작업 공간 1–9 선택',
   'cheatSheet.selectTab': '탭 1–9 선택',

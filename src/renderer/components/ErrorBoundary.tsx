@@ -8,9 +8,9 @@ import { translate, isLanguage } from '../i18n';
  * React unmounts the entire tree when a render throws and nothing catches it.
  * In an Electron app that means a blank window painted in the background
  * colour — indistinguishable from a hang, and only a restart clears it. wmux
- * renders data it does not own (orchestration state.json written by the
- * plugin, session snapshots, agent metadata), so a malformed payload must
- * degrade to a broken panel, never a dead app.
+ * renders data it does not own (session snapshots, agent metadata, host
+ * reports), so a malformed payload must degrade to a broken panel, never a
+ * dead app.
  *
  * Wrap the root as a last-resort net, and wrap individual data-driven panels
  * so the rest of the UI keeps working when one of them fails.
@@ -18,7 +18,7 @@ import { translate, isLanguage } from '../i18n';
 
 interface Props {
   children: React.ReactNode;
-  /** Shown in the fallback and in the console, e.g. "orchestration panel". */
+  /** Shown in the fallback and in the console, e.g. "agent-roster". */
   label?: string;
   /** Render nothing instead of the fallback card (for non-essential panels). */
   silent?: boolean;

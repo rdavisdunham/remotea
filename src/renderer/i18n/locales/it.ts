@@ -428,20 +428,14 @@ export const it: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Shell predefinita',
   'settings.workspacePanel.shell.systemDefault': 'Predefinita di sistema',
+  'settings.workspacePanel.closeToTray': 'Chiudi nell\'area di notifica',
+  'settings.workspacePanel.closeToTrayHint':
+    'Il pulsante × della finestra o Alt+F4 nasconde l\'ultima finestra di remotea nell\'area di notifica invece di uscire, così le sessioni del terminale e gli agenti continuano a funzionare. Fai clic sull\'icona per riaprirla; «Esci da remotea» nel suo menu esce davvero. Ha la precedenza sulla conferma qui sopra.',
   // Scheda di fallback ErrorBoundary
   'errorBoundary.labelFailed': '{label} non riuscito',
   'errorBoundary.somethingWrong': 'Qualcosa è andato storto',
   'errorBoundary.retry': 'riprova',
   // Barra laterale — pannello di orchestrazione
-  'orchestrationPanel.expand': 'Espandi orchestrazione',
-  'orchestrationPanel.collapse': 'Comprimi orchestrazione',
-  'orchestrationPanel.reviewer': 'revisore',
-  'orchestrationPanel.dismiss': 'ignora',
-  'orchestrationPanel.waiting': 'in attesa',
-  'orchestrationPanel.status.running': 'in corso',
-  'orchestrationPanel.status.complete': 'completato',
-  'orchestrationPanel.status.failed': 'fallito',
-  'orchestrationPanel.status.queued': 'in coda',
   // Foglio scorciatoie da tastiera
   'cheatSheet.selectWorkspace': 'Seleziona area di lavoro 1–9',
   'cheatSheet.selectTab': 'Seleziona scheda 1–9',

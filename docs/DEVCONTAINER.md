@@ -151,19 +151,18 @@ docker run --add-host=host.docker.internal:host-gateway \
   …
 ```
 
-### 5. Get the CLI and the plugin into the container
+### 5. Get the CLI into the container
 
-Outside a container wmux installs both for you. Inside one it cannot: wmux is
-not running there, so `ensureOrchestratorPlugin()` never executes. This is the
-one step the native case gets for free.
+Outside a container the app puts the CLI on the path for you. Inside one it
+cannot, because the app is not running there. This is the one step the native
+case gets for free.
 
-Mount them read-only from the wmux install directory (`resources/` next to
+Mount it read-only from the wmux install directory (`resources/` next to
 `wmux.exe`, or the repo checkout):
 
 ```jsonc
 "mounts": [
-  "source=${localEnv:WMUX_RESOURCES}/cli,target=/opt/wmux/cli,type=bind,readonly",
-  "source=${localEnv:WMUX_RESOURCES}/wmux-orchestrator,target=/home/vscode/.claude/plugins/wmux-orchestrator,type=bind,readonly"
+  "source=${localEnv:WMUX_RESOURCES}/cli,target=/opt/wmux/cli,type=bind,readonly"
 ],
 "containerEnv": {
   "WMUX_CLI": "/opt/wmux/cli/wmux.js"
@@ -200,7 +199,6 @@ Everything routes through the same transport, with no per-tool configuration:
 | `wmux <any command>` | the CLI's `--remote` / `WMUX_REMOTE` support (issue #78) |
 | `wmux-hook.js` (Claude Code hooks) | its own TCP branch on `WMUX_REMOTE` — this is what unsticks the sidebar |
 | `wmux-bash-integration.sh` | `wmux raw-v1 <line>`, instead of the WSL temp-file drop it cannot write to |
-| wmux-orchestrator | the `wmux` shim above; the plugin itself is unaware of any of this |
 
 With `WMUX_REMOTE` unset, every one of these falls back to the local named
 pipe exactly as before. The transport is additive.

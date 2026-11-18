@@ -428,20 +428,14 @@ export const sv: Translation = {
   'settings.workspacePanel.shellSection': 'Skal',
   'settings.workspacePanel.defaultShell': 'Standardskal',
   'settings.workspacePanel.shell.systemDefault': 'Systemets standard',
+  'settings.workspacePanel.closeToTray': 'Stäng till systemfältet',
+  'settings.workspacePanel.closeToTrayHint':
+    'Fönstrets ×-knapp eller Alt+F4 döljer det sista remotea-fönstret i systemfältet i stället för att avsluta, så terminalsessioner och agenter fortsätter att köra. Klicka på ikonen för att få tillbaka det; "Avsluta remotea" i dess meny avslutar på riktigt. Går före bekräftelsen ovan.',
   // Reservkort för ErrorBoundary
   'errorBoundary.labelFailed': '{label} misslyckades',
   'errorBoundary.somethingWrong': 'Något gick fel',
   'errorBoundary.retry': 'försök igen',
   // Sidopanel — orkestreringspanel
-  'orchestrationPanel.expand': 'Expandera orkestrering',
-  'orchestrationPanel.collapse': 'Fäll ihop orkestrering',
-  'orchestrationPanel.reviewer': 'granskare',
-  'orchestrationPanel.dismiss': 'avfärda',
-  'orchestrationPanel.waiting': 'väntar',
-  'orchestrationPanel.status.running': 'körs',
-  'orchestrationPanel.status.complete': 'klar',
-  'orchestrationPanel.status.failed': 'misslyckades',
-  'orchestrationPanel.status.queued': 'i kö',
   // Kortkommandoöversikt
   'cheatSheet.selectWorkspace': 'Välj arbetsyta 1–9',
   'cheatSheet.selectTab': 'Välj flik 1–9',

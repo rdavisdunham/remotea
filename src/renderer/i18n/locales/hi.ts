@@ -439,20 +439,14 @@ export const hi: Translation = {
   'settings.workspacePanel.shellSection': 'शेल',
   'settings.workspacePanel.defaultShell': 'डिफ़ॉल्ट शेल',
   'settings.workspacePanel.shell.systemDefault': 'सिस्टम डिफ़ॉल्ट',
+  'settings.workspacePanel.closeToTray': 'ट्रे में बंद करें',
+  'settings.workspacePanel.closeToTrayHint':
+    'विंडो का × बटन या Alt+F4 remotea से बाहर निकलने के बजाय आख़िरी remotea विंडो को सिस्टम ट्रे में छिपा देता है, ताकि टर्मिनल सत्र और एजेंट चलते रहें। उसे वापस लाने के लिए ट्रे आइकन पर क्लिक करें; उसके मेनू में "remotea से बाहर निकलें" सचमुच बंद करता है। ऊपर की पुष्टि से पहले लागू होता है।',
   // ErrorBoundary फ़ॉलबैक कार्ड
   'errorBoundary.labelFailed': '{label} विफल रहा',
   'errorBoundary.somethingWrong': 'कुछ गलत हो गया',
   'errorBoundary.retry': 'पुनः प्रयास करें',
   // साइडबार — ऑर्केस्ट्रेशन पैनल
-  'orchestrationPanel.expand': 'ऑर्केस्ट्रेशन विस्तृत करें',
-  'orchestrationPanel.collapse': 'ऑर्केस्ट्रेशन छोटा करें',
-  'orchestrationPanel.reviewer': 'समीक्षक',
-  'orchestrationPanel.dismiss': 'खारिज करें',
-  'orchestrationPanel.waiting': 'प्रतीक्षा',
-  'orchestrationPanel.status.running': 'चालू',
-  'orchestrationPanel.status.complete': 'पूर्ण',
-  'orchestrationPanel.status.failed': 'विफल',
-  'orchestrationPanel.status.queued': 'कतारबद्ध',
   // कीबोर्ड शॉर्टकट चीट-शीट
   'cheatSheet.selectWorkspace': 'वर्कस्पेस 1–9 चुनें',
   'cheatSheet.selectTab': 'टैब 1–9 चुनें',

@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createRequire } from 'node:module';
 import {
   ensurePiContext,
   ensurePiExtension,
@@ -15,10 +14,6 @@ import {
 } from '../../src/main/pi-context';
 import { CLI_BIN_PLACEHOLDER } from '../../src/main/agent-instructions';
 
-const require_ = createRequire(import.meta.url);
-const { AGENTS } = require_('../../resources/wmux-orchestrator/scripts/launch-agent.js') as {
-  AGENTS: Record<string, { bin: string; args: (p: string) => string[] }>;
-};
 
 /**
  * Issue #231: #165 was filed as "omp/pi" and closed once omp worked, which left
@@ -259,22 +254,5 @@ describe('#231 pi extension install', () => {
 
   it('tolerates being asked to remove what was never installed', () => {
     expect(() => removePiExtension()).not.toThrow();
-  });
-});
-
-describe('#231 orchestrator can launch pi workers', () => {
-  it('knows pi alongside claude, opencode and omp', () => {
-    expect(Object.keys(AGENTS)).toEqual(
-      expect.arrayContaining(['claude', 'opencode', 'omp', 'pi']),
-    );
-    expect(AGENTS.pi.bin).toBe('pi');
-  });
-
-  it('keeps the prompt out of the flag parser', () => {
-    for (const agent of Object.values(AGENTS)) {
-      const args = agent.args('--not-a-flag');
-      expect(args[args.length - 2]).toBe('--');
-      expect(args[args.length - 1]).toBe('--not-a-flag');
-    }
   });
 });

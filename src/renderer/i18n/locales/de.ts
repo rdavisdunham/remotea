@@ -428,20 +428,14 @@ export const de: Translation = {
   'settings.workspacePanel.shellSection': 'Shell',
   'settings.workspacePanel.defaultShell': 'Standard-Shell',
   'settings.workspacePanel.shell.systemDefault': 'Systemstandard',
+  'settings.workspacePanel.closeToTray': 'In den Infobereich schließen',
+  'settings.workspacePanel.closeToTrayHint':
+    'Die ×-Schaltfläche des Fensters oder Alt+F4 blendet das letzte remotea-Fenster in den Infobereich aus, statt remotea zu beenden – Terminalsitzungen und Agents laufen weiter. Ein Klick auf das Symbol holt es zurück; „remotea beenden“ in seinem Menü beendet wirklich. Hat Vorrang vor der Bestätigung oben.',
   // ErrorBoundary-Fallback-Karte
   'errorBoundary.labelFailed': '{label} fehlgeschlagen',
   'errorBoundary.somethingWrong': 'Etwas ist schiefgelaufen',
   'errorBoundary.retry': 'erneut versuchen',
   // Seitenleiste — Orchestrierungs-Panel
-  'orchestrationPanel.expand': 'Orchestrierung erweitern',
-  'orchestrationPanel.collapse': 'Orchestrierung einklappen',
-  'orchestrationPanel.reviewer': 'Reviewer',
-  'orchestrationPanel.dismiss': 'verwerfen',
-  'orchestrationPanel.waiting': 'wartet',
-  'orchestrationPanel.status.running': 'läuft',
-  'orchestrationPanel.status.complete': 'abgeschlossen',
-  'orchestrationPanel.status.failed': 'fehlgeschlagen',
-  'orchestrationPanel.status.queued': 'in Warteschlange',
   // Tastenkürzel-Übersicht
   'cheatSheet.selectWorkspace': 'Arbeitsbereich 1–9 auswählen',
   'cheatSheet.selectTab': 'Tab 1–9 auswählen',

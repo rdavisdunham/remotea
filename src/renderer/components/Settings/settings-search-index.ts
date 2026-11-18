@@ -566,6 +566,14 @@ export const SETTINGS_SEARCH_TERMS = {
       "label": "Ask before closing this window with × or Alt+F4. Local terminals in the window end, including agents. Host terminals detach; closing the window does not request that they stop. Updates, restarts and Windows shutdown never prompt; local processes still end."
     },
     {
+      "key": "settings.workspacePanel.closeToTray",
+      "label": "Close to tray"
+    },
+    {
+      "key": "settings.workspacePanel.closeToTrayHint",
+      "label": "The window's × button or Alt+F4 hides the last remotea window to the system tray instead of quitting, so terminal sessions and agents keep running. Click the tray icon to bring it back; Quit remotea in its menu quits for real. Takes priority over the confirmation above."
+    },
+    {
       "key": "settings.workspacePanel.sessionSnapshot",
       "label": "Save layout snapshots every"
     },
@@ -2161,7 +2169,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "help.task.customize.body",
-      "label": "Settings search finds controls and their scope. User TOML configuration can override UI preferences after reload; custom locale files fall back to English. F1 shows live shortcuts; Settings → Shortcuts and the command palette reflect rebinding. TRACE, agent navigator/office, prompt outline, browser engines and snapshots remain available. Legacy local orchestration is wmux-orchestrator compatibility, separate from OpenCode integration and Eridani. Report desktop/host versions and redacted diagnostics; never include tokens. Windows desktop and Linux/WSL host are current support boundaries."
+      "label": "Settings search finds controls and their scope. User TOML configuration can override UI preferences after reload; custom locale files fall back to English. F1 shows live shortcuts; Settings → Shortcuts and the command palette reflect rebinding. TRACE, agent navigator/office, prompt outline, browser engines and snapshots remain available. Report desktop/host versions and redacted diagnostics; never include tokens. Windows desktop and Linux/WSL host are current support boundaries."
     }
   ],
   "Agents": [
@@ -2312,6 +2320,7 @@ export const PREFERENCE_FIELDS = {
     "explorerOpenByDefault",
     "confirmWorkspaceClose",
     "confirmAppClose",
+    "closeToTray",
     "detectAgentScreens",
     "defaultLayoutId",
     "restoreClaudeSessions",

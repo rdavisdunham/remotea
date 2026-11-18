@@ -606,15 +606,6 @@ export const zhTW: Translation = {
   'errorBoundary.somethingWrong': '發生錯誤',
   'errorBoundary.retry': '重試',
   // 側邊欄 — 編排面板
-  'orchestrationPanel.expand': '展開編排面板',
-  'orchestrationPanel.collapse': '收合編排面板',
-  'orchestrationPanel.reviewer': '審查者',
-  'orchestrationPanel.dismiss': '關閉',
-  'orchestrationPanel.waiting': '等待中',
-  'orchestrationPanel.status.running': '執行中',
-  'orchestrationPanel.status.complete': '已完成',
-  'orchestrationPanel.status.failed': '失敗',
-  'orchestrationPanel.status.queued': '排隊中',
   // 快速鍵速查表
   'cheatSheet.selectWorkspace': '選擇工作區 1–9',
   'cheatSheet.selectTab': '選擇分頁 1–9',
@@ -773,6 +764,9 @@ export const zhTW: Translation = {
   'agentNavigator.fromScreen': '從畫面判讀',
   'settings.workspacePanel.detectAgentScreens': '判讀 agent 畫面以推斷狀態',
   'settings.workspacePanel.detectAgentScreensHint': '對於不會自行回報狀態的 agent（Codex、Gemini、Aider…），用內建規則比對它們畫面上的介面，分辨是在等你還是在工作。完全在這台電腦上執行，也絕不覆蓋 agent 自己宣告的狀態——只會把宣告為閒置、畫面上仍有提問的窗格標為提問；宣告為工作中或在等你的 agent 所在窗格完全不讀取。規則可在 %APPDATA%\\remotea\\agent-detection 覆寫，用 `wmux detect explain` 查看觸發了哪一條規則。',
+  'settings.workspacePanel.closeToTray': '關閉時縮小到系統匣',
+  'settings.workspacePanel.closeToTrayHint':
+    '視窗的 × 按鈕或 Alt+F4 不再結束 remotea，而是把最後一個 remotea 視窗隱藏到系統匣，終端機工作階段和 agent 會繼續執行。按一下系統匣圖示即可還原；選單中的「結束 remotea」才會真正結束。優先於上面的確認設定。',
   'agentNavigator.silentProbed': '已偵測——未回報狀態',
   'agentNavigator.hint': '↑↓ 移動 · Enter 前往 · a/b/q/w/i/u 篩選 · Esc 關閉',
   'agentNavigator.workspacesWithAgents': '個工作區',

@@ -117,7 +117,7 @@ Main-owned `agentIntegration={decision,features,decidedAt?}`. New installs defau
 | Configure coding-agent integrations on this computer | `decision`, effective off until granted | Loading/busy disables; details disclose Claude Code, OpenCode, Kiro, omp, pi, Grok, Qwen and Antigravity as supported per feature | UI/AgentIntegration:104 |
 | Agent instructions | `features.instructions=true` | Marked instruction sections in Claude/OpenCode/omp/pi/Qwen docs; Kiro steering and Grok rules | UI/AgentIntegration:35–38 |
 | Status hooks | `features.hooks=true` | Claude, omp, pi, Grok, Antigravity and Qwen; path hints include the omp extension | UI/AgentIntegration:41–44; `agent-integration.ts:126–129,187` |
-| OpenCode status and task plugin | `features.orchestrator=true` | OpenCode plugin only, `~/.config/opencode/plugin/`; legacy Claude orchestrator removed regardless | UI/AgentIntegration:47–55 |
+| OpenCode status and task plugin | `features.orchestrator=true` | OpenCode plugin only, `~/.config/opencode/plugin/`. The key keeps its old name so a stored `false` stays off | UI/AgentIntegration:47–55 |
 | Connect agent MCP tools to the desktop browser | `features.browserMcp=true` | `~/.claude.json`, `~/.qwen/settings.json`; configures browser panel access | UI/AgentIntegration:58–61 |
 
 All four children remain visible but disabled/unchecked if master not granted; busy disables all. The corresponding component contains the full affected-file path hints. These are filesystem-changing operations presented as preferences and deserve clear ownership scope, not removal for a server-first workflow.
