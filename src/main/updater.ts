@@ -6,7 +6,6 @@ import { IPC_CHANNELS, type UpdateTriggerResult } from '../shared/types';
 import { fetchLatestRelease, compareVersions, releasePageUrl } from './update-checker';
 import {
   isPortableZipInstall,
-  isScoopManagedInstall,
   resolvePortableZipTarget,
   runPortableZipUpdate,
   applyStagedPortableUpdate,
@@ -26,12 +25,11 @@ import {
 //   2. No silent install — autoDownload/autoInstallOnAppQuit are off; the user
 //      must explicitly confirm the install via a dialog.
 //
-// Authenticode signing is wired in CI (issue #71): release.yml signs wmux.exe
-// via SignPath when the SIGNPATH_* secrets are configured. The publisherName
-// pin was REMOVED from electron-builder.json: SignPath fell back to a
-// self-signed cert, and a pin combined with non-chain-trusted artifacts made
-// every client reject every update (which is why latest.yml was withheld for
-// 0.26–0.31, stranding all installs). Without the pin, NsisUpdater skips
+// remotea releases are not Authenticode-signed (wmux's SignPath step was
+// removed). There is no publisherName pin in electron-builder.json: under
+// wmux, a pin combined with non-chain-trusted artifacts made every client
+// reject every update (which is why wmux withheld latest.yml for 0.26–0.31,
+// stranding all installs). Without the pin, NsisUpdater skips
 // Authenticode verification; download integrity comes from the latest.yml
 // sha512, and the quarantine window + explicit install dialog below are the
 // primary client-side controls. Re-add the pin only together with reliable
@@ -81,28 +79,6 @@ function currentInstallIsPortable(): boolean {
   const exe = app.getPath('exe');
   if (!exe) return false;
   return isPortableZipInstall(path.dirname(exe));
-}
-
-function currentInstallIsScoop(): boolean {
-  if (!app.isPackaged) return false;
-  const exe = app.getPath('exe');
-  return !!exe && isScoopManagedInstall(path.dirname(exe));
-}
-
-/**
- * A Scoop install updates through Scoop (#321): the in-place zip path would
- * overwrite `apps/wmux/<version>/` behind Scoop's back. The click still gets an
- * answer, not a release page offering a zip the user should not unpack there.
- */
-function tellScoopUser(): UpdateTriggerResult {
-  dialog.showMessageBox({
-    type: 'info',
-    title: 'remotea update',
-    message: 'This copy of remotea is managed by Scoop.',
-    detail: 'Update it with:\n\n    scoop update remotea\n\nthen restart wmux.',
-    buttons: ['OK'],
-  }).catch(() => { /* the answer is informational; a dismissed dialog loses nothing */ });
-  return { handled: true };
 }
 
 // ── In-app install, driven by the badge (issue #125) ─────────────────────────
@@ -246,7 +222,6 @@ export function canSelfUpdate(): boolean {
  */
 export async function requestUpdateNow(): Promise<UpdateTriggerResult> {
   if (!canSelfUpdate()) return { handled: false, reason: 'not_supported' };
-  if (currentInstallIsScoop()) return tellScoopUser();
 
   // Already downloaded — this click is the install confirmation. That holds
   // only once the dialog is no longer asking: a finished download sets `ready`
