@@ -882,6 +882,7 @@ export const IPC_CHANNELS = {
   // CDP (browser.* pipe methods map to these internal IPC channels)
   CDP_ATTACH: 'cdp:attach',
   CDP_DETACH: 'cdp:detach',
+  BROWSER_FOCUS_DEVTOOLS: 'browser:focus-devtools',
   CDP_NAVIGATE: 'cdp:navigate',
   CDP_SNAPSHOT: 'cdp:snapshot',
   CDP_CLICK: 'cdp:click',
@@ -921,6 +922,12 @@ export const IPC_CHANNELS = {
    * guest hosted by the window that asks.
    */
   BROWSER_GET_HISTORY: 'browser:get-history',
+  /**
+   * A shortcut-shaped key pressed inside a browser pane's page (main → the
+   * window hosting that guest). The page keeps the key; the desktop decides
+   * whether one of its tab-level actions answers it. See webview-guest-keys.ts.
+   */
+  BROWSER_GUEST_KEY: 'browser:guest-key',
   // Active workspace query (renderer → main)
   GET_ACTIVE_WORKSPACE: 'get-active-workspace',
   // Hook events (Claude Code hooks → main → renderer)

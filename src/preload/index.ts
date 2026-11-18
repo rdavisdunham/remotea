@@ -7,6 +7,7 @@ import { IPC_CHANNELS, type InsertionResult, type NotificationSoundPickResult, t
 } from '../shared/types';
 import type { BrowserHistory } from '../shared/browser-history';
 import type { HostDTO, HostSaveRequest, HostStatus, HostTestRequest, HostTestResult, PtyExitInfo, RegistryPayload, RemoteSize, RemoteRegistryView, TerminalSnapshot } from '../shared/remote-hosts-types';
+import type { GuestKey } from '../shared/guest-key';
 import type {
   RemoteConsoleBridge,
   RemoteConsoleStatus,
@@ -221,6 +222,14 @@ contextBridge.exposeInMainWorld('wmux', {
     /** The webview's back/forward stack, to persist it (#315). Null for a guest this window does not host. */
     getHistory: (webContentsId: number): Promise<BrowserHistory | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.BROWSER_GET_HISTORY, webContentsId),
+    focusDevTools: (webContentsId: number): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BROWSER_FOCUS_DEVTOOLS, webContentsId),
+    /** Shortcut-shaped keys pressed inside a browser pane's page. See webview-guest-keys.ts. */
+    onGuestKey: (cb: (webContentsId: number, key: GuestKey) => void) => {
+      const handler = (_event: unknown, webContentsId: number, key: GuestKey) => cb(webContentsId, key);
+      ipcRenderer.on(IPC_CHANNELS.BROWSER_GUEST_KEY, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BROWSER_GUEST_KEY, handler);
+    },
   },
   agent: {
     list: (workspaceId?: string) => ipcRenderer.invoke(IPC_CHANNELS.AGENT_LIST, workspaceId),
