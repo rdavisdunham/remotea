@@ -408,7 +408,7 @@ export function buildApplyUpdateCmd(): string {
     // wmux has already quit by the time this runs, so bailing out here is the
     // one outcome the user cannot recover from without finding wmux.exe by hand.
     ':relaunch',
-    'echo   Starting wmux...',
+    'echo   Starting remotea...',
     'start "" "%EXE%"',
     // 2>nul because a missing %SRC% is now a path that reaches this line:
     // /q suppresses the confirmation prompt and nothing else, so rmdir on

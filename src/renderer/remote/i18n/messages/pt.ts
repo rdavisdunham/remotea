@@ -12,7 +12,7 @@ export const pt: Readonly<Record<string, string>> = {
   'loading': 'Conectando…',
 
   'pair.title': 'Parear este dispositivo',
-  'pair.body': 'Seu computador ofereceu parear este navegador com o console remoto do wmux. Só continue se você acabou de escanear este código.',
+  'pair.body': 'Seu computador ofereceu parear este navegador com o console remoto do remotea. Só continue se você acabou de escanear este código.',
   'pair.nameLabel': 'Nome do dispositivo',
   'pair.namePlaceholder': 'O nome definido no computador',
   'pair.confirm': 'Parear',
@@ -67,7 +67,7 @@ export const pt: Readonly<Record<string, string>> = {
   'attach.loading': 'Carregando tela…',
   'attach.exited': 'Processo encerrado ({code})',
   'attach.lag': 'Recuperando o atraso…',
-  'attach.errNoTerminal': 'Este terminal não está aberto em nenhuma janela do wmux.',
+  'attach.errNoTerminal': 'Este terminal não está aberto em nenhuma janela do remotea.',
   'attach.errTimeout': 'O computador não respondeu a tempo.',
   'attach.errGone': 'Este terminal foi fechado.',
   'attach.closedTerminal': 'Terminal fechado',

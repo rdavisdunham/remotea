@@ -168,7 +168,7 @@ function handleExport(params: any, respond: (result: any) => void, respondError:
     }
     return null;
   })().then((desc) => {
-    if (!desc) { respondError(-32602, 'no workspace to save: run this from a wmux pane, or pass --workspace'); return; }
+    if (!desc) { respondError(-32602, 'no workspace to save: run this from a remotea pane, or pass --workspace'); return; }
     respond(manifestFromWorkspace(desc, to, typeof params?.name === 'string' ? params.name : undefined));
   }, (err: unknown) => respondError(-32603, err instanceof Error ? err.message : String(err)));
 }
@@ -178,7 +178,7 @@ export async function pickAndOpenManifest(parent: BrowserWindow | null, host: Ma
   const options: Electron.OpenDialogOptions = {
     title: 'Open workspace file',
     properties: ['openFile'],
-    filters: [{ name: 'wmux workspace', extensions: ['json'] }],
+    filters: [{ name: 'remotea workspace', extensions: ['json'] }],
   };
   const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options);
   if (picked.canceled || !picked.filePaths[0]) return;

@@ -67,7 +67,7 @@ export const sv: Readonly<Record<string, string>> = {
   'attach.loading': 'Läser in skärmen…',
   'attach.exited': 'Processen avslutades ({code})',
   'attach.lag': 'Hämtar ikapp…',
-  'attach.errNoTerminal': 'Den här terminalen är inte öppen i något wmux-fönster.',
+  'attach.errNoTerminal': 'Den här terminalen är inte öppen i något remotea-fönster.',
   'attach.errTimeout': 'Datorn svarade inte i tid.',
   'attach.errGone': 'Den här terminalen har stängts.',
   'attach.closedTerminal': 'Stängd terminal',

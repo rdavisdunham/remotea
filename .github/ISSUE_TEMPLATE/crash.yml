@@ -46,7 +46,7 @@ body:
     attributes:
       label: What were you doing when it died?
       description: |
-        Anything about the moment helps: how long wmux had been up, how many
+        Anything about the moment helps: how long remotea had been up, how many
         panes were open, whether the machine was shutting down or logging off,
         whether a shell had just exited.
     validations:
