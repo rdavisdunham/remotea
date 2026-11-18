@@ -638,7 +638,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
           }
         : {
             ...options,
-            cwd: options.cwd || process.env.USERPROFILE || 'C:\\',
+            cwd: options.cwd || process.env.USERPROFILE || os.homedir(),
             // A renderer's env is a surface's (#284): valid keys only, never a
             // WMUX_* identity key, `${env:NAME}` resolved here and only here.
             env: resolveSurfaceEnv(options?.env, process.env),

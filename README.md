@@ -178,7 +178,7 @@ Each app sends the server a stream of what happened: connection state, how each 
 
 A `v*` tag runs `.github/workflows/release.yml`: tests, then the NSIS installer and the portable zip, built with electron-builder on Windows.
 
-The Windows smoke workflow (`.github/workflows/smoke.yml`) runs on that tag too, and on every pull request that touches `src/`, `resources/`, `build/`, `package.json`, the lockfile, the electron-builder, Vite or tsconfig configuration, or the workflow itself. It builds the app the same way and then runs the packaged binary's own self-test twice: once from `release/win-unpacked/`, and once after a silent per-user install of the installer into a temp folder, which is uninstalled afterwards. The self-test is `remotea.exe --smoke [--smoke-out=<file>] [--smoke-timeout=<ms>]` (`src/main/smoke.ts`). It runs these checks, then writes a JSON result and exits 0 or 1 within 90 seconds:
+The packaged smoke workflow (`.github/workflows/smoke.yml`) runs on that tag too, and on every pull request that touches `src/`, `resources/`, `build/`, `package.json`, the lockfile, the electron-builder, Vite or tsconfig configuration, or the workflow itself. It builds the app the same way and then runs the packaged binary's own self-test twice: once from `release/win-unpacked/`, and once after a silent per-user install of the installer into a temp folder, which is uninstalled afterwards. The self-test is `remotea.exe --smoke [--smoke-out=<file>] [--smoke-timeout=<ms>]` (`src/main/smoke.ts`). It runs these checks, then writes a JSON result and exits 0 or 1 within 90 seconds:
 
 - opens the main window
 - checks that the sandboxed preload bridge loaded
@@ -191,6 +191,8 @@ A `--smoke` run uses its own instance (`%APPDATA%\remotea-smoke…`) and skips a
 ```powershell
 pwsh scripts/smoke-windows.ps1 -Exe release\win-unpacked\remotea.exe -Out smoke\result.json
 ```
+
+The same workflow's `smoke-macos` job builds an ad-hoc signed Apple silicon app (`npx electron-builder --mac dir`) on a `macos-15` runner and runs the same self-test on its binary with `scripts/smoke-mac.sh`. The result, the app's logs and any crash reports are uploaded as the `macos-smoke` artifact. This checks only that the app starts and a terminal answers on a Mac; there is no installable Mac build yet.
 
 The window's privileges (sandbox, CSP, permissions, `openExternal`) are audited in [docs/remotea/desktop-security.md](docs/remotea/desktop-security.md).
 

@@ -194,4 +194,21 @@ describe('smoke wiring', () => {
     expect(wf).toMatch(/remotea-\$ver-setup\.exe/);
     expect(wf).toContain("tags: ['v*']");
   });
+
+  // The Mac launch check: an unsigned (ad-hoc) arm64 build, its binary run
+  // directly so the exit code comes back, with the result and crash reports
+  // uploaded even when it fails.
+  it('is run on macOS against the packaged app binary', () => {
+    const wf = fs.readFileSync(path.join(repo, '.github/workflows/smoke.yml'), 'utf8');
+    expect(wf).toContain('smoke-macos:');
+    const mac = wf.slice(wf.indexOf('smoke-macos:'));
+    expect(mac).toContain('runs-on: macos-15');
+    expect(mac).toContain('npx electron-builder --mac dir --publish never');
+    expect(mac).toContain('scripts/smoke-mac.sh release/mac-arm64/remotea.app/Contents/MacOS/remotea');
+    expect(mac).toContain('DiagnosticReports');
+    expect(wf).toContain("- 'scripts/smoke-mac.sh'");
+    const script = fs.readFileSync(path.join(repo, 'scripts/smoke-mac.sh'), 'utf8');
+    expect(script).toContain('--smoke-out=');
+    expect(script).not.toMatch(/^\s*open\s/m);
+  });
 });
