@@ -16,13 +16,6 @@ jobs:
   build-sign-release:
     runs-on: windows-latest
 
-    # SignPath Authenticode signing (issue #71). The signing steps run only when
-    # both secrets are configured, so releases keep working while SignPath OSS
-    # approval is pending — and turn on automatically once the secrets land.
-    env:
-      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-      SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -133,93 +126,6 @@ jobs:
       # which is already baked into the installer by the time a separate step
       # could run, so it had no effect on the shipped artifact.
 
-      # ── Sign exe with SignPath (runs only when secrets are set, #71) ──
-      # continue-on-error: a rejected submission (e.g. SignPath OSS yearly
-      # quota exceeded) must not block the release — we ship unsigned, as
-      # before, and signing resumes automatically once quota is available.
-      # The verify step below stays fatal: if a SIGNED artifact comes back
-      # invalid, the release fails rather than shipping it.
-      - name: Submit exe to SignPath for Authenticode signing
-        id: sign-submit
-        if: env.SIGNPATH_API_TOKEN != '' && env.SIGNPATH_ORGANIZATION_ID != ''
-        continue-on-error: true
-        shell: bash
-        run: |
-          HTTP_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-            -X POST \
-            -H "Authorization: Bearer $SIGNPATH_API_TOKEN" \
-            -F "projectSlug=wmux" \
-            -F "signingPolicySlug=wmux" \
-            -F "artifactConfigurationSlug=initial" \
-            -F "description=CI release v${{ steps.version.outputs.version }}" \
-            -F "artifact=@release/${{ steps.version.outputs.installer }}" \
-            -D headers.txt \
-            "https://app.signpath.io/api/v1/$SIGNPATH_ORGANIZATION_ID/SigningRequests/SubmitWithArtifact")
-          HTTP_CODE=$(echo "$HTTP_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
-          echo "HTTP status: $HTTP_CODE"
-          if [ "$HTTP_CODE" != "201" ]; then
-            echo "::warning::SignPath submission failed (HTTP $HTTP_CODE) — releasing unsigned"
-            echo "$HTTP_RESPONSE"
-            exit 1
-          fi
-          LOCATION=$(grep -i "^location:" headers.txt | tr -d '\r')
-          SIGNING_REQUEST_ID=$(echo "$LOCATION" | grep -oE '[0-9a-f-]{36}$')
-          echo "Signing request ID: $SIGNING_REQUEST_ID"
-          echo "signing_request_id=$SIGNING_REQUEST_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for signing to complete
-        if: steps.sign-submit.outcome == 'success' && steps.sign-submit.outputs.signing_request_id != ''
-        shell: bash
-        run: |
-          REQ_ID="${{ steps.sign-submit.outputs.signing_request_id }}"
-          API="https://app.signpath.io/api/v1/$SIGNPATH_ORGANIZATION_ID/SigningRequests/$REQ_ID"
-          for i in $(seq 1 60); do
-            RESPONSE=$(curl -s -H "Authorization: Bearer $SIGNPATH_API_TOKEN" "$API")
-            STATUS=$(echo "$RESPONSE" | jq -r '.status')
-            echo "[$i/60] Status: $STATUS"
-            if [ "$STATUS" = "Completed" ]; then
-              echo "Signing completed successfully!"
-              exit 0
-            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Denied" ] || [ "$STATUS" = "Canceled" ]; then
-              echo "::error::Signing request $STATUS"
-              echo "$RESPONSE" | jq .
-              exit 1
-            fi
-            sleep 10
-          done
-          echo "::error::Signing timed out after 10 minutes"
-          exit 1
-
-      - name: Download signed exe and verify signature
-        id: sign-verify
-        if: steps.sign-submit.outcome == 'success' && steps.sign-submit.outputs.signing_request_id != ''
-        shell: bash
-        run: |
-          curl -s \
-            -H "Authorization: Bearer $SIGNPATH_API_TOKEN" \
-            -o "release/${{ steps.version.outputs.installer }}" \
-            "https://app.signpath.io/api/v1/$SIGNPATH_ORGANIZATION_ID/SigningRequests/${{ steps.sign-submit.outputs.signing_request_id }}/SignedArtifact"
-          echo "Signed installer downloaded, size: $(wc -c < release/${{ steps.version.outputs.installer }}) bytes"
-          # trusted=true only for a chain-valid Authenticode signature. A
-          # SignPath project can also sign with a SELF-SIGNED certificate
-          # (e.g. while the OSS "SignPath Foundation" cert is unavailable,
-          # issue #71): Get-AuthenticodeSignature then reports UnknownError
-          # (untrusted root). That artifact is fine to ship for manual
-          # download, but it must NOT be advertised to the auto-updater —
-          # electron-updater requires a Valid signature on the user's machine,
-          # so a self-signed installer downloads and then fails to install,
-          # which is exactly the endless-update loop of issue #96.
-          powershell -NoProfile -Command "
-            \$sig = Get-AuthenticodeSignature 'release/${{ steps.version.outputs.installer }}';
-            \$subject = if (\$sig.SignerCertificate) { \$sig.SignerCertificate.Subject } else { '(none)' };
-            Write-Host ('Status: ' + \$sig.Status + ' — Subject: ' + \$subject);
-            \$trusted = if (\$sig.Status -eq 'Valid') { 'true' } else { 'false' };
-            Add-Content -Path \$env:GITHUB_OUTPUT -Value ('trusted=' + \$trusted);
-            if (\$trusted -eq 'false') {
-              Write-Host '::warning::Installer signature is not chain-trusted (self-signed cert?). Shipping anyway — clients no longer pin publisherName, so auto-update still works (integrity via latest.yml sha512).'
-            }
-          "
-
       # ── Portable zip ───────────────────────────────────────
       # Keep shipping the portable zip (remotea-X.Y.Z-win-x64.zip; zip-updater's
       # pickZipAsset looks for "win-x64") alongside the NSIS installer: unsigned
@@ -248,8 +154,8 @@ jobs:
       # will fail verification silently; the notify-only checker
       # (update-checker.ts) tells those users to update manually once.
       #
-      # MUST run last, AFTER signing: SignPath rewrites the installer PE, so a
-      # hash computed earlier would not match the shipped file. Points at the
+      # MUST run after anything that rewrites the installer (signing, if it is
+      # ever added back), or the hash would not match the shipped file. Points at the
       # NSIS installer (a zip can be downloaded but never installed — issue
       # #96). No blockmap is emitted, so electron-updater does a full
       # (non-differential) download verified by the top-level sha512.
@@ -301,33 +207,3 @@ jobs:
             latest.yml
           draft: false
           generate_release_notes: true
-
-      # ── Scoop bucket (#321) ────────────────────────────────
-      # The repo is its own Scoop bucket (bucket/wmux.json). A custom bucket has
-      # no Excavator bot, so the manifest is bumped here, from the zip that was
-      # just uploaded, and committed to master. Only for a real tag push: a
-      # manual re-run of an older tag must not move the bucket backwards.
-      # continue-on-error: the release is already published; a push race with
-      # another commit must not mark it failed — re-run this step, or run the
-      # script by hand.
-      # remotea (the fork) has neither bucket/ nor the script, and its branch is
-      # main, so this is skipped until a bucket is set up for it.
-      - name: Update Scoop manifest
-        if: ${{ github.event_name == 'push' && hashFiles('scripts/update-scoop-manifest.mjs') != '' }}
-        continue-on-error: true
-        shell: bash
-        run: |
-          VER='${{ steps.version.outputs.version }}'
-          ZIP="$PWD/${{ steps.version.outputs.zip }}"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch --no-tags origin master
-          git checkout -B master origin/master
-          node scripts/update-scoop-manifest.mjs "$VER" "$ZIP"
-          if git diff --quiet -- bucket/wmux.json; then
-            echo 'bucket/wmux.json already at this version'
-            exit 0
-          fi
-          git add bucket/wmux.json
-          git commit -m "chore(scoop): bucket manifest for $VER"
-          git push origin master

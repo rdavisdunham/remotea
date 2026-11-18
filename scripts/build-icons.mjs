@@ -136,32 +136,11 @@ async function main() {
   log(`  wrote icon.ico (${entries.length} sizes)`);
 
   // The Linux/Electron window icon, and the source for anything wanting a big
-  // raster (store listings, the site).
+  // raster (store listings).
   const master = await renderPng(win, art, 512);
   fs.writeFileSync(path.join(ICONS, 'icon.png'), master);
   fs.writeFileSync(path.join(ROOT, 'resources', 'icon.png'), master);
   log('  wrote icon.png (512px)');
-
-  // Site favicon — also the apple-touch-icon, which is why it is 256 and not 32.
-  const favicon = await renderPng(win, art, 256);
-  fs.writeFileSync(path.join(ROOT, 'site', 'assets', 'favicon.png'), favicon);
-  log('  wrote site/assets/favicon.png');
-
-  // The orchestrator page needs its own copy. netlify.toml rewrites
-  // plugin.wmux.org/* to /orchestrator/:splat, so a relative path there can
-  // never climb out to site/assets/ — `../assets/` just normalises back to
-  // /assets/ under that host and 404s, which is what it had been doing.
-  // A second *generated* file is fine; a second hand-maintained one would not be.
-  const orchAssets = path.join(ROOT, 'site', 'orchestrator', 'assets');
-  fs.mkdirSync(orchAssets, { recursive: true });
-  fs.writeFileSync(path.join(orchAssets, 'favicon.png'), favicon);
-  log('  wrote site/orchestrator/assets/favicon.png');
-
-  // The site's own header/hero logo. Generated here rather than hand-exported so
-  // it cannot drift from the app icon the way a manual copy would.
-  const siteLogo = await renderPng(win, art, 1024);
-  fs.writeFileSync(path.join(ROOT, 'site', 'assets', 'wmux_logo.png'), siteLogo);
-  log('  wrote site/assets/wmux_logo.png (1024px)');
 
   win.destroy();
   fs.writeFileSync(path.join(ROOT, 'build-icons.log'), logLines.join('\n') + '\n');

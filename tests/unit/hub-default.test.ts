@@ -5,9 +5,10 @@ import {
   UI_MODE_DEFAULT_REV,
 } from '../../src/renderer/store/settings-slice';
 
-// The agent office is on for everyone since 2.3.0. It shipped in 2.2.0 as an
-// off-by-default easter egg, so this is a second promotion through the same
-// block that TRACE went through in 1.5.0 — and the two must not interfere.
+// The agent office is off by default in remotea (HUB_DEFAULT_REV 2). wmux
+// turned it on for everyone in 2.3.0 (rev 1); remotea switches every profile
+// off once, including profiles that had it on, through the same promotion that
+// TRACE used in 1.5.0. The two promotions must not interfere.
 
 const APPEARANCE_KEY = 'wmux-appearance-prefs';
 
@@ -34,24 +35,26 @@ afterEach(() => {
 });
 
 describe('agent office default', () => {
-  it('ships on', () => {
-    expect(DEFAULT_APPEARANCE_PREFS.hubEnabled).toBe(true);
+  it('ships off', () => {
+    expect(DEFAULT_APPEARANCE_PREFS.hubEnabled).toBe(false);
+    expect(HUB_DEFAULT_REV).toBe(2);
   });
 
-  it('gives a fresh install the office', async () => {
+  it('gives a fresh install no office (AE4)', async () => {
     const { prefs } = await loadWith();
-    expect(prefs.hubEnabled).toBe(true);
+    expect(prefs.hubEnabled).toBe(false);
   });
 
   // The whole point of the rev: a plain default change reaches nobody, because
-  // setAppearancePrefs persists the entire block and the stored false wins.
-  it('promotes a 2.2.0 user whose blob predates the rev', async () => {
+  // setAppearancePrefs persists the entire block and the stored true wins.
+  it('switches off a rev-1 profile that had the office on, once', async () => {
     const { prefs, writes } = await loadWith({
       uiTheme: 'light',
-      hubEnabled: false,
+      hubEnabled: true,
+      hubDefaultRev: 1,
       uiModeDefaultRev: UI_MODE_DEFAULT_REV,
     });
-    expect(prefs.hubEnabled).toBe(true);
+    expect(prefs.hubEnabled).toBe(false);
     expect(prefs.hubDefaultRev).toBe(HUB_DEFAULT_REV);
     // Promotion must be recorded on disk immediately, or it repeats every launch.
     expect((writes[APPEARANCE_KEY] as { hubDefaultRev: number }).hubDefaultRev)
@@ -62,20 +65,22 @@ describe('agent office default', () => {
     const { prefs } = await loadWith({
       uiTheme: 'light',
       terminalBgOpacity: 40,
+      hubEnabled: true,
+      hubDefaultRev: 1,
       uiModeDefaultRev: UI_MODE_DEFAULT_REV,
     });
     expect(prefs.uiTheme).toBe('light');
     expect(prefs.terminalBgOpacity).toBe(40);
   });
 
-  // The promotion is one-time, so switching it back off has to stick.
-  it('leaves a post-promotion opt-out alone', async () => {
+  // The promotion is one-time, so switching it back on has to stick.
+  it('leaves a post-promotion opt-in alone', async () => {
     const { prefs, writes } = await loadWith({
-      hubEnabled: false,
+      hubEnabled: true,
       hubDefaultRev: HUB_DEFAULT_REV,
       uiModeDefaultRev: UI_MODE_DEFAULT_REV,
     });
-    expect(prefs.hubEnabled).toBe(false);
+    expect(prefs.hubEnabled).toBe(true);
     expect(writes[APPEARANCE_KEY]).toBeUndefined();
   });
 });
@@ -84,21 +89,22 @@ describe('promotion independence', () => {
   // The reason hubDefaultRev is its own counter instead of a bump of
   // UI_MODE_DEFAULT_REV. A shared rev would re-promote uiMode here and drag a
   // deliberate classic choice back to TRACE.
-  it('does not disturb a settled classic choice while enabling the office', async () => {
+  it('does not disturb a settled classic choice while turning the office off', async () => {
     const { prefs } = await loadWith({
       uiMode: 'classic',
       uiModeDefaultRev: UI_MODE_DEFAULT_REV,
-      hubEnabled: false,
+      hubEnabled: true,
+      hubDefaultRev: 1,
     });
     expect(prefs.uiMode).toBe('classic');
-    expect(prefs.hubEnabled).toBe(true);
+    expect(prefs.hubEnabled).toBe(false);
   });
 
   // The mirror case: a pre-1.5.0 blob is due BOTH promotions in one load.
   it('applies both promotions to a legacy blob and stamps both revs', async () => {
-    const { prefs, writes } = await loadWith({ uiTheme: 'dark', uiMode: 'classic', hubEnabled: false });
+    const { prefs, writes } = await loadWith({ uiTheme: 'dark', uiMode: 'classic', hubEnabled: true });
     expect(prefs.uiMode).toBe('trace');
-    expect(prefs.hubEnabled).toBe(true);
+    expect(prefs.hubEnabled).toBe(false);
     const written = writes[APPEARANCE_KEY] as Record<string, number>;
     expect(written.uiModeDefaultRev).toBe(UI_MODE_DEFAULT_REV);
     expect(written.hubDefaultRev).toBe(HUB_DEFAULT_REV);
@@ -110,7 +116,7 @@ describe('promotion independence', () => {
     const { writes } = await loadWith({
       uiMode: 'classic',
       uiModeDefaultRev: UI_MODE_DEFAULT_REV,
-      hubEnabled: false,
+      hubEnabled: true,
       hubDefaultRev: HUB_DEFAULT_REV,
     });
     expect(writes[APPEARANCE_KEY]).toBeUndefined();
