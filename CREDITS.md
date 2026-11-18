@@ -8,7 +8,7 @@ remotea is a combination of two ideas from two open-source projects. It would no
 **Project:** <https://github.com/amirlehmam/wmux> · <https://wmux.org>
 **License:** MIT
 
-remotea's Windows app **is** wmux: an Electron/React/xterm.js terminal multiplexer for AI agents with workspaces, splits, agent-state detection, notifications, session restore, and the rest of its organizational features. This repository started as a clone of wmux v2.45.0 (`29c1d52`). wmux's full commit history is preserved here, so every upstream contributor is credited for their work in `git log`.
+remotea's Windows app **is** wmux: an Electron/React/xterm.js terminal multiplexer for AI agents with workspaces, splits, agent-state detection, notifications, session restore, and the rest of its organizational features. This repository started as a clone of wmux v2.45.0 (`29c1d52`). wmux's full commit history is preserved here, so every upstream contributor is credited for their work in `git log`. remotea no longer merges from wmux. Each wmux fix it takes later is copied with `git cherry-pick -x`, keeping its author, and listed in the [upstream ledger](docs/remotea/upstream-ledger.md).
 
 remotea adds the following on top:
 
