@@ -3,9 +3,9 @@
  *
  *   npm run build:icons
  *
- * Why Electron and not sharp/resvg: this repo lives under a path with a space
- * ("OneDrive - Pulsa"), which breaks node-gyp — every native image dependency
- * is off the table (see the build gotcha in AGENTS.md). Electron is already a
+ * Why Electron and not sharp/resvg: wmux, where this script started, lived
+ * under a path with a space ("OneDrive - Pulsa"), which breaks node-gyp, so
+ * every native image dependency was off the table. Electron is already a
  * devDependency and rasterizes SVG exactly, so this costs zero new packages and
  * zero native builds.
  *
