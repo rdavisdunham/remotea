@@ -10,7 +10,7 @@
 import * as path from 'path';
 
 /**
- * Dir holding the `wmux`/`wmux.cmd` shims (each runs `node $WMUX_CLI`).
+ * Dir holding the `wmux`/`remotea.cmd` shims (each runs `node $REMOTEA_CLI`).
  *
  * Prepended to PATH in every spawned shell so bare `wmux` resolves in
  * NON-interactive shells too (Claude Code's Bash tool, orchestrator hook

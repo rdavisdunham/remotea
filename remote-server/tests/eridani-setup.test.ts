@@ -305,7 +305,7 @@ describe('remotea eridani setup', () => {
 
     const h = await runSetup(flags(w, ['--hooks']), w.deps({ out: sink().out }));
     expect(h.changed.join('\n')).toMatch(/hooks installed/);
-    expect(fs.readFileSync(settings, 'utf8')).toMatch(/wmux-hook/);
+    expect(fs.readFileSync(settings, 'utf8')).toMatch(/remotea-hook/);
     const again = await runSetup(flags(w, ['--hooks']), w.deps({ out: sink().out }));
     expect(again.changed).toEqual([]);
     expect(again.hooks.current).toBe(true);

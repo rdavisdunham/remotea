@@ -1,10 +1,10 @@
-// wmux-plugin-version: 2
+// remotea-plugin-version: 2
 // wmux plugin for the Antigravity CLI (agy) — tells wmux which conversation
 // each pane holds, so a restored tab can reopen it with `agy --conversation`.
-// Auto-installed by wmux to ~/.gemini/config/plugins/wmux/. Does nothing outside
+// Auto-installed by wmux to ~/.gemini/config/plugins/remotea/. Does nothing outside
 // a wmux pane.
 //
-// agy runs it as `node wmux-agy-hook.cjs <Event>` from this directory (a hook's
+// agy runs it as `node remotea-agy-hook.cjs <Event>` from this directory (a hook's
 // working directory is the folder holding its hooks.json). The command carries
 // no path and no quotes on purpose: agy 1.4 hands a quoted argument to node with
 // its quotes still on, so `node "C:\...\x.cjs"` cannot be found.
@@ -38,12 +38,12 @@ function finish() {
 }
 
 /**
- * Only a pane of THIS wmux: it always exports WMUX=1 and WMUX_PIPE beside the
+ * Only a pane of THIS wmux: it always exports REMOTEA=1 and REMOTEA_PIPE beside the
  * surface id. Another app also named wmux sets a surface id and neither of
  * those (#282), and agy started anywhere else has no surface id at all.
  */
 function inWmuxPane(e) {
-  return !!e.WMUX_SURFACE_ID && (e.WMUX === '1' || !!e.WMUX_PIPE);
+  return !!e.REMOTEA_SURFACE_ID && (e.REMOTEA === '1' || !!e.REMOTEA_PIPE);
 }
 
 /**
@@ -63,15 +63,15 @@ function conversationToReport(raw, fired) {
 /**
  * Where to send the report: wmux's named pipe, or — in a pane whose shell runs
  * elsewhere (a devcontainer, a remotea session in WSL) — the TCP endpoint in
- * WMUX_REMOTE, with its own token, the transport wmux-hook.js also speaks.
+ * REMOTEA_REMOTE, with its own token, the transport remotea-hook.js also speaks.
  */
 function endpoint(e) {
-  const m = /^\[?([^\]]+?)\]?:(\d{1,5})$/.exec((e.WMUX_REMOTE || '').trim());
-  if (m) return { connect: { host: m[1], port: Number(m[2]) }, token: e.WMUX_REMOTE_TOKEN || '' };
-  const instance = (e.WMUX_INSTANCE || '').trim();
+  const m = /^\[?([^\]]+?)\]?:(\d{1,5})$/.exec((e.REMOTEA_REMOTE || '').trim());
+  if (m) return { connect: { host: m[1], port: Number(m[2]) }, token: e.REMOTEA_REMOTE_TOKEN || '' };
+  const instance = (e.REMOTEA_INSTANCE || '').trim();
   return {
-    connect: { path: e.WMUX_PIPE || '\\\\.\\pipe\\wmux' + (instance ? '-' + instance : '') },
-    token: e.WMUX_PIPE_TOKEN || '',
+    connect: { path: e.REMOTEA_PIPE || '\\\\.\\pipe\\remotea' + (instance ? '-' + instance : '') },
+    token: e.REMOTEA_PIPE_TOKEN || '',
   };
 }
 
@@ -79,7 +79,7 @@ function report(conversationId) {
   const target = endpoint(env);
   const frame = JSON.stringify({
     method: 'pane.report_agent_session',
-    params: { surfaceId: env.WMUX_SURFACE_ID, sessionId: conversationId, provider: 'agy' },
+    params: { surfaceId: env.REMOTEA_SURFACE_ID, sessionId: conversationId, provider: 'agy' },
     id: 1,
     token: target.token,
   });

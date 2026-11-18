@@ -40,7 +40,7 @@ const RECHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function minReleaseAgeMs(): number {
-  const raw = process.env.WMUX_MIN_RELEASE_AGE_DAYS;
+  const raw = process.env.REMOTEA_MIN_RELEASE_AGE_DAYS;
   const days = raw !== undefined && raw !== '' ? Number(raw) : DEFAULT_MIN_RELEASE_AGE_DAYS;
   if (!Number.isFinite(days) || days < 0) return DEFAULT_MIN_RELEASE_AGE_DAYS * DAY_MS;
   return days * DAY_MS;
@@ -428,14 +428,14 @@ export function isMissingChannelFileError(err: unknown): boolean {
 }
 
 export function isUpdaterDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.WMUX_DISABLE_UPDATER === '1';
+  return env.REMOTEA_DISABLE_UPDATER === '1';
 }
 
 export function initAutoUpdater(): void {
   // Kill switch for air-gapped / corporate / sandboxed environments that
   // cannot (or should not) reach GitHub (issue #68).
   if (isUpdaterDisabled()) {
-    console.log('[updater] Disabled via WMUX_DISABLE_UPDATER=1');
+    console.log('[updater] Disabled via REMOTEA_DISABLE_UPDATER=1');
     return;
   }
 

@@ -69,11 +69,11 @@ describe.runIf(hasGit)('git-worktree integration with real git', { timeout: 60_0
 
   beforeAll(() => {
     savedLocalAppData = process.env.LOCALAPPDATA;
-    savedWmuxInstance = process.env.WMUX_INSTANCE;
+    savedWmuxInstance = process.env.REMOTEA_INSTANCE;
 
     tempBase = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-wt-git-'));
     process.env.LOCALAPPDATA = tempBase;
-    process.env.WMUX_INSTANCE = 'test-git';
+    process.env.REMOTEA_INSTANCE = 'test-git';
 
     mainRepo = path.join(tempBase, 'main-repo');
     fs.mkdirSync(mainRepo, { recursive: true });
@@ -99,8 +99,8 @@ describe.runIf(hasGit)('git-worktree integration with real git', { timeout: 60_0
   afterAll(async () => {
     if (savedLocalAppData !== undefined) process.env.LOCALAPPDATA = savedLocalAppData;
     else delete process.env.LOCALAPPDATA;
-    if (savedWmuxInstance !== undefined) process.env.WMUX_INSTANCE = savedWmuxInstance;
-    else delete process.env.WMUX_INSTANCE;
+    if (savedWmuxInstance !== undefined) process.env.REMOTEA_INSTANCE = savedWmuxInstance;
+    else delete process.env.REMOTEA_INSTANCE;
     if (tempBase && fs.existsSync(tempBase)) {
       try {
         await fs.promises.rm(tempBase, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });

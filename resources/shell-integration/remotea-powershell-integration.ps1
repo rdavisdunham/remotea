@@ -1,7 +1,7 @@
-# wmux PowerShell Integration
-# Injected automatically by wmux
+# remotea PowerShell Integration
+# Injected automatically by remotea
 
-$env:WMUX = "1"
+$env:REMOTEA = "1"
 
 # UTF-8 I/O so multi-byte input (Korean, Japanese, Chinese, emoji, accents)
 # survives the conpty round-trip cleanly.
@@ -12,29 +12,29 @@ try {
     $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'
 } catch {}
 
-# wmux CLI shortcut — Claude Code and users can just type: wmux browser open <url>
-function wmux { node "$env:WMUX_CLI" @args }
+# remotea CLI shortcut — Claude Code and users can just type: remotea browser open <url>
+function remotea { node "$env:REMOTEA_CLI" @args }
 
 # Named pipe client helper. State updates carry an "auth <token> " prefix —
-# wmux injects WMUX_PIPE_TOKEN into every shell it spawns, and the pipe server
+# remotea injects REMOTEA_PIPE_TOKEN into every shell it spawns, and the pipe server
 # rejects unauthenticated V1 commands (issue #72).
 #
-# The pipe NAME must track WMUX_INSTANCE exactly the way shared/instance.ts's
-# getPipePath() does. A side-by-side instance (`WMUX_INSTANCE=dev`) listens on
-# "wmux-dev", so a shell hardcoding "wmux" connects to a pipe that is not there
+# The pipe NAME must track REMOTEA_INSTANCE exactly the way shared/instance.ts's
+# getPipePath() does. A side-by-side instance (`REMOTEA_INSTANCE=dev`) listens on
+# "remotea-dev", so a shell hardcoding "remotea" connects to a pipe that is not there
 # and eats the full Connect() timeout before the catch below swallows it. The
 # prompt sends three of these per command (Report-Cwd, Report-ShellState,
 # ports_kick), so that mistake costs ~3s of dead time after EVERY command —
 # including `clear` — with nothing logged to explain it.
 $global:_wmux_pipe_name = $(
-    $inst = if ($env:WMUX_INSTANCE) { $env:WMUX_INSTANCE.Trim() } else { '' }
-    if ($inst) { "wmux-$inst" } else { 'wmux' }
+    $inst = if ($env:REMOTEA_INSTANCE) { $env:REMOTEA_INSTANCE.Trim() } else { '' }
+    if ($inst) { "remotea-$inst" } else { 'remotea' }
 )
 
 function Send-WmuxMessage {
     param([string]$Message)
     try {
-        if ($env:WMUX_PIPE_TOKEN) { $Message = "auth $($env:WMUX_PIPE_TOKEN) $Message" }
+        if ($env:REMOTEA_PIPE_TOKEN) { $Message = "auth $($env:REMOTEA_PIPE_TOKEN) $Message" }
         $pipe = New-Object System.IO.Pipes.NamedPipeClientStream(".", $global:_wmux_pipe_name, [System.IO.Pipes.PipeDirection]::InOut)
         $pipe.Connect(1000)
         $writer = New-Object System.IO.StreamWriter($pipe)
@@ -48,7 +48,7 @@ function Send-WmuxMessage {
 
 # Report CWD
 function Report-Cwd {
-    $surfaceId = $env:WMUX_SURFACE_ID
+    $surfaceId = $env:REMOTEA_SURFACE_ID
     if ($surfaceId) {
         Send-WmuxMessage "report_pwd $surfaceId $PWD"
     }
@@ -61,20 +61,20 @@ function Report-Cwd {
 # cannot carry that: the job is already running by the time the pane moves.
 #
 # Nor can the pipe, which is the obvious candidate and the one to rule out
-# explicitly. It runs one direction — shell to wmux — and the consumer here is
+# explicitly. It runs one direction — shell to remotea — and the consumer here is
 # another *shell* process, not wmux. The prompt already sends this exact value
 # over as report_pwd; routing the hand-off through the pipe would mean adding
 # currentCwd to the surface listing, a V2 method and a CLI verb to read it back,
-# then spawning node on every 45s tick, so that the shell can ask wmux for
+# then spawning node on every 45s tick, so that the shell can ask remotea for
 # something the shell itself just told it. This is a shell-to-shell hand-off, so
 # it stays between the shells.
 #
-# The directory is wmux's own scratch directory under the user's temp
+# The directory is remotea's own scratch directory under the user's temp
 # (remote-insert.ts uses it too), rather than a second scratch location.
-$global:_wmux_cwd_file = if ($env:WMUX_SURFACE_ID) {
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) "wmux"
+$global:_wmux_cwd_file = if ($env:REMOTEA_SURFACE_ID) {
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) "remotea"
     try { $null = New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop } catch {}
-    Join-Path $dir "cwd-$($env:WMUX_SURFACE_ID).txt"
+    Join-Path $dir "cwd-$($env:REMOTEA_SURFACE_ID).txt"
 } else { $null }
 
 function Update-WmuxCwdFile {
@@ -91,7 +91,7 @@ function Update-WmuxCwdFile {
 # a test instead of only through a real process exit.
 #
 # The PR badge is deliberately NOT this function's business. A shell that is
-# killed rather than asked to leave (Ctrl+W, `wmux close-pane`, closing the
+# killed rather than asked to leave (Ctrl+W, `remotea close-pane`, closing the
 # workspace) runs no exit handler at all, and a last-gasp pipe write is
 # best-effort by nature — so the badge is dropped where the renderer already
 # learns the process is gone: the `pty:exit` handler in useTerminal.ts, which
@@ -113,7 +113,7 @@ function Invoke-WmuxExitCleanup {
 # both ends: the prompt rewrites it on every command, and its poller touches it
 # on every tick — 45 seconds apart, whether or not anyone is typing. So a file
 # nothing has touched for a day belonged to a pane that is gone, and none of
-# this requires asking wmux which surfaces still exist.
+# this requires asking remotea which surfaces still exist.
 function Remove-StaleWmuxCwdFiles {
     param(
         [string]$Directory,
@@ -218,7 +218,7 @@ function Resolve-WmuxPaneCwd {
 #
 # The flag must only advance on a send that actually landed. The earlier shape
 # flipped it right after deciding what to send, before attempting the write —
-# so a clear_pr that failed to go out (pipe not up yet, wmux busy, connect
+# so a clear_pr that failed to go out (pipe not up yet, remotea busy, connect
 # timeout) still left the pane believing it had nothing left to retract, and
 # no later tick would ever try that clear again: the badge this file exists to
 # unstick would get stuck the same way, just on the send instead of the
@@ -417,7 +417,7 @@ function Request-WmuxGitReport {
     try {
         $ps = [powershell]::Create()
         $ps.Runspace = $rs
-        $null = $ps.AddScript((Get-WmuxGitWorkerScript)).AddArgument($shared).AddArgument($global:_wmux_git).AddArgument($env:WMUX_SURFACE_ID).AddArgument($global:_wmux_pipe_name)
+        $null = $ps.AddScript((Get-WmuxGitWorkerScript)).AddArgument($shared).AddArgument($global:_wmux_git).AddArgument($env:REMOTEA_SURFACE_ID).AddArgument($global:_wmux_pipe_name)
         $global:_wmux_git_handle = $ps.BeginInvoke()
         $global:_wmux_git_ps = $ps
         return $true
@@ -461,7 +461,7 @@ function Stop-WmuxGitWorker {
 # what git answered for when it ran here, so the row keeps saying the same
 # thing.
 function Report-GitBranch {
-    $surfaceId = $env:WMUX_SURFACE_ID
+    $surfaceId = $env:REMOTEA_SURFACE_ID
     if (-not $surfaceId) { return }
 
     $cwd = $ExecutionContext.SessionState.Path.CurrentFileSystemLocation.ProviderPath
@@ -488,21 +488,21 @@ function Get-WmuxSshEventMarker {
 # Report shell state
 function Report-ShellState {
     param([string]$State)
-    $surfaceId = $env:WMUX_SURFACE_ID
+    $surfaceId = $env:REMOTEA_SURFACE_ID
     if ($surfaceId) {
         $sequence = Get-WmuxSshEventMarker
         Send-WmuxMessage "report_shell_state $surfaceId $sequence $State"
     }
 }
 
-# Report the command line itself, so wmux can tell that this pane just ssh'd
+# Report the command line itself, so remotea can tell that this pane just ssh'd
 # somewhere. That is what lets a pasted screenshot be uploaded to the remote
 # host instead of having a local Windows path typed into a remote shell.
 #
 # No once-per-cycle guard is needed here: unlike bash's DEBUG trap, the Enter
 # handler fires exactly once per submitted line.
 function Report-Command {
-    $surfaceId = $env:WMUX_SURFACE_ID
+    $surfaceId = $env:REMOTEA_SURFACE_ID
     if (-not $surfaceId) { return }
     $line = $null
     $cursor = $null
@@ -530,7 +530,7 @@ function Report-Command {
 # OSC 133 — semantic prompt marks (issue #207)
 #
 # Everything above this point reports out of band, over the named pipe, and that
-# is the right shape for facts wmux only has to learn eventually. Prompt
+# is the right shape for facts remotea only has to learn eventually. Prompt
 # boundaries are not one of those. Their consumer is xterm's parser, which has
 # to know where the prompt ended at the exact byte offset in the stream; a pipe
 # message that lands a few milliseconds later can no longer say which row that
@@ -538,7 +538,7 @@ function Report-Command {
 #
 # The spelling is FinalTerm's — the same marks iTerm2, VS Code, WezTerm, kitty
 # and Windows Terminal emit — so a pane running somebody else's integration
-# feeds wmux exactly the boundaries this file does.
+# feeds remotea exactly the boundaries this file does.
 # ---------------------------------------------------------------------------
 
 # Whether a C has gone out with no D behind it yet. D only means anything as the
@@ -548,18 +548,18 @@ function Report-Command {
 $global:_wmux_command_open = $false
 
 # The mark bytes themselves, as a string. An empty string when this shell is not
-# in a wmux pane, so callers can splice the result in unconditionally.
+# in a remotea pane, so callers can splice the result in unconditionally.
 #
 # ST is ESC \ and not BEL. Both close an OSC string, but BEL is a bell on every
 # terminal that takes it at face value, and a prompt that dings once per command
 # is not a feature.
 #
-# [char]0x1b rather than PowerShell 7's `e escape: wmux spawns whichever
+# [char]0x1b rather than PowerShell 7's `e escape: remotea spawns whichever
 # PowerShell the user configured, and Windows PowerShell 5.1 renders `e as a
 # literal "e".
 function Get-WmuxPromptMark {
     param([string]$Payload)
-    if (-not $env:WMUX_SURFACE_ID) { return '' }
+    if (-not $env:REMOTEA_SURFACE_ID) { return '' }
     $esc = [char]0x1b
     return "$esc]133;$Payload" + $esc + '\'
 }
@@ -691,7 +691,7 @@ if (-not $global:_wmux_prompt_hooked) {
         } else {
             Report-ShellState "idle"
         }
-        Send-WmuxMessage "ports_kick $env:WMUX_SURFACE_ID"
+        Send-WmuxMessage "ports_kick $env:REMOTEA_SURFACE_ID"
 
         # A and B are RETURNED, wrapped around the prompt, rather than written to
         # the console from in here. That placement is the fix for the Ctrl+L
@@ -819,25 +819,25 @@ $null = Register-EngineEvent -SourceIdentifier ([System.Management.Automation.PS
                 }
             }
         }
-    } -ArgumentList $env:WMUX_SURFACE_ID, $global:_wmux_pipe_name, $env:WMUX_PIPE_TOKEN, $global:_wmux_cwd_file
+    } -ArgumentList $env:REMOTEA_SURFACE_ID, $global:_wmux_pipe_name, $env:REMOTEA_PIPE_TOKEN, $global:_wmux_cwd_file
 }
 
 # Quick-launch profile startup commands (issue #32).
-# wmux passes these in WMUX_STARTUP_COMMANDS (newline-separated) so they run as
+# remotea passes these in REMOTEA_STARTUP_COMMANDS (newline-separated) so they run as
 # part of init — before the first interactive prompt — rather than being injected
 # as keystrokes afterward. Keystroke injection raced the shell's init-time
 # Device Attributes query (ConPTY answers DA1 with "\e[?62;4;9;22c" on stdin);
 # when that response landed on the prompt alongside an injected "<cmd>\r" the two
 # merged into a bogus executed line (e.g. "62;4;9;22ccls"). Running here avoids
 # that entirely. Runs last so the prompt override / PSReadLine handlers exist.
-if ($env:WMUX_STARTUP_COMMANDS) {
-    $_wmux_startup = $env:WMUX_STARTUP_COMMANDS -split "`n"
+if ($env:REMOTEA_STARTUP_COMMANDS) {
+    $_wmux_startup = $env:REMOTEA_STARTUP_COMMANDS -split "`n"
     # One-shot, and cleared BEFORE the loop: removing it afterwards meant the
     # startup command's own process inherited it (measured: a baked
-    # `cmd /c echo %WMUX_STARTUP_COMMANDS%` printed it). A restored
+    # `cmd /c echo %REMOTEA_STARTUP_COMMANDS%` printed it). A restored
     # `claude --resume <id>` and everything that agent spawned then carried
     # the command line, session id included, in their environment.
-    Remove-Item Env:\WMUX_STARTUP_COMMANDS -ErrorAction SilentlyContinue
+    Remove-Item Env:\REMOTEA_STARTUP_COMMANDS -ErrorAction SilentlyContinue
     foreach ($_wmux_cmd in $_wmux_startup) {
         $_wmux_cmd = $_wmux_cmd.Trim()
         if ($_wmux_cmd) {

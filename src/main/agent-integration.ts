@@ -5,7 +5,7 @@ import { clearIntegrationFailures } from './integration-failures';
  * wmux integrates with Claude Code, OpenCode, Kiro, omp, pi, Grok, agy and Qwen Code by editing files
  * in the user's home: it appends a block to ~/.claude/CLAUDE.md,
  * ~/.config/opencode/AGENTS.md, ~/.omp/agent/AGENTS.md and pi's user-scope
- * context file, writes ~/.kiro/steering/wmux.md, registers eight hook families
+ * context file, writes ~/.kiro/steering/remotea.md, registers eight hook families
  * in ~/.claude/settings.json, installs a status extension into
  * ~/.pi/agent/extensions/, points chrome-devtools-mcp at its own CDP proxy, and
  * installs an OpenCode status plugin.
@@ -107,9 +107,9 @@ export const INTEGRATION_CONSENT_DETAIL =
   '  • ~/.claude/CLAUDE.md, ~/.config/opencode/AGENTS.md, ~/.omp/agent/AGENTS.md\n' +
   '    and ~/.pi/agent/AGENTS.md\n' +
   '      a remotea section, between markers, leaving your own text untouched\n' +
-  '  • ~/.kiro/steering/wmux.md\n' +
+  '  • ~/.kiro/steering/remotea.md\n' +
   '      a steering file of remotea\'s own; your other Kiro steering is untouched\n' +
-  '  • ~/.grok/rules/wmux.md and ~/.grok/hooks/wmux.json (only if Grok is installed)\n' +
+  '  • ~/.grok/rules/remotea.md and ~/.grok/hooks/remotea.json (only if Grok is installed)\n' +
   '      files of remotea\'s own; the rules file only when Grok is not already\n' +
   '      reading the ~/.claude/CLAUDE.md section\n' +
   '  • ~/.qwen/QWEN.md and ~/.qwen/settings.json (only if Qwen Code is installed)\n' +
@@ -118,13 +118,13 @@ export const INTEGRATION_CONSENT_DETAIL =
   '  • ~/.claude/settings.json\n' +
   '      eight hook families: PostToolUse, Notification, Stop, SubagentStop,\n' +
   '      SessionStart, UserPromptSubmit, PreToolUse and SessionEnd\n' +
-  '  • ~/.pi/agent/extensions/wmux.js\n' +
+  '  • ~/.pi/agent/extensions/remotea.js\n' +
   '      a pi extension that reports this pane\'s status to the sidebar\n' +
-  '  • ~/.omp/agent/extensions/wmux.js\n' +
+  '  • ~/.omp/agent/extensions/remotea.js\n' +
   '      an omp extension that reports foreground and background job state\n' +
-  '  • ~/.gemini/config/plugins/wmux/ (only if the Antigravity CLI is installed)\n' +
+  '  • ~/.gemini/config/plugins/remotea/ (only if the Antigravity CLI is installed)\n' +
   '      an agy plugin of remotea\'s own that reports each pane\'s conversation\n' +
-  '  • ~/.config/opencode/plugin/wmux.js\n' +
+  '  • ~/.config/opencode/plugin/remotea.js\n' +
   '      the remotea status plugin for OpenCode\n' +
   '  • ~/.claude/settings.json\n' +
   '      a pinned chrome-devtools-mcp pointed at the browser panel instead of its own Chrome\n\n' +

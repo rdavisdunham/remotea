@@ -1,21 +1,21 @@
-// wmux-plugin-version: 6
+// remotea-plugin-version: 6
 // wmux OpenCode CLI-side (TUI) plugin — the half that runs in the TUI process,
 // so a pane is attributable even when the server is remote or shared (#310).
-// Installed by `wmux opencode-tui` to <config>/plugins/wmux-cli/tui.js.
-// No-ops entirely outside wmux (WMUX !== '1').
+// Installed by `wmux opencode-tui` to <config>/plugins/remotea-cli/tui.js.
+// No-ops entirely outside wmux (REMOTEA !== '1').
 import { Plugin } from "@opencode/plugin/tui";
 import { createEffect, createRoot } from "solid-js";
 import { callWmux, callWmuxSync, createActivityReporter, createBlockedReporter, createPromptReporter, createSessionReporter, createSessionSeeder, eventSessionID, isHostedSession, makeLogger, resolveDebugLog, resolveNodeRuntime, routeFromTabs, tabSessionIds } from "./core.js";
 
 export default Plugin.define({
-  id: "wmux.cli",
+  id: "remotea.cli",
   setup(ctx) {
-    // Resolved before the WMUX gate so "the plugin loaded but did nothing" is
+    // Resolved before the REMOTEA gate so "the plugin loaded but did nothing" is
     // itself a visible log line — otherwise the commonest failure is silence.
-    const log = makeLogger(resolveDebugLog(process.env.WMUX_PLUGIN_DEBUG));
-    const surface = process.env.WMUX_SURFACE_ID;
-    if (process.env.WMUX !== "1" || !surface) {
-      log("init: inactive", { WMUX: process.env.WMUX, surface });
+    const log = makeLogger(resolveDebugLog(process.env.REMOTEA_PLUGIN_DEBUG));
+    const surface = process.env.REMOTEA_SURFACE_ID;
+    if (process.env.REMOTEA !== "1" || !surface) {
+      log("init: inactive", { REMOTEA: process.env.REMOTEA, surface });
       return;
     }
 
@@ -23,7 +23,7 @@ export default Plugin.define({
     log("init", {
       surface,
       runtime: runtime.file,
-      cli: process.env.WMUX_CLI,
+      cli: process.env.REMOTEA_CLI,
       pid: process.pid,
     });
 

@@ -11,7 +11,7 @@ import { WorkspaceId } from '../../src/shared/types';
 // their directory over the same `report_pwd`. `workspace.cwd` was a single
 // last-writer-wins field, so the pwsh pane's C:\Users\<user> overwrote the
 // POSIX path — and since a plain WSL pane never reports its own cwd (wmux sets
-// WMUX_INTEGRATION=1 in the distro but installs no rc hook there), the next WSL
+// REMOTEA_INTEGRATION=1 in the distro but installs no rc hook there), the next WSL
 // pane fell back to that Win32 path, failed isPosixPath, and got `--cd ~`.
 // Users saw every new WSL pane open in /home/<user> instead of the project.
 //

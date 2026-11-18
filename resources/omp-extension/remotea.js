@@ -1,4 +1,4 @@
-// wmux-plugin-version: 4
+// remotea-plugin-version: 4
 // Omp factories are rebound per session, but share this module in one process.
 // Track session ancestry too: running agents need not have an async job record.
 import { execFile } from 'node:child_process';
@@ -16,10 +16,10 @@ function descendsFrom(sessions, agent, parentId) {
 }
 
 export default function wmuxExtension(omp) {
-  const surface = process.env.WMUX_SURFACE_ID;
-  const cli = process.env.WMUX_CLI;
-  const runtime = process.env.WMUX_NODE;
-  if (process.env.WMUX !== '1' || !surface || !cli || !runtime) return;
+  const surface = process.env.REMOTEA_SURFACE_ID;
+  const cli = process.env.REMOTEA_CLI;
+  const runtime = process.env.REMOTEA_NODE;
+  if (process.env.REMOTEA !== '1' || !surface || !cli || !runtime) return;
 
   let queue = Promise.resolve();
   let lastState = null;
@@ -69,7 +69,7 @@ export default function wmuxExtension(omp) {
         execFile(runtime, [cli, ...args, '--surface', surface], {
           windowsHide: true,
           timeout: 2000,
-          env: process.env.WMUX_NODE_ELECTRON === '1'
+          env: process.env.REMOTEA_NODE_ELECTRON === '1'
             ? { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
             : process.env,
         }, (error) => {
@@ -95,7 +95,7 @@ export default function wmuxExtension(omp) {
         execFile(runtime, [cli, ...args, '--surface', surface], {
           windowsHide: true,
           timeout: 1500,
-          env: process.env.WMUX_NODE_ELECTRON === '1'
+          env: process.env.REMOTEA_NODE_ELECTRON === '1'
             ? { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
             : process.env,
         }, () => resolve());

@@ -230,9 +230,9 @@ function scheduleTintRetry(
  * Which surface a hook event belongs to (issue #304).
  *
  * One `hook.event`, two producers, two spellings of "which pane": Claude Code's
- * `wmux-hook.js` talks JSON-RPC itself and sends `surfaceId`; the OpenCode
+ * `remotea-hook.js` talks JSON-RPC itself and sends `surfaceId`; the OpenCode
  * plugin goes through `wmux hook`, whose transport stamps the calling pane as
- * `caller` — the same `$WMUX_SURFACE_ID` the browser verbs route by (issue
+ * `caller` — the same `$REMOTEA_SURFACE_ID` the browser verbs route by (issue
  * #62).
  *
  * The two are deliberately NOT collapsed any earlier than here. Main's hook

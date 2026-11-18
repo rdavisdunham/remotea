@@ -1,6 +1,6 @@
 /**
  * Phase 4: agent status from hooks. The bridge's auth and method rules; the
- * real wmux-hook.js (resources/cli) talking to a real bridge, exactly as Claude
+ * real remotea-hook.js (resources/cli) talking to a real bridge, exactly as Claude
  * Code and Codex run it; and the hub's relay — live to attached apps, replayed
  * to apps that attach later.
  */
@@ -19,8 +19,8 @@ import { parseClientMsg } from '../../src/shared/remote-host-protocol';
 
 const SECRET = 'test-secret';
 const SURF = 'surf-hook-1';
-const HOOK_JS = path.resolve(__dirname, '..', '..', 'resources', 'cli', 'wmux-hook.js');
-const AGY_HOOK = path.resolve(__dirname, '..', '..', 'resources', 'agy-plugin', 'wmux-agy-hook.cjs');
+const HOOK_JS = path.resolve(__dirname, '..', '..', 'resources', 'cli', 'remotea-hook.js');
+const AGY_HOOK = path.resolve(__dirname, '..', '..', 'resources', 'agy-plugin', 'remotea-agy-hook.cjs');
 
 const cleanup: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -74,7 +74,7 @@ function runHook(args: string[], env: Record<string, string>, payload: object, s
   });
 }
 
-describe('wmux-hook.js through the bridge', () => {
+describe('remotea-hook.js through the bridge', () => {
   async function bridge() {
     const relayed: Array<{ id: string; method: string; params: Record<string, unknown> }> = [];
     const b = new HookBridge({ secret: SECRET, relay: (id, method, params) => (relayed.push({ id, method, params }), true) });
@@ -252,8 +252,8 @@ describe('hub relay', () => {
 
   it('new sessions get the bridge address and their own token', () => {
     const env = hookEnv(SECRET, 7718, SURF);
-    expect(env).toEqual({ WMUX: '1', WMUX_SURFACE_ID: SURF, WMUX_REMOTE: '127.0.0.1:7718', WMUX_REMOTE_TOKEN: hookToken(SECRET, SURF) });
-    expect(hookEnv(SECRET, 7718, SURF, { cliPath: '/x/wmux.js', nodePath: '/n/node' })).toMatchObject({ WMUX_CLI: '/x/wmux.js', WMUX_NODE: '/n/node' });
+    expect(env).toEqual({ REMOTEA: '1', REMOTEA_SURFACE_ID: SURF, REMOTEA_REMOTE: '127.0.0.1:7718', REMOTEA_REMOTE_TOKEN: hookToken(SECRET, SURF) });
+    expect(hookEnv(SECRET, 7718, SURF, { cliPath: '/x/remotea.js', nodePath: '/n/node' })).toMatchObject({ REMOTEA_CLI: '/x/remotea.js', REMOTEA_NODE: '/n/node' });
     expect(hookToken(SECRET, SURF)).not.toBe(hookToken(SECRET, 'surf-other'));
     expect(hookToken(SECRET, SURF)).not.toContain(SECRET);
   });
@@ -274,15 +274,37 @@ describe('hooks install', () => {
   }
   const read = (f: string) => JSON.parse(fs.readFileSync(f, 'utf8'));
 
+  it('replaces its own old-named entries and leaves a wmux install\'s byte-identical (AE5)', () => {
+    const { home, paths } = tempHome();
+    const settingsFile = path.join(home, '.claude', 'settings.json');
+    const wmuxCheckout = path.join(home, 'src', 'wmux');
+    fs.mkdirSync(path.join(wmuxCheckout, 'resources', 'cli'), { recursive: true });
+    fs.writeFileSync(path.join(wmuxCheckout, 'package.json'), JSON.stringify({ name: 'wmux' }));
+    const ourOld = { hooks: [{ type: 'command', command: `node "${paths.cliDir}/wmux-hook.js" --event Stop` }] };
+    const theirs = { hooks: [{ type: 'command', command: `node "${wmuxCheckout}/resources/cli/wmux-hook.js" --event Stop` }] };
+    fs.writeFileSync(settingsFile, JSON.stringify({ hooks: { Stop: [ourOld, theirs] } }));
+
+    installHooks(paths);
+    let stop = read(settingsFile).hooks.Stop;
+    expect(stop.map((e: any) => e.hooks[0].command)).toEqual([
+      theirs.hooks[0].command, `node "${path.join(paths.cliDir, 'remotea-hook.js')}" --event Stop`,
+    ]);
+    expect(JSON.stringify(stop[0])).toBe(JSON.stringify(theirs));
+
+    removeHooks(paths);
+    stop = read(settingsFile).hooks.Stop;
+    expect(stop).toEqual([theirs]);
+  });
+
   it('adds remotea entries beside other tools\' hooks, idempotently, and removes only its own', () => {
     const { home, paths, claude, codex } = tempHome();
     const status1 = installHooks(paths);
     installHooks(paths); // twice: still one entry per event
-    expect(fs.existsSync(path.join(paths.cliDir, 'wmux-hook.js'))).toBe(true);
+    expect(fs.existsSync(path.join(paths.cliDir, 'remotea-hook.js'))).toBe(true);
     const c = read(path.join(home, '.claude', 'settings.json'));
     expect(c.model).toBe('opus');
     expect(c.hooks.SessionStart.map((e: any) => e.hooks[0].command)).toEqual([
-      "bash '/x/herdr-agent-state.sh' session", `node "${path.join(paths.cliDir, 'wmux-hook.js')}" --event SessionStart`,
+      "bash '/x/herdr-agent-state.sh' session", `node "${path.join(paths.cliDir, 'remotea-hook.js')}" --event SessionStart`,
     ]);
     expect(c.hooks.Stop[0].hooks[0].command).toContain('moshi-hook');
     const x = read(path.join(home, '.codex', 'hooks.json'));
@@ -320,10 +342,10 @@ describe('hooks install', () => {
     const { home, paths } = tempHome();
     fs.mkdirSync(path.join(home, '.config', 'opencode'), { recursive: true });
     const rows = installHooks(paths);
-    const plugin = path.join(home, '.config', 'opencode', 'plugin', 'wmux.js');
+    const plugin = path.join(home, '.config', 'opencode', 'plugin', 'remotea.js');
     expect(rows.find((r) => r.agent === 'opencode')).toMatchObject({ present: true, entries: 1 });
     expect(fs.readFileSync(plugin, 'utf8')).toContain('WmuxPlugin');
-    expect(fs.existsSync(path.join(paths.cliDir, 'wmux.js'))).toBe(true);
+    expect(fs.existsSync(path.join(paths.cliDir, 'remotea.js'))).toBe(true);
     expect(fs.existsSync(path.join(paths.cliDir, 'wsl-network.js'))).toBe(true);
     removeHooks(paths);
     expect(fs.existsSync(plugin)).toBe(false);
@@ -343,20 +365,20 @@ describe('hooks install', () => {
     const rows = installHooks(paths);
     for (const agent of ['pi', 'omp', 'grok', 'qwen', 'agy']) expect(rows.find((r) => r.agent === agent)).toMatchObject({ present: true });
     expect(rows.filter((r) => r.entries > 0).map((r) => r.agent).sort()).toEqual(['agy', 'claude', 'codex', 'grok', 'omp', 'pi', 'qwen']);
-    const script = path.join(paths.cliDir, 'wmux-hook.js');
-    expect(fs.readFileSync(h('.pi', 'agent', 'extensions', 'wmux.js'), 'utf8')).toMatch(/wmux-plugin-version/);
-    expect(fs.readFileSync(h('.omp', 'agent', 'extensions', 'wmux.js'), 'utf8')).toMatch(/wmux-plugin-version/);
-    const grok = read(h('.grok', 'hooks', 'wmux.json'));
+    const script = path.join(paths.cliDir, 'remotea-hook.js');
+    expect(fs.readFileSync(h('.pi', 'agent', 'extensions', 'remotea.js'), 'utf8')).toMatch(/remotea-plugin-version/);
+    expect(fs.readFileSync(h('.omp', 'agent', 'extensions', 'remotea.js'), 'utf8')).toMatch(/remotea-plugin-version/);
+    const grok = read(h('.grok', 'hooks', 'remotea.json'));
     expect(grok.hooks.StopFailure[0].hooks[0].command).toBe(`node "${script}" --event StopFailure`);
     const q = read(h('.qwen', 'settings.json'));
     expect(q.model).toEqual(qwen.model);
     expect(q.hooks.Stop.map((e: any) => e.hooks[0].command)).toEqual(['mine', `node ${script} --event Stop --provider qwen`]);
-    const agyDir = h('.gemini', 'config', 'plugins', 'wmux');
-    expect(fs.readdirSync(agyDir).sort()).toEqual(['hooks.json', 'plugin.json', 'wmux-agy-hook.cjs']);
+    const agyDir = h('.gemini', 'config', 'plugins', 'remotea');
+    expect(fs.readdirSync(agyDir).sort()).toEqual(['hooks.json', 'plugin.json', 'remotea-agy-hook.cjs']);
 
     removeHooks(paths);
     expect(read(h('.qwen', 'settings.json'))).toEqual(qwen);
-    for (const f of [h('.pi', 'agent', 'extensions', 'wmux.js'), h('.omp', 'agent', 'extensions', 'wmux.js'), h('.grok', 'hooks', 'wmux.json'), path.join(agyDir, 'wmux-agy-hook.cjs')]) {
+    for (const f of [h('.pi', 'agent', 'extensions', 'remotea.js'), h('.omp', 'agent', 'extensions', 'remotea.js'), h('.grok', 'hooks', 'remotea.json'), path.join(agyDir, 'remotea-agy-hook.cjs')]) {
       expect(fs.existsSync(f)).toBe(false);
     }
   });
@@ -368,13 +390,13 @@ describe('hooks install', () => {
     const commented = '{\n  // my settings\n  "model": {}\n}\n';
     const userGrok = JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'say done' }] }] } });
     fs.writeFileSync(path.join(home, '.qwen', 'settings.json'), commented);
-    fs.writeFileSync(path.join(home, '.grok', 'hooks', 'wmux.json'), userGrok);
+    fs.writeFileSync(path.join(home, '.grok', 'hooks', 'remotea.json'), userGrok);
     const rows = installHooks(paths);
     expect(rows.find((r) => r.agent === 'qwen')).toMatchObject({ present: true, entries: 0 });
     expect(rows.find((r) => r.agent === 'grok')).toMatchObject({ present: true, entries: 0 });
     removeHooks(paths);
     expect(fs.readFileSync(path.join(home, '.qwen', 'settings.json'), 'utf8')).toBe(commented);
-    expect(fs.readFileSync(path.join(home, '.grok', 'hooks', 'wmux.json'), 'utf8')).toBe(userGrok);
+    expect(fs.readFileSync(path.join(home, '.grok', 'hooks', 'remotea.json'), 'utf8')).toBe(userGrok);
   });
 
   it('skips an agent that is not installed', () => {
@@ -385,8 +407,8 @@ describe('hooks install', () => {
   });
 
   it('applyCodexHooks keeps foreign entries in order', () => {
-    const out = applyCodexHooks({ hooks: { Stop: [{ hooks: [{ command: 'a' }] }] } }, '/h/wmux-hook.js');
-    expect(out.hooks.Stop.map((e: any) => e.hooks[0].command)).toEqual(['a', 'node "/h/wmux-hook.js" --event Stop --provider codex']);
+    const out = applyCodexHooks({ hooks: { Stop: [{ hooks: [{ command: 'a' }] }] } }, '/h/remotea-hook.js');
+    expect(out.hooks.Stop.map((e: any) => e.hooks[0].command)).toEqual(['a', 'node "/h/remotea-hook.js" --event Stop --provider codex']);
   });
 });
 

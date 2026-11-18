@@ -114,7 +114,7 @@ export const ru: Translation = {
   'markdown.openInApp': 'Открыть в приложении по умолчанию',
   'markdown.moreActions': 'Другие действия',
   'markdown.noFile': 'Не связано с файлом',
-  'markdown.empty': 'Нет содержимого. Используйте wmux markdown set, чтобы добавить содержимое, или перетащите файл сюда.',
+  'markdown.empty': 'Нет содержимого. Используйте remotea markdown set, чтобы добавить содержимое, или перетащите файл сюда.',
   'markdown.error.copy': 'Не удалось записать в буфер обмена',
   'markdown.error.read': 'Не удалось прочитать файл',
   'markdown.error.action': 'Действие не удалось',

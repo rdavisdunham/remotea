@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hookParams } from '../../src/cli/wmux';
+import { hookParams } from '../../src/cli/remotea';
 
 /**
  * `wmux hook` is how the OpenCode plugin hands wmux a `UserPromptSubmit`

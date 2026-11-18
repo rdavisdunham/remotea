@@ -100,7 +100,7 @@ export const zh: Translation = {
   'markdown.openInApp': '用默认应用打开',
   'markdown.moreActions': '更多操作',
   'markdown.noFile': '未关联文件',
-  'markdown.empty': '暂无内容。请使用 wmux markdown set，或将文件拖放到此处。',
+  'markdown.empty': '暂无内容。请使用 remotea markdown set，或将文件拖放到此处。',
   'markdown.error.copy': '无法写入剪贴板',
   'markdown.error.read': '无法读取文件',
   'markdown.error.action': '操作失败',

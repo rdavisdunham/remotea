@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { RAW_V1_VERBS, rawV1Error, rawV1Parse } from '../../src/cli/wmux';
+import { RAW_V1_VERBS, rawV1Error, rawV1Parse } from '../../src/cli/remotea';
 
 /**
- * `wmux raw-v1` exists so the bash integration can report shell state from
+ * `remotea raw-v1` exists so the bash integration can report shell state from
  * inside a devcontainer, where it cannot reach the pipe directly (issue #19).
  * It began as a generic passthrough: whatever line you handed it went to the V1
  * handler.
@@ -15,10 +15,10 @@ import { RAW_V1_VERBS, rawV1Error, rawV1Parse } from '../../src/cli/wmux';
  * the integration actually emits is six verbs long, so name them.
  */
 
-const INTEGRATION = path.resolve(__dirname, '../../src/shell-integration/wmux-bash-integration.sh');
+const INTEGRATION = path.resolve(__dirname, '../../src/shell-integration/remotea-bash-integration.sh');
 const POWERSHELL_INTEGRATION = path.resolve(
   __dirname,
-  '../../src/shell-integration/wmux-powershell-integration.ps1'
+  '../../src/shell-integration/remotea-powershell-integration.ps1'
 );
 
 describe('raw-v1 allowlist', () => {
@@ -55,8 +55,8 @@ describe('raw-v1 allowlist', () => {
   });
 
   it('prints usage when no verb is given at all', () => {
-    expect(rawV1Error(undefined)).toMatch(/^Usage: wmux raw-v1/);
-    expect(rawV1Error('')).toMatch(/^Usage: wmux raw-v1/);
+    expect(rawV1Error(undefined)).toMatch(/^Usage: remotea raw-v1/);
+    expect(rawV1Error('')).toMatch(/^Usage: remotea raw-v1/);
   });
 
   it('matches on the verb alone, not on the rest of the line', () => {
@@ -86,8 +86,8 @@ describe('raw-v1 allowlist', () => {
  * The allowlist above was correct and still rejected every real report, because
  * nothing tested how the verb is recovered from argv.
  *
- * wmux-bash-integration.sh builds the V1 line as one string and passes it
- * quoted — `wmux raw-v1 "report_pwd $surface_id $(pwd)"` — so args[1] is the
+ * remotea-bash-integration.sh builds the V1 line as one string and passes it
+ * quoted — `remotea raw-v1 "report_pwd $surface_id $(pwd)"` — so args[1] is the
  * whole line, not the verb. Checking args[1] meant checking
  * "report_pwd surf-1 /tmp" against a list of bare verbs: never a match, exit 1
  * before sendV1, and silence, since the caller fires into `>/dev/null 2>&1 &`.
@@ -99,7 +99,7 @@ describe('raw-v1 argv parsing', () => {
   const SURFACE = 'surf-1';
 
   it('recovers the verb when the whole line arrives as one argument', () => {
-    // THE regression: the shape wmux-bash-integration.sh actually sends.
+    // THE regression: the shape remotea-bash-integration.sh actually sends.
     const { line, verb } = rawV1Parse(['raw-v1', `report_pwd ${SURFACE} /tmp/x`]);
 
     expect(verb).toBe('report_pwd');
@@ -151,8 +151,8 @@ describe('raw-v1 argv parsing', () => {
   });
 
   it('asks for usage when no line is given', () => {
-    expect(rawV1Error(rawV1Parse(['raw-v1']).verb)).toMatch(/^Usage: wmux raw-v1/);
-    expect(rawV1Error(rawV1Parse(['raw-v1', '   ']).verb)).toMatch(/^Usage: wmux raw-v1/);
+    expect(rawV1Error(rawV1Parse(['raw-v1']).verb)).toMatch(/^Usage: remotea raw-v1/);
+    expect(rawV1Error(rawV1Parse(['raw-v1', '   ']).verb)).toMatch(/^Usage: remotea raw-v1/);
   });
 
   it('accepts every line the shipped bash integration can actually emit', () => {

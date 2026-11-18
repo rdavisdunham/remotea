@@ -39,7 +39,7 @@ export interface UserLocale {
 
 export interface UserLocalesResult {
   locales: UserLocale[];
-  /** Non-fatal problems, surfaced via `wmux locales`. */
+  /** Non-fatal problems, surfaced via `remotea locales`. */
   errors: string[];
   /** The directory that was scanned, whether or not it exists. */
   dir: string;

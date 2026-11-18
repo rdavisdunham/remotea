@@ -114,7 +114,7 @@ export const ja: Translation = {
   'markdown.openInApp': '既定のアプリで開く',
   'markdown.moreActions': 'その他の操作',
   'markdown.noFile': 'ファイルに基づいていません',
-  'markdown.empty': 'コンテンツがありません。wmux markdown set でコンテンツを追加するか、ファイルをここにドロップしてください。',
+  'markdown.empty': 'コンテンツがありません。remotea markdown set でコンテンツを追加するか、ファイルをここにドロップしてください。',
   'markdown.error.copy': 'クリップボードに書き込めませんでした',
   'markdown.error.read': 'ファイルを読み取れませんでした',
   'markdown.error.action': '操作に失敗しました',

@@ -9,17 +9,17 @@ Scripts in `src/shell-integration/` (deployed to `resources/shell-integration/`)
 
 | Script | Reports |
 |--------|---------|
-| `wmux-powershell-integration.ps1` | cwd, git branch/dirty, shell state, PR polling (45s), OSC 133 A/B/C/D |
-| `wmux-bash-integration.sh` | cwd, git branch/dirty, shell state, ports, OSC 133 A/B/C/D (bash + zsh) |
-| `wmux-cmd-integration.cmd` | Basic OSC 9 escape sequences, OSC 133 A/B (no C/D — cmd has no preexec seam, so they are not representable and are deliberately not faked) |
+| `remotea-powershell-integration.ps1` | cwd, git branch/dirty, shell state, PR polling (45s), OSC 133 A/B/C/D |
+| `remotea-bash-integration.sh` | cwd, git branch/dirty, shell state, ports, OSC 133 A/B/C/D (bash + zsh) |
+| `remotea-cmd-integration.cmd` | Basic OSC 9 escape sequences, OSC 133 A/B (no C/D — cmd has no preexec seam, so they are not representable and are deliberately not faked) |
 
 **Who loads the bash script.** Git Bash gets it from `pty-manager.ts` as `--init-file`
 (#427), so the script's prologue reads the user's rc or login files itself. WSL panes
-only get `WMUX_BASH_SCRIPT` for a line in the distro's `~/.bashrc` (#428): wsl.exe
+only get `REMOTEA_BASH_SCRIPT` for a line in the distro's `~/.bashrc` (#428): wsl.exe
 starts the distro's own shell. Native reports go through Windows node running
 `wmux raw-v1` (bash cannot open the pipe; the old `/mnt/c/.../Temp/wmux/messages`
 drop was never read by anything), so in WSL they depend on `WSL_ENV_PASSTHROUGH`
-carrying `WMUX_PIPE` and the token back out. Git Bash reports its cwd as a Windows
+carrying `REMOTEA_PIPE` and the token back out. Git Bash reports its cwd as a Windows
 path (`pwd -W`): `/c/...` reads as POSIX to `isPosixPath` and is never restored.
 
 **WSL's explorer cwd is OSC 7.** A WSL shell reports its cwd in-band with OSC 7 (#378): the

@@ -9,7 +9,7 @@
  * in `dist/cli/` respectively. Nothing kept either in step, and both had
  * silently rotted (#168, #169): the packaged PowerShell integration predated
  * the pipe's auth gate, so it sent V1 lines with no token and every report was
- * rejected into a void, and `resources/cli/wmux.js` was ~1700 diff lines behind
+ * rejected into a void, and `resources/cli/remotea.js` was ~1700 diff lines behind
  * a build of its own source.
  *
  * This is the same failure as #137, where a second copy of the app icon went
@@ -23,7 +23,7 @@
  * `src/shell-integration` and `dist/cli/*.js` into the package, and
  * `getShellIntegrationPath()` falls back to `src/` in dev — so a packaged wmux
  * has always run fresh sources. What reads the copies is dev-mode Claude hook
- * registration (`claude-context.ts`, for `resources/cli/wmux-hook.js`) and
+ * registration (`claude-context.ts`, for `resources/cli/remotea-hook.js`) and
  * anything consuming wmux out of a repo checkout, which is how the drift
  * surfaced in the first place.
  */
@@ -94,7 +94,7 @@ if (problems.length) {
   for (const p of problems) console.error(`  ${p}`);
   console.error('\nRegenerate them:');
   console.error('  cp -r src/shell-integration/* resources/shell-integration/');
-  console.error('  npm run build:main && cp dist/cli/wmux.js dist/cli/wmux-hook.js resources/cli/');
+  console.error('  npm run build:main && cp dist/cli/remotea.js dist/cli/remotea-hook.js resources/cli/');
   process.exit(1);
 }
 

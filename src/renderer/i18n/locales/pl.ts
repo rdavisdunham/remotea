@@ -114,7 +114,7 @@ export const pl: Translation = {
   'markdown.openInApp': 'Otwórz w aplikacji domyślnej',
   'markdown.moreActions': 'Więcej akcji',
   'markdown.noFile': 'Nie ma pliku źródłowego',
-  'markdown.empty': 'Brak treści. Użyj wmux markdown set, aby dodać treść, albo upuść tu plik.',
+  'markdown.empty': 'Brak treści. Użyj remotea markdown set, aby dodać treść, albo upuść tu plik.',
   'markdown.error.copy': 'Nie udało się zapisać do schowka',
   'markdown.error.read': 'Nie udało się odczytać pliku',
   'markdown.error.action': 'Akcja nie powiodła się',

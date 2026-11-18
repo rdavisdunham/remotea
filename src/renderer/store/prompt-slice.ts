@@ -36,7 +36,7 @@ export interface PromptEntry {
   /**
    * What the user typed. Empty until known: a shell entry is opened at the
    * `133;B` mark and only learns its command line at `133;C`, and an agent
-   * entry that arrived without a payload (an older wmux-hook.js still on disk)
+   * entry that arrived without a payload (an older remotea-hook.js still on disk)
    * stays empty forever rather than inventing something.
    */
   text: string;
@@ -64,7 +64,7 @@ export interface PromptEntry {
  * layout separately. Generous enough that a normal multi-paragraph prompt
  * survives intact for the outline.
  *
- * Enforced here EVEN THOUGH wmux-hook.js already caps the prompt at the same
+ * Enforced here EVEN THOUGH remotea-hook.js already caps the prompt at the same
  * number before sending it, and deliberately without the two being derived from
  * one constant: that file is copied into the user's `~/.claude` and an old copy
  * routinely outlives an upgrade, so this end cannot assume the other end agrees

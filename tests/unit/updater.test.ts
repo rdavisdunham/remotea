@@ -103,10 +103,10 @@ describe('isMissingChannelFileError', () => {
 });
 
 describe('isUpdaterDisabled', () => {
-  it('is disabled only when WMUX_DISABLE_UPDATER is exactly "1"', () => {
-    expect(isUpdaterDisabled({ WMUX_DISABLE_UPDATER: '1' } as NodeJS.ProcessEnv)).toBe(true);
-    expect(isUpdaterDisabled({ WMUX_DISABLE_UPDATER: 'true' } as NodeJS.ProcessEnv)).toBe(false);
-    expect(isUpdaterDisabled({ WMUX_DISABLE_UPDATER: '0' } as NodeJS.ProcessEnv)).toBe(false);
+  it('is disabled only when REMOTEA_DISABLE_UPDATER is exactly "1"', () => {
+    expect(isUpdaterDisabled({ REMOTEA_DISABLE_UPDATER: '1' } as NodeJS.ProcessEnv)).toBe(true);
+    expect(isUpdaterDisabled({ REMOTEA_DISABLE_UPDATER: 'true' } as NodeJS.ProcessEnv)).toBe(false);
+    expect(isUpdaterDisabled({ REMOTEA_DISABLE_UPDATER: '0' } as NodeJS.ProcessEnv)).toBe(false);
     expect(isUpdaterDisabled({} as NodeJS.ProcessEnv)).toBe(false);
   });
 });
@@ -118,7 +118,7 @@ describe('isUpdaterDisabled', () => {
 describe('in-app update (issue #125)', () => {
   beforeEach(() => {
     fakeApp.isPackaged = true;
-    delete process.env.WMUX_DISABLE_UPDATER;
+    delete process.env.REMOTEA_DISABLE_UPDATER;
   });
 
   it('refuses to self-update from an unpackaged run', async () => {
@@ -131,7 +131,7 @@ describe('in-app update (issue #125)', () => {
 
   it('honours the kill switch', async () => {
     const u = await freshUpdater();
-    process.env.WMUX_DISABLE_UPDATER = '1';
+    process.env.REMOTEA_DISABLE_UPDATER = '1';
     expect(u.canSelfUpdate()).toBe(false);
     await expect(u.requestUpdateNow()).resolves.toEqual({ handled: false, reason: 'not_supported' });
   });
@@ -280,7 +280,7 @@ describe('portable zip install', () => {
     fs.writeFileSync(path.join(root, 'wmux.exe'), '');
     fakeApp.exePath = path.join(root, 'wmux.exe');
     fakeApp.isPackaged = true;
-    delete process.env.WMUX_DISABLE_UPDATER;
+    delete process.env.REMOTEA_DISABLE_UPDATER;
     zipMocks.resolvePortableZipTarget.mockReset();
     zipMocks.runPortableZipUpdate.mockReset().mockReturnValue(new Promise(() => {}));
     zipMocks.applyStagedPortableUpdate.mockReset();
@@ -347,7 +347,7 @@ describe('portable zip install that cannot run (#3)', () => {
     fs.writeFileSync(path.join(root, 'wmux.exe'), '');
     fakeApp.exePath = path.join(root, 'wmux.exe');
     fakeApp.isPackaged = true;
-    delete process.env.WMUX_DISABLE_UPDATER;
+    delete process.env.REMOTEA_DISABLE_UPDATER;
     zipMocks.resolvePortableZipTarget.mockReset().mockResolvedValue(target);
     zipMocks.runPortableZipUpdate.mockReset().mockResolvedValue(staged);
     zipMocks.applyStagedPortableUpdate.mockReset();
@@ -570,7 +570,7 @@ describe('install dialog asks once per version (#275)', () => {
   beforeEach(() => {
     fakeApp.isPackaged = true;
     fakeApp.exePath = '';
-    delete process.env.WMUX_DISABLE_UPDATER;
+    delete process.env.REMOTEA_DISABLE_UPDATER;
     fakeDialog.showMessageBox.mockReset().mockResolvedValue({ response: 1 });
   });
 

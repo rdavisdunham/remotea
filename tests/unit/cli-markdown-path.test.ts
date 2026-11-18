@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveMarkdownFilePath } from '../../src/cli/wmux';
+import { resolveMarkdownFilePath } from '../../src/cli/remotea';
 
 const spawnSync = vi.hoisted(() => vi.fn());
 vi.mock('child_process', async (importOriginal) => ({

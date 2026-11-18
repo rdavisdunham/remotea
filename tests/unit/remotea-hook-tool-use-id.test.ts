@@ -10,14 +10,14 @@ import path from 'path';
  * Claude Code's `tool_use_id`, and only for calls wmux can attribute.
  */
 
-const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/wmux-hook.js');
+const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/remotea-hook.js');
 
 function runHook(args: string[], port: number, stdin: string): Promise<void> {
   const env = {
     ...process.env,
-    WMUX_REMOTE: `127.0.0.1:${port}`,
-    WMUX_REMOTE_TOKEN: 't',
-    WMUX_SURFACE_ID: 'surf-tool-id',
+    REMOTEA_REMOTE: `127.0.0.1:${port}`,
+    REMOTEA_REMOTE_TOKEN: 't',
+    REMOTEA_SURFACE_ID: 'surf-tool-id',
   } as Record<string, string>;
   return new Promise((resolve, reject) => {
     const child = execFile(process.execPath, [HOOK_SCRIPT, ...args], { env, timeout: 15000 }, (err) => {
@@ -51,7 +51,7 @@ async function hookParams(args: string[], payload: unknown): Promise<Record<stri
   }
 }
 
-describe('wmux-hook.js tool_use_id (#399)', () => {
+describe('remotea-hook.js tool_use_id (#399)', () => {
   it('forwards it on a PreToolUse', async () => {
     const params = await hookParams(['--event', 'PreToolUse'], {
       hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_use_id: 'toolu_01AbC',
@@ -82,7 +82,7 @@ describe('wmux-hook.js tool_use_id (#399)', () => {
 });
 
 /**
- * The desktop path: a local pane reports over the pipe with no WMUX_REMOTE.
+ * The desktop path: a local pane reports over the pipe with no REMOTEA_REMOTE.
  * The ledger that retracts a stale permission block lives in the desktop's
  * agent-hook-bridge, so the id has to arrive here, not only at a server.
  */
@@ -102,8 +102,8 @@ async function pipeHookParams(payload: unknown): Promise<Record<string, any>> {
     socket.on('error', () => {});
   });
   await new Promise<void>((ready) => server.listen(pipe, () => ready()));
-  const base = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('WMUX')));
-  const env = { ...base, WMUX: '1', WMUX_PIPE: pipe, WMUX_PIPE_TOKEN: 't', WMUX_SURFACE_ID: 'surf-tool-id' } as Record<string, string>;
+  const base = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('REMOTEA')));
+  const env = { ...base, REMOTEA: '1', REMOTEA_PIPE: pipe, REMOTEA_PIPE_TOKEN: 't', REMOTEA_SURFACE_ID: 'surf-tool-id' } as Record<string, string>;
   try {
     await new Promise<void>((resolve, reject) => {
       const child = execFile(process.execPath, [HOOK_SCRIPT, '--event', 'PreToolUse'], { env, timeout: 15000 }, (err) => {
@@ -118,7 +118,7 @@ async function pipeHookParams(payload: unknown): Promise<Record<string, any>> {
   }
 }
 
-describe('wmux-hook.js tool_use_id over the local pipe (#399)', () => {
+describe('remotea-hook.js tool_use_id over the local pipe (#399)', () => {
   it('forwards it to the desktop', async () => {
     const params = await pipeHookParams({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_use_id: 'toolu_01AbC' });
     expect(params.toolUseId).toBe('toolu_01AbC');

@@ -7,14 +7,14 @@ import {
 } from '../../src/main/agent-instructions';
 
 /**
- * Issue #158: the probe the block hands its reader could not tell "wmux is not
- * running" from "this session cannot reach the wmux CLI", and the block told
+ * Issue #158: the probe the block hands its reader could not tell "remotea is not
+ * running" from "this session cannot reach the remotea CLI", and the block told
  * the reader to assume the first.
  *
- * That is the common case, not the exotic one. wmux only puts `wmux` on PATH
+ * That is the common case, not the exotic one. remotea only puts `remotea` on PATH
  * for PTYs it spawns itself — nothing is persisted to the user's PATH — so
- * every session wmux did not spawn (a desktop app, a plain terminal, SSH, a
- * scheduled run) hits "command not found" while wmux is running perfectly well.
+ * every session remotea did not spawn (a desktop app, a plain terminal, SSH, a
+ * scheduled run) hits "command not found" while remotea is running perfectly well.
  * Those are precisely the sessions the block is written GLOBALLY to reach.
  */
 describe('agent instruction block (issue #158)', () => {
@@ -22,10 +22,10 @@ describe('agent instruction block (issue #158)', () => {
 
   it('separates "not found" from "did not answer"', () => {
     // The old text collapsed three symptoms into one conclusion:
-    //   "command not found, no reply, or an error → wmux is not running"
+    //   "command not found, no reply, or an error → remotea is not running"
     expect(raw).not.toMatch(/command not found, no reply, or an error/);
     // No FIRST answer is evidence of absence: not found is the normal state
-    // off a wmux pane (#158), and a bare `wmux` may be another app's CLI
+    // off a remotea pane (#158), and a bare `remotea` may be another app's CLI
     // (#282). Anything but `pong` goes to the absolute probe first.
     expect(raw).toMatch(/anything else[^]*do not\s+conclude yet/i);
   });
@@ -34,13 +34,13 @@ describe('agent instruction block (issue #158)', () => {
     expect(raw).toContain(CLI_BIN_PLACEHOLDER);
     // The fallback probe must be the placeholder plus the discovery verbs, so a
     // session off PATH has something concrete to run rather than advice.
-    expect(raw).toMatch(new RegExp(`${CLI_BIN_PLACEHOLDER.replace(/[{}]/g, '\\$&')}/wmux" capabilities`));
+    expect(raw).toMatch(new RegExp(`${CLI_BIN_PLACEHOLDER.replace(/[{}]/g, '\\$&')}/remotea" capabilities`));
   });
 
   it('substitutes the install path, leaving no placeholder behind', () => {
-    const out = renderInstructions(raw, 'C:\\Program Files\\wmux\\resources\\cli-bin');
+    const out = renderInstructions(raw, 'C:\\Program Files\\remotea\\resources\\cli-bin');
     expect(out).not.toContain(CLI_BIN_PLACEHOLDER);
-    expect(out).toContain('C:\\Program Files\\wmux\\resources\\cli-bin/wmux" capabilities');
+    expect(out).toContain('C:\\Program Files\\remotea\\resources\\cli-bin/remotea" capabilities');
   });
 
   it('substitutes every occurrence, not just the first', () => {
@@ -57,12 +57,12 @@ describe('agent instruction block (issue #158)', () => {
   });
 
   it('uses capabilities rather than ping to select command families', () => {
-    expect(raw).toContain('A successful `wmux ping`');
+    expect(raw).toContain('A successful `remotea ping`');
     expect(raw).toContain('does **not** establish any');
     expect(raw).toContain('Host status bridge (`features: ["status"]`)');
     expect(raw).toContain('Missing browser');
     expect(raw).toContain('support does not disable status reporting');
-    expect(raw).toContain('`wmux agent-state` is a desktop query');
+    expect(raw).toContain('`remotea agent-state` is a desktop query');
     expect(raw).toMatch(/Use your\s+normal tools/);
     expect(raw).toMatch(/Nothing here is a\s+restriction on what you may otherwise do/);
   });
@@ -72,7 +72,7 @@ describe('agent instruction block (issue #158)', () => {
     expect(builder.extraResources).toContainEqual(expect.objectContaining({
       from: 'resources/claude-instructions.md', to: 'claude-instructions/claude-instructions.md',
     }));
-    expect(raw).toContain('<!-- wmux:start');
-    expect(raw).toContain('<!-- wmux:end -->');
+    expect(raw).toContain('<!-- remotea:start');
+    expect(raw).toContain('<!-- remotea:end -->');
   });
 });

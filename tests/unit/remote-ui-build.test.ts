@@ -2,7 +2,7 @@
  * The BUILT phone console (#254). Skipped when dist/renderer is absent (a
  * fresh clone that only ran `npm test`); run after `npx vite build`.
  *
- * With `WMUX_REQUIRE_BUILD=1` a missing build is a FAILURE, not a skip. The
+ * With `REMOTEA_REQUIRE_BUILD=1` a missing build is a FAILURE, not a skip. The
  * release workflow sets it in a step after `vite build`: its `npm test` gate
  * runs before any build exists, so without this the whole suite skipped on
  * every tag and a vite.config change that stopped emitting the manifest would
@@ -26,7 +26,7 @@ const DIST = path.resolve(__dirname, '../../dist/renderer');
 const PAGE = path.join(DIST, 'remote/index.html');
 const MANIFEST = path.join(DIST, REMOTE_MANIFEST_FILE);
 const built = fs.existsSync(PAGE) && fs.existsSync(MANIFEST);
-const required = process.env.WMUX_REQUIRE_BUILD === '1';
+const required = process.env.REMOTEA_REQUIRE_BUILD === '1';
 
 describe('vite entries (#254)', () => {
   it('names the desktop entry index, so its chunk stays assets/index-*.js', () => {

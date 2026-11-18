@@ -216,7 +216,7 @@ describe('RemoteHostClient against a real server', () => {
     const bridge = new HookBridge({ secret, relay: (id, m, p) => rig.hub.relayRpc(id, m, p) });
     const bport = await bridge.listen(0);
     cleanup.push(() => bridge.close());
-    // Exactly what wmux-hook.js sends (see hook-bridge.test.ts for the real script).
+    // Exactly what remotea-hook.js sends (see hook-bridge.test.ts for the real script).
     const send = (params: Record<string, unknown>) => new Promise<string>((resolve, reject) => {
       const sock = net.connect(bport, '127.0.0.1', () => sock.write(JSON.stringify({ method: 'hook.event', params: { surfaceId: 'surf-int-9', ...params }, id: 1, token: hookToken(secret, 'surf-int-9') }) + '\n'));
       sock.setEncoding('utf8');

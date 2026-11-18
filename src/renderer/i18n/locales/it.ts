@@ -103,7 +103,7 @@ export const it: Translation = {
   'markdown.openInApp': "Apri nell'applicazione predefinita",
   'markdown.moreActions': 'Altre azioni',
   'markdown.noFile': 'Nessun file associato',
-  'markdown.empty': 'Nessun contenuto. Usa wmux markdown set, oppure trascina qui un file.',
+  'markdown.empty': 'Nessun contenuto. Usa remotea markdown set, oppure trascina qui un file.',
   'markdown.error.copy': 'Impossibile scrivere negli appunti',
   'markdown.error.read': 'Impossibile leggere il file',
   'markdown.error.action': "L'azione non è riuscita",

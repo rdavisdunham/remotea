@@ -1728,7 +1728,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     });
 
     // OSC 7: the shell's working directory, reported through its own output
-    // (#378) — how a WSL shell, which has no pipe and no WMUX_SURFACE_ID when
+    // (#378) — how a WSL shell, which has no pipe and no REMOTEA_SURFACE_ID when
     // `wsl` is typed into a PowerShell pane, moves the explorer. Forwarded raw;
     // main decides whether the path is one wmux may act on.
     terminal.parser.registerOscHandler(7, (data) => {

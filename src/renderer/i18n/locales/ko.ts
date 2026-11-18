@@ -119,7 +119,7 @@ export const ko: Translation = {
   'markdown.moreActions': '추가 작업',
   'markdown.noFile': '파일과 연결되어 있지 않습니다',
   'markdown.empty':
-    '내용이 없습니다. wmux markdown set 으로 내용을 추가하거나 파일을 여기에 끌어다 놓으세요.',
+    '내용이 없습니다. remotea markdown set 으로 내용을 추가하거나 파일을 여기에 끌어다 놓으세요.',
   'markdown.error.copy': '클립보드에 쓰지 못했습니다',
   'markdown.error.read': '파일을 읽지 못했습니다',
   'markdown.error.action': '작업에 실패했습니다',

@@ -14,7 +14,7 @@ const consent = {
 };
 const observed: IntegrationStatus = {
   environment: 'desktop-user', checkedAt: 1234, runtime: 'not-probed', failures: [],
-  files: [{ provider: 'Kiro', feature: 'instructions', path: '/temporary-home/.kiro/steering/wmux.md', state: 'missing' }],
+  files: [{ provider: 'Kiro', feature: 'instructions', path: '/temporary-home/.kiro/steering/remotea.md', state: 'missing' }],
 };
 let root: Root;
 let container: HTMLDivElement;

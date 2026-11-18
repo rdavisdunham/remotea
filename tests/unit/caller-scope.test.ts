@@ -67,7 +67,7 @@ describe('caller resolution (issue #143)', () => {
   });
 
   // "Fall back to the focused window only when the id is unknown" — a stale
-  // WMUX_SURFACE_ID (closed pane, exported env) must not strand the caller.
+  // REMOTEA_SURFACE_ID (closed pane, exported env) must not strand the caller.
   it('falls back to the focused window, with no workspace opinion, for an unknown surface', async () => {
     const a = win(1, {});
     const b = win(2, {});

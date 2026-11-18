@@ -24,8 +24,8 @@ import { execFileSync } from 'child_process';
  * Neither needs a repo.
  */
 
-const PS1 = path.join(__dirname, '..', '..', 'src', 'shell-integration', 'wmux-powershell-integration.ps1');
-const SH = path.join(__dirname, '..', '..', 'src', 'shell-integration', 'wmux-bash-integration.sh');
+const PS1 = path.join(__dirname, '..', '..', 'src', 'shell-integration', 'remotea-powershell-integration.ps1');
+const SH = path.join(__dirname, '..', '..', 'src', 'shell-integration', 'remotea-bash-integration.sh');
 const psSource = fs.readFileSync(PS1, 'utf8').replace(/\r\n/g, '\n');
 const shSource = fs.readFileSync(SH, 'utf8').replace(/\r\n/g, '\n');
 
@@ -156,7 +156,7 @@ async function workerReports(shell: string, cwd: string): Promise<{ taken: strin
   try {
     const taken = await new Promise<string>((resolve, reject) => {
       const child = spawn(shell, ['-NoProfile', '-NonInteractive', '-Command', script], {
-        env: { ...process.env, WMUX_INSTANCE: instance, WMUX_SURFACE_ID: SURFACE, WMUX_PIPE_TOKEN: '' },
+        env: { ...process.env, REMOTEA_INSTANCE: instance, REMOTEA_SURFACE_ID: SURFACE, REMOTEA_PIPE_TOKEN: '' },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       let out = '';
@@ -220,7 +220,7 @@ function shBranchMessage(lines: string[], exitCode: number): string {
   const script = [
     // Sourced with no surface id, so the DEBUG trap the file installs has
     // nothing to report while the harness sets itself up; then the trap goes.
-    `unset WMUX_SURFACE_ID`,
+    `unset REMOTEA_SURFACE_ID`,
     `source ${sq(scriptPath)}`,
     `trap - DEBUG`,
     // The fake git insists on the argv the integration must send: without
@@ -232,7 +232,7 @@ function shBranchMessage(lines: string[], exitCode: number): string {
     `  return ${exitCode}`,
     `}`,
     `_wmux_report() { printf '[%s]\\n' "$1"; }`,
-    `export WMUX_SURFACE_ID=${sq(SURFACE)}`,
+    `export REMOTEA_SURFACE_ID=${sq(SURFACE)}`,
     `_wmux_report_git`,
   ].join('\n');
   return execFileSync(bash as string, ['-c', script], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();

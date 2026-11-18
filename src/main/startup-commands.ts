@@ -4,7 +4,7 @@
 // `claude --resume <id>` on restore #186, a devcontainer re-entry #19) reach
 // the shell one of two ways:
 //
-//   * PowerShell with the integration script: baked into WMUX_STARTUP_COMMANDS
+//   * PowerShell with the integration script: baked into REMOTEA_STARTUP_COMMANDS
 //     and run by the script during init. No keystrokes at all — measured for
 //     #251 by spawning pwsh 7 under node-pty exactly as PtyManager does, with a
 //     stand-in `claude` that prints its argv: `["--resume","<id>"]` intact on

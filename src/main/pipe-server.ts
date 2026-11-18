@@ -21,7 +21,7 @@ export interface V2Request {
 // agent status / notifications / diff refreshes (issue #72) — requires a valid
 // per-instance token. The legitimate telemetry clients (Claude Code hooks,
 // agents, shell integration) all run inside wmux-spawned shells and carry
-// WMUX_PIPE_TOKEN, so nothing tokenless has a reason to write state. Keeping
+// REMOTEA_PIPE_TOKEN, so nothing tokenless has a reason to write state. Keeping
 // an allowlist (rather than a blocklist) means any new privileged method is
 // locked down by default.
 const PUBLIC_V2_METHODS = new Set<string>([
@@ -133,7 +133,7 @@ export class PipeServer extends EventEmitter {
     });
 
     this.server.listen(this.pipePath, () => {
-      console.log(`wmux pipe server listening on ${this.pipePath}`);
+      console.log(`remotea pipe server listening on ${this.pipePath}`);
     });
 
     this.server.on('error', (err: NodeJS.ErrnoException) => {
@@ -156,7 +156,7 @@ export class PipeServer extends EventEmitter {
 
   private handleV1(rawLine: string, reply: (text: string) => void): void {
     // V1 lines from wmux-spawned clients carry an "auth <token> " prefix
-    // (WMUX_PIPE_TOKEN is injected into every wmux shell). All V1 commands
+    // (REMOTEA_PIPE_TOKEN is injected into every wmux shell). All V1 commands
     // mutate UI state (notify, report_pwd, report_pr, shell state, …), so —
     // like privileged V2 methods — they require the per-instance token; an
     // unauthenticated local process must not be able to spoof them (issue

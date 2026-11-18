@@ -114,7 +114,7 @@ export const tr: Translation = {
   'markdown.openInApp': 'Varsayılan uygulamada aç',
   'markdown.moreActions': 'Daha fazla eylem',
   'markdown.noFile': 'Bir dosyaya dayanmıyor',
-  'markdown.empty': 'İçerik yok. İçerik eklemek için wmux markdown set kullanın veya buraya bir dosya bırakın.',
+  'markdown.empty': 'İçerik yok. İçerik eklemek için remotea markdown set kullanın veya buraya bir dosya bırakın.',
   'markdown.error.copy': 'Panoya yazılamadı',
   'markdown.error.read': 'Dosya okunamadı',
   'markdown.error.action': 'Eylem başarısız oldu',

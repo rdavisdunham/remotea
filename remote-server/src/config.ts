@@ -20,7 +20,7 @@ export interface ServerConfig {
   exitedRetentionDays: number;
   tombstoneDays: number;
   /**
-   * Loopback port for the hook bridge: agents' hooks (wmux-hook.js and the
+   * Loopback port for the hook bridge: agents' hooks (remotea-hook.js and the
    * wmux plugins) report status here, and the server relays it to the apps.
    * 0 turns the bridge off.
    */

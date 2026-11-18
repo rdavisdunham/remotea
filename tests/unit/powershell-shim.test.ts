@@ -12,14 +12,14 @@ import {
 } from '../../src/main/powershell-shim';
 
 /**
- * PowerShell callers lost their argument quoting through wmux.cmd (issue #154):
+ * PowerShell callers lost their argument quoting through remotea.cmd (issue #154):
  * PowerShell strips the quotes when invoking a batch file, cmd.exe re-reads the
  * bare `>` / `|` / `&` as shell syntax, and `wmux browser eval
  * "document.title.length>0"` silently redirected its own output into a file
  * named `0` — exit 0, no output, a junk file, and `wmux send` transmitting text
  * the user never wrote.
  *
- * The redirect is applied to cmd.exe's invocation line before wmux.cmd starts,
+ * The redirect is applied to cmd.exe's invocation line before remotea.cmd starts,
  * which is why the fix is a .ps1 (PowerShell prefers it over every PATHEXT
  * entry and splats @args natively) and not more careful batch quoting.
  *
@@ -83,15 +83,15 @@ describe('PowerShell shim gate (issue #154)', () => {
   it('ships the probe script the gate executes, next to the shim it vouches for', () => {
     // Same directory and same origin, or the probe stops being representative
     // of the file it is clearing.
-    expect(fs.existsSync(path.join(SHIM_DIR, 'wmux.ps1'))).toBe(true);
-    expect(fs.readFileSync(path.join(SHIM_DIR, 'wmux-shim-probe.ps1'), 'utf-8'))
+    expect(fs.existsSync(path.join(SHIM_DIR, 'remotea.ps1'))).toBe(true);
+    expect(fs.readFileSync(path.join(SHIM_DIR, 'remotea-shim-probe.ps1'), 'utf-8'))
       .toContain(SHIM_PROBE_MARKER);
   });
 
   it('passes arguments through natively instead of re-exposing them to a shell', () => {
-    const shim = fs.readFileSync(path.join(SHIM_DIR, 'wmux.ps1'), 'utf-8');
+    const shim = fs.readFileSync(path.join(SHIM_DIR, 'remotea.ps1'), 'utf-8');
     expect(shim).toContain('@args');
-    expect(shim).toMatch(/\$env:WMUX_CLI/);
+    expect(shim).toMatch(/\$env:REMOTEA_CLI/);
   });
 });
 
@@ -120,8 +120,8 @@ describe.skipIf(!powershell)('a shim invoked from PowerShell (issue #154)', () =
   // Stands in for the CLI: prints argv as JSON, so a mangled argument is visible.
   const echo = path.join(dir, 'echo.js');
   fs.writeFileSync(echo, 'console.log(JSON.stringify(process.argv.slice(2)));\n');
-  fs.writeFileSync(path.join(dir, 'wmux.cmd'), '@echo off\r\nnode "%WMUX_CLI%" %*\r\n');
-  fs.copyFileSync(path.join(SHIM_DIR, 'wmux.ps1'), path.join(dir, 'wmux.ps1'));
+  fs.writeFileSync(path.join(dir, 'remotea.cmd'), '@echo off\r\nnode "%REMOTEA_CLI%" %*\r\n');
+  fs.copyFileSync(path.join(SHIM_DIR, 'remotea.ps1'), path.join(dir, 'remotea.ps1'));
 
   /** Run `wmux <args>` the way a user types it, letting PATH pick the shim. */
   function callThroughPath(args: string[]): string {
@@ -133,7 +133,7 @@ describe.skipIf(!powershell)('a shim invoked from PowerShell (issue #154)', () =
         encoding: 'utf-8',
         timeout: 30000,
         cwd: dir,
-        env: { ...process.env, WMUX_CLI: echo, PSExecutionPolicyPreference: 'Bypass' },
+        env: { ...process.env, REMOTEA_CLI: echo, PSExecutionPolicyPreference: 'Bypass' },
       },
     );
   }
@@ -184,15 +184,15 @@ const ROUND_TRIPS: string[][] = [
   ['', 'x', ''],
   ['{"cmd":"claude --x \\"y\\"","label":"L"}'],
   // Not quote cases, but the `--%` path expands %VAR% and must not reach these.
-  ['%PATH%', '100%', '%WMUX_PS_ARGLINE%', 'document.title.length>0', 'a|b', "it's"],
+  ['%PATH%', '100%', '%REMOTEA_PS_ARGLINE%', 'document.title.length>0', 'a|b', "it's"],
 ];
 
 describe.skipIf(installedHosts.length === 0)('embedded quotes survive the shim (issue #247)', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-shim-247-'));
   const echo = path.join(dir, 'echo.js');
   fs.writeFileSync(echo, 'console.log(JSON.stringify(process.argv.slice(2)));\n');
-  fs.copyFileSync(path.join(SHIM_DIR, 'wmux.ps1'), path.join(dir, 'wmux.ps1'));
-  const env = { ...process.env, WMUX_CLI: echo, PSExecutionPolicyPreference: 'Bypass' };
+  fs.copyFileSync(path.join(SHIM_DIR, 'remotea.ps1'), path.join(dir, 'remotea.ps1'));
+  const env = { ...process.env, REMOTEA_CLI: echo, PSExecutionPolicyPreference: 'Bypass' };
 
   function run(host: string, script: string): string {
     return execFileSync(

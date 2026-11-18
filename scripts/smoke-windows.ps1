@@ -4,7 +4,7 @@
 #
 #   pwsh scripts/smoke-windows.ps1 -Exe release\win-unpacked\remotea.exe -Out smoke\unpacked.json -Instance smoke-unpacked
 #
-# Each run uses its own WMUX_INSTANCE, so it never shares a pipe, %APPDATA%
+# Each run uses its own REMOTEA_INSTANCE, so it never shares a pipe, %APPDATA%
 # folder or single-instance lock with an installed remotea (or another variant).
 param(
   [Parameter(Mandatory = $true)] [string] $Exe,
@@ -19,7 +19,7 @@ $outFull = [System.IO.Path]::GetFullPath($Out)
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outFull) | Out-Null
 Remove-Item -LiteralPath $outFull -ErrorAction SilentlyContinue
 
-$env:WMUX_INSTANCE = $Instance
+$env:REMOTEA_INSTANCE = $Instance
 # Quoted: Start-Process joins the list with spaces and quotes nothing itself.
 $appArgs = @('--smoke', "--smoke-out=`"$outFull`"", "--smoke-timeout=$TimeoutMs")
 Write-Host "smoke: $Exe $($appArgs -join ' ') (instance $Instance)"

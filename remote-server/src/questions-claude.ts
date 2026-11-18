@@ -12,7 +12,7 @@
  *   `tool_response.answers` (the acceptance signal); a locally answered call
  *   also carries `tool_response.annotations`.
  *
- * The hook helper (wmux-hook.js `--event AskUserQuestion`) asks the bridge
+ * The hook helper (remotea-hook.js `--event AskUserQuestion`) asks the bridge
  * (`remotea.question`) and this broker holds the request:
  *
  *   held       `question` sent up; the pane is needs_you

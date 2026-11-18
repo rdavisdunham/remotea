@@ -9,8 +9,9 @@
  * location:
  *   - a folder the caller names (the host's `~/.local/share/remotea/cli`,
  *     this install's `resources/cli` and `resources/cli-bin`), or
- *   - a checkout of this repo: a `resources/cli` or `resources/cli-bin`
- *     folder whose `package.json` two levels up says `"name": "remotea"`.
+ *   - a checkout of this repo: a `resources/cli`, `resources/cli-bin` or
+ *     `src/cli-bin` (what a source run renders into blocks) folder whose
+ *     `package.json` two levels up says `"name": "remotea"`.
  *     A wmux checkout says `"name": "wmux"` there and is never proven.
  *
  * Pure apart from the injected `readFile`, so both the desktop and the host
@@ -44,10 +45,10 @@ function isInside(p: string, dir: string): boolean {
   return a === b || a.startsWith(b + '/');
 }
 
-/** A `resources/cli` or `resources/cli-bin` folder of a remotea checkout. */
+/** A `resources/cli`, `resources/cli-bin` or `src/cli-bin` folder of a remotea checkout. */
 function isRemoteaCheckoutDir(dir: string, readFile: OwnershipContext['readFile']): boolean {
   const d = norm(dir);
-  const m = /^(.*)\/resources\/cli(?:-bin)?$/i.exec(d);
+  const m = /^(.*)\/(?:resources\/cli(?:-bin)?|src\/cli-bin)$/i.exec(d);
   if (!m) return false;
   const raw = readFile(`${m[1]}/package.json`);
   if (raw === null) return false;

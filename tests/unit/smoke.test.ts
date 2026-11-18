@@ -184,7 +184,7 @@ describe('smoke wiring', () => {
     const firstImport = index.split(/\r?\n/).find((l) => l.startsWith('import '));
     expect(firstImport).toBe("import './smoke-env';");
     const env = fs.readFileSync(path.join(repo, 'src/main/smoke-env.ts'), 'utf8');
-    for (const v of ['WMUX_INSTANCE', 'REMOTEA_SKIP_AGENT_INTEGRATION', 'WMUX_DISABLE_UPDATER']) expect(env).toContain(v);
+    for (const v of ['REMOTEA_INSTANCE', 'REMOTEA_SKIP_AGENT_INTEGRATION', 'REMOTEA_DISABLE_UPDATER']) expect(env).toContain(v);
   });
 
   it('is run by the Windows smoke workflow on the unpacked build and the installer', () => {

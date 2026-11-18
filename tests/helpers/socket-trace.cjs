@@ -5,7 +5,7 @@
 const fs = require('fs');
 const net = require('net');
 
-const log = process.env.WMUX_SOCKET_TRACE;
+const log = process.env.REMOTEA_SOCKET_TRACE;
 const traced = new WeakSet();
 const note = (what) => { try { fs.appendFileSync(log, what + '\n'); } catch { /* never break the client */ } };
 

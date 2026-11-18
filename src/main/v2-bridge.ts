@@ -53,7 +53,7 @@ export interface CallerTarget<W> {
  *   1. No caller id → the focused window, no workspace opinion. Unchanged.
  *   2. Probe windows for the surface, cached window first. First hit wins and
  *      supplies BOTH the window and the workspace.
- *   3. Surface unknown anywhere (stale `WMUX_SURFACE_ID`, closed pane) → fall
+ *   3. Surface unknown anywhere (stale `REMOTEA_SURFACE_ID`, closed pane) → fall
  *      back to the focused window, exactly as if no id had been passed.
  *
  * The cache is only a probe-ORDER hint, never the answer. It used to be
@@ -222,7 +222,7 @@ const SPECS: Record<string, BridgeSpec> = {
     emptyOnNoWindow: { workspaces: [] },
   },
   // The caller's own workspace. `callerScoped` supplies the id from the
-  // caller's surface; when that resolution misses (no WMUX_SURFACE_ID, or a
+  // caller's surface; when that resolution misses (no REMOTEA_SURFACE_ID, or a
   // stale one from a closed pane) no id is injected, the renderer returns null
   // and `requireResult` turns that into an error + non-zero CLI exit. An
   // explicit miss rather than the focused workspace, so a caller can tell

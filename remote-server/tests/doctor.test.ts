@@ -78,7 +78,7 @@ function facts(over: Partial<DoctorFacts> = {}): DoctorFacts {
     agentHooks: [
       { agent: 'claude', file: `${HOME}/.claude/settings.json`, present: true, entries: 9, expected: 9, helperPath: true },
       { agent: 'codex', file: `${HOME}/.codex/hooks.json`, present: true, entries: 7, expected: 7, helperPath: true, trust: { trusted: 7, disabled: 0, total: 7 } },
-      { agent: 'opencode', file: `${HOME}/.config/opencode/plugin/wmux.js`, present: false, entries: 0, expected: 1, helperPath: null, version: { installed: null, bundled: 'ffff' } },
+      { agent: 'opencode', file: `${HOME}/.config/opencode/plugin/remotea.js`, present: false, entries: 0, expected: 1, helperPath: null, version: { installed: null, bundled: 'ffff' } },
     ],
     eridani: { configured: true, enabled: true, keyPresent: true, mode: 'parity', link: link() },
     collector: { sqlite: null, stateMtime: NOW - 60_000, scan: { mode: 'parity', lastScanAt: NOW - 60_000, lastScan: { seen: 4, queued: 1, failed: 0 }, lastScanError: null, codexUnavailable: null } },
@@ -192,7 +192,7 @@ describe('doctor: evaluate', () => {
       agentHooks: [
         { agent: 'claude', file: `${HOME}/.claude/settings.json`, present: true, entries: 0, expected: 9, helperPath: null },
         { agent: 'codex', file: `${HOME}/.codex/hooks.json`, present: true, entries: 7, expected: 7, helperPath: true, trust: { trusted: 5, disabled: 0, total: 7 } },
-        { agent: 'opencode', file: `${HOME}/.config/opencode/plugin/wmux.js`, present: true, entries: 1, expected: 1, helperPath: null, version: { installed: 'aaaa', bundled: 'bbbb' } },
+        { agent: 'opencode', file: `${HOME}/.config/opencode/plugin/remotea.js`, present: true, entries: 1, expected: 1, helperPath: null, version: { installed: 'aaaa', bundled: 'bbbb' } },
       ],
     }));
     expect(byId(items, 'hooks.helper')).toMatchObject({ level: 'warn', fix: 'remotea hooks install' });
@@ -289,7 +289,7 @@ describe('doctor: verify dependencies and database heuristics', () => {
 
 describe('doctor: Codex trust records', () => {
   const hooks = '/home/u/.codex/hooks.json';
-  const handlers: Array<[string, number, number, string]> = [['SessionStart', 1, 0, 'node wmux-hook.js'], ['PermissionRequest', 0, 0, 'node wmux-hook.js']];
+  const handlers: Array<[string, number, number, string]> = [['SessionStart', 1, 0, 'node remotea-hook.js'], ['PermissionRequest', 0, 0, 'node remotea-hook.js']];
   it('counts trusted and disabled entries by position; no hooks.state at all is "cannot tell"', () => {
     const toml = [
       '[hooks.state]',

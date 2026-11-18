@@ -627,7 +627,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.restoreOpencodeSessionsHint",
-      "label": "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode integration (the server plugin, or the TUI plugin installed with `wmux opencode-tui` for OpenCode 2). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 on a remote or shared server is captured by the TUI plugin; re-run `wmux opencode-tui` in that environment after a remotea update."
+      "label": "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode integration (the server plugin, or the TUI plugin installed with `remotea opencode-tui` for OpenCode 2). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 on a remote or shared server is captured by the TUI plugin; re-run `remotea opencode-tui` in that environment after a remotea update."
     },
     {
       "key": "settings.workspacePanel.restoreAgySessions",
@@ -659,7 +659,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.detectAgentScreensHint",
-      "label": "For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `wmux detect explain` to see which rule fired."
+      "label": "For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `remotea detect explain` to see which rule fired."
     },
     {
       "key": "settings.workspacePanel.explorerOpenByDefault",
@@ -695,7 +695,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.keepAwakeHint",
-      "label": "Prevents Windows from sleeping while coding agents are working. Smart mode only engages for agents that report a working state through hooks — Claude Code, Qwen Code, Grok, the OpenCode plugin, or `wmux report-agent` — and releases it when they are idle or waiting on you. A working claim not renewed for 15 minutes stops counting."
+      "label": "Prevents Windows from sleeping while coding agents are working. Smart mode only engages for agents that report a working state through hooks — Claude Code, Qwen Code, Grok, the OpenCode plugin, or `remotea report-agent` — and releases it when they are idle or waiting on you. A working claim not renewed for 15 minutes stops counting."
     },
     {
       "key": "settings.workspacePanel.preventDisplaySleep",
@@ -735,7 +735,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.newWorkspaceHint",
-      "label": "What a new workspace opens with — the sidebar \"+\", Ctrl+N, first launch and wmux new-workspace all use this. A saved layout marked Default below wins over it."
+      "label": "What a new workspace opens with — the sidebar \"+\", Ctrl+N, first launch and remotea new-workspace all use this. A saved layout marked Default below wins over it."
     },
     {
       "key": "settings.workspacePanel.panes",
@@ -2073,7 +2073,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.help.credits",
-      "label": "Credits — built on wmux and inspired by herdr"
+      "label": "Credits — built on remotea and inspired by herdr"
     },
     {
       "key": "settings.help.tasks",
@@ -2161,7 +2161,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "help.task.cli.body",
-      "label": "The desktop package exposes remotea and injects working wmux compatibility shims. On a host, remotea administers the server; wmux may reach only a status bridge. Run wmux identify and wmux capabilities before using a command family. A successful ping does not establish browser or workspace control. Desktop --remote addresses a desktop CLI bridge, not a session-server WebSocket."
+      "label": "The desktop package exposes remotea and injects working remotea compatibility shims. On a host, remotea administers the server; remotea may reach only a status bridge. Run remotea identify and remotea capabilities before using a command family. A successful ping does not establish browser or workspace control. Desktop --remote addresses a desktop CLI bridge, not a session-server WebSocket."
     },
     {
       "key": "help.task.customize.title",

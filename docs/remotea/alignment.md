@@ -41,8 +41,8 @@ Closing a local terminal ends its process. Hiding a host tab only hides it on th
 | PtyManager and native shell discovery | Retained for standalone Windows use; router removes the explicit `local:` system-shell marker before local creation |
 | Local AgentManager | Continues using its local PTY API; no local Eridani executor is assembled |
 | TerminalRouter and host protocol | Existing `remote:<host> [command]` retained; missing/malformed hosts never fall back to local launch or termination |
-| CLI and shell integration | `wmux`, `remotea`, `WMUX_*`, named-pipe identities and `window.wmux` retained until the wmux cleanup renames them; outside-facing names then move once, with a move command and no aliases |
-| Settings and TOML | Existing `wmux-*` keys and `.wmux` file formats retained until the wmux cleanup; its move command carries them over once, with no mass reset |
+| CLI and shell integration | `remotea`, `remotea`, `REMOTEA_*`, named-pipe identities and `window.wmux` retained until the remotea cleanup renames them; outside-facing names then move once, with a move command and no aliases |
+| Settings and TOML | Existing `wmux-*` keys and `.wmux` file formats retained until the remotea cleanup; its move command carries them over once, with no mass reset |
 | Profiles, layouts, manifests | Existing records load; location UI interprets compatible shell fields and preserves commands |
 | Local files/Git/worktrees | Retained; supplied source-aware IPC requests reject remote/unknown ownership; legacy cwd-only calls retain desktop-local semantics |
 | Remote files | Source-bound file routing, optimistic save protection and change statistics retained |

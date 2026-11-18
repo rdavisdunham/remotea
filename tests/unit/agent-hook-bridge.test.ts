@@ -194,7 +194,7 @@ describe('applyHookToAgentState', () => {
   it('background work does not retract a live question (issue #151)', () => {
     // The reported case: the agent starts a background shell, then asks a
     // question with options. The background command's own hooks carry the SAME
-    // WMUX_SURFACE_ID, so its tool lifecycle lands on the pane that is asking.
+    // REMOTEA_SURFACE_ID, so its tool lifecycle lands on the pane that is asking.
     // Every one of these used to assert awaitingHuman: false and snap the pane
     // back to "Running" with the question still on screen.
     applyHookToAgentState(surf, 'UserPromptSubmit', null);

@@ -1,9 +1,9 @@
-# The extensionless wmux CLI shim is a bash script — force LF so its shebang
+# The extensionless remotea CLI shim is a bash script — force LF so its shebang
 # runs under bash even on Windows with core.autocrlf=true.
-src/cli-bin/wmux text eol=lf
+src/cli-bin/remotea text eol=lf
 
 # $BROWSER entry point; same reason — bash shebang, must stay LF.
-src/cli-bin/wmux-open-url text eol=lf
+src/cli-bin/remotea-open-url text eol=lf
 
 # Every shell script, for the same reason. The release is built on a Windows
 # runner with core.autocrlf=true, so without this the bash integration shipped
@@ -16,9 +16,9 @@ src/cli-bin/wmux-open-url text eol=lf
 # runs as `tlocal` and `REM` as `M`. It half-works — the last line still
 # executes — which is exactly why nobody notices. This has been riding on
 # core.autocrlf=true; a clone with autocrlf=false shipped a broken shim.
-src/cli-bin/wmux.cmd text eol=crlf
-resources/shell-integration/wmux-cmd-integration.cmd text eol=crlf
-src/shell-integration/wmux-cmd-integration.cmd text eol=crlf
+src/cli-bin/remotea.cmd text eol=crlf
+resources/shell-integration/remotea-cmd-integration.cmd text eol=crlf
+src/shell-integration/remotea-cmd-integration.cmd text eol=crlf
 
 # Generated from .agents/skills/ by `npm run sync:skills` (#368); GitHub collapses it in diffs.
 .claude/skills/** linguist-generated=true

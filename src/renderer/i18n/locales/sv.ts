@@ -103,7 +103,7 @@ export const sv: Translation = {
   'markdown.openInApp': 'Öppna i standardappen',
   'markdown.moreActions': 'Fler åtgärder',
   'markdown.noFile': 'Har ingen fil kopplad',
-  'markdown.empty': 'Inget innehåll. Använd wmux markdown set för att lägga till innehåll, eller släpp en fil här.',
+  'markdown.empty': 'Inget innehåll. Använd remotea markdown set för att lägga till innehåll, eller släpp en fil här.',
   'markdown.error.copy': 'Kunde inte skriva till urklipp',
   'markdown.error.read': 'Kunde inte läsa filen',
   'markdown.error.action': 'Åtgärden misslyckades',

@@ -168,7 +168,7 @@ export const cs: Translation = {
   'markdown.openInApp': 'Otevřít ve výchozí aplikaci',
   'markdown.moreActions': 'Další akce',
   'markdown.noFile': 'Není podložen souborem',
-  'markdown.empty': 'Žádný obsah. Přidejte jej příkazem wmux markdown set, nebo sem přetáhněte soubor.',
+  'markdown.empty': 'Žádný obsah. Přidejte jej příkazem remotea markdown set, nebo sem přetáhněte soubor.',
   'markdown.error.copy': 'Nepodařilo se zapsat do schránky',
   'markdown.error.read': 'Nepodařilo se přečíst soubor',
   'markdown.error.action': 'Akce se nezdařila',
@@ -877,7 +877,7 @@ export const cs: Translation = {
   'settings.workspacePanel.sessionSnapshot30': '30 minut',
   'settings.workspacePanel.sessionSnapshot60': '60 minut',
   'settings.workspacePanel.restoreOpencodeSessionsHint':
-    'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje integraci OpenCode v remotea (serverový plugin, nebo TUI plugin nainstalovaný pomocí `wmux opencode-tui` pro OpenCode 2). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. OpenCode 2 na vzdáleném nebo sdíleném serveru zachytává TUI plugin; po aktualizaci remotea spusťte v daném prostředí znovu `wmux opencode-tui`.',
+    'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje integraci OpenCode v remotea (serverový plugin, nebo TUI plugin nainstalovaný pomocí `remotea opencode-tui` pro OpenCode 2). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. OpenCode 2 na vzdáleném nebo sdíleném serveru zachytává TUI plugin; po aktualizaci remotea spusťte v daném prostředí znovu `remotea opencode-tui`.',
   'settings.workspacePanel.restoreQwenSessionsHint':
     'Znovu spustí Qwen Code v každé obnovené kartě, kde běžel, pomocí „qwen --resume“ v původním adresáři. Vyžaduje hooky remotea pro Qwen (zapnuté stavové hooky) a Qwen Code 0.14 nebo novější. Karty, jejichž relace už Qwen nemá, se přeskočí. Řádně ukončené relace Qwen se neobnovují.',
   'settings.workspacePanel.restoreAgySessionsHint':
@@ -898,7 +898,7 @@ export const cs: Translation = {
   // Pracovní prostor — rozložení a uložené předvolby
   'settings.workspacePanel.newWorkspaceSection': 'Nový pracovní prostor',
   'settings.workspacePanel.newWorkspaceHint':
-    'Určuje, co se otevře v novém pracovním prostoru — používá ho tlačítko „+“ v postranním panelu, Ctrl+N, první spuštění i wmux new-workspace. Přednost má uložené rozložení označené níže jako Výchozí.',
+    'Určuje, co se otevře v novém pracovním prostoru — používá ho tlačítko „+“ v postranním panelu, Ctrl+N, první spuštění i remotea new-workspace. Přednost má uložené rozložení označené níže jako Výchozí.',
   'settings.workspacePanel.panes': 'Terminálové panely',
   'settings.workspacePanel.layout': 'Uspořádání',
   'settings.workspacePanel.layoutGrid': 'Mřížka (vyvážené řádky)',
@@ -976,7 +976,7 @@ export const cs: Translation = {
   'agentNavigator.fromScreen': 'přečteno z obrazovky',
   'settings.workspacePanel.detectAgentScreens': 'Odhadovat stav agentů podle obsahu obrazovky',
   'settings.workspacePanel.detectAgentScreensHint':
-    'U agentů, kteří sami nehlásí stav (Codex, Gemini, Aider…), porovnává obsah jejich obrazovky s přiloženými pravidly a rozlišuje čekání na vás od probíhající práce. Vše probíhá pouze na tomto počítači a nikdy nepřepisuje stav oznámený agentem — pouze upřesňuje nečinnost, pokud na obrazovce zůstala otázka. Panely, jejichž agent hlásí práci nebo čekání na vás, se vůbec nečtou. Pravidla můžete upravit v %APPDATA%\\remotea\\agent-detection; příkaz „wmux detect explain“ ukáže, které pravidlo se použilo.',
+    'U agentů, kteří sami nehlásí stav (Codex, Gemini, Aider…), porovnává obsah jejich obrazovky s přiloženými pravidly a rozlišuje čekání na vás od probíhající práce. Vše probíhá pouze na tomto počítači a nikdy nepřepisuje stav oznámený agentem — pouze upřesňuje nečinnost, pokud na obrazovce zůstala otázka. Panely, jejichž agent hlásí práci nebo čekání na vás, se vůbec nečtou. Pravidla můžete upravit v %APPDATA%\\remotea\\agent-detection; příkaz „remotea detect explain“ ukáže, které pravidlo se použilo.',
   'settings.workspacePanel.closeToTray': 'Zavírat do oznamovací oblasti',
   'settings.workspacePanel.closeToTrayHint':
     'Tlačítko × okna nebo Alt+F4 skryje poslední okno remotea do oznamovací oblasti místo ukončení, takže relace terminálu i agenti dál běží. Kliknutím na ikonu ho vrátíte; „Ukončit remotea“ v její nabídce aplikaci skutečně ukončí. Má přednost před potvrzením výše.',

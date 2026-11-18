@@ -2,7 +2,7 @@
 #
 # install-npiperelay.sh — Download npiperelay.exe (SHA-256 pinned) into WSL2 so
 # the wmux CLI / `wmux bridge` can reach the Windows \\.\pipe\wmux named pipe via
-# WSL interop (see src/cli/wmux.ts → connectViaNpiperelay).
+# WSL interop (see src/cli/remotea.ts → connectViaNpiperelay).
 #
 # npiperelay.exe is a small open-source Windows binary that forwards a named pipe
 # to its own stdin/stdout; WSL2 executes it via interop, so no socat/Unix-socket

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readScreenParams } from '../../src/cli/wmux';
+import { readScreenParams } from '../../src/cli/remotea';
 
 /**
  * `wmux read-screen` argv → the `surface.read_text` params. `--events` asks for

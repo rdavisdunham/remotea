@@ -4,13 +4,13 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 
 /**
- * WMUX_STARTUP_COMMANDS must not outlive the read that consumes it.
+ * REMOTEA_STARTUP_COMMANDS must not outlive the read that consumes it.
  *
  * The PowerShell integration runs a pane's startup commands during init
  * (quick-launch profiles, `wmux agent spawn`, restore's `claude --resume <id>`).
  * It used to clear the variable AFTER the loop, so the command it had just
  * started inherited it — found while chasing #251: a baked
- * `cmd /c echo %WMUX_STARTUP_COMMANDS%` printed the variable, which means a
+ * `cmd /c echo %REMOTEA_STARTUP_COMMANDS%` printed the variable, which means a
  * restored Claude and every process it spawned carried the command line,
  * session id included, in their environment.
  *
@@ -18,11 +18,11 @@ import { execFileSync } from 'child_process';
  * shipped text rather than a copy of it.
  */
 
-const PS1 = path.join(__dirname, '..', '..', 'src', 'shell-integration', 'wmux-powershell-integration.ps1');
+const PS1 = path.join(__dirname, '..', '..', 'src', 'shell-integration', 'remotea-powershell-integration.ps1');
 const psSource = fs.readFileSync(PS1, 'utf8').replace(/\r\n/g, '\n');
 
 function startupBlock(): string {
-  const start = psSource.indexOf('if ($env:WMUX_STARTUP_COMMANDS) {');
+  const start = psSource.indexOf('if ($env:REMOTEA_STARTUP_COMMANDS) {');
   expect(start).toBeGreaterThan(-1);
   const end = psSource.indexOf('\n}\n', start);
   expect(end).toBeGreaterThan(start);
@@ -37,16 +37,16 @@ const POWERSHELL = path.join(
 
 function runBlock(commands: string): string {
   return execFileSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', startupBlock()], {
-    env: { ...process.env, WMUX_STARTUP_COMMANDS: commands },
+    env: { ...process.env, REMOTEA_STARTUP_COMMANDS: commands },
     encoding: 'utf8',
   }).replace(/\r\n/g, '\n');
 }
 
-describe.runIf(process.platform === 'win32')('WMUX_STARTUP_COMMANDS is consumed, not inherited', () => {
+describe.runIf(process.platform === 'win32')('REMOTEA_STARTUP_COMMANDS is consumed, not inherited', () => {
   it('a startup command does not see the variable in its own environment', () => {
     // `if defined`, not `echo %VAR%`: the leaked value would be the probe's
     // own text, so an echo-based assertion matches whether it leaked or not.
-    const out = runBlock('cmd /c "if defined WMUX_STARTUP_COMMANDS (echo LEAKED) else (echo CLEAN)"');
+    const out = runBlock('cmd /c "if defined REMOTEA_STARTUP_COMMANDS (echo LEAKED) else (echo CLEAN)"');
     expect(out).toContain('CLEAN');
     expect(out).not.toContain('LEAKED');
   });

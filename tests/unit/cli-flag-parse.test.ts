@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseFlagArgs } from '../../src/cli/wmux';
+import { parseFlagArgs } from '../../src/cli/remotea';
 
 // Issue #247. `agent spawn` walked argv pairwise, so one stray token (Windows
 // PowerShell 5.1 splitting a --cmd value at its embedded quotes) misaligned

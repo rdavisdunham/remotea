@@ -24,7 +24,7 @@ vi.mock('node:child_process', () => ({
   },
 }));
 
-const CORE = path.resolve(__dirname, '../../resources/opencode-plugin/wmux-tui-core.js');
+const CORE = path.resolve(__dirname, '../../resources/opencode-plugin/remotea-tui-core.js');
 const load = () => import(/* @vite-ignore */ CORE);
 
 const SURFACE = 'surf-1';
@@ -784,22 +784,22 @@ describe('callWmux (#310)', () => {
 
   it('runs the shipped CLI on the resolved JS runtime, argv untouched', async () => {
     const { callWmux } = await load();
-    const env = { WMUX_CLI: 'C:\\wmux\\resources\\cli\\wmux.js' };
+    const env = { REMOTEA_CLI: 'C:\\wmux\\resources\\cli\\remotea.js' };
     callWmux(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, env);
     expect(calls).toHaveLength(1);
     expect(calls[0].file).toBe(':node:');
-    expect(calls[0].argv).toEqual(['C:\\wmux\\resources\\cli\\wmux.js', 'report-session', 'ses_abc12345']);
+    expect(calls[0].argv).toEqual(['C:\\wmux\\resources\\cli\\remotea.js', 'report-session', 'ses_abc12345']);
     expect(calls[0].opts.env).toBeUndefined();
   });
 
   it('marks wmux\'s own Electron binary as Node, or a second wmux window opens', async () => {
     const { callWmux } = await load();
-    const env = { WMUX_CLI: 'wmux.js' };
+    const env = { REMOTEA_CLI: 'remotea.js' };
     callWmux({ file: 'wmux.exe', electron: true }, ['x'], () => {}, env);
     expect(calls[0].opts.env.ELECTRON_RUN_AS_NODE).toBe('1');
   });
 
-  it('skips on Windows without WMUX_CLI — execFile cannot spawn the .cmd shim', async () => {
+  it('skips on Windows without REMOTEA_CLI — execFile cannot spawn the .cmd shim', async () => {
     const { callWmux } = await load();
     callWmux(runtimeNode, ['x'], () => {}, {}, 'win32');
     expect(calls).toEqual([]);
@@ -808,7 +808,7 @@ describe('callWmux (#310)', () => {
   it('reports completion on every path, the skip included', async () => {
     const { callWmux } = await load();
     const done = vi.fn();
-    callWmux(runtimeNode, ['x'], () => {}, { WMUX_CLI: 'wmux.js' }, 'linux', done);
+    callWmux(runtimeNode, ['x'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
     callWmux(runtimeNode, ['x'], () => {}, {}, 'win32', done);
     expect(done).toHaveBeenCalledTimes(2);
   });
@@ -818,18 +818,18 @@ describe('callWmux (#310)', () => {
     const done = vi.fn();
     const failure = new Error('pipe busy');
     execFailure.value = failure;
-    callWmux(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, { WMUX_CLI: 'wmux.js' }, 'linux', done);
+    callWmux(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
     expect(done).toHaveBeenCalledWith(failure);
 
     done.mockClear();
     execFailure.value = null;
-    callWmux(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, { WMUX_CLI: 'wmux.js' }, 'linux', done);
+    callWmux(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
     expect(done).toHaveBeenCalledWith(null);
   });
 
   it('bounds every call — a hung CLI must not hold the activity reporter in flight forever', async () => {
     const { callWmux } = await load();
-    callWmux(runtimeNode, ['x'], () => {}, { WMUX_CLI: 'wmux.js' }, 'linux');
+    callWmux(runtimeNode, ['x'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux');
     callWmux(runtimeNode, ['x'], () => {}, {}, 'linux');
     for (const call of calls) {
       expect(call.opts.timeout).toBeGreaterThan(0);
@@ -849,16 +849,16 @@ describe('callWmux (#310)', () => {
       runtimeNode,
       ['release-agent', '--session', 'ses_abc12345'],
       () => {},
-      { WMUX_CLI: 'wmux.js' },
+      { REMOTEA_CLI: 'remotea.js' },
     );
     expect(syncCalls).toHaveLength(1);
     expect(syncCalls[0].file).toBe(':node:');
-    expect(syncCalls[0].argv).toEqual(['wmux.js', 'release-agent', '--session', 'ses_abc12345']);
+    expect(syncCalls[0].argv).toEqual(['remotea.js', 'release-agent', '--session', 'ses_abc12345']);
     expect(syncCalls[0].opts.timeout).toBeGreaterThan(0);
     expect(syncCalls[0].opts.stdio).toBe('ignore');
   });
 
-  it('skips the synchronous path on Windows without WMUX_CLI', async () => {
+  it('skips the synchronous path on Windows without REMOTEA_CLI', async () => {
     const { callWmuxSync } = await load();
     expect(callWmuxSync(runtimeNode, ['x'], () => {}, {}, 'win32')).toBe(false);
     expect(syncCalls).toEqual([]);

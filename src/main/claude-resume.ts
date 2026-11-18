@@ -15,7 +15,7 @@ import type { SurfaceId } from '../shared/types';
 //
 //   * `AgentStateRecord.sessionId` already had the slot, already documented as
 //     "a resumable handle, not a PID". Nothing ever wrote it, because
-//     wmux-hook.ts parsed the Claude payload and dropped `session_id`.
+//     remotea-hook.ts parsed the Claude payload and dropped `session_id`.
 //   * `SurfaceRef.startupCommands` already runs a command once after a restored
 //     PTY spawns, env-baked for PowerShell and keystroke-injected elsewhere.
 //   * `freezeSurfaceCwds()` already showed the pattern for baking a live value

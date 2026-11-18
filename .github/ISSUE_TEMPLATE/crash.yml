@@ -28,7 +28,7 @@ body:
     attributes:
       label: Crash fingerprint
       description: |
-        Run `wmux crash-report` and paste the output. It needs no running desktop app.
+        Run `remotea crash-report` and paste the output. It needs no running desktop app.
         It reads the Windows Event Log and Remotea’s own lifecycle log — no memory,
         so no environment variables, no pane contents, no command lines.
 
@@ -37,7 +37,7 @@ body:
         fault offset, additional parameter.
       render: text
       placeholder: |
-        $ wmux crash-report
+        $ remotea crash-report
     validations:
       required: true
 

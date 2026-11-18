@@ -1,14 +1,14 @@
-# The wmux OpenCode plugin
+# The remotea OpenCode plugin
 
-wmux drives its sidebar from what an agent *declares*, not from what its output
+remotea drives its sidebar from what an agent *declares*, not from what its output
 looks like on screen. For Claude Code that comes from hooks; for OpenCode it
-comes from a plugin wmux installs for you, at:
+comes from a plugin remotea installs for you, at:
 
 ```
-~/.config/opencode/plugin/wmux.js
+~/.config/opencode/plugin/remotea.js
 ```
 
-The plugin no-ops entirely outside wmux (`WMUX !== "1"`), and is only installed
+The plugin no-ops entirely outside remotea (`REMOTEA !== "1"`), and is only installed
 once you have granted the agent-integration consent prompt. Removing that
 consent deletes it again.
 
@@ -16,7 +16,7 @@ consent deletes it again.
 
 ## What it reports
 
-| OpenCode event | What wmux is told |
+| OpenCode event | What remotea is told |
 |---|---|
 | `question.asked`, `permission.asked`, `permission.requested` | pane is **blocked** — sidebar shows "Needs you" |
 | `question.replied` / `.answered`, `permission.replied` / `.answered` | unblocked |
@@ -25,7 +25,7 @@ consent deletes it again.
 | `file.edited` | active, and refreshes the diff view |
 | `session.idle` | done |
 | `session.error` | done, and unblocked |
-| prompt admission, v2 (`ctx.session.hook("prompt")`) | the user's submitted prompt enters the **prompt log** — highlight, outline, `wmux prompts` |
+| prompt admission, v2 (`ctx.session.hook("prompt")`) | the user's submitted prompt enters the **prompt log** — highlight, outline, `remotea prompts` |
 
 **`message.part.updated` never unblocks a pane.** That looks like a missing
 self-heal and is deliberate: OpenCode emits one for the ask's *own* tool part
@@ -44,14 +44,14 @@ those mean the agent actually moved on.
 
 Since plugin version 8 ([#304][304]) a submitted prompt also reaches the prompt
 log. The v2 plugin registers `ctx.session.hook("prompt")`, reads
-`event.prompt.text`, and calls `wmux hook --event UserPromptSubmit --prompt …` —
+`event.prompt.text`, and calls `remotea hook --event UserPromptSubmit --prompt …` —
 the same event Claude Code's `UserPromptSubmit` hook produces, which is what
-fills the prompt outline, the Prompts pane and `wmux prompts`. Before this the
+fills the prompt outline, the Prompts pane and `remotea prompts`. Before this the
 log stayed empty for every OpenCode pane, because the shell integration's
 OSC 133 marks end when a TUI takes the screen and nothing else ever sent the
 event.
 
-- The text is capped at 4000 chars, the same `MAX_PROMPT` `wmux-hook.js` uses.
+- The text is capped at 4000 chars, the same `MAX_PROMPT` `remotea-hook.js` uses.
 - `event.messageID` dedupes admission: OpenCode documents the hook as
   retry-safe but not exactly-once, and two entries would put two jump marks on
   one line. A missing id falls back to the renderer's own identical-text window.
@@ -72,31 +72,31 @@ has no pane's environment and none of its reports can be attributed — the
 server half now returns a no-op for every pane-specific signal in that mode.
 
 Since the CLI-side (TUI) half exists it covers those setups: it runs in the
-TUI process, against a remote server, with the pane's `WMUX_*` environment.
+TUI process, against a remote server, with the pane's `REMOTEA_*` environment.
 
 Install it from the pane that will host the TUI:
 
 ```bash
-wmux opencode-tui            # install or update, into <config>/plugins/wmux-cli/
-wmux opencode-tui --remove   # remove, only when the file carries our marker
+remotea opencode-tui            # install or update, into <config>/plugins/remotea-cli/
+remotea opencode-tui --remove   # remove, only when the file carries our marker
 ```
 
-- It writes `tui.js` and `core.js` to `<config>/plugins/wmux-cli/` — the
+- It writes `tui.js` and `core.js` to `<config>/plugins/remotea-cli/` — the
   directory form OpenCode's CLI resolves without a `package.json`. `<config>`
   is `$XDG_CONFIG_HOME/opencode` when that variable is absolute, else
   `~/.config/opencode`, resolved **in the environment the command runs in**.
   In a WSL pane that is the distro's home; in a devcontainer, the container's.
   Nothing on the Windows side writes into a WSL home.
-- It is not installed automatically and does not need a wmux restart. Re-run
-  the command after upgrading wmux: it compares the `// wmux-plugin-version:`
+- It is not installed automatically and does not need a remotea restart. Re-run
+  the command after upgrading wmux: it compares the `// remotea-plugin-version:`
   marker on `tui.js` and rewrites both files when the shipped version differs.
 - **Keep backups outside `plugins/`.** OpenCode loads *every* directory under
   `<config>/plugins/` as a plugin, so a copy such as
-  `plugins/wmux-cli.bak/tui.js` registers the same `wmux.cli` id, shadows the
+  `plugins/remotea-cli.bak/tui.js` registers the same `remotea.cli` id, shadows the
   live one, and the symptom is silence: no `init` line and no reports. Move an
-  old copy to `~/wmux-cli.bak` instead of leaving it beside the plugin.
+  old copy to `~/remotea-cli.bak` instead of leaving it beside the plugin.
 - **What it reports today** (issue #310): the viewed session handle —
-  `wmux report-session <id> --provider opencode` — so *Resume OpenCode sessions
+  `remotea report-session <id> --provider opencode` — so *Resume OpenCode sessions
   on restore* works for remote/shared setups. The viewed tab is followed
   reactively; a viewed subagent resolves to its root; quitting the TUI releases
   the handle.
@@ -123,45 +123,45 @@ wmux opencode-tui --remove   # remove, only when the file carries our marker
   instead of inflating a refcount. Running sessions are tracked by id: an end
   still clears after the user switches tabs, and a subagent's end cannot return
   a pane to idle while its parent is still running. Tool labels stay out.
-- **Resilience** (plugin v6): a `report-session` call that never reached wmux
+- **Resilience** (plugin v6): a `report-session` call that never reached remotea
   is retried after 1 s, 3 s and 10 s, so the named pipe answering *All pipe
   instances are busy* during a restore burst no longer leaves the pane without
   a handle for the rest of its life. A pane that starts a turn also reasserts
   the handle it holds, throttled to once per 30 s: a handle main dropped after
   a successful report heals on the next run rather than waiting for the user to
   switch sessions.
-- `WMUX_PLUGIN_DEBUG` works as it does for the server half, into
-  `wmux-tui-plugin-debug.log`, and logs each distinct TUI event type once —
+- `REMOTEA_PLUGIN_DEBUG` works as it does for the server half, into
+  `remotea-tui-plugin-debug.log`, and logs each distinct TUI event type once —
   which is how the prompt-submission signal was identified.
-- WSL needs the same prerequisites as any wmux CLI call from inside the
-  distro: `WMUX_*` arrives via `WSLENV`, and the named pipe is reached through
+- WSL needs the same prerequisites as any remotea CLI call from inside the
+  distro: `REMOTEA_*` arrives via `WSLENV`, and the named pipe is reached through
   `npiperelay.exe` automatically (`docs/DEVCONTAINER.md`).
 
 ---
 
 ## Debugging it
 
-Set `WMUX_PLUGIN_DEBUG` before launching OpenCode:
+Set `REMOTEA_PLUGIN_DEBUG` before launching OpenCode:
 
 ```bash
-# on, default location: %TEMP%\wmux-plugin-debug.log (Windows), $TMPDIR/… (unix)
-export WMUX_PLUGIN_DEBUG=1
+# on, default location: %TEMP%\remotea-plugin-debug.log (Windows), $TMPDIR/… (unix)
+export REMOTEA_PLUGIN_DEBUG=1
 
 # or point it wherever you are already tailing
-export WMUX_PLUGIN_DEBUG=/tmp/wmux-debug.log
+export REMOTEA_PLUGIN_DEBUG=/tmp/wmux-debug.log
 ```
 
 It logs plugin init (resolved JS runtime, surface id, CLI path), every event
-received, every wmux CLI call, and each call's result — in order, written
+received, every remotea CLI call, and each call's result — in order, written
 synchronously, because the ordering between an event and the call it caused is
 the entire diagnostic:
 
 ```
-2026-08-23T08:55:02.188Z [wmux] event {"type":"question.asked",…}
-2026-08-23T08:55:02.189Z [wmux] cli ["report-agent","--surface","surf-…","--blocked","Waiting for your answer"]
-2026-08-23T08:55:02.205Z [wmux] event {"type":"message.part.updated",…}
-2026-08-23T08:55:02.206Z [wmux] cli ["agent-activity","--surface","surf-…","--active"]
-2026-08-23T08:55:12.519Z [wmux] cli ["report-agent","--surface","surf-…","--unblocked"]
+2026-08-23T08:55:02.188Z [remotea] event {"type":"question.asked",…}
+2026-08-23T08:55:02.189Z [remotea] cli ["report-agent","--surface","surf-…","--blocked","Waiting for your answer"]
+2026-08-23T08:55:02.205Z [remotea] event {"type":"message.part.updated",…}
+2026-08-23T08:55:02.206Z [remotea] cli ["agent-activity","--surface","surf-…","--active"]
+2026-08-23T08:55:12.519Z [remotea] cli ["report-agent","--surface","surf-…","--unblocked"]
 ```
 
 **A file, not the console** ([#190][190]). OpenCode is a TUI that owns the
@@ -196,7 +196,7 @@ restore** can reopen it with `opencode -s <id>`. Version 10 tightens the rules:
   background session from the viewed one. This also removes the last-writer
   race between the two halves.
 - **A shared server is a hard no-op for the server half.** `--service`, and any
-  `serve` without `--stdio`, hosts multiple panes while `WMUX_SURFACE_ID` names
+  `serve` without `--stdio`, hosts multiple panes while `REMOTEA_SURFACE_ID` names
   only the pane that started it. Session, activity, blocked state, prompts and
   shell env all belong to the TUI half there. A standalone TUI's private
   `serve --stdio` is one pane and still reports.
@@ -215,15 +215,15 @@ restore** can reopen it with `opencode -s <id>`. Version 10 tightens the rules:
 - A real OpenCode exit releases the handle synchronously. A plugin dispose or
   reload waits 1.5 s for a replacement instance to cancel it, so updating the
   plugin does not clear every open private-server handle. Main refuses the
-  release while wmux itself is quitting.
+  release while remotea itself is quitting.
 - Every CLI call has a 10 s timeout, so a hung CLI cannot leave a report in
   flight forever.
 - **OpenCode 2's shared background server cannot attribute a pane.** By default
   v2 runs one `opencode serve --service` for every TUI, plugins live in it, and
-  its `WMUX_SURFACE_ID` names only the pane that started it. The CLI-side TUI
-  half (`wmux opencode-tui`) runs in the TUI process instead, so it captures the
+  its `REMOTEA_SURFACE_ID` names only the pane that started it. The CLI-side TUI
+  half (`remotea opencode-tui`) runs in the TUI process instead, so it captures the
   viewed session, prompts, blocked state and working/idle for remote and shared
-  servers. Run the installer after a wmux update so the installed marker
+  servers. Run the installer after a remotea update so the installed marker
   matches.
 - The CLI also retries **idempotent report verbs** — `report-session`,
   `report-agent`, `report-metadata`, `report-subagent`, `release-agent` and the
@@ -234,13 +234,13 @@ restore** can reopen it with `opencode -s <id>`. Version 10 tightens the rules:
 
 ## Links
 
-wmux sets `BROWSER=wmux-open-url` in WSL panes. The shim calls `wmux open`,
+remotea sets `BROWSER=remotea-open-url` in WSL panes. The shim calls `remotea open`,
 which goes through the same destination rule as a terminal link click: the panel
 by default, the system browser when **Settings → Browser → Open links in the
 system browser** is on.
 
 - Codex already honours `$BROWSER` through the Rust `webbrowser` crate, so its
-  plain link clicks land in the panel as soon as a wmux build with the shim is
+  plain link clicks land in the panel as soon as a remotea build with the shim is
   running.
 - OpenCode needs `$BROWSER` support in its own opener (OpenCode issue
   [#58526](https://github.com/anomalyco/opencode/issues/58526)). Until that
@@ -248,8 +248,8 @@ system browser** is on.
   Ctrl+click is the way to the panel.
 - Mouse capture, wheel forwarding and touch-pan gain are unchanged: this routes
   where a link opens, not how the pane scrolls.
-- `wmux-open-url` resolves through PATH, which relies on WSL's default
-  `appendWindowsPath` interop — the same mechanism that makes `wmux` itself
+- `remotea-open-url` resolves through PATH, which relies on WSL's default
+  `appendWindowsPath` interop — the same mechanism that makes `remotea` itself
   runnable in the pane. If interop is disabled, links fall back to the system
   browser.
 
@@ -257,15 +257,15 @@ system browser** is on.
 
 ## Versioning
 
-The first line of `wmux.js` is a marker:
+The first line of `remotea.js` is a marker:
 
 ```js
-// wmux-plugin-version: 10
+// remotea-plugin-version: 10
 ```
 
-wmux compares it against the installed copy on every launch and overwrites when
+remotea compares it against the installed copy on every launch and overwrites when
 they differ. A plugin change that forgets to bump it reaches nobody who already
-has the plugin. A `wmux.js` with no marker is assumed to be yours, and is
+has the plugin. A `remotea.js` with no marker is assumed to be yours, and is
 neither overwritten nor removed.
 
 [189]: https://github.com/amirlehmam/wmux/issues/189

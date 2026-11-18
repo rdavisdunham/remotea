@@ -248,7 +248,7 @@ function codexShimDirsForPane(
     shellType, executable: resolveExistingShellPath('codex.exe'), cliBinDir,
     psVerified: powerShellShimDir() !== null, env,
     runtime: nodeRuntime.path,
-    launcher: path.join(path.dirname(cliPath), 'wmux-codex.js'),
+    launcher: path.join(path.dirname(cliPath), 'remotea-codex.js'),
   });
 }
 
@@ -387,12 +387,12 @@ function getCliPath(): string {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { app } = require('electron') as typeof import('electron');
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'cli', 'wmux.js');
+      return path.join(process.resourcesPath, 'cli', 'remotea.js');
     }
   } catch {
     // Not running in Electron
   }
-  return path.join(__dirname, '../cli/wmux.js');
+  return path.join(__dirname, '../cli/remotea.js');
 }
 
 
@@ -505,24 +505,24 @@ export function buildShellArgs(
   cwd: string | undefined,
 ): string[] {
   if (shellType === 'powershell') {
-    const script = path.join(integrationDir, 'wmux-powershell-integration.ps1');
+    const script = path.join(integrationDir, 'remotea-powershell-integration.ps1');
     if (fs.existsSync(script)) {
-      env.WMUX_PS1_SCRIPT = script;
-      return ['-NoLogo', '-ExecutionPolicy', 'Bypass', '-NoExit', '-Command', '. $env:WMUX_PS1_SCRIPT'];
+      env.REMOTEA_PS1_SCRIPT = script;
+      return ['-NoLogo', '-ExecutionPolicy', 'Bypass', '-NoExit', '-Command', '. $env:REMOTEA_PS1_SCRIPT'];
     }
     console.warn(`[remotea] shell-integration not found at: ${script} — starting PowerShell without integration`);
     return ['-NoLogo'];
   }
   if (shellType === 'cmd') {
-    return ['/K', path.join(integrationDir, 'wmux-cmd-integration.cmd')];
+    return ['/K', path.join(integrationDir, 'remotea-cmd-integration.cmd')];
   }
   if (shellType === 'wsl') {
-    env.WMUX_INTEGRATION = '1';
-    // Propagate WMUX_* vars into the WSL distro (issue #60). Without WSLENV, WSL
+    env.REMOTEA_INTEGRATION = '1';
+    // Propagate REMOTEA_* vars into the WSL distro (issue #60). Without WSLENV, WSL
     // strips every Windows env var, so the notification framework, sidebar and
     // `wmux` CLI inside WSL can't reach the host. /u = pass through, /up = pass
     // through AND translate the Windows path to a WSL mount (/mnt/c/...).
-    // WMUX_REMOTE / WMUX_REMOTE_TOKEN ride along so a devcontainer launched from
+    // REMOTEA_REMOTE / REMOTEA_REMOTE_TOKEN ride along so a devcontainer launched from
     // this WSL shell inherits them and its CLI can reach wmux over the bridge
     // (issue #19). Harmless when unset — WSLENV skips a variable with no value.
     env.WSLENV = env.WSLENV ? `${env.WSLENV}:${WSL_ENV_PASSTHROUGH}` : WSL_ENV_PASSTHROUGH;
@@ -533,8 +533,8 @@ export function buildShellArgs(
     // for them: wsl.exe starts the distro's own login shell, and wmux could
     // only hand that an rc file by replacing the shell or writing to the
     // distro's home.
-    if (env.WMUX_NODE) env.WMUX_WSL_NODE = env.WMUX_NODE;
-    env.WMUX_BASH_SCRIPT = path.join(integrationDir, 'wmux-bash-integration.sh');
+    if (env.REMOTEA_NODE) env.REMOTEA_WSL_NODE = env.REMOTEA_NODE;
+    env.REMOTEA_BASH_SCRIPT = path.join(integrationDir, 'remotea-bash-integration.sh');
     // A restored WSL/POSIX cwd (issue #60) can't be a Win32 process cwd (error
     // 267). Open it INSIDE the distro via --cd instead; the Win32-side cwd is
     // sanitized to a valid Windows dir by the caller.
@@ -559,11 +559,11 @@ export function gitBashArgs(
   integrationDir: string,
   env: { [key: string]: string },
 ): string[] | null {
-  const script = path.join(integrationDir, 'wmux-bash-integration.sh');
+  const script = path.join(integrationDir, 'remotea-bash-integration.sh');
   const plan = gitBashIntegrationArgs(shell, extraArgs, script);
   if (!plan || !fs.existsSync(script)) return null;
-  env.WMUX_BASH_INIT = '1';
-  if (plan.login) env.WMUX_BASH_LOGIN = '1';
+  env.REMOTEA_BASH_INIT = '1';
+  if (plan.login) env.REMOTEA_BASH_LOGIN = '1';
   return plan.args;
 }
 
@@ -773,7 +773,7 @@ export class PtyManager {
     const processEnvClean = Object.fromEntries(
       Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
     );
-    // WMUX_CLI is a .js path, so anything that wants to RUN it needs a JS
+    // REMOTEA_CLI is a .js path, so anything that wants to RUN it needs a JS
     // runtime too — and the host process is not reliably one (issue #187:
     // OpenCode's `process.execPath` is the compiled `opencode.exe`, and node
     // can be installed yet absent from the PATH a given agent inherited).
@@ -783,25 +783,25 @@ export class PtyManager {
     const env: { [key: string]: string } = {
       ...processEnvClean,
       ...options.env,
-      WMUX: '1',
-      WMUX_SURFACE_ID: id,
-      WMUX_PIPE: getPipePath(),
-      WMUX_PIPE_TOKEN: readPipeToken(),
-      WMUX_CLI: cliPath,
-      WMUX_NODE: nodeRuntime.path,
+      REMOTEA: '1',
+      REMOTEA_SURFACE_ID: id,
+      REMOTEA_PIPE: getPipePath(),
+      REMOTEA_PIPE_TOKEN: readPipeToken(),
+      REMOTEA_CLI: cliPath,
+      REMOTEA_NODE: nodeRuntime.path,
     };
-    // Only set when true. A consumer that spawns WMUX_NODE without honouring
+    // Only set when true. A consumer that spawns REMOTEA_NODE without honouring
     // this opens a second wmux window instead of running a script, so the
     // variable's presence — not its value — is the signal, and an absent one
     // must never read as "yes".
-    if (nodeRuntime.electron) env.WMUX_NODE_ELECTRON = '1';
+    if (nodeRuntime.electron) env.REMOTEA_NODE_ELECTRON = '1';
 
     // Make bare `wmux` resolvable in every spawned shell AND all its children
     // (Claude Code's Bash tool, hook scripts, the orchestrator coordinator) by
     // prepending the cli-bin shim dir to PATH. PATH inherits down the process
     // tree regardless of shell/login/interactive state — which is exactly what
     // the interactive `wmux` shell function cannot reach. Prepend (not append)
-    // so this instance's shim wins; it is instance-scoped via $WMUX_CLI/$WMUX_PIPE
+    // so this instance's shim wins; it is instance-scoped via $REMOTEA_CLI/$REMOTEA_PIPE
     // anyway. The Windows env key is `Path`, so match case-insensitively.
     // The .ps1 shim dir goes AHEAD of cli-bin when — and only when — wmux has
     // verified PowerShell will run it (issue #154). PowerShell prefers a .ps1
@@ -833,7 +833,7 @@ export class PtyManager {
     // writing `\x1b[?62;4;9;22c` onto the shell's stdin. If that response landed
     // on the prompt the same instant our injected `<cmd>\r` arrived, PSReadLine
     // merged them into one bogus executed line (e.g. `62;4;9;22ccls`). Baking the
-    // commands into the integration script (via WMUX_STARTUP_COMMANDS) removes
+    // commands into the integration script (via REMOTEA_STARTUP_COMMANDS) removes
     // the race: they run during init and the first prompt render — the only one
     // that triggers the leaky query — happens afterward, exactly as it does for a
     // plain terminal that shows no junk.
@@ -845,11 +845,11 @@ export class PtyManager {
     // shell actually being ready, not by each caller on its own timer (#251,
     // see startup-commands.ts). Either way PtyManager has taken them, so
     // `startupCommandsConsumed` is simply "were there any".
-    const bakeIntoInit = startupCommands.length > 0 && shellType === 'powershell' && !!env.WMUX_PS1_SCRIPT;
+    const bakeIntoInit = startupCommands.length > 0 && shellType === 'powershell' && !!env.REMOTEA_PS1_SCRIPT;
     if (bakeIntoInit) {
       // Newlines survive the env block; the integration script trims each line
       // (so a stray CR is harmless) and runs it via Invoke-Expression.
-      env.WMUX_STARTUP_COMMANDS = startupCommands.join('\n');
+      env.REMOTEA_STARTUP_COMMANDS = startupCommands.join('\n');
     }
     const startupCommandsConsumed = startupCommands.length > 0;
 

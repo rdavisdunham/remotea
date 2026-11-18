@@ -4,8 +4,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { readRenderedInstructions } from './agent-instructions';
 
-const START_MARKER = '<!-- wmux:start';
-const END_MARKER = '<!-- wmux:end -->';
+const START_MARKER = '<!-- remotea:start';
+const END_MARKER = '<!-- remotea:end -->';
 
 
 export function getClaudeMdPath(): string {
@@ -24,7 +24,7 @@ const LEGACY_SIGNATURES = [
  * Remove copies of the wmux block that predate the markers (and the smux-era
  * name), so the managed section is the only one left.
  *
- * Early versions appended the block with no `<!-- wmux:start -->` around it.
+ * Early versions appended the block with no `<!-- remotea:start -->` around it.
  * Splicing keys off the FIRST marker pair, so those copies were never updated
  * and never removed: they accumulate, one per rename or marker change, and are
  * loaded into every session on the machine forever. The file this was found on
@@ -49,7 +49,7 @@ export function stripLegacyBlocks(content: string): string {
 }
 
 /**
- * Remove every complete `<!-- wmux:start … <!-- wmux:end -->` pair.
+ * Remove every complete `<!-- remotea:start … <!-- remotea:end -->` pair.
  *
  * Applied only to what follows the FIRST pair — the one block that is managed.
  * This used to recurse with stripLegacyBlocks, which treated each later pair as
@@ -121,7 +121,7 @@ function collapse(text: string): string {
  * - Inserts the wmux block if not present
  * - Updates the wmux block if it's outdated
  * - Drops marker-less copies left by older versions (they are ours, and stale)
- * - Never touches content outside the <!-- wmux:start --> / <!-- wmux:end --> markers
+ * - Never touches content outside the <!-- remotea:start --> / <!-- remotea:end --> markers
  */
 export function ensureClaudeContext(): void {
   try {
@@ -147,7 +147,8 @@ export function ensureClaudeContext(): void {
 
     // CLAUDE.md exists — check for existing wmux block
     const raw = fs.readFileSync(claudeMdPath, 'utf-8');
-    const existing = stripLegacyBlocks(raw);
+    // Old-named blocks go only when their path is this install's (KTD8).
+    const existing = stripLegacyBlocks(stripOldRemoteaBlocks(raw, desktopOwnershipContext()));
     const startIdx = existing.indexOf(START_MARKER);
     const endIdx = existing.indexOf(END_MARKER);
 
@@ -243,16 +244,18 @@ function getCliAbsolutePath(): string {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { app } = require('electron') as typeof import('electron');
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'cli', 'wmux.js');
+      return path.join(process.resourcesPath, 'cli', 'remotea.js');
     }
   } catch {}
-  return path.resolve(path.join(__dirname, '../cli/wmux.js'));
+  return path.resolve(path.join(__dirname, '../cli/remotea.js'));
 }
 
 // The hook-entry builders are pure and shared with the remotea server (which
 // installs the same hooks inside WSL): see src/shared/claude-hooks.ts.
-export { applyWmuxHooks, removeWmuxHooks, wmuxEventHookCommand, WMUX_HOOK_EVENTS } from '../shared/claude-hooks';
-import { applyWmuxHooks, removeWmuxHooks, WMUX_HOOK_EVENTS } from '../shared/claude-hooks';
+export { applyWmuxHooks, removeWmuxHooks, wmuxEventHookCommand, REMOTEA_HOOK_EVENTS } from '../shared/claude-hooks';
+import { applyWmuxHooks, removeWmuxHooks, REMOTEA_HOOK_EVENTS } from '../shared/claude-hooks';
+import { stripLegacyBlocks as stripOldRemoteaBlocks, stripLegacyHookEntries } from '../shared/legacy-cleanup';
+import { desktopOwnershipContext } from './ownership-context';
 
 /**
  * Absolute, forward-slashed path to the hook helper OUTSIDE the ASAR.
@@ -265,12 +268,12 @@ export function getHookScriptPath(): string {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { app } = require('electron') as typeof import('electron');
     if (app.isPackaged) {
-      hookScript = path.join(process.resourcesPath, 'cli', 'wmux-hook.js');
+      hookScript = path.join(process.resourcesPath, 'cli', 'remotea-hook.js');
     } else {
-      hookScript = path.resolve(path.join(__dirname, '../../resources/cli/wmux-hook.js'));
+      hookScript = path.resolve(path.join(__dirname, '../../resources/cli/remotea-hook.js'));
     }
   } catch {
-    hookScript = path.resolve(path.join(__dirname, '../../resources/cli/wmux-hook.js'));
+    hookScript = path.resolve(path.join(__dirname, '../../resources/cli/remotea-hook.js'));
   }
   return hookScript.split(path.sep).join('/');
 }
@@ -297,9 +300,10 @@ export function ensureClaudeHooks(): void {
     let settings: any;
     try { settings = JSON.parse(raw); } catch { return; }
 
-    const updated = applyWmuxHooks(settings, getHookScriptPath());
+    // Old-named entries go only when their path is this install's (KTD8).
+    const updated = applyWmuxHooks(stripLegacyHookEntries(settings, desktopOwnershipContext()), getHookScriptPath());
     fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf-8');
-    console.log(`[remotea] Configured ${WMUX_HOOK_EVENTS.join('/')} hooks in ~/.claude/settings.json`);
+    console.log(`[remotea] Configured ${REMOTEA_HOOK_EVENTS.join('/')} hooks in ~/.claude/settings.json`);
   } catch (err) {
     reportIntegrationFailure('Claude Code', 'write', err);
     console.warn('[remotea] Failed to update Claude hooks:', err);
@@ -322,7 +326,7 @@ export function removeClaudeHooks(): void {
     const next = JSON.stringify(updated, null, 2);
     if (next === JSON.stringify(settings, null, 2)) return;
     fs.writeFileSync(settingsPath, next, 'utf-8');
-    console.log('[remotea] Removed wmux hooks from ~/.claude/settings.json');
+    console.log('[remotea] Removed remotea hooks from ~/.claude/settings.json');
   } catch (err) {
     reportIntegrationFailure('Claude Code', 'remove', err);
     console.warn('[remotea] Failed to remove Claude hooks:', err);

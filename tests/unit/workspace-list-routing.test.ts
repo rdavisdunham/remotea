@@ -36,7 +36,7 @@ describe('workspace list routing (#398)', () => {
   });
 
   it('the CLI sends list-workspaces and workspace list to different methods', () => {
-    const cli = fs.readFileSync(path.join(__dirname, '../../src/cli/wmux.ts'), 'utf-8');
+    const cli = fs.readFileSync(path.join(__dirname, '../../src/cli/remotea.ts'), 'utf-8');
     expect(cli).toMatch(/'list-workspaces': async \(\) => print\(await sendV2\('workspace\.list'\)\)/);
     expect(cli).toMatch(/sub === 'list'\) \{\s*print\(await sendV2\('workspace\.list_manifests'/);
     expect(WORKSPACE_MANIFEST_METHODS.has('workspace.list_manifests')).toBe(true);

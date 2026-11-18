@@ -1,4 +1,4 @@
-// ─── Per-instance identity (WMUX_INSTANCE) ───────────────────────────────────
+// ─── Per-instance identity (REMOTEA_INSTANCE) ───────────────────────────────────
 // The pipe and the APPDATA dir were already suffixed so a dev build can run
 // beside an installed one. The AppUserModelId was not, and that gap was not
 // cosmetic: Windows maps an AUMID to exactly one executable, so a dev build
@@ -10,15 +10,15 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { getPipePath, getAppDataDir, getAppUserModelId } from '../../src/shared/instance';
 
-const original = process.env.WMUX_INSTANCE;
+const original = process.env.REMOTEA_INSTANCE;
 afterEach(() => {
-  if (original === undefined) delete process.env.WMUX_INSTANCE;
-  else process.env.WMUX_INSTANCE = original;
+  if (original === undefined) delete process.env.REMOTEA_INSTANCE;
+  else process.env.REMOTEA_INSTANCE = original;
 });
 
 describe('getAppUserModelId', () => {
   it('is the bare production id when no instance is set', () => {
-    delete process.env.WMUX_INSTANCE;
+    delete process.env.REMOTEA_INSTANCE;
     expect(getAppUserModelId()).toBe('com.remotea.app');
   });
 
@@ -26,27 +26,27 @@ describe('getAppUserModelId', () => {
     // The installer registers shortcuts under electron-builder's `appId`. If
     // these ever diverge, every pinned button breaks for ordinary users — the
     // exact failure this module is meant to prevent, aimed at the wrong people.
-    delete process.env.WMUX_INSTANCE;
+    delete process.env.REMOTEA_INSTANCE;
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const builder = require('../../electron-builder.json');
     expect(getAppUserModelId()).toBe(builder.appId);
   });
 
   it('suffixes for a named instance, so a dev build cannot seize the install', () => {
-    process.env.WMUX_INSTANCE = 'dev';
+    process.env.REMOTEA_INSTANCE = 'dev';
     expect(getAppUserModelId()).toBe('com.remotea.app-dev');
     expect(getAppUserModelId()).not.toBe('com.remotea.app');
   });
 
   it('suffixes in lockstep with the pipe and the APPDATA dir', () => {
-    process.env.WMUX_INSTANCE = 'dev';
+    process.env.REMOTEA_INSTANCE = 'dev';
     expect(getPipePath()).toContain('-dev');
     expect(getAppDataDir()).toContain('-dev');
     expect(getAppUserModelId()).toContain('-dev');
   });
 
   it('ignores whitespace-only values like the other identities do', () => {
-    process.env.WMUX_INSTANCE = '   ';
+    process.env.REMOTEA_INSTANCE = '   ';
     expect(getAppUserModelId()).toBe('com.remotea.app');
     expect(getPipePath()).toBe(getPipePath()); // same rule, no suffix
   });

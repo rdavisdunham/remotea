@@ -72,7 +72,7 @@ describe('read-only desktop integration observations', () => {
     const instructions = readRenderedInstructions()!;
     write('.claude/CLAUDE.md', `User notes\n${instructions}\nPrivate notes`);
     expect(observation('Claude Code', 'instructions').state).toBe('present');
-    write('.claude/CLAUDE.md', instructions.replace('remotea', 'custom-remotea'));
+    write('.claude/CLAUDE.md', instructions.replace('# remotea', '# custom-remotea'));
     expect(observation('Claude Code', 'instructions').state).toBe('modified');
     write('.claude/CLAUDE.md', 'Only user-owned notes');
     expect(observation('Claude Code', 'instructions').state).toBe('missing');
@@ -92,7 +92,7 @@ describe('read-only desktop integration observations', () => {
   });
 
   it('reports actual filesystem failures from existing writers and clears them on a new apply', () => {
-    const blocked = path.join(home, '.kiro/steering/wmux.md');
+    const blocked = path.join(home, '.kiro/steering/remotea.md');
     fs.mkdirSync(blocked, { recursive: true });
     ensureKiroContext();
     expect(integrationFailures()).toEqual([{ provider: 'Kiro', operation: 'write', code: 'EISDIR' }]);

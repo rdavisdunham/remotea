@@ -114,7 +114,7 @@ export const uk: Translation = {
   'markdown.openInApp': 'Відкрити в застосунку за замовчуванням',
   'markdown.moreActions': 'Інші дії',
   'markdown.noFile': 'Не пов\'язано з файлом',
-  'markdown.empty': 'Немає вмісту. Скористайтеся wmux markdown set, щоб додати вміст, або перетягніть файл сюди.',
+  'markdown.empty': 'Немає вмісту. Скористайтеся remotea markdown set, щоб додати вміст, або перетягніть файл сюди.',
   'markdown.error.copy': 'Не вдалося записати в буфер обміну',
   'markdown.error.read': 'Не вдалося прочитати файл',
   'markdown.error.action': 'Дію не вдалося виконати',

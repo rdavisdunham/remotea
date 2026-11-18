@@ -3,7 +3,7 @@ import * as path from 'path';
 import { findNodeRuntime, getNodeRuntime, resetNodeRuntimeCache } from '../../src/main/node-runtime';
 
 /**
- * Issue #187: wmux hands agents a `.js` path (`WMUX_CLI`) and assumed everyone
+ * Issue #187: wmux hands agents a `.js` path (`REMOTEA_CLI`) and assumed everyone
  * downstream had something to run it with. Nobody does, reliably.
  */
 const only = (...present: string[]) => (p: string) => present.includes(p);
@@ -15,7 +15,7 @@ describe('findNodeRuntime', () => {
   });
 
   it('does NOT accept OpenCode as a JS runtime — the whole of #187', () => {
-    // `opencode.exe wmux.js agent-activity --active` prints OpenCode's help.
+    // `opencode.exe remotea.js agent-activity --active` prints OpenCode's help.
     const exec = 'C:\\Users\\stefan\\.opencode\\bin\\opencode.exe';
     const nodePath = 'C:\\Program Files\\nodejs\\node.exe';
     const found = findNodeRuntime(

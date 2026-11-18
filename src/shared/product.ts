@@ -1,4 +1,4 @@
-/** Public destinations; compatibility identifiers (wmux/WMUX_*) remain unchanged. */
+/** Public destinations; compatibility identifiers (wmux/REMOTEA_*) remain unchanged. */
 export const PRODUCT = {
   name: 'remotea',
   repositoryOwner: 'rdavisdunham',

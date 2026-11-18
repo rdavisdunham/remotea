@@ -182,7 +182,7 @@ export function getConfigPath(): string {
  */
 const warnedConfigProblems = new Set<string>();
 
-/** Forget past complaints AND the memo, so `wmux reload-config` re-reads. */
+/** Forget past complaints AND the memo, so `remotea reload-config` re-reads. */
 export function resetConfigWarnings(): void {
   warnedConfigProblems.clear();
   // Belt and braces alongside the mtime check: an editor that rewrites the file
@@ -200,7 +200,7 @@ function warnConfig(filePath: string, problem: string): void {
   const key = `${filePath}\0${problem}`;
   if (warnedConfigProblems.has(key)) return;
   warnedConfigProblems.add(key);
-  console.warn(`[remotea] ${filePath}: ${problem} — see \`wmux config show\``);
+  console.warn(`[remotea] ${filePath}: ${problem} — see \`remotea config show\``);
 }
 
 /**

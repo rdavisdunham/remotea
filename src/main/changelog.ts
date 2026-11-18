@@ -137,7 +137,7 @@ export function fetchReleases(limit = CHANGELOG_LIMIT): Promise<unknown | null> 
       redirect: 'follow',
     });
     req.setHeader('Accept', 'application/vnd.github+json');
-    req.setHeader('User-Agent', `wmux/${app.getVersion()}`);
+    req.setHeader('User-Agent', `remotea/${app.getVersion()}`);
     let body = '';
     req.on('response', (res) => {
       if (res.statusCode !== 200) {

@@ -14,16 +14,16 @@ import path from 'path';
  * to throw for the WHOLE object and take `session_id` with it, silently killing
  * `claude --resume` on the next workspace restore (issue #186).
  *
- * Exercised against the real compiled resources/cli/wmux-hook.js over its TCP
- * remote transport, the same way wmux-hook-remote-transport.test.ts does: this
+ * Exercised against the real compiled resources/cli/remotea-hook.js over its TCP
+ * remote transport, the same way remotea-hook-remote-transport.test.ts does: this
  * script is a fire-and-forget CLI leaf with no exported functions, and the
  * behaviour under test is precisely what the shipped process does with bytes on
  * its stdin.
  */
 
-const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/wmux-hook.js');
+const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/remotea-hook.js');
 
-/** Mirrors MAX_PROMPT in src/cli/wmux-hook.ts. */
+/** Mirrors MAX_PROMPT in src/cli/remotea-hook.ts. */
 const MAX_PROMPT = 4000;
 
 function runHook(args: string[], env: Record<string, string>, stdin: string): Promise<void> {
@@ -78,13 +78,13 @@ function startCapturingServer(): Promise<CapturingServer> {
 function envFor(port: number): Record<string, string> {
   return {
     ...process.env,
-    WMUX_REMOTE: `127.0.0.1:${port}`,
-    WMUX_REMOTE_TOKEN: 't',
-    WMUX_SURFACE_ID: 'surf-payload',
+    REMOTEA_REMOTE: `127.0.0.1:${port}`,
+    REMOTEA_REMOTE_TOKEN: 't',
+    REMOTEA_SURFACE_ID: 'surf-payload',
   } as Record<string, string>;
 }
 
-describe('wmux-hook.js oversized payloads (issue #207)', () => {
+describe('remotea-hook.js oversized payloads (issue #207)', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -157,7 +157,7 @@ describe('wmux-hook.js oversized payloads (issue #207)', () => {
   });
 });
 
-describe('wmux-hook.js Notification kind (issue #253)', () => {
+describe('remotea-hook.js Notification kind (issue #253)', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -300,7 +300,7 @@ describe('wmux-hook.js Notification kind (issue #253)', () => {
   });
 });
 
-describe('wmux-hook.js subagent identity (issue #272)', () => {
+describe('remotea-hook.js subagent identity (issue #272)', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {

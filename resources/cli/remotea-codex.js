@@ -11,7 +11,7 @@ exports.wmuxRequestPatiently = wmuxRequestPatiently;
 exports.codexCapabilityKey = codexCapabilityKey;
 exports.supportsRemote = supportsRemote;
 exports.runWmuxCodex = runWmuxCodex;
-/** Launched by wmux's private PATH shims using wmux's resolved Node runtime. */
+/** Launched by remotea's private PATH shims using remotea's resolved Node runtime. */
 const child_process_1 = require("child_process");
 const fs_1 = __importDefault(require("fs"));
 const net_1 = __importDefault(require("net"));
@@ -135,8 +135,8 @@ function resumeTarget(clientArgs) {
 /** Authenticated local pipe only; never send environment variables or transcripts. */
 const wmuxRequest = (method, params, timeoutMs) => {
     return new Promise((resolve, reject) => {
-        const pipe = process.env.WMUX_PIPE;
-        const token = process.env.WMUX_PIPE_TOKEN;
+        const pipe = process.env.REMOTEA_PIPE;
+        const token = process.env.REMOTEA_PIPE_TOKEN;
         if (!pipe || !token) {
             reject(new Error('Outside remotea'));
             return;
@@ -178,9 +178,9 @@ const wmuxRequest = (method, params, timeoutMs) => {
     });
 };
 /**
- * The request, asked again while wmux is merely busy. A single 2 s attempt
+ * The request, asked again while remotea is merely busy. A single 2 s attempt
  * used to decide each launch: during a restore, roughly half the Codex panes
- * timed out and started without session capture, so wmux lost track of
+ * timed out and started without session capture, so remotea lost track of
  * them — a `/new` or a quit there was never recorded.
  */
 async function wmuxRequestPatiently(method, params, patience, request = wmuxRequest, now = Date.now) {
@@ -202,7 +202,7 @@ const RELEASE_PATIENCE = { budgetMs: 10_000, firstAttemptMs: 2_000 };
  */
 const REMOTE_PROBE_TIMEOUT_MS = 30_000;
 function capabilityCachePath() {
-    return path_1.default.join(os_1.default.tmpdir(), 'wmux-codex-remote-support.json');
+    return path_1.default.join(os_1.default.tmpdir(), 'remotea-codex-remote-support.json');
 }
 function codexCapabilityKey(executable) {
     try {
@@ -287,12 +287,12 @@ async function startRelay(options) {
     }
 }
 async function runWmuxCodex(args = process.argv.slice(2)) {
-    const executable = process.env.WMUX_CODEX_EXE;
+    const executable = process.env.REMOTEA_CODEX_EXE;
     if (!executable || !path_1.default.isAbsolute(executable))
         throw new Error('remotea could not locate the native Codex executable');
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
-    const surfaceId = process.env.WMUX_SURFACE_ID;
+    const surfaceId = process.env.REMOTEA_SURFACE_ID;
     const plan = codexLaunchPlan(args, process.cwd());
     if (!plan.interactive || !surfaceId)
         return runCli(executable, args, env);
@@ -304,7 +304,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
         })).enabled === true;
     }
     catch (error) {
-        // An older/offline wmux leaves the CLI usable. Say so when wmux was there
+        // An older/offline remotea leaves the CLI usable. Say so when remotea was there
         // but never answered: that pane is about to run without session capture.
         if ((0, transport_retry_1.isTransientWmuxError)(error))
             console.error('[remotea] remotea did not answer; starting Codex without session restore.');
@@ -325,7 +325,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
             try {
                 await wmuxRequestPatiently(method, { surfaceId, sessionId }, REPORT_PATIENCE);
             }
-            catch { /* A crashed wmux cannot receive a report; Codex still owns its history. */ }
+            catch { /* A crashed remotea cannot receive a report; Codex still owns its history. */ }
         });
     };
     const target = resumeTarget(plan.clientArgs);
@@ -333,7 +333,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
         executable, args: plan.serverArgs, cwd: plan.cwd, env, yolo: plan.yolo,
         onSession: sessionId => report('pane.report_codex_session', sessionId),
         // Only the conversation this launch was asked to reopen — what a restore
-        // typed. wmux then forgets that saved id instead of retrying it forever.
+        // typed. remotea then forgets that saved id instead of retrying it forever.
         onMissing: sessionId => { if (sessionId === target)
             report('pane.codex_session_missing', sessionId); },
     });
@@ -342,8 +342,8 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
     let exitCode;
     try {
         exitCode = await runCli(executable, [
-            '--remote', relay.url, '--remote-auth-token-env', 'WMUX_CODEX_RELAY_TOKEN', ...plan.clientArgs,
-        ], { ...env, WMUX_CODEX_RELAY_TOKEN: relay.token });
+            '--remote', relay.url, '--remote-auth-token-env', 'REMOTEA_CODEX_RELAY_TOKEN', ...plan.clientArgs,
+        ], { ...env, REMOTEA_CODEX_RELAY_TOKEN: relay.token });
     }
     finally {
         await relay.close();
@@ -351,11 +351,11 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
     await reports;
     if (exitCode === 0 && relay.sessionId) {
         // Only an orderly CLI exit forgets the handle. A crash, socket failure or
-        // wmux shutdown retains it. Main also guards this RPC while quitting.
+        // remotea shutdown retains it. Main also guards this RPC while quitting.
         try {
             await wmuxRequestPatiently('pane.release_codex_session', { surfaceId, sessionId: relay.sessionId }, RELEASE_PATIENCE);
         }
-        catch { /* wmux has already closed */ }
+        catch { /* remotea has already closed */ }
         console.log(`To resume later: codex resume ${relay.sessionId}`);
     }
     return exitCode;

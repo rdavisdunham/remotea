@@ -10,10 +10,10 @@ import path from 'path';
  * answers the second. This is the path a session report takes during a restore
  * burst: the first attempt gets a busy/reset answer, the retry lands.
  *
- * It runs `resources/cli/wmux.js` rather than importing src/cli/wmux.ts because
+ * It runs `resources/cli/remotea.js` rather than importing src/cli/remotea.ts because
  * that is the file the plugin actually executes.
  */
-const CLI = path.resolve(__dirname, '../../resources/cli/wmux.js');
+const CLI = path.resolve(__dirname, '../../resources/cli/remotea.js');
 const SESSION = 'ses_e4ec0000000000000000000000';
 
 function runCli(socketPath: string): Promise<{ code: number | null; stdout: string }> {
@@ -26,9 +26,9 @@ function runCli(socketPath: string): Promise<{ code: number | null; stdout: stri
     ], {
       env: {
         ...process.env,
-        WMUX_PIPE: socketPath,
-        WMUX_PIPE_TOKEN: 'test-token',
-        WMUX_SURFACE_ID: 'surf-retry-test',
+        REMOTEA_PIPE: socketPath,
+        REMOTEA_PIPE_TOKEN: 'test-token',
+        REMOTEA_SURFACE_ID: 'surf-retry-test',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -41,11 +41,11 @@ function runCli(socketPath: string): Promise<{ code: number | null; stdout: stri
 
 describe('report-session against a busy pipe', () => {
   it('asks again after the first connection is reset', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-cli-retry-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-cli-retry-'));
     // Windows has no Unix sockets in a temp dir: listen on a named pipe, which
     // is what the CLI talks to there anyway.
     const socketPath = process.platform === 'win32'
-      ? `\\\\.\\pipe\\wmux-cli-retry-${process.pid}-${Date.now()}`
+      ? `\\\\.\\pipe\\remotea-cli-retry-${process.pid}-${Date.now()}`
       : path.join(dir, 'pipe.sock');
     let connections = 0;
     const server = net.createServer((socket) => {

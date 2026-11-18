@@ -103,8 +103,8 @@ describe('what a committed file may not do', () => {
     expect(errorsOf({ version: 1, panes: [{ run: ['x'], waitFor: { http: 'file:///C:/x' } }] }).join()).toMatch(/http\(s\)/);
   });
 
-  it('WMUX_* variables belong to wmux', () => {
-    expect(errorsOf({ version: 1, panes: [{ run: ['x'], env: { WMUX_SURFACE_ID: 'x' } }] }).join()).toMatch(/belong to remotea/);
+  it('REMOTEA_* variables belong to remotea', () => {
+    expect(errorsOf({ version: 1, panes: [{ run: ['x'], env: { REMOTEA_SURFACE_ID: 'x' } }] }).join()).toMatch(/belong to remotea/);
   });
 
   it('a credential written literally is a warning that names the fix', () => {
@@ -207,8 +207,8 @@ describe('surface env at spawn', () => {
     expect(expandEnvRefs('${env:UNSET_ONE}', {})).toBe('');
   });
 
-  it('drops invalid keys and every WMUX_* identity key', () => {
-    expect(resolveSurfaceEnv({ PORT: '4000', WMUX_SURFACE_ID: 'x', wmux_pipe: 'y', 'BAD KEY': 'z', NUM: 3 as unknown as string }, {}))
+  it('drops invalid keys and every REMOTEA_* identity key', () => {
+    expect(resolveSurfaceEnv({ PORT: '4000', REMOTEA_SURFACE_ID: 'x', remotea_pipe: 'y', 'BAD KEY': 'z', NUM: 3 as unknown as string }, {}))
       .toEqual({ PORT: '4000' });
   });
 });

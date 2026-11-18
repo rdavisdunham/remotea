@@ -100,6 +100,16 @@ describe('isRemoteaBlock', () => {
     expect(isRemoteaBlock(block('/w/remotea/resources/cli-bin'), ctx(files))).toBe(true);
   });
 
+  it('claims a block rendered by a source run (src/cli-bin)', () => {
+    const files = { '/w/remotea/package.json': JSON.stringify({ name: 'remotea' }) };
+    expect(isRemoteaBlock(block('/w/remotea/src/cli-bin'), ctx(files))).toBe(true);
+  });
+
+  it('does not claim a src/cli-bin block from a wmux checkout', () => {
+    const files = { '/w/wmux/package.json': JSON.stringify({ name: 'wmux' }) };
+    expect(isRemoteaBlock(block('/w/wmux/src/cli-bin'), ctx(files))).toBe(false);
+  });
+
   it('does not claim a block with no path in it', () => {
     expect(isRemoteaBlock('<!-- wmux:start -->\nnotes\n<!-- wmux:end -->', ctx())).toBe(false);
   });

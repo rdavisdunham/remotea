@@ -2,7 +2,7 @@
  * v2-browser.ts — Per-caller browser routing for V2 pipe handlers (issue #62).
  *
  * Each distinct caller (an agent's terminal surface, identified by its
- * WMUX_SURFACE_ID and sent as `params.caller`) is bound to its OWN browser
+ * REMOTEA_SURFACE_ID and sent as `params.caller`) is bound to its OWN browser
  * surface, created in that caller's workspace. The CDPBridge tracks every
  * attached browser independently, so concurrent agents no longer share — and
  * clobber — a single browser window. With no caller (manual human use) we fall
@@ -532,7 +532,7 @@ export async function runBrowserCommandForTarget(
  *
  * How long one agent-browser invocation may run. These are NOT free-floating:
  * the CLI hangs up on its own deadline (`browserDeadline()` in
- * `src/cli/wmux.ts` = BROWSER_READY_MS + verb + BROWSER_SLACK_MS), and a server
+ * `src/cli/remotea.ts` = BROWSER_READY_MS + verb + BROWSER_SLACK_MS), and a server
  * budget larger than that deadline is not a longer budget — it is an
  * UNREPORTABLE one. The client is already gone, so a command that overruns
  * prints a bare `timed out` and the server's real diagnosis

@@ -104,7 +104,7 @@ export const es: Translation = {
   'markdown.moreActions': 'Más acciones',
   'markdown.noFile': 'Sin archivo asociado',
   'markdown.empty':
-    'Sin contenido. Usa wmux markdown set para añadirlo, o arrastra aquí un archivo.',
+    'Sin contenido. Usa remotea markdown set para añadirlo, o arrastra aquí un archivo.',
   'markdown.error.copy': 'No se pudo escribir en el portapapeles',
   'markdown.error.read': 'No se pudo leer el archivo',
   'markdown.error.action': 'La acción ha fallado',

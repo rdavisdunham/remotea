@@ -14,7 +14,7 @@ import * as path from "node:path";
 
 /**
  * OpenCode session ids are `ses_` + base62. Same rule as the server half
- * (resources/opencode-plugin/wmux.js) and main's validator: strict because the
+ * (resources/opencode-plugin/remotea.js) and main's validator: strict because the
  * value ends up on a restored pane's command line, and the two halves are
  * installed separately so neither can import the other.
  */
@@ -24,11 +24,11 @@ export const SESSION_ID_RE = /^ses_[A-Za-z0-9_]{8,120}$/;
 const JS_RUNTIME_RE = /^(node|bun)(\.exe)?$/i;
 
 /**
- * Find something that can run `$WMUX_CLI` (issue #187).
+ * Find something that can run `$REMOTEA_CLI` (issue #187).
  *
  * `process.execPath` is only a JS runtime by accident of the host: under
  * Claude Code it is node.exe, under OpenCode it is the compiled `opencode.exe`,
- * and under a TUI running in WSL `WMUX_NODE` is a Windows path that does not
+ * and under a TUI running in WSL `REMOTEA_NODE` is a Windows path that does not
  * exist in the distro. Fall back to the host, then to PATH and the well-known
  * install directories — the same order the server half uses.
  */
@@ -38,9 +38,9 @@ export function resolveNodeRuntime(
   platform = process.platform,
   exists = existsSync,
 ) {
-  const declared = env.WMUX_NODE;
+  const declared = env.REMOTEA_NODE;
   if (declared && exists(declared)) {
-    return { file: declared, electron: env.WMUX_NODE_ELECTRON === "1" };
+    return { file: declared, electron: env.REMOTEA_NODE_ELECTRON === "1" };
   }
   if (execPath && JS_RUNTIME_RE.test(path.basename(execPath))) {
     return { file: execPath, electron: false };
@@ -84,7 +84,7 @@ function firstExisting(dirs, names, exists) {
 }
 
 /**
- * Where `WMUX_PLUGIN_DEBUG` should write, or null when debugging is off
+ * Where `REMOTEA_PLUGIN_DEBUG` should write, or null when debugging is off
  * (issue #190). A file, not the console: the TUI owns the terminal, and an
  * agent working inside it cannot read its own stderr.
  */
@@ -93,7 +93,7 @@ export function resolveDebugLog(value, tmpdir = os.tmpdir) {
   if (!v || v === "0" || v.toLowerCase() === "false") return null;
   if (v === "1" || v.toLowerCase() === "true") {
     try {
-      return path.join(tmpdir(), "wmux-tui-plugin-debug.log");
+      return path.join(tmpdir(), "remotea-tui-plugin-debug.log");
     } catch {
       return null;
     }
@@ -125,7 +125,7 @@ export function makeLogger(file) {
   return (label, data) => {
     try {
       const suffix = data === undefined ? "" : ` ${summarize(data)}`;
-      appendFileSync(file, `${new Date().toISOString()} [wmux-tui] ${label}${suffix}\n`);
+      appendFileSync(file, `${new Date().toISOString()} [remotea-tui] ${label}${suffix}\n`);
     } catch {}
   };
 }
@@ -152,7 +152,7 @@ export function callWmux(runtime, argv, log = () => {}, env = process.env, platf
     try { done(failure); } catch {}
   };
   try {
-    const cli = env.WMUX_CLI;
+    const cli = env.REMOTEA_CLI;
     // Bounded: the activity reporter keeps one call in flight and waits on
     // `done`, so a CLI that never returned would silence every later report.
     const opts = { windowsHide: true, timeout: CLI_TIMEOUT_MS };
@@ -165,9 +165,9 @@ export function callWmux(runtime, argv, log = () => {}, env = process.env, platf
       // same exe opens a second wmux window.
       if (runtime.electron) opts.env = { ...env, ELECTRON_RUN_AS_NODE: "1" };
     } else if (platform === "win32") {
-      // The PATH shim is `wmux.cmd`, which execFile cannot spawn without a
-      // shell. Nothing to do — WMUX_CLI is always set alongside WMUX=1.
-      log("cli: skipped (no WMUX_CLI on win32)", argv);
+      // The PATH shim is `remotea.cmd`, which execFile cannot spawn without a
+      // shell. Nothing to do — REMOTEA_CLI is always set alongside REMOTEA=1.
+      log("cli: skipped (no REMOTEA_CLI on win32)", argv);
       finish();
       return;
     } else {
@@ -199,7 +199,7 @@ export function callWmux(runtime, argv, log = () => {}, env = process.env, platf
  */
 export function callWmuxSync(runtime, argv, log = () => {}, env = process.env, platform = process.platform) {
   try {
-    const cli = env.WMUX_CLI;
+    const cli = env.REMOTEA_CLI;
     let file;
     let args;
     let childEnv = env;
@@ -208,7 +208,7 @@ export function callWmuxSync(runtime, argv, log = () => {}, env = process.env, p
       args = [cli, ...argv];
       if (runtime.electron) childEnv = { ...env, ELECTRON_RUN_AS_NODE: "1" };
     } else if (platform === "win32") {
-      log("cli: sync skipped (no WMUX_CLI on win32)", argv);
+      log("cli: sync skipped (no REMOTEA_CLI on win32)", argv);
       return false;
     } else {
       file = "wmux";
@@ -490,7 +490,7 @@ export function createSessionSeeder({
 }
 
 /**
- * The cap `wmux-hook.js` and the server half apply to a prompt (#304). argv
+ * The cap `remotea-hook.js` and the server half apply to a prompt (#304). argv
  * borne here rather than stdin, so it must stay well under the Windows
  * command-line limit; 4000 is the number the other producers use.
  */

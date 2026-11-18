@@ -1,18 +1,18 @@
 #!/bin/bash
-# wmux Bash/Zsh Integration
-# Sourced via WMUX_INTEGRATION=1 detection
+# remotea Bash/Zsh Integration
+# Sourced via REMOTEA_INTEGRATION=1 detection
 
 # Git Bash panes load this file with `bash --init-file` (pty-manager.ts, #427),
 # and --init-file REPLACES the rc file bash would have read. So the user's own
 # startup files are read here, before anything else, the way that bash would
 # have read them: a login shell (what Settings' "Git Bash" starts) gets the
-# login files, because bash ignores --init-file for a login shell and wmux has to
-# drop --login to use it; anything else gets ~/.bashrc. WMUX_BASH_INIT is cleared
+# login files, because bash ignores --init-file for a login shell and remotea has to
+# drop --login to use it; anything else gets ~/.bashrc. REMOTEA_BASH_INIT is cleared
 # first, so a bash started from this pane, or a ~/.bashrc that sources this file
 # itself, never comes back through here.
-if [ -n "${WMUX_BASH_INIT-}" ] && [ -n "${BASH_VERSION-}" ]; then
-    _wmux_login="${WMUX_BASH_LOGIN-}"
-    unset WMUX_BASH_INIT WMUX_BASH_LOGIN
+if [ -n "${REMOTEA_BASH_INIT-}" ] && [ -n "${BASH_VERSION-}" ]; then
+    _wmux_login="${REMOTEA_BASH_LOGIN-}"
+    unset REMOTEA_BASH_INIT REMOTEA_BASH_LOGIN
     if [ -n "$_wmux_login" ]; then
         [ -r /etc/profile ] && . /etc/profile
         if [ -r ~/.bash_profile ]; then . ~/.bash_profile
@@ -25,7 +25,7 @@ if [ -n "${WMUX_BASH_INIT-}" ] && [ -n "${BASH_VERSION-}" ]; then
     unset _wmux_login
 fi
 
-export WMUX=1
+export REMOTEA=1
 
 # Sequence the two reports that define an ssh session's lifetime. The remote
 # transport deliberately starts one backgrounded CLI process per report, so
@@ -38,15 +38,15 @@ _wmux_next_ssh_event_seq() {
     _wmux_ssh_event_seq=$((_wmux_ssh_event_seq + 1))
 }
 
-# wmux CLI shortcut — Claude Code and users can just type: wmux browser open <url>
+# remotea CLI shortcut — Claude Code and users can just type: remotea browser open <url>
 #
-# Only where the cli-bin shim is not on PATH already. The shim honours WMUX_NODE
+# Only where the cli-bin shim is not on PATH already. The shim honours REMOTEA_NODE
 # (#187) and this bare `node` does not, so in a Git Bash pane, which loads this
-# file on its own since #427, the function would break `wmux` on a machine with
+# file on its own since #427, the function would break `remotea` on a machine with
 # no node on PATH.
-if ! command -v wmux &>/dev/null; then
-    wmux() { node "$WMUX_CLI" "$@"; }
-    [ -n "${BASH_VERSION-}" ] && export -f wmux
+if ! command -v remotea &>/dev/null; then
+    remotea() { node "$REMOTEA_CLI" "$@"; }
+    [ -n "${BASH_VERSION-}" ] && export -f remotea
 fi
 
 _wmux_report() {
@@ -54,20 +54,20 @@ _wmux_report() {
     # Devcontainer transport (issue #19): a shell inside a Linux container can
     # reach neither the Windows named pipe nor a Windows runtime, so the native
     # route below is a no-op there and the pane never reports anything. When
-    # WMUX_REMOTE is set, relay the same V1 line through `wmux raw-v1` instead —
-    # the `wmux` shim resolves to `node "$WMUX_CLI"`, which already speaks TCP to
-    # a `wmux bridge` (issue #78). No protocol is duplicated here.
+    # REMOTEA_REMOTE is set, relay the same V1 line through `remotea raw-v1` instead —
+    # the `remotea` shim resolves to `node "$REMOTEA_CLI"`, which already speaks TCP to
+    # a `remotea bridge` (issue #78). No protocol is duplicated here.
     #
     # Fire-and-forget: backgrounded with output discarded, so a slow or absent
     # bridge delays no prompt and fails no command.
-    if [ -n "${WMUX_REMOTE}" ] && command -v wmux &>/dev/null; then
-        ( wmux raw-v1 "$msg" >/dev/null 2>&1 & )
+    if [ -n "${REMOTEA_REMOTE}" ] && command -v remotea &>/dev/null; then
+        ( remotea raw-v1 "$msg" >/dev/null 2>&1 & )
         return
     fi
     # Native: the same `raw-v1` line, through the Windows-side CLI resolved below.
     [ -z "$_wmux_cli_script" ] && return
     (
-        if [ -n "${WMUX_NODE_ELECTRON-}" ]; then
+        if [ -n "${REMOTEA_NODE_ELECTRON-}" ]; then
             export ELECTRON_RUN_AS_NODE=1
             # Interop hands a Windows process only what WSLENV names.
             [ -n "${WSL_DISTRO_NAME-}" ] && export WSLENV="${WSLENV:+$WSLENV:}ELECTRON_RUN_AS_NODE"
@@ -79,40 +79,40 @@ _wmux_report() {
 # How a native report reaches the named pipe, resolved once per source. bash
 # cannot open the pipe itself: under Git Bash `> //./pipe/wmux` fails after
 # seconds (measured), and WSL has no Windows pipes at all. Until #427/#428 this
-# branch appended to a temp file that nothing in wmux has ever read, so Git Bash
+# branch appended to a temp file that nothing in remotea has ever read, so Git Bash
 # and WSL panes reported no cwd, no branch and no shell state.
 #
-#   Git Bash: WMUX_NODE, the JS runtime wmux resolved for this pane (#187),
-#   runs WMUX_CLI, which is already a Windows path.
+#   Git Bash: REMOTEA_NODE, the JS runtime remotea resolved for this pane (#187),
+#   runs REMOTEA_CLI, which is already a Windows path.
 #   WSL: the same runtime on the Windows side of interop, which is what reaches
-#   the pipe. WMUX_WSL_NODE is it translated to a /mnt path, a separate name so
+#   the pipe. REMOTEA_WSL_NODE is it translated to a /mnt path, a separate name so
 #   the cli-bin shim does not pick a Windows runtime up with a /mnt script path;
 #   the script goes back to its Windows spelling, which is all node.exe can
-#   open. WSLENV carries WMUX_PIPE and the token back out (pane-browser-env.ts).
+#   open. WSLENV carries REMOTEA_PIPE and the token back out (pane-browser-env.ts).
 _wmux_windows=""
 _wmux_cli_node=""
 _wmux_cli_script=""
 case "${OSTYPE-}" in
     msys*|cygwin*)
         _wmux_windows=1
-        if [ -n "${WMUX_NODE-}" ] && [ -x "$WMUX_NODE" ]; then
-            _wmux_cli_node="$WMUX_NODE"
+        if [ -n "${REMOTEA_NODE-}" ] && [ -x "$REMOTEA_NODE" ]; then
+            _wmux_cli_node="$REMOTEA_NODE"
         elif command -v node &>/dev/null; then
             _wmux_cli_node=node
         fi
-        [ -n "$_wmux_cli_node" ] && _wmux_cli_script="${WMUX_CLI-}"
+        [ -n "$_wmux_cli_node" ] && _wmux_cli_script="${REMOTEA_CLI-}"
         ;;
     *)
-        if [ -n "${WSL_DISTRO_NAME-}" ] && [ -n "${WMUX_CLI-}" ] \
-            && [ -n "${WMUX_WSL_NODE-}" ] && [ -x "$WMUX_WSL_NODE" ]; then
-            _wmux_cli_node="$WMUX_WSL_NODE"
-            _wmux_cli_script="$(wslpath -w "$WMUX_CLI" 2>/dev/null)"
+        if [ -n "${WSL_DISTRO_NAME-}" ] && [ -n "${REMOTEA_CLI-}" ] \
+            && [ -n "${REMOTEA_WSL_NODE-}" ] && [ -x "$REMOTEA_WSL_NODE" ]; then
+            _wmux_cli_node="$REMOTEA_WSL_NODE"
+            _wmux_cli_script="$(wslpath -w "$REMOTEA_CLI" 2>/dev/null)"
         fi
         ;;
 esac
 
-# The cwd as wmux should store it. Git Bash's own spelling, /c/Users/me, looks
-# POSIX to wmux (isPosixPath), which takes it for a WSL path: a restored pane
+# The cwd as remotea should store it. Git Bash's own spelling, /c/Users/me, looks
+# POSIX to remotea (isPosixPath), which takes it for a WSL path: a restored pane
 # was handed %USERPROFILE% instead (#427). So Git Bash reports what PowerShell
 # does, C:\Users\me, the directory a restored pane is spawned in. `pwd -W` is
 # MSYS's; Cygwin has only cygpath. Either costs a fork, so the answer is kept
@@ -121,7 +121,7 @@ _wmux_cwd_for=""
 _wmux_cwd_win=""
 
 _wmux_report_cwd() {
-    local surface_id="${WMUX_SURFACE_ID}"
+    local surface_id="${REMOTEA_SURFACE_ID}"
     [ -z "$surface_id" ] && return
     local cwd="$PWD"
     if [ -n "$_wmux_windows" ]; then
@@ -149,7 +149,7 @@ _wmux_report_cwd() {
 # that refreshes the index takes .git/index.lock — the lock the `git commit`
 # being typed needs. Parsed with builtins: the whole point is fewer forks.
 _wmux_report_git() {
-    local surface_id="${WMUX_SURFACE_ID}"
+    local surface_id="${REMOTEA_SURFACE_ID}"
     [ -z "$surface_id" ] && return
     local out line branch="" dirty=""
     if out=$(git --no-optional-locks status --porcelain=v2 --branch 2>/dev/null); then
@@ -174,7 +174,7 @@ _wmux_report_git() {
 # OSC 133 — semantic prompt marks (issue #207)
 #
 # Everything above this point reports out of band, through the Windows-side CLI
-# or the bridge, and that is the right shape for facts wmux only has to learn
+# or the bridge, and that is the right shape for facts remotea only has to learn
 # eventually. Prompt boundaries are not one of those. Their consumer is xterm's
 # parser, which has to know where the prompt ended at the exact byte offset in
 # the stream; a message that arrives a few milliseconds later can no longer say
@@ -182,7 +182,7 @@ _wmux_report_git() {
 #
 # The spelling is FinalTerm's — the same marks iTerm2, VS Code, WezTerm, kitty
 # and Windows Terminal emit — so a pane running somebody else's integration
-# feeds wmux exactly the boundaries this file does.
+# feeds remotea exactly the boundaries this file does.
 # ---------------------------------------------------------------------------
 
 _wmux_esc=$'\033'
@@ -230,7 +230,7 @@ _wmux_mark_b="${_wmux_esc}]133;B${_wmux_ps1_st}"
 # between Enter and the command starting — the same cost argument that keeps
 # _wmux_report_command down to ssh.
 _wmux_osc133() {
-    [ -z "${WMUX_SURFACE_ID}" ] && return 0
+    [ -z "${REMOTEA_SURFACE_ID}" ] && return 0
     printf '\033]133;%s\033\\' "$1"
     return 0
 }
@@ -257,7 +257,7 @@ _wmux_command_open="${_wmux_command_open-}"
 # in place, so a PS1 nobody rewrites is wrapped exactly once instead of growing
 # a fresh pair of marks per prompt.
 _wmux_apply_prompt_marks() {
-    [ -z "${WMUX_SURFACE_ID}" ] && return 0
+    [ -z "${REMOTEA_SURFACE_ID}" ] && return 0
     case "$PS1" in
         *"${_wmux_mark_a}"*) return 0 ;;
     esac
@@ -341,21 +341,21 @@ _wmux_precmd() {
     # 130 = SIGINT (Ctrl+C), 137 = SIGKILL, 143 = SIGTERM
     _wmux_next_ssh_event_seq
     if [ $exit_code -eq 130 ] || [ $exit_code -eq 137 ] || [ $exit_code -eq 143 ]; then
-        _wmux_report "report_shell_state ${WMUX_SURFACE_ID} seq=${_wmux_ssh_event_seq} interrupted"
+        _wmux_report "report_shell_state ${REMOTEA_SURFACE_ID} seq=${_wmux_ssh_event_seq} interrupted"
     else
-        _wmux_report "report_shell_state ${WMUX_SURFACE_ID} seq=${_wmux_ssh_event_seq} idle"
+        _wmux_report "report_shell_state ${REMOTEA_SURFACE_ID} seq=${_wmux_ssh_event_seq} idle"
     fi
-    _wmux_report "ports_kick ${WMUX_SURFACE_ID}"
+    _wmux_report "ports_kick ${REMOTEA_SURFACE_ID}"
 }
 
-# Report the command line itself, so wmux can tell that this pane just ssh'd
+# Report the command line itself, so remotea can tell that this pane just ssh'd
 # somewhere. That is what lets a pasted screenshot be uploaded to the remote
 # host instead of having a local Windows path typed into a remote shell.
 #
 # Once per prompt cycle: bash drives preexec from a DEBUG trap, which fires
 # for every simple command — including the ones inside PROMPT_COMMAND — so an
 # unguarded report would put several lines on the pipe per keypress.
-# Report an ssh command line, so wmux can tell that this pane just connected
+# Report an ssh command line, so remotea can tell that this pane just connected
 # somewhere. That is what lets a pasted screenshot be uploaded to the remote
 # host instead of having a local Windows path typed into a remote shell.
 #
@@ -364,7 +364,7 @@ _wmux_precmd() {
 # command the user just typed — so a bare `return` after a non-matching test
 # would silently swallow commands in any pane where extdebug is on.
 _wmux_report_command() {
-    local surface_id="${WMUX_SURFACE_ID}"
+    local surface_id="${REMOTEA_SURFACE_ID}"
     [ -z "$surface_id" ] && return 0
     # Once per prompt cycle: bash drives preexec from a DEBUG trap, which fires
     # for every simple command, including the ones inside PROMPT_COMMAND.
@@ -408,7 +408,7 @@ _wmux_report_command() {
 # prompt would start one per iteration. _wmux_report_command keeps seeing every
 # command, so `cd x && ssh host` is still caught.
 _wmux_preexec() {
-    local surface_id="${WMUX_SURFACE_ID}"
+    local surface_id="${REMOTEA_SURFACE_ID}"
     [ -z "$surface_id" ] && return 0
     if [ -n "$_wmux_prompt_armed" ] && [ "${1#_wmux_precmd}" = "$1" ]; then
         # First, and before any reporting: readline has already echoed the
@@ -425,7 +425,7 @@ _wmux_preexec() {
 # Install hooks.
 #
 # Gated on whether the hooks are STILL INSTALLED, never on whether this file has
-# run before. wmux does not own the `source` line for every bash — in WSL the
+# run before. remotea does not own the `source` line for every bash — in WSL the
 # user puts it in their own .bashrc, and pty-manager.ts injects this file only
 # into Git Bash — so `source ~/.bashrc` can re-run this file in the same shell.
 # Any rc that ASSIGNS PROMPT_COMMAND (a prompt theme, or a plain

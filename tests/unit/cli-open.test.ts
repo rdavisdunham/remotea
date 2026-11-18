@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { openUrlArg } from '../../src/cli/wmux';
+import { openUrlArg } from '../../src/cli/remotea';
 
 describe('wmux open argument', () => {
   it('accepts http and https and preserves the URL verbatim', () => {

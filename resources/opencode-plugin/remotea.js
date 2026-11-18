@@ -1,7 +1,7 @@
-// wmux-plugin-version: 10
+// remotea-plugin-version: 10
 // wmux OpenCode plugin — bridges OpenCode hooks/events to the wmux sidebar.
-// Auto-installed by wmux to ~/.config/opencode/plugin/wmux.js.
-// No-ops entirely outside wmux (WMUX !== '1').
+// Auto-installed by wmux to ~/.config/opencode/plugin/remotea.js.
+// No-ops entirely outside wmux (REMOTEA !== '1').
 import { execFile, execFileSync } from "node:child_process";
 import { appendFileSync, existsSync } from "node:fs";
 import * as os from "node:os";
@@ -11,15 +11,15 @@ import * as path from "node:path";
 const JS_RUNTIME_RE = /^(node|bun)(\.exe)?$/i;
 
 /**
- * Find something that can run `$WMUX_CLI` (issue #187).
+ * Find something that can run `$REMOTEA_CLI` (issue #187).
  *
  * v2 used `process.execPath`, which is only a JS runtime by accident of the
  * host: under Claude Code it is node.exe, under OpenCode it is the compiled
  * `opencode.exe`. That turned every call into
- * `opencode.exe wmux.js agent-activity --active`, which prints OpenCode's help
+ * `opencode.exe remotea.js agent-activity --active`, which prints OpenCode's help
  * and exits 1 — invisibly, so the sidebar sat on "Running" forever.
  *
- * Order matters. `WMUX_NODE` comes first because wmux resolved it in its own
+ * Order matters. `REMOTEA_NODE` comes first because wmux resolved it in its own
  * process, where it could also fall back to its Electron binary — so it is the
  * only link in this chain that cannot come up empty. The rest is for a plugin
  * installed by an older wmux that does not declare it yet.
@@ -32,9 +32,9 @@ function resolveNodeRuntime(
   platform = process.platform,
   exists = existsSync,
 ) {
-  const declared = env.WMUX_NODE;
+  const declared = env.REMOTEA_NODE;
   if (declared && exists(declared)) {
-    return { file: declared, electron: env.WMUX_NODE_ELECTRON === "1" };
+    return { file: declared, electron: env.REMOTEA_NODE_ELECTRON === "1" };
   }
   if (execPath && JS_RUNTIME_RE.test(path.basename(execPath))) {
     return { file: execPath, electron: false };
@@ -80,7 +80,7 @@ function firstExisting(dirs, names, exists) {
 }
 
 /**
- * Where `WMUX_PLUGIN_DEBUG` should write, or null when debugging is off (#190).
+ * Where `REMOTEA_PLUGIN_DEBUG` should write, or null when debugging is off (#190).
  *
  * v3 logged to `console.error`, which is unreadable by design here: OpenCode is
  * a TUI that owns the terminal, and the agent running inside it cannot read its
@@ -98,7 +98,7 @@ function resolveDebugLog(value, tmpdir = os.tmpdir) {
   if (!v || v === "0" || v.toLowerCase() === "false") return null;
   if (v === "1" || v.toLowerCase() === "true") {
     try {
-      return path.join(tmpdir(), "wmux-plugin-debug.log");
+      return path.join(tmpdir(), "remotea-plugin-debug.log");
     } catch {
       return null;
     }
@@ -233,12 +233,12 @@ function resetPendingReleases() {
 }
 
 export const WmuxPlugin = async (options = {}) => {
-  // Resolved before the WMUX gate so "the plugin loaded but did nothing" is
+  // Resolved before the REMOTEA gate so "the plugin loaded but did nothing" is
   // itself a visible log line — otherwise the commonest failure is silence.
-  const log = makeLogger(resolveDebugLog(process.env.WMUX_PLUGIN_DEBUG));
-  const surface = process.env.WMUX_SURFACE_ID;
-  if (process.env.WMUX !== "1" || !surface) {
-    log("init: inactive", { WMUX: process.env.WMUX, surface });
+  const log = makeLogger(resolveDebugLog(process.env.REMOTEA_PLUGIN_DEBUG));
+  const surface = process.env.REMOTEA_SURFACE_ID;
+  if (process.env.REMOTEA !== "1" || !surface) {
+    log("init: inactive", { REMOTEA: process.env.REMOTEA, surface });
     return {};
   }
   // A replacement instance cancels the delayed release its predecessor
@@ -246,7 +246,7 @@ export const WmuxPlugin = async (options = {}) => {
   // releases synchronously before this line can run.
   cancelPendingRelease(surface);
 
-  // A shared server sees every pane's sessions while WMUX_SURFACE_ID names
+  // A shared server sees every pane's sessions while REMOTEA_SURFACE_ID names
   // only the pane that started it. No pane-specific signal from this process
   // can be attributed: session handles, activity, blocked state, prompts and
   // shell env all belong to the TUI half, which runs inside the pane.
@@ -269,13 +269,13 @@ export const WmuxPlugin = async (options = {}) => {
     surface,
     runtime: runtime.file,
     electron: runtime.electron,
-    cli: process.env.WMUX_CLI,
+    cli: process.env.REMOTEA_CLI,
     pid: process.pid,
   });
 
   /** How to run the wmux CLI with `args`, or null when it cannot be run. */
   function cliCommand(args) {
-    const cli = process.env.WMUX_CLI;
+    const cli = process.env.REMOTEA_CLI;
     const opts = { windowsHide: true };
     if (cli) {
       // wmux's own Electron binary is Node only with this set; without it the
@@ -283,8 +283,8 @@ export const WmuxPlugin = async (options = {}) => {
       if (runtime.electron) opts.env = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
       return { file: runtime.file, argv: [cli, ...args], opts };
     }
-    // The PATH shim is `wmux.cmd`, which execFile cannot spawn without a
-    // shell. Nothing to do — WMUX_CLI is always set alongside WMUX=1.
+    // The PATH shim is `remotea.cmd`, which execFile cannot spawn without a
+    // shell. Nothing to do — REMOTEA_CLI is always set alongside REMOTEA=1.
     if (process.platform === "win32") return null;
     return { file: "wmux", argv: args, opts };
   }
@@ -302,7 +302,7 @@ export const WmuxPlugin = async (options = {}) => {
       try {
         const command = cliCommand(args);
         if (!command) {
-          log("cli: skipped (no WMUX_CLI on win32)", args);
+          log("cli: skipped (no REMOTEA_CLI on win32)", args);
           resolve({ ok: false, permanent: true });
           return;
         }
@@ -569,7 +569,7 @@ export const WmuxPlugin = async (options = {}) => {
   };
 
   /**
-   * The cap `wmux-hook.js` applies to Claude Code prompts (#304). A prompt
+   * The cap `remotea-hook.js` applies to Claude Code prompts (#304). A prompt
    * travels as an argv value here rather than stdin, so it must stay well
    * under the Windows command-line limit; 4000 is the number the other
    * producer already uses.
@@ -673,13 +673,13 @@ export const WmuxPlugin = async (options = {}) => {
       }
     },
     "shell.env": async (input, output) => {
-      output.env.WMUX = "1";
-      output.env.WMUX_SURFACE_ID = surface;
-      if (process.env.WMUX_PIPE) output.env.WMUX_PIPE = process.env.WMUX_PIPE;
-      if (process.env.WMUX_CLI) output.env.WMUX_CLI = process.env.WMUX_CLI;
+      output.env.REMOTEA = "1";
+      output.env.REMOTEA_SURFACE_ID = surface;
+      if (process.env.REMOTEA_PIPE) output.env.REMOTEA_PIPE = process.env.REMOTEA_PIPE;
+      if (process.env.REMOTEA_CLI) output.env.REMOTEA_CLI = process.env.REMOTEA_CLI;
       // Children need the runtime too, or they re-derive it and hit #187.
-      if (process.env.WMUX_NODE) output.env.WMUX_NODE = process.env.WMUX_NODE;
-      if (process.env.WMUX_NODE_ELECTRON) output.env.WMUX_NODE_ELECTRON = process.env.WMUX_NODE_ELECTRON;
+      if (process.env.REMOTEA_NODE) output.env.REMOTEA_NODE = process.env.REMOTEA_NODE;
+      if (process.env.REMOTEA_NODE_ELECTRON) output.env.REMOTEA_NODE_ELECTRON = process.env.REMOTEA_NODE_ELECTRON;
     },
   };
   // For v2's dispose (setupV2). Non-enumerable, so a loader walking the hooks
@@ -750,7 +750,7 @@ function fromV2Event(event) {
  * signal, never the plugin, and never OpenCode's startup.
  */
 async function setupV2(ctx) {
-  const log = makeLogger(resolveDebugLog(process.env.WMUX_PLUGIN_DEBUG));
+  const log = makeLogger(resolveDebugLog(process.env.REMOTEA_PLUGIN_DEBUG));
   // v2 has a TUI process per pane and its TUI half knows which session is on
   // screen. The server half cannot tell a background session from the viewed
   // one, so it must not write the restore handle. It keeps activity, blocked
@@ -833,7 +833,7 @@ export default { id: "wmux", server: WmuxPlugin, setup: setupV2 };
  * exported these four, so the loader called e.g. `summarize(ctx)`, got a string,
  * and dereferenced `null.config` — taking OpenCode down at startup with
  * "Unexpected server error" for anyone launching it OUTSIDE wmux. Inside wmux it
- * crashed just the same, but the WMUX gate meant nobody testing wmux ever saw
+ * crashed just the same, but the REMOTEA gate meant nobody testing wmux ever saw
  * the export loop as the cause.
  *
  * `WmuxPlugin` and the default definition must stay the only exports in this

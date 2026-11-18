@@ -22,7 +22,7 @@ import { reportIntegrationFailure } from './integration-failures';
  * We still write the marker-wrapped instructions verbatim rather than stripping
  * the markers, for two reasons: the file is then byte-identical to what the
  * other two agents receive (one source of truth, no per-agent drift), and the
- * start marker is what `removeKiroContext` checks before deleting — a wmux.md
+ * start marker is what `removeKiroContext` checks before deleting — a remotea.md
  * the user wrote themselves has no marker and is left where it is.
  *
  * ── What is deliberately NOT installed ───────────────────────────────────────
@@ -43,16 +43,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { readRenderedInstructions } from './agent-instructions';
+import { isLegacyRemoteaBlockFile } from '../shared/legacy-cleanup';
+import { LEGACY_PLUGIN_FILES } from '../shared/legacy-names';
+import { desktopOwnershipContext } from './ownership-context';
 
 /** Identifies a file as wmux-managed. Shared with the other two agent paths. */
-const START_MARKER = '<!-- wmux:start';
+const START_MARKER = '<!-- remotea:start';
 
 /**
- * ~/.kiro/steering/wmux.md — the *global* steering location, which applies to
+ * ~/.kiro/steering/remotea.md — the *global* steering location, which applies to
  * every workspace. The per-project .kiro/steering/ is the user's, not ours.
  */
 export function getKiroSteeringPath(): string {
-  return path.join(os.homedir(), '.kiro', 'steering', 'wmux.md');
+  return path.join(os.homedir(), '.kiro', 'steering', 'remotea.md');
 }
 
 /** Pure: is this file ours to manage? Everything else is the user's. */
@@ -69,12 +72,19 @@ export function ensureKiroContext(): void {
     const block = rendered.trimEnd() + '\n';
     const steeringPath = getKiroSteeringPath();
 
-    // A pre-existing wmux.md that is NOT ours belongs to the user. Overwriting
+    // The old-named file goes only when the path inside it is this install's
+    // (KTD8); a wmux install writes the same name.
+    const oldPath = path.join(path.dirname(steeringPath), LEGACY_PLUGIN_FILES.kiro[0]);
+    const ctx = desktopOwnershipContext();
+    const old = ctx.readFile(oldPath);
+    if (old !== null && isLegacyRemoteaBlockFile(old, ctx)) fs.unlinkSync(oldPath);
+
+    // A pre-existing remotea.md that is NOT ours belongs to the user. Overwriting
     // it would be the same class of mistake as clobbering their CLAUDE.md.
     if (fs.existsSync(steeringPath)) {
       const current = fs.readFileSync(steeringPath, 'utf-8');
       if (!isWmuxManaged(current)) {
-        console.warn('[remotea] ~/.kiro/steering/wmux.md exists and is not wmux-managed — leaving it alone');
+        console.warn('[remotea] ~/.kiro/steering/remotea.md exists and is not remotea\'s — leaving it alone');
         return;
       }
       if (current === block) return; // already current; don't churn the mtime
@@ -82,7 +92,7 @@ export function ensureKiroContext(): void {
 
     fs.mkdirSync(path.dirname(steeringPath), { recursive: true });
     fs.writeFileSync(steeringPath, block, 'utf-8');
-    console.log('[remotea] Updated remotea steering in ~/.kiro/steering/wmux.md');
+    console.log('[remotea] Updated remotea steering in ~/.kiro/steering/remotea.md');
   } catch (err) {
     reportIntegrationFailure('Kiro', 'write', err);
     console.warn('[remotea] Failed to update Kiro context:', err);
@@ -93,7 +103,7 @@ export function ensureKiroContext(): void {
  * Delete the wmux steering file (issue #132's inverse requirement: every write
  * wmux makes outside its own directory must be undoable).
  *
- * Guarded on the marker, so a wmux.md the user happens to have written under
+ * Guarded on the marker, so a remotea.md the user happens to have written under
  * that name survives switching the integration off.
  */
 export function removeKiroContext(): void {
@@ -102,7 +112,7 @@ export function removeKiroContext(): void {
     if (!fs.existsSync(steeringPath)) return;
     if (!isWmuxManaged(fs.readFileSync(steeringPath, 'utf-8'))) return;
     fs.unlinkSync(steeringPath);
-    console.log('[remotea] Removed remotea steering from ~/.kiro/steering/wmux.md');
+    console.log('[remotea] Removed remotea steering from ~/.kiro/steering/remotea.md');
   } catch (err) {
     reportIntegrationFailure('Kiro', 'remove', err);
     console.warn('[remotea] Failed to remove Kiro context:', err);

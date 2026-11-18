@@ -98,7 +98,7 @@ export interface Region {
 }
 
 export interface Rule {
-  /** Stable, and shown by `wmux detect explain`. */
+  /** Stable, and shown by `remotea detect explain`. */
   id: string;
   state: DetectedState;
   /** Higher wins. Equal priority → first in file, so order is meaningful. */
@@ -156,7 +156,7 @@ export interface DetectionResult {
    */
   state: DetectedState | 'unknown';
   ruleId: string | null;
-  /** Machine-readable cause, for `wmux detect explain`. */
+  /** Machine-readable cause, for `remotea detect explain`. */
   reason:
     | 'matched'
     | 'no-agent-signature'

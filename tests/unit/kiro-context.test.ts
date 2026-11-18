@@ -16,7 +16,7 @@ import { CLI_BIN_PLACEHOLDER, renderInstructions } from '../../src/main/agent-in
  * These drive the real filesystem against a throwaway HOME rather than mocking
  * fs, because the properties that matter are all about what is on disk
  * afterwards: that the steering file lands where Kiro actually reads it, that a
- * file wmux did not write is never touched, and that switching the integration
+ * file remotea did not write is never touched, and that switching the integration
  * off leaves nothing behind (#132's inverse requirement).
  */
 describe('#148 Kiro steering', () => {
@@ -44,7 +44,7 @@ describe('#148 Kiro steering', () => {
     fs.rmSync(home, { recursive: true, force: true });
   });
 
-  const steering = () => path.join(home, '.kiro', 'steering', 'wmux.md');
+  const steering = () => path.join(home, '.kiro', 'steering', 'remotea.md');
   const read = () => fs.readFileSync(steering(), 'utf-8');
 
   it('targets the global steering dir Kiro CLI loads automatically', () => {
@@ -57,7 +57,7 @@ describe('#148 Kiro steering', () => {
     expect(fs.existsSync(steering())).toBe(false);
     ensureKiroContext();
     expect(fs.existsSync(steering())).toBe(true);
-    expect(read()).toContain('wmux browser open');
+    expect(read()).toContain('remotea browser open');
   });
 
   it('writes the same marker-wrapped block the other agents get', () => {
@@ -76,7 +76,7 @@ describe('#148 Kiro steering', () => {
 
   it('leaves no unsubstituted placeholder in the steering file (issue #158)', () => {
     // A placeholder that reached disk would hand the reader a literal
-    // "{{WMUX_CLI_BIN}}/wmux ping" to run, which is worse than the ambiguity it
+    // "{{REMOTEA_CLI_BIN}}/wmux ping" to run, which is worse than the ambiguity it
     // was added to remove.
     ensureKiroContext();
     expect(read()).not.toContain(CLI_BIN_PLACEHOLDER);
@@ -91,7 +91,7 @@ describe('#148 Kiro steering', () => {
     expect(fs.statSync(steering()).mtimeMs).toBe(mtime);
   });
 
-  it('refuses to overwrite a wmux.md the user wrote themselves', () => {
+  it('refuses to overwrite a remotea.md the user wrote themselves', () => {
     fs.mkdirSync(path.dirname(steering()), { recursive: true });
     fs.writeFileSync(steering(), '# my own steering\nprefer tabs\n');
     ensureKiroContext();
@@ -105,7 +105,7 @@ describe('#148 Kiro steering', () => {
     expect(fs.existsSync(steering())).toBe(false);
   });
 
-  it('leaves an unmanaged wmux.md alone on removal', () => {
+  it('leaves an unmanaged remotea.md alone on removal', () => {
     fs.mkdirSync(path.dirname(steering()), { recursive: true });
     fs.writeFileSync(steering(), '# mine\n');
     removeKiroContext();
@@ -127,8 +127,8 @@ describe('#148 Kiro steering', () => {
 });
 
 describe('isWmuxManaged', () => {
-  it('recognises the wmux marker', () => {
-    expect(isWmuxManaged('<!-- wmux:start v1 -->\nx')).toBe(true);
+  it('recognises the remotea marker', () => {
+    expect(isWmuxManaged('<!-- remotea:start v1 -->\nx')).toBe(true);
   });
   it('treats an unmarked file as the user\'s', () => {
     expect(isWmuxManaged('# my notes')).toBe(false);

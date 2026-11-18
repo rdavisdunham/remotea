@@ -1,9 +1,9 @@
 @echo off
-REM wmux CMD Integration
+REM remotea CMD Integration
 REM Reports CWD via OSC 9 escape sequence embedded in prompt
 
-REM Set WMUX env var
-set WMUX=1
+REM Set REMOTEA env var
+set REMOTEA=1
 
 REM UTF-8 code page so multi-byte input (Korean, Japanese, Chinese, emoji)
 REM round-trips through conpty correctly.
@@ -29,6 +29,6 @@ REM mean claiming a boundary one whole command late, so a cmd pane reports where
 REM its prompts are and stays honest about knowing nothing else. Consumers must
 REM already tolerate an A/B-only stream: plenty of shells emit no D.
 REM
-REM Guarded on WMUX_SURFACE_ID like every other emission in this integration —
+REM Guarded on REMOTEA_SURFACE_ID like every other emission in this integration —
 REM without a surface there is nothing for the marks to be about.
-if defined WMUX_SURFACE_ID prompt $e]133;A$e\$e]9;9;$P$e\$P$G$e]133;B$e\
+if defined REMOTEA_SURFACE_ID prompt $e]133;A$e\$e]9;9;$P$e\$P$G$e]133;B$e\

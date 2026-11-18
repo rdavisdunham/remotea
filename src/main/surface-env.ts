@@ -15,12 +15,12 @@ const ENV_REF_RE = /\$\{env:([A-Za-z_]\w{0,127})\}/g;
 
 /**
  * Keys wmux owns in every pane. A surface setting one would detach the pane
- * from its own identity (WMUX_SURFACE_ID), point hooks at another pipe
- * (WMUX_PIPE) or swap the CLI an agent runs (WMUX_CLI) — so they are dropped
+ * from its own identity (REMOTEA_SURFACE_ID), point hooks at another pipe
+ * (REMOTEA_PIPE) or swap the CLI an agent runs (REMOTEA_CLI) — so they are dropped
  * rather than merged, even though PtyManager writes its own afterwards anyway.
  */
 export function isReservedEnvKey(key: string): boolean {
-  return /^WMUX(_|$)/i.test(key);
+  return /^REMOTEA(_|$)/i.test(key);
 }
 
 /** Expand `${env:NAME}` against `source`; an unset name expands to ''. */

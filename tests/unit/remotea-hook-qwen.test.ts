@@ -13,11 +13,11 @@ import path from 'path';
  * on Claude's names, and its tool-result continuations — which also fire
  * UserPromptSubmit — landing in the prompt log as things the user typed.
  *
- * Run against the real compiled resources/cli/wmux-hook.js over its TCP remote
- * transport, like wmux-hook-payload-size.test.ts.
+ * Run against the real compiled resources/cli/remotea-hook.js over its TCP remote
+ * transport, like remotea-hook-payload-size.test.ts.
  */
 
-const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/wmux-hook.js');
+const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/remotea-hook.js');
 const QWEN_ID = '0f8e6b0c-3c1a-4a5e-9b7d-2a1c3e4f5a6b';
 
 function runHook(args: string[], env: Record<string, string>, stdin: string): Promise<void> {
@@ -64,10 +64,10 @@ function startCapturingServer(): Promise<CapturingServer> {
 function envFor(port: number): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
   delete env.GROK_HOOK_EVENT;
-  return { ...env, WMUX_REMOTE: `127.0.0.1:${port}`, WMUX_REMOTE_TOKEN: 't', WMUX_SURFACE_ID: 'surf-qwen' };
+  return { ...env, REMOTEA_REMOTE: `127.0.0.1:${port}`, REMOTEA_REMOTE_TOKEN: 't', REMOTEA_SURFACE_ID: 'surf-qwen' };
 }
 
-describe('wmux-hook.js under Qwen Code (--provider qwen)', () => {
+describe('remotea-hook.js under Qwen Code (--provider qwen)', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {

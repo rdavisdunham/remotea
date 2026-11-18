@@ -179,7 +179,7 @@ function parseEnv(value: unknown, where: string, errors: string[], warnings: str
   const env: Record<string, string> = {};
   for (const [key, val] of Object.entries(value)) {
     if (!ENV_KEY_RE.test(key)) { errors.push(`${where}.${key}: not a valid variable name`); continue; }
-    if (isReservedEnvKey(key)) { errors.push(`${where}.${key}: WMUX_* variables belong to remotea`); continue; }
+    if (isReservedEnvKey(key)) { errors.push(`${where}.${key}: REMOTEA_* variables belong to remotea`); continue; }
     if (typeof val !== 'string') { errors.push(`${where}.${key}: value must be a string`); continue; }
     if (SECRET_KEY_RE.test(key) && val !== '' && !val.includes('${env:')) {
       warnings.push(`${where}.${key} looks like a credential written into a file that gets committed — use "\${env:${key}}" to read it from your environment instead`);

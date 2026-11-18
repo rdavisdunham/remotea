@@ -19,7 +19,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { isWmuxPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
 
-const HOOK_SCRIPT = 'wmux-agy-hook.cjs';
+const HOOK_SCRIPT = 'remotea-agy-hook.cjs';
 
 /** The two events the hook script reports from — see its header for why both. */
 const AGY_HOOK_EVENTS = ['SessionStart', 'PreInvocation'] as const;
@@ -29,12 +29,12 @@ function agyHome(home = os.homedir()): string {
 }
 
 export function getAgyPluginDir(home = os.homedir()): string {
-  return path.join(home, '.gemini', 'config', 'plugins', 'wmux');
+  return path.join(home, '.gemini', 'config', 'plugins', 'remotea');
 }
 
 /** Pure: the plugin manifest. The directory name is what agy keys enablement by. */
 export function buildAgyPluginManifest(): string {
-  return JSON.stringify({ name: 'wmux' }, null, 2) + '\n';
+  return JSON.stringify({ name: 'remotea' }, null, 2) + '\n';
 }
 
 /**
@@ -50,7 +50,7 @@ export function buildAgyHooks(): string {
   for (const event of AGY_HOOK_EVENTS) {
     handlers[event] = [{ type: 'command', command: `node ${HOOK_SCRIPT} ${event}`, timeout: 5 }];
   }
-  return JSON.stringify({ 'wmux-session': handlers }, null, 2) + '\n';
+  return JSON.stringify({ 'remotea-session': handlers }, null, 2) + '\n';
 }
 
 export function getHookScriptSrcPath(): string {
@@ -97,7 +97,7 @@ export function ensureAgyPlugin(home = os.homedir(), scriptSrc = getHookScriptSr
     }
     const dir = getAgyPluginDir(home);
     if (isDirectory(dir) && !ownsPluginDir(dir)) {
-      console.warn(`[remotea] ${dir} exists and is not wmux-managed — leaving it alone`);
+      console.warn(`[remotea] ${dir} exists and is not remotea's — leaving it alone`);
       return;
     }
     fs.mkdirSync(dir, { recursive: true });

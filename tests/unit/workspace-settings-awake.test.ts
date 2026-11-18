@@ -67,7 +67,7 @@ describe('WorkspaceSettings Keep Awake UI', () => {
 
   it('says which agents Smart mode can see', () => {
     expect(host.textContent).toContain('report a working state through hooks');
-    expect(host.textContent).toContain('wmux report-agent');
+    expect(host.textContent).toContain('remotea report-agent');
   });
 
   it('shows the state MAIN holds, and follows its pushes', () => {

@@ -40,7 +40,7 @@ export interface SpawnTargetLookups {
   /**
    * Which workspace holds this SURFACE, across every window, or null (#246).
    * Asked about the caller's own terminal — the `caller` every CLI call carries
-   * as `$WMUX_SURFACE_ID` — so it has the same every-window rule. A miss is not
+   * as `$REMOTEA_SURFACE_ID` — so it has the same every-window rule. A miss is not
    * an error here: it is a stale id or a shell wmux did not start, and the
    * resolution simply moves on to the active workspace.
    */
@@ -72,7 +72,7 @@ export class SpawnTargetError extends Error {
  * half of #242 went unnoticed.
  *
  * Order: the named workspace, then the CALLER's workspace, then the active one.
- * The caller step is #246. Every CLI call carries `caller: $WMUX_SURFACE_ID`,
+ * The caller step is #246. Every CLI call carries `caller: $REMOTEA_SURFACE_ID`,
  * and `layout.grid`, `pane.list` and friends already scope themselves to it
  * (#143, `resolveCallerTarget` in v2-bridge.ts) — but this path never read it,
  * so an agent spawned from a background workspace was filed in whichever one

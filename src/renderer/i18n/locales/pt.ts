@@ -103,7 +103,7 @@ export const pt: Translation = {
   'markdown.openInApp': 'Abrir no aplicativo padrão',
   'markdown.moreActions': 'Mais ações',
   'markdown.noFile': 'Sem arquivo associado',
-  'markdown.empty': 'Sem conteúdo. Use wmux markdown set para adicionar conteúdo, ou solte um arquivo aqui.',
+  'markdown.empty': 'Sem conteúdo. Use remotea markdown set para adicionar conteúdo, ou solte um arquivo aqui.',
   'markdown.error.copy': 'Não foi possível gravar na área de transferência',
   'markdown.error.read': 'Não foi possível ler o arquivo',
   'markdown.error.action': 'A ação falhou',

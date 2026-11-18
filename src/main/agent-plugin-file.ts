@@ -18,13 +18,13 @@
  */
 
 /**
- * `// wmux-plugin-version: N` anywhere in the file.
+ * `// remotea-plugin-version: N` anywhere in the file.
  *
  * Compared VERBATIM, never numerically: the marker is a source-level identity,
  * not an ordering. A downgrade has to reinstall too, and a marker that is not a
  * number at all (a branch name, a hash) must still work.
  */
-export const PLUGIN_VERSION_RE = /wmux-plugin-version:\s*(\S+)/;
+export const PLUGIN_VERSION_RE = /remotea-plugin-version:\s*(\S+)/;
 
 /**
  * Pure: compare embedded version markers to decide whether to re-install.

@@ -63,7 +63,7 @@ export function toAgentBrowserArgv(method: string, params: any, session: string)
       // be treated as falsy.
       //
       // KNOWN ENGINE DIVERGENCE: `wmux browser wait <ref> [ms]` (see
-      // src/cli/wmux.ts) sends ref AND timeout together — the ms bounds how
+      // src/cli/remotea.ts) sends ref AND timeout together — the ms bounds how
       // long to wait for that element. In `web` mode both reach
       // cdpBridge.wait(ref, timeout) and the timeout is honoured. agent-browser's
       // CLI has no equivalent: `wait <selector>` takes no per-call --timeout

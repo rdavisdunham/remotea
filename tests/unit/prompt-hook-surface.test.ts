@@ -4,7 +4,7 @@ import { hookEventSurface } from '../../src/renderer/utils/prompt-log';
 /**
  * One `hook.event`, two producers, two spellings of "which pane" (issue #304).
  *
- * Claude Code's `wmux-hook.js` sends `surfaceId`; the OpenCode plugin goes
+ * Claude Code's `remotea-hook.js` sends `surfaceId`; the OpenCode plugin goes
  * through `wmux hook`, whose transport stamps the calling pane as `caller`.
  * The prompt log must read both — and main must keep seeing only `surfaceId`
  * for this event, because a v2 opencode `UserPromptSubmit` carries no `Stop`

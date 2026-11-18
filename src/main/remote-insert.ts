@@ -201,7 +201,7 @@ function captureImage(image: NativeImage, downscale: boolean): CapturedImage {
  */
 export async function materializeClipboard(
   snapshot: ClipboardSnapshot,
-  dir: string = path.join(os.tmpdir(), 'wmux'),
+  dir: string = path.join(os.tmpdir(), 'remotea'),
 ): Promise<PasteSource> {
   if (snapshot.kind !== 'image') return snapshot;
   const { image } = snapshot;

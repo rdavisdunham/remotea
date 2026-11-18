@@ -103,7 +103,7 @@ export const de: Translation = {
   'markdown.openInApp': 'In Standard-App öffnen',
   'markdown.moreActions': 'Weitere Aktionen',
   'markdown.noFile': 'Keiner Datei zugeordnet',
-  'markdown.empty': 'Kein Inhalt. wmux markdown set verwenden, oder eine Datei hier ablegen.',
+  'markdown.empty': 'Kein Inhalt. remotea markdown set verwenden, oder eine Datei hier ablegen.',
   'markdown.error.copy': 'In die Zwischenablage konnte nicht geschrieben werden',
   'markdown.error.read': 'Die Datei konnte nicht gelesen werden',
   'markdown.error.action': 'Die Aktion ist fehlgeschlagen',

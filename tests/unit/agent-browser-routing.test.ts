@@ -181,7 +181,7 @@ describe('runBrowserCommandForTarget — engine dispatch', () => {
   // A server budget above the CLI's client deadline is not a longer budget, it
   // is an unreportable one: the client has already hung up and printed a bare
   // `timed out`, so the server's real diagnosis never reaches the user.
-  // browser-timeout.test.ts pins the actual numbers against src/cli/wmux.ts;
+  // browser-timeout.test.ts pins the actual numbers against src/cli/remotea.ts;
   // this pins that a budget is passed at all, per verb.
   it('bounds every agent invocation with a per-verb timeout', async () => {
     const runAgent = vi.fn(async () => ok({}));

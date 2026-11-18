@@ -18,16 +18,16 @@ import path from 'node:path';
  * The instance already knows: loadUserConfig() records the real path and
  * `config.get` returns it.
  *
- * Spawned from dist/, not from resources/cli/wmux.js. dist/cli/wmux.js is the
+ * Spawned from dist/, not from resources/cli/remotea.js. dist/cli/remotea.js is the
  * file a released wmux runs — package.json's `bin` points at it, electron-builder
  * copies it into the package, and the release staging step copies it into the zip.
- * resources/cli/wmux.js is a checked-in copy of that build with nothing enforcing
+ * resources/cli/remotea.js is a checked-in copy of that build with nothing enforcing
  * the copy, so it drifts from src/; a test spawning it asserts against whatever
  * was committed last rather than against this branch's source.
  */
 
 const ROOT = path.resolve(__dirname, '../..');
-const CLI = path.join(ROOT, 'dist', 'cli', 'wmux.js');
+const CLI = path.join(ROOT, 'dist', 'cli', 'remotea.js');
 const WINDOWS_PATH = 'C:\\Users\\lsi2abt\\.wmux\\config.toml';
 
 // dist/ is gitignored and `npm test` runs ahead of `npm run build:main`, so the
@@ -107,8 +107,8 @@ describe('wmux config path', () => {
   it("prints the instance's own path, not one rebuilt from the local $HOME", async () => {
     const port = await startFakeInstance('tok');
     const out = await runCli(['config', 'path'], {
-      WMUX_REMOTE: `127.0.0.1:${port}`,
-      WMUX_REMOTE_TOKEN: 'tok',
+      REMOTEA_REMOTE: `127.0.0.1:${port}`,
+      REMOTEA_REMOTE_TOKEN: 'tok',
     });
     expect(out).toBe(WINDOWS_PATH);
   });
@@ -117,7 +117,7 @@ describe('wmux config path', () => {
     // The two disagreeing is exactly the failure: `show` was right all along,
     // so a user comparing them had one true answer and one plausible fiction.
     const port = await startFakeInstance('tok');
-    const env = { WMUX_REMOTE: `127.0.0.1:${port}`, WMUX_REMOTE_TOKEN: 'tok' };
+    const env = { REMOTEA_REMOTE: `127.0.0.1:${port}`, REMOTEA_REMOTE_TOKEN: 'tok' };
     const shown = JSON.parse(await runCli(['config', 'show'], env)) as { path: string };
     expect(await runCli(['config', 'path'], env)).toBe(shown.path);
   });
@@ -126,8 +126,8 @@ describe('wmux config path', () => {
     // Still a guess, but a self-consistent one: path.join on POSIX cannot emit
     // the `/home/vscode\.wmux\config.toml` hybrid the old string template did.
     const out = await runCli(['config', 'path'], {
-      WMUX_REMOTE: '127.0.0.1:1',
-      WMUX_REMOTE_TOKEN: 'tok',
+      REMOTEA_REMOTE: '127.0.0.1:1',
+      REMOTEA_REMOTE_TOKEN: 'tok',
     });
     // path.posix, not path.join: $HOME is a POSIX path, and on a Windows runner
     // path.join would spell the expectation with backslashes the CLI no longer emits.

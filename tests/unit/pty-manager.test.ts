@@ -247,9 +247,9 @@ describe('PtyManager', { timeout: 60_000 }, () => {
       shell: TEST_SHELL,
       cwd: process.env.USERPROFILE || 'C:\\',
       env: TEST_ENV,
-      // %WMUX% only expands if cmd EXECUTES the line; the echoed keystrokes
-      // still read `%WMUX%`, so the expanded form proves it ran.
-      startupCommands: ['echo STARTUP_%WMUX%_RAN'],
+      // %REMOTEA% only expands if cmd EXECUTES the line; the echoed keystrokes
+      // still read `%REMOTEA%`, so the expanded form proves it ran.
+      startupCommands: ['echo STARTUP_%REMOTEA%_RAN'],
     });
     expect(startupCommandsConsumed).toBe(true);
 

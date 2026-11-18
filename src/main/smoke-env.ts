@@ -8,8 +8,8 @@ import { parseSmokeArgs } from './smoke';
 
 if (parseSmokeArgs(process.argv, process.env)) {
   process.env.REMOTEA_SMOKE = '1';
-  if (!process.env.WMUX_INSTANCE?.trim()) process.env.WMUX_INSTANCE = 'smoke';
+  if (!process.env.REMOTEA_INSTANCE?.trim()) process.env.REMOTEA_INSTANCE = 'smoke';
   process.env.REMOTEA_SKIP_AGENT_INTEGRATION = '1';
-  process.env.WMUX_DISABLE_UPDATER = '1';
+  process.env.REMOTEA_DISABLE_UPDATER = '1';
   process.env.REMOTEA_NO_DEVTOOLS = '1';
 }

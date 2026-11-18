@@ -60,44 +60,44 @@ function readWslNetworkingMode(): string | null {
   }
 }
 
-// Respect WMUX_PIPE when set (e.g. by a parent wmux running with WMUX_INSTANCE),
+// Respect REMOTEA_PIPE when set (e.g. by a parent remotea running with REMOTEA_INSTANCE),
 // so the CLI talks to the same instance that spawned the shell. Without it, the
-// fallback follows WMUX_INSTANCE the way shared/instance.ts's getPipePath()
+// fallback follows REMOTEA_INSTANCE the way shared/instance.ts's getPipePath()
 // does — restated rather than imported, because the CLI ships file by file (see
-// wmux-hook.ts). It used to be the installed pipe whatever the instance, while
+// remotea-hook.ts). It used to be the installed pipe whatever the instance, while
 // readPipeToken() below already read that instance's token: a CLI run outside a
 // pane against a side-by-side build sent the dev token to the installed wmux.
 export function cliPipePath(env: NodeJS.ProcessEnv): string {
-  if (env.WMUX_PIPE) return env.WMUX_PIPE;
-  const instance = env.WMUX_INSTANCE?.trim() ?? '';
+  if (env.REMOTEA_PIPE) return env.REMOTEA_PIPE;
+  const instance = env.REMOTEA_INSTANCE?.trim() ?? '';
   return '\\\\.\\pipe\\remotea' + (instance ? '-' + instance : '');
 }
 const PIPE_PATH = cliPipePath(process.env);
 
-// ─── Remote transport (issue #78: remote wmux management) ────────────────────
-// When --remote host[:port] (or WMUX_REMOTE) is set, every command connects
+// ─── Remote transport (issue #78: remote remotea management) ────────────────────
+// When --remote host[:port] (or REMOTEA_REMOTE) is set, every command connects
 // over TCP instead of the local named pipe — typically through an SSH tunnel
-// (`ssh -L 9787:127.0.0.1:9787 user@host`) to a `wmux bridge` running on the
+// (`ssh -L 9787:127.0.0.1:9787 user@host`) to a `remotea bridge` running on the
 // remote machine. Auth is unchanged: the remote instance's pipe token must be
-// supplied via --token or WMUX_REMOTE_TOKEN (print it there with `wmux token`).
+// supplied via --token or REMOTEA_REMOTE_TOKEN (print it there with `remotea token`).
 const DEFAULT_BRIDGE_PORT = 9787;
 let remoteTarget: { host: string; port: number } | null = null;
 
-// How long `wmux bridge` lets a relay keep draining after its client socket has
+// How long `remotea bridge` lets a relay keep draining after its client socket has
 // closed, before forcing teardown. Must exceed the pipe round-trip, or the frame
 // a write-then-close client just sent is discarded mid-flight. Measured worst
 // case inside a devcontainer on a corporate-managed Windows host is ~7s (a fresh
 // npiperelay.exe is spawned per connection over WSL interop, and AV/EDR scans it
 // on every exec), so the default leaves generous headroom. The relay normally
 // exits on its own well before this — the timer is only the backstop.
-const BRIDGE_DRAIN_GRACE_MS = parseInt(process.env.WMUX_BRIDGE_DRAIN_MS || '', 10) || 15000;
+const BRIDGE_DRAIN_GRACE_MS = parseInt(process.env.REMOTEA_BRIDGE_DRAIN_MS || '', 10) || 15000;
 
-// How many npiperelay relays `wmux bridge` keeps spawned and attached to the pipe
+// How many npiperelay relays `remotea bridge` keeps spawned and attached to the pipe
 // ahead of demand (see the pool in cmdBridge). 0 disables pre-warming and restores
 // spawn-per-connection. Only ever used on the npiperelay path — the Unix-socket and
 // native-pipe transports connect instantly and have nothing to pre-warm.
 const BRIDGE_WARM_RELAYS = (() => {
-  const raw = process.env.WMUX_BRIDGE_WARM?.trim();
+  const raw = process.env.REMOTEA_BRIDGE_WARM?.trim();
   if (!raw) return 2;
   const n = parseInt(raw, 10);
   return Number.isFinite(n) && n >= 0 ? n : 2;
@@ -116,7 +116,7 @@ function parseRemoteTarget(spec: string): { host: string; port: number } {
 
 // ─── WSL2 transport: reach the Windows \\.\pipe\wmux from inside WSL2 ─────────
 //
-// A wmux CLI (or `wmux bridge`) running inside WSL2 needs to talk to the wmux
+// A remotea CLI (or `remotea bridge`) running inside WSL2 needs to talk to the remotea
 // process on the Windows host over the \\.\pipe\wmux named pipe. AF_VSOCK,
 // TCP-over-gateway and cross-boundary Unix sockets were all evaluated and
 // rejected (HCS-managed WSL2 UVMs ignore GuestCommunicationServices; gateway
@@ -132,9 +132,9 @@ function parseRemoteTarget(spec: string): { host: string; port: number } {
 //   Pinned version: v1.11.4  SHA-256: cea82cf5c9c22a28bef8075750acb7958f766393baebff4597cf21442f71c4b3
 //
 //   Transport selection order:
-//     0. remoteTarget set (--remote / WMUX_REMOTE) → TCP (the devcontainer path,
-//        served by a `wmux bridge` reachable at host.docker.internal:9787)
-//     1. WMUX_PIPE starts with '/' → use as a Unix socket path
+//     0. remoteTarget set (--remote / REMOTEA_REMOTE) → TCP (the devcontainer path,
+//        served by a `remotea bridge` reachable at host.docker.internal:9787)
+//     1. REMOTEA_PIPE starts with '/' → use as a Unix socket path
 //     2. inside WSL (not win32, and WSL_DISTRO_NAME / WSLENV set — #288)
 //        → spawn npiperelay.exe automatically
 //     3. native Windows → connect directly to the named pipe
@@ -251,21 +251,21 @@ function connectViaNpiperelay(pipePath: string, onConnect: () => void): Duplex {
   return duplex;
 }
 
-// Auth token for privileged (V2) pipe requests. wmux injects WMUX_PIPE_TOKEN
+// Auth token for privileged (V2) pipe requests. remotea injects REMOTEA_PIPE_TOKEN
 // into the shells it spawns; for CLIs launched elsewhere, fall back to the
 // token file in the instance's APPDATA dir (readable only by this user).
 function readPipeToken(): string {
-  const fromEnv = process.env.WMUX_PIPE_TOKEN?.trim();
+  const fromEnv = process.env.REMOTEA_PIPE_TOKEN?.trim();
   if (fromEnv) return fromEnv;
   try {
-    const suffix = process.env.WMUX_INSTANCE?.trim() ? `-${process.env.WMUX_INSTANCE.trim()}` : '';
+    const suffix = process.env.REMOTEA_INSTANCE?.trim() ? `-${process.env.REMOTEA_INSTANCE.trim()}` : '';
     const base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    return fs.readFileSync(path.join(base, `wmux${suffix}`, 'pipe-token'), 'utf-8').trim();
+    return fs.readFileSync(path.join(base, `remotea${suffix}`, 'pipe-token'), 'utf-8').trim();
   } catch {
     return '';
   }
 }
-// Mutable: overridden by --token / WMUX_REMOTE_TOKEN when talking to a remote
+// Mutable: overridden by --token / REMOTEA_REMOTE_TOKEN when talking to a remote
 // instance, whose token differs from this machine's.
 let PIPE_TOKEN = readPipeToken();
 
@@ -289,7 +289,7 @@ function sendV1(command: string): Promise<string> {
       // written, so a half-close buys nothing and costs ~60 ms. On a Windows
       // named pipe libuv answers `end()` by arming a 50 ms `eof_timeout` (libuv
       // src/win/pipe.c) before it reports EOF, and the process cannot exit
-      // until the handle is gone: `wmux ping` measured 96 ms this way against a
+      // until the handle is gone: `remotea ping` measured 96 ms this way against a
       // pipe that answers in 1 ms, 36 ms with destroy(). Same in sendV2.
       if (data.includes('\n')) { client.destroy(); finish(); }
     });
@@ -327,13 +327,13 @@ function sendV2(
   params: Record<string, any> = {},
   timeoutMs: number = DEFAULT_V2_TIMEOUT_MS,
 ): Promise<any> {
-  // Every command carries the caller's surface (WMUX_SURFACE_ID). Browser
+  // Every command carries the caller's surface (REMOTEA_SURFACE_ID). Browser
   // commands use it to route each agent to its OWN browser pane, so concurrent
   // agents no longer share and clobber one browser window (issue #62); the
   // workspace/pane/surface commands use it to answer about the window the
   // calling shell actually lives in rather than an arbitrary one (issue #141).
-  if (params.caller === undefined && process.env.WMUX_SURFACE_ID) {
-    params = { ...params, caller: process.env.WMUX_SURFACE_ID };
+  if (params.caller === undefined && process.env.REMOTEA_SURFACE_ID) {
+    params = { ...params, caller: process.env.REMOTEA_SURFACE_ID };
   }
   return new Promise((resolve, reject) => {
     const client = connectTransport(() => {
@@ -475,13 +475,13 @@ const BROWSER_CMDS: Record<string, (args: string[]) => BrowserRequest> = {
   back: () => ({ method: 'browser.back', params: {}, timeoutMs: browserDeadline(0) }),
   forward: () => ({ method: 'browser.forward', params: {}, timeoutMs: browserDeadline(0) }),
   reload: () => ({ method: 'browser.reload', params: {}, timeoutMs: browserDeadline(0) }),
-  // `wmux browser engine [web|agent]` — get or flip which engine a browser
+  // `remotea browser engine [web|agent]` — get or flip which engine a browser
   // surface runs on. Unlike every verb above, this is two distinct V2 methods
   // (get vs set) rather than one passthrough shape, and the value is validated
   // HERE rather than left to the server: rejecting a typo before a single byte
   // reaches the pipe matches `checkFlags`'s reasoning elsewhere in this file
   // (issue #143) and names both valid values in one place instead of two.
-  // `--surface`/`$WMUX_SURFACE_ID` reaches this like any other browser verb —
+  // `--surface`/`$REMOTEA_SURFACE_ID` reaches this like any other browser verb —
   // via `caller`, merged in by `browserRequest` below — so the routing
   // subtlety (a terminal surface is not a browser surface) is main's problem
   // to resolve, not the CLI's; see `resolveCallerBrowserSurface` in index.ts.
@@ -491,14 +491,14 @@ const BROWSER_CMDS: Record<string, (args: string[]) => BrowserRequest> = {
       return { method: 'browser.get_engine', params: {}, timeoutMs: browserDeadline(0) };
     }
     if (value !== 'web' && value !== 'agent') {
-      throw new Error(`wmux browser engine: engine must be "web" or "agent" (got "${value}")`);
+      throw new Error(`remotea browser engine: engine must be "web" or "agent" (got "${value}")`);
     }
     return { method: 'browser.set_engine', params: { engine: value }, timeoutMs: browserDeadline(0) };
   },
 };
 
 /**
- * Resolve `wmux browser <verb> …` to the request it issues. Null for an unknown
+ * Resolve `remotea browser <verb> …` to the request it issues. Null for an unknown
  * verb. Pure, so the deadlines and the caller wiring are testable without a
  * running app.
  *
@@ -506,7 +506,7 @@ const BROWSER_CMDS: Record<string, (args: string[]) => BrowserRequest> = {
  * browser surface: the main process maps it to that pane's own browser, which is
  * what keeps concurrent agents isolated (issue #62). Passing it explicitly does
  * not change that routing — it only supplies from a flag what a shell inside a
- * pane supplies from $WMUX_SURFACE_ID.
+ * pane supplies from $REMOTEA_SURFACE_ID.
  */
 export function browserRequest(args: string[], caller?: string): BrowserRequest | null {
   const build = BROWSER_CMDS[args[1]];
@@ -515,22 +515,22 @@ export function browserRequest(args: string[], caller?: string): BrowserRequest 
   return caller ? { ...req, params: { ...req.params, caller } } : req;
 }
 
-/** How long `wmux open` waits for the renderer to accept the URL. */
+/** How long `remotea open` waits for the renderer to accept the URL. */
 export const OPEN_URL_TIMEOUT_MS = 10_000;
 
 /**
- * The single positional argument of `wmux open`: one http(s) URL.
+ * The single positional argument of `remotea open`: one http(s) URL.
  *
  * Validated in the CLI as well as the renderer because a typo should fail with
  * a usage-shaped message before a request reaches the pipe. `new URL` also
- * rejects a bare host, so `wmux open example.com` is an error rather than a
+ * rejects a bare host, so `remotea open example.com` is an error rather than a
  * silently mangled request.
  */
 export function openUrlArg(args: string[]): string {
   const value = args[1] ?? '';
   const protocol = URL.canParse(value) ? new URL(value).protocol : '';
   if (args.length > 2 || (protocol !== 'http:' && protocol !== 'https:')) {
-    throw new Error('wmux open: expected one http(s) URL');
+    throw new Error('remotea open: expected one http(s) URL');
   }
   return value;
 }
@@ -539,17 +539,17 @@ export function openUrlArg(args: string[]): string {
  * What a group command says when its subcommand is missing or unknown.
  *
  * `browser`, `agent`, `pane` and `layout` all dispatched on `args[1]` and
- * interpolated it into the error unchecked, so a bare `wmux browser` — the
+ * interpolated it into the error unchecked, so a bare `remotea browser` — the
  * natural thing to type when you want to know the verbs — answered
  * `Unknown browser command: undefined` (issue #156). That reads like the CLI
  * malfunctioned rather than like a usage error, and it was a dead end: nothing
- * in it pointed at `wmux help browser`, and `wmux browser --help` cannot fill
+ * in it pointed at `remotea help browser`, and `remotea browser --help` cannot fill
  * the gap because browser is passthrough (`--help` is text to send, not a
  * request for usage). `markdown` and `config` already printed usage here.
  */
 export function subcommandError(command: string, sub: string | undefined): string {
   return sub === undefined || sub === ''
-    ? `wmux ${command} needs a subcommand.`
+    ? `remotea ${command} needs a subcommand.`
     : `Unknown ${command} subcommand: ${sub}`;
 }
 
@@ -588,7 +588,7 @@ export function formatRemoteStatus(status: any): string {
 }
 
 /**
- * `wmux remote status [--json]` — the Remote Console's only CLI verb, over its
+ * `remotea remote status [--json]` — the Remote Console's only CLI verb, over its
  * only pipe method (#254). Read-only by design: enabling, pairing and revoking
  * are Settings clicks, because anything a pipe command can do, a prompt-injected
  * agent holding the pipe token can do too (A3).
@@ -604,7 +604,7 @@ async function cmdBrowser(args: string[]): Promise<void> {
   // --surface says which pane's browser to drive, mirroring send / read-screen /
   // agent-activity. Strip it before the verb reads its positional args, or
   // `browser type e5 --surface surf-x hi` would type the flag into the page.
-  const caller = getFlag(args, '--surface') || process.env.WMUX_SURFACE_ID;
+  const caller = getFlag(args, '--surface') || process.env.REMOTEA_SURFACE_ID;
   const rest = stripFlag(args, '--surface');
   const req = browserRequest(rest, caller);
   if (!req) failSubcommand('browser', rest[1]);
@@ -714,7 +714,7 @@ function agentSpawnBatch(args: string[]): Promise<any> {
     value: ['--json', '--strategy', '--workspace'],
   });
   const json = values['--json'];
-  if (json === undefined) { console.error('Usage: wmux agent spawn-batch --json \'[...]\''); process.exit(1); }
+  if (json === undefined) { console.error('Usage: remotea agent spawn-batch --json \'[...]\''); process.exit(1); }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -769,9 +769,9 @@ async function cmdConfig(args: string[]): Promise<void> {
   } else if (sub === 'path') {
     // Ask the instance rather than reconstructing the path here. The config lives
     // on the Windows host, but this CLI routinely runs somewhere that cannot name
-    // it: inside WSL, or inside a devcontainer reaching wmux over the TCP bridge.
+    // it: inside WSL, or inside a devcontainer reaching remotea over the TCP bridge.
     // There $HOME is the Linux home and the old `${home}\.wmux\config.toml` form
-    // produced `/home/vscode\.wmux\config.toml` — neither the file wmux reads nor
+    // produced `/home/vscode\.wmux\config.toml` — neither the file remotea reads nor
     // a well-formed path on either OS. loadUserConfig() already reports the real
     // one in `path` (user-config.ts), which config.get returns verbatim.
     try {
@@ -790,7 +790,7 @@ async function cmdConfig(args: string[]): Promise<void> {
       : path.join(home, '.wmux', 'config.toml');
     console.log(fallbackPath);
   } else {
-    console.error('Usage: wmux config <show|reload|path>'); process.exit(1);
+    console.error('Usage: remotea config <show|reload|path>'); process.exit(1);
   }
 }
 
@@ -815,12 +815,12 @@ async function cmdLocales(args: string[]): Promise<void> {
       : path.join(home, '.wmux', 'locales');
     console.log(fallbackPath);
   } else {
-    console.error('Usage: wmux locales [list|reload|path]'); process.exit(1);
+    console.error('Usage: remotea locales [list|reload|path]'); process.exit(1);
   }
 }
 
 /**
- * `wmux layout agents` flags -> `layout.agents` params. The caller's surface is
+ * `remotea layout agents` flags -> `layout.agents` params. The caller's surface is
  * only the anchor when no explicit anchor was given: the renderer treats an
  * explicit `anchorPaneId` as authoritative, so sending a pane AND the caller's
  * surface would turn a stale pane into a miss instead of a fallback.
@@ -870,7 +870,7 @@ export function layoutAgentsParams(
 
 async function cmdLayout(args: string[]): Promise<void> {
   if (args[1] === 'agents') {
-    const parsed = layoutAgentsParams(args.slice(2), process.env.WMUX_SURFACE_ID);
+    const parsed = layoutAgentsParams(args.slice(2), process.env.REMOTEA_SURFACE_ID);
     if ('error' in parsed) fail('layout', COMMAND_SPECS.layout, parsed.error);
     print(await sendV2('layout.agents', parsed.params));
     return;
@@ -889,15 +889,15 @@ async function cmdLayout(args: string[]): Promise<void> {
   };
   if (!params.count || params.count < 1) { console.error('--count <N> is required and must be >= 1'); process.exit(1); }
   // If no explicit anchor, fall back to the current shell's surface so the command "just works" from inside a pane.
-  if (!params.anchorSurfaceId && !params.anchorPaneId && process.env.WMUX_SURFACE_ID) {
-    params.anchorSurfaceId = process.env.WMUX_SURFACE_ID;
+  if (!params.anchorSurfaceId && !params.anchorPaneId && process.env.REMOTEA_SURFACE_ID) {
+    params.anchorSurfaceId = process.env.REMOTEA_SURFACE_ID;
   }
   print(await sendV2('layout.grid', params));
 }
 
 // Workspace manifests (#284). Paths are resolved HERE, against the caller's
-// cwd, so `wmux workspace open` in a repo means that repo. There is no
-// --trust: trust is a native dialog in wmux, which nothing on the pipe can
+// cwd, so `remotea workspace open` in a repo means that repo. There is no
+// --trust: trust is a native dialog in remotea, which nothing on the pipe can
 // answer — a pane's agent holds the pipe token and must not be able to.
 const WORKSPACE_FILE = 'wmux.workspace.json';
 
@@ -1008,13 +1008,13 @@ async function cmdMarkdown(args: string[]): Promise<void> {
       const filePath = resolveMarkdownFilePath(args[fileFlag + 1] || '');
       print(await sendV2('markdown.load_file', { surfaceId, filePath }));
     } else {
-      console.error('Usage: wmux markdown set <id> --content <text> [--title T] | --file <path>'); process.exit(1);
+      console.error('Usage: remotea markdown set <id> --content <text> [--title T] | --file <path>'); process.exit(1);
     }
   } else if (sub === 'get') {
     // Read a surface's buffer back out — mirrors `read-screen` for terminals.
     print(await sendV2('markdown.get_content', { surfaceId: args[2] }));
   } else if (sub) {
-    // One-shot: `wmux markdown <file>` — create a markdown surface and load the
+    // One-shot: `remotea markdown <file>` — create a markdown surface and load the
     // file into it. Relative paths resolve against the caller's cwd.
     const filePath = resolveMarkdownFilePath(sub);
     const created = await sendV2('surface.create', { type: 'markdown' });
@@ -1022,7 +1022,7 @@ async function cmdMarkdown(args: string[]): Promise<void> {
     if (!surfaceId) { console.error('Failed to create markdown surface'); process.exit(1); }
     print(await sendV2('markdown.load_file', { surfaceId, filePath }));
   } else {
-    console.error('Usage: wmux markdown <file>  |  wmux markdown set <id> --content <text> [--title T] | --file <path>  |  wmux markdown get <id>');
+    console.error('Usage: remotea markdown <file>  |  remotea markdown set <id> --content <text> [--title T] | --file <path>  |  remotea markdown get <id>');
     process.exit(1);
   }
 }
@@ -1073,12 +1073,12 @@ async function cmdNewWorkspace(args: string[]): Promise<void> {
 function worktreeRepoDir(cwd: unknown): { cwd?: string } {
   if (remoteTarget) return typeof cwd === 'string' ? { cwd } : {};
   if (typeof cwd === 'string' && cwd) return { cwd: path.resolve(process.cwd(), cwd) };
-  return process.env.WMUX_SURFACE_ID ? {} : { cwd: process.cwd() };
+  return process.env.REMOTEA_SURFACE_ID ? {} : { cwd: process.cwd() };
 }
 
 /**
  * The workspace this shell lives in. An agent knows its own surface
- * (`WMUX_SURFACE_ID`), but nothing maps that back to a workspace:
+ * (`REMOTEA_SURFACE_ID`), but nothing maps that back to a workspace:
  * `list-workspaces`' `isActive` reports the FOCUSED workspace, which is the
  * right answer for a UI query and a different question from "the pane I'm in".
  * `--surface <id>` asks on another pane's behalf. A surface that resolves to
@@ -1090,8 +1090,8 @@ async function cmdCurrentWorkspace(args: string[]): Promise<void> {
 }
 
 // Remote terminal (issue #78): open a workspace whose shell is the OpenSSH
-// client connecting to <target>. Everything that isn't a wmux flag is passed
-// through to ssh, so `wmux ssh -p 2222 user@host` works as expected.
+// client connecting to <target>. Everything that isn't a remotea flag is passed
+// through to ssh, so `remotea ssh -p 2222 user@host` works as expected.
 async function cmdSsh(args: string[]): Promise<void> {
   const title = getFlag(args, '--title');
   const sshArgs: string[] = [];
@@ -1100,7 +1100,7 @@ async function cmdSsh(args: string[]): Promise<void> {
     sshArgs.push(args[i]);
   }
   if (sshArgs.length === 0) {
-    console.error('Usage: wmux ssh [ssh options] <user@host> [--title T]');
+    console.error('Usage: remotea ssh [ssh options] <user@host> [--title T]');
     process.exit(1);
   }
   // Title heuristic: the last non-flag token is the destination (`-p 2222
@@ -1112,10 +1112,10 @@ async function cmdSsh(args: string[]): Promise<void> {
   }));
 }
 
-// TCP↔pipe bridge (issue #78): exposes this machine's wmux pipe on a TCP port
+// TCP↔pipe bridge (issue #78): exposes this machine's remotea pipe on a TCP port
 // so a remote CLI can drive it through an SSH tunnel. Pure byte relay — no
 // parsing, no auth of its own; the pipe token is still verified end-to-end by
-// wmux's pipe server, so the bridge grants nothing by itself.
+// remotea's pipe server, so the bridge grants nothing by itself.
 async function cmdBridge(args: string[]): Promise<void> {
   const port = parseInt(getFlag(args, '--port') || '', 10) || DEFAULT_BRIDGE_PORT;
   // --wsl binds 0.0.0.0 so a container on the Windows host can reach a bridge
@@ -1137,7 +1137,7 @@ async function cmdBridge(args: string[]): Promise<void> {
     port,
   });
   if (decision.host === null) {
-    console.error(`wmux bridge: ${decision.error}`);
+    console.error(`remotea bridge: ${decision.error}`);
     process.exit(1);
   }
   const host = decision.host;
@@ -1180,10 +1180,10 @@ async function cmdBridge(args: string[]): Promise<void> {
     while (warm.length < warmSize) {
       const stream = connectTransport(() => {});
       const entry = { stream, claim: () => {} };
-      // Dying before being claimed means the upstream isn't there — wmux not
+      // Dying before being claimed means the upstream isn't there — remotea not
       // running, or the pipe gone. npiperelay exits immediately in that case, so
       // without a backoff the bridge would respawn a Windows process in a tight
-      // loop for as long as wmux stays down.
+      // loop for as long as remotea stays down.
       const onDead = (): void => {
         const i = warm.indexOf(entry);
         if (i === -1) return; // already claimed — the client's teardown owns it now
@@ -1208,7 +1208,7 @@ async function cmdBridge(args: string[]): Promise<void> {
     while (warm.length) {
       const entry = warm.pop()!;
       entry.claim();
-      // wmux may have restarted since this relay attached.
+      // remotea may have restarted since this relay attached.
       if (!entry.stream.destroyed && entry.stream.writable) {
         warmFailures = 0;
         return entry.stream;
@@ -1219,10 +1219,10 @@ async function cmdBridge(args: string[]): Promise<void> {
   };
 
   const server = net.createServer((sock) => {
-    // Connect to the local wmux through the same selector the CLI uses. In the
+    // Connect to the local remotea through the same selector the CLI uses. In the
     // bridge process remoteTarget is always null, so this resolves to a Unix
     // socket, npiperelay (inside WSL2), or the named pipe directly — which is
-    // what lets `wmux bridge` run inside WSL2 and still reach the Windows pipe.
+    // what lets `remotea bridge` run inside WSL2 and still reach the Windows pipe.
     // A warm relay is the same thing, already connected.
     const pipe = takeWarm() ?? connectTransport(() => {});
     // Replace what we just consumed so the next client is served warm too.
@@ -1231,7 +1231,7 @@ async function cmdBridge(args: string[]): Promise<void> {
     pipe.pipe(sock);
 
     // Teardown is half-close-aware on purpose. Destroying BOTH sides on either
-    // 'close' silently ate hook events: wmux-hook.js writes its frame and end()s
+    // 'close' silently ate hook events: remotea-hook.js writes its frame and end()s
     // immediately, and over npiperelay the Duplex's destroy() is child.kill() —
     // so the relay died with the frame still buffered in its stdin and never
     // forwarded it. Clients that write-then-close are the normal case here
@@ -1275,26 +1275,26 @@ async function cmdBridge(args: string[]): Promise<void> {
   process.once('SIGTERM', shutdown);
 
   server.listen(port, host, () => {
-    console.log(`wmux bridge listening on ${host}:${port} ↔ ${PIPE_PATH}`);
+    console.log(`remotea bridge listening on ${host}:${port} ↔ ${PIPE_PATH}`);
     if (warmSize > 0) {
       fillWarm();
-      console.log(`Keeping ${warmSize} npiperelay relay(s) warm (WMUX_BRIDGE_WARM=0 to disable).`);
+      console.log(`Keeping ${warmSize} npiperelay relay(s) warm (REMOTEA_BRIDGE_WARM=0 to disable).`);
     }
     if (wslMode) {
       console.log('WSL2 mode. From a container on this host:');
-      console.log(`  WMUX_REMOTE=host.docker.internal:${port}`);
-      console.log("  WMUX_REMOTE_TOKEN=<run 'wmux token' here>");
+      console.log(`  REMOTEA_REMOTE=host.docker.internal:${port}`);
+      console.log("  REMOTEA_REMOTE_TOKEN=<run 'remotea token' here>");
     } else {
       console.log('From another machine:');
       console.log(`  ssh -L ${port}:127.0.0.1:${port} <user>@<this-host>`);
-      console.log(`  wmux --remote 127.0.0.1:${port} --token <run 'wmux token' here> list-workspaces`);
+      console.log(`  remotea --remote 127.0.0.1:${port} --token <run 'remotea token' here> list-workspaces`);
     }
     console.log('Ctrl+C to stop.');
   });
 }
 
 // Prints this instance's pipe auth token so it can be passed to --token /
-// WMUX_REMOTE_TOKEN on the machine that will drive this one remotely.
+// REMOTEA_REMOTE_TOKEN on the machine that will drive this one remotely.
 function cmdToken(): void {
   if (!PIPE_TOKEN) {
     console.error('No pipe token found — has remotea been started on this machine?');
@@ -1305,22 +1305,22 @@ function cmdToken(): void {
 
 async function cmdSetColorScheme(args: string[]): Promise<void> {
   // Two forms:
-  //   wmux set-color-scheme <scheme>             → apply to current surface
-  //   wmux set-color-scheme <surfaceId> <scheme> → apply to a specific surface
+  //   remotea set-color-scheme <scheme>             → apply to current surface
+  //   remotea set-color-scheme <surfaceId> <scheme> → apply to a specific surface
   let surfaceId = args[1];
   let scheme = args[2];
   if (!scheme) {
     scheme = surfaceId;
-    surfaceId = process.env.WMUX_SURFACE_ID || '';
+    surfaceId = process.env.REMOTEA_SURFACE_ID || '';
   }
-  if (!surfaceId) { console.error('No surface id. Pass one as argument or run inside a wmux pane.'); process.exit(1); }
-  if (!scheme) { console.error('Usage: wmux set-color-scheme [surfaceId] <scheme>'); process.exit(1); }
+  if (!surfaceId) { console.error('No surface id. Pass one as argument or run inside a remotea pane.'); process.exit(1); }
+  if (!scheme) { console.error('Usage: remotea set-color-scheme [surfaceId] <scheme>'); process.exit(1); }
   print(await sendV2('surface.set_color_scheme', { surfaceId, colorScheme: scheme }));
 }
 
 async function cmdSend(args: string[]): Promise<void> {
   // Drop --surface <id> (and its value) from the free-form text args.
-  const surfaceId = getFlag(args, '--surface') || process.env.WMUX_SURFACE_ID;
+  const surfaceId = getFlag(args, '--surface') || process.env.REMOTEA_SURFACE_ID;
   const textArgs = stripFlag(args.slice(1), '--surface');
   const payload: Record<string, any> = { text: textArgs.join(' ') };
   if (surfaceId) payload.surfaceId = surfaceId;
@@ -1347,7 +1347,7 @@ export function sendKeyParams(
 }
 
 async function cmdSendKey(args: string[]): Promise<void> {
-  print(await sendV2('surface.send_key', sendKeyParams(args, process.env.WMUX_SURFACE_ID)));
+  print(await sendV2('surface.send_key', sendKeyParams(args, process.env.REMOTEA_SURFACE_ID)));
 }
 
 /** One prompt line: `#<seq>  <hh:mm>  <summary>`. */
@@ -1419,7 +1419,7 @@ function printAllPrompts(result: any): void {
 }
 
 /**
- * `wmux read-screen` argv → `surface.read_text` params. Same targeting rule as
+ * `remotea read-screen` argv → `surface.read_text` params. Same targeting rule as
  * send/send-key: inside a pane the caller's own surface is the default;
  * cross-pane reads take --surface explicitly. `--events` is opt-in because
  * agents call read-screen constantly and only a diagnosis wants the history.
@@ -1442,7 +1442,7 @@ export function readScreenParams(
  *
  * The prompt log is the one thing `read-screen` cannot recover: an agent TUI
  * repaints over its own scrollback, so by the time anyone asks, the prompt text
- * is no longer on screen to be read. Defaults to $WMUX_SURFACE_ID like send and
+ * is no longer on screen to be read. Defaults to $REMOTEA_SURFACE_ID like send and
  * read-screen, so an agent inside a pane needs no id; run outside a pane with no
  * --surface it reports every tracked pane, which is the only useful answer there.
  *
@@ -1459,7 +1459,7 @@ export function readScreenParams(
  * other command does with a bad id.
  */
 async function cmdPrompts(args: string[]): Promise<void> {
-  const surfaceId = getFlag(args, '--surface') || process.env.WMUX_SURFACE_ID;
+  const surfaceId = getFlag(args, '--surface') || process.env.REMOTEA_SURFACE_ID;
   const rawLimit = getFlag(args, '--limit');
   const limit = rawLimit === undefined ? 0 : Number(rawLimit);
   if (rawLimit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
@@ -1480,7 +1480,7 @@ async function cmdNotify(args: string[]): Promise<void> {
   const bodyIdx = args.indexOf('--body');
   const body = bodyIdx !== -1 ? args[bodyIdx + 1] : undefined;
   const text = args.filter((_, i) => i > 0 && ![titleIdx, titleIdx + 1, bodyIdx, bodyIdx + 1].includes(i)).join(' ') || body || '';
-  await sendV1(`notify ${process.env.WMUX_SURFACE_ID || ''} ${text}`);
+  await sendV1(`notify ${process.env.REMOTEA_SURFACE_ID || ''} ${text}`);
   console.log('Notification sent');
 }
 
@@ -1514,7 +1514,7 @@ async function cmdHook(args: string[]): Promise<void> {
 }
 
 /**
- * `wmux opencode-tui [--remove]` — install the CLI-side (TUI) half (#310).
+ * `remotea opencode-tui [--remove]` — install the CLI-side (TUI) half (#310).
  *
  * Deliberately a local file operation, not a pipe command: it is run from the
  * pane that will host the TUI, so the config directory it resolves is the
@@ -1531,7 +1531,7 @@ function cmdOpencodeTui(args: string[]): void {
     } else if (result.status === 'absent') {
       console.log(`No remotea OpenCode TUI plugin installed at ${result.dir}`);
     } else {
-      console.error(`Refusing to remove ${path.join(result.dir, 'tui.js')}: it carries no wmux version marker.`);
+      console.error(`Refusing to remove ${path.join(result.dir, 'tui.js')}: it carries no remotea version marker.`);
       process.exit(1);
     }
     return;
@@ -1547,13 +1547,13 @@ function cmdOpencodeTui(args: string[]): void {
     console.log(`Installed the remotea OpenCode TUI plugin (v${result.version ?? '?'}) to ${result.dir}`);
     console.log('Restart OpenCode so the TUI loads it.');
   } else {
-    console.log(`wmux OpenCode TUI plugin already current (v${result.version ?? '?'}) at ${result.dir}`);
+    console.log(`remotea OpenCode TUI plugin already current (v${result.version ?? '?'}) at ${result.dir}`);
   }
 }
 
 async function cmdAgentActivity(args: string[]): Promise<void> {
-  const surfaceId = getFlag(args, '--surface') || process.env.WMUX_SURFACE_ID;
-  if (!surfaceId) { console.error('agent-activity: --surface or WMUX_SURFACE_ID required'); process.exit(1); }
+  const surfaceId = getFlag(args, '--surface') || process.env.REMOTEA_SURFACE_ID;
+  if (!surfaceId) { console.error('agent-activity: --surface or REMOTEA_SURFACE_ID required'); process.exit(1); }
   const params: Record<string, any> = { surfaceId };
   const tool = getFlag(args, '--tool'); if (tool) params.tool = tool;
   const skill = getFlag(args, '--skill'); if (skill) params.skill = skill;
@@ -1565,10 +1565,10 @@ async function cmdAgentActivity(args: string[]): Promise<void> {
 /**
  * V1 passthrough for the shell integration (issue #19: devcontainer support).
  *
- * wmux-bash-integration.sh writes its state lines straight to the local pipe
+ * remotea-bash-integration.sh writes its state lines straight to the local pipe
  * when it can reach one. Inside a devcontainer it can't, so it calls
- * `wmux raw-v1` instead and gets the CLI's transport — including TCP via
- * --remote / WMUX_REMOTE to a `wmux bridge` (issue #78) — without the CLI
+ * `remotea raw-v1` instead and gets the CLI's transport — including TCP via
+ * --remote / REMOTEA_REMOTE to a `remotea bridge` (issue #78) — without the CLI
  * growing a near-identical wrapper per verb. Auth is unchanged: sendV1 still
  * prefixes `auth <token>`.
  *
@@ -1586,13 +1586,13 @@ export const RAW_V1_VERBS = [
   'report_shell_state',
   'ports_kick',
   'report_startup_command',
-  // The command line a pane just ran, so wmux can tell it has ssh'd somewhere
+  // The command line a pane just ran, so remotea can tell it has ssh'd somewhere
   // and upload a pasted file to that host instead of typing a local path.
   'report_command',
 ] as const;
 
 export function rawV1Error(verb: string | undefined): string | null {
-  if (!verb) return 'Usage: wmux raw-v1 <command> [surfaceId] [args...]';
+  if (!verb) return 'Usage: remotea raw-v1 <command> [surfaceId] [args...]';
   if ((RAW_V1_VERBS as readonly string[]).includes(verb)) return null;
   return `raw-v1: ${verb} is not a passthrough command. Accepted: ${RAW_V1_VERBS.join(', ')}`;
 }
@@ -1601,9 +1601,9 @@ export function rawV1Error(verb: string | undefined): string | null {
  * Split a `raw-v1` argv into the V1 line to send and the verb to check.
  *
  * The two callers disagree about argv, and both are legitimate. A hand-typed
- * call splits naturally — `wmux raw-v1 report_pwd surf-1 /tmp` — but
- * wmux-bash-integration.sh builds the line as a single string and passes it
- * quoted: `wmux raw-v1 "report_pwd $surface_id $(pwd)"`. There the whole line
+ * call splits naturally — `remotea raw-v1 report_pwd surf-1 /tmp` — but
+ * remotea-bash-integration.sh builds the line as a single string and passes it
+ * quoted: `remotea raw-v1 "report_pwd $surface_id $(pwd)"`. There the whole line
  * is args[1].
  *
  * Checking args[1] against the allowlist therefore rejected every report the
@@ -1631,10 +1631,10 @@ async function cmdRawV1(args: string[]): Promise<void> {
 
 // ─── Crash reports (issue #174) ──────────────────────────────────────────────
 //
-// "wmux crashed, here's a dump" is a request a maintainer makes casually and a
+// "remotea crashed, here's a dump" is a request a maintainer makes casually and a
 // user answers casually. On Windows a minidump carries the process ENVIRONMENT
-// BLOCK, and wmux's users are by construction developers who keep credentials
-// in the environment so the shells wmux spawns can see them. The reporter who
+// BLOCK, and remotea's users are by construction developers who keep credentials
+// in the environment so the shells remotea spawns can see them. The reporter who
 // raised this checked eight dumps before uploading; every one held live
 // credentials, the worst eleven of them.
 //
@@ -1643,7 +1643,7 @@ async function cmdRawV1(args: string[]): Promise<void> {
 // Windows Event Log line, which carries no memory at all. Asking for a warning
 // and still making the dump the path of least resistance would change nothing.
 //
-// It deliberately runs with no wmux instance: the moment you want it is after
+// It deliberately runs with no remotea instance: the moment you want it is after
 // the process died.
 
 /** Fields of an `Application Error` record — the crash fingerprint, no memory. */
@@ -1726,7 +1726,7 @@ export interface WerDumpConfig {
 }
 
 /**
- * True when this machine is set up to write dumps of wmux on the next crash.
+ * True when this machine is set up to write dumps of remotea on the next crash.
  *
  * Worth surfacing unprompted: a user who turned this on did so because a
  * maintainer asked, and is therefore precisely the user about to hand the file
@@ -1761,7 +1761,7 @@ function system32(...parts: string[]): string {
 
 function readWerConfig(): WerDumpConfig {
   if (process.platform !== 'win32') return { configured: false };
-  const key = 'HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps\\wmux.exe';
+  const key = 'HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps\\remotea.exe';
   const res = spawnSync(system32('reg.exe'), ['query', key], { encoding: 'utf-8', windowsHide: true, timeout: 5000 });
   if (res.status !== 0 || !res.stdout) return { configured: false };
   return {
@@ -1777,7 +1777,7 @@ function readWerConfig(): WerDumpConfig {
  * The app name is matched on the property rather than anywhere in the rendered
  * text. Substring-matching the message attributes any crash whose *path*
  * happens to contain the string — on the machine this was written, a sibling
- * project at `...\newmux\smux.exe` was being reported as a wmux crash, with a
+ * project at `...\newmux\smux.exe` was being reported as a remotea crash, with a
  * fault offset identical to the one #150 is about. A crash report that
  * confidently hands the maintainer another program's crash is worse than none.
  */
@@ -1805,12 +1805,12 @@ function readCrashEvents(limit: number): CrashEventFields[] {
   return res.stdout ? parseEventRows(res.stdout) : [];
 }
 
-/** Last N lines of the diagnostics log wmux writes to its own data directory. */
+/** Last N lines of the diagnostics log remotea writes to its own data directory. */
 function readDiagnosticsTail(lines: number): string[] {
   try {
     const base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    const suffix = process.env.WMUX_INSTANCE?.trim() ? `-${process.env.WMUX_INSTANCE.trim()}` : '';
-    const file = path.join(base, `wmux${suffix}`, 'logs', 'main.log');
+    const suffix = process.env.REMOTEA_INSTANCE?.trim() ? `-${process.env.REMOTEA_INSTANCE.trim()}` : '';
+    const file = path.join(base, `remotea${suffix}`, 'logs', 'main.log');
     return fs.readFileSync(file, 'utf-8').split(/\r?\n/).filter(Boolean).slice(-lines);
   } catch {
     return [];
@@ -1820,7 +1820,7 @@ function readDiagnosticsTail(lines: number): string[] {
 /**
  * Was this crash a SHUTDOWN crash? (issue #214)
  *
- * The single most useful fact about a wmux abort, and until now the report made
+ * The single most useful fact about a remotea abort, and until now the report made
  * you derive it by hand. #214 arrived with six crashes and a `main.log`, filed
  * as a runtime regression in the file explorer. Every one of the six actually
  * sat on a `will-quit` line — the process had reached shutdown and died inside
@@ -1872,16 +1872,16 @@ export function formatCrashReport(input: {
   osVersion: string;
 }): string {
   // Every `start` line carries version=. Taking it from there rather than from
-  // a package.json lookup means it reports the wmux that actually ran, not the
+  // a package.json lookup means it reports the remotea that actually ran, not the
   // one whose CLI you happen to be invoking — which on a machine mid-upgrade
   // are different answers, and the crash belongs to the first one.
   const lastStart = [...input.diagnostics].reverse().find((l) => l.includes(' start '));
   const version = lastStart?.match(/\bversion=(\S{1,32})/)?.[1] ?? 'unknown (no log)';
 
   const out: string[] = [
-    '# wmux crash report',
+    '# remotea crash report',
     '',
-    'This output is what a wmux crash report should contain: the Windows crash',
+    'This output is what a remotea crash report should contain: the Windows crash',
     'fingerprint and remotea\'s own process-lifecycle log. It carries no memory —',
     'no environment variables, no pane contents, no command lines.',
     '',
@@ -1889,7 +1889,7 @@ export function formatCrashReport(input: {
     'docs/crash-reports.md for what a Windows minidump actually contains.',
     '',
     `platform    : ${input.platform} ${input.osVersion}`,
-    `wmux version: ${version}`,
+    `remotea version: ${version}`,
   ];
 
   out.push('', '## Windows Event Log — Application Error, wmux.exe', '');
@@ -1907,7 +1907,7 @@ export function formatCrashReport(input: {
     for (const e of input.events) {
       out.push(
         `- ${e.time}`,
-        `    wmux version        : ${e.version}`,
+        `    remotea version        : ${e.version}`,
         `    faulting module     : ${e.faultingModule}`,
         `    exception code      : ${e.exceptionCode}`,
         `    fault offset        : ${e.faultOffset}`,
@@ -1932,7 +1932,7 @@ export function formatCrashReport(input: {
     }
   }
 
-  out.push('', '## wmux main.log (process lifecycle only)', '');
+  out.push('', '## remotea main.log (process lifecycle only)', '');
   out.push(...(input.diagnostics.length ? input.diagnostics : ['(no log — remotea 1.1.1+ writes one on every launch)']));
 
   out.push(...describeWerConfig(input.wer));
@@ -1952,21 +1952,21 @@ async function cmdCrashReport(args: string[]): Promise<void> {
 }
 
 // ─── Declared agent state (issue #128) ───────────────────────────────────────
-// The reporting side of the protocol. An agent running inside a wmux pane can
-// call these with no arguments beyond the state itself — WMUX_SURFACE_ID is
+// The reporting side of the protocol. An agent running inside a remotea pane can
+// call these with no arguments beyond the state itself — REMOTEA_SURFACE_ID is
 // already in its environment, so it never has to discover which pane it is in.
 
 /** Resolve the pane this command is about: --surface, else the ambient pane. */
 function reportingSurface(args: string[], command: string): string {
-  const surfaceId = getFlag(args, '--surface') || process.env.WMUX_SURFACE_ID;
+  const surfaceId = getFlag(args, '--surface') || process.env.REMOTEA_SURFACE_ID;
   if (!surfaceId) {
-    console.error(`${command}: --surface or WMUX_SURFACE_ID required`);
+    console.error(`${command}: --surface or REMOTEA_SURFACE_ID required`);
     process.exit(1);
   }
   return surfaceId;
 }
 
-/** Optional monotonic sequence — wmux drops any report at or below the last seen. */
+/** Optional monotonic sequence — remotea drops any report at or below the last seen. */
 function seqFlag(args: string[]): number | undefined {
   const raw = getFlag(args, '--seq');
   if (!raw) return undefined;
@@ -1991,7 +1991,7 @@ async function cmdReportAgent(args: string[]): Promise<void> {
   const depth = getFlag(args, '--run-depth');
   if (depth !== undefined) params.runDepth = Number(depth);
 
-  // --choices declares what wmux may offer as an answer (issue #128). JSON
+  // --choices declares what remotea may offer as an answer (issue #128). JSON
   // rather than a packed string because each choice carries four fields and the
   // payload is exact bytes — the one place a cramped syntax would be a bug
   // waiting to happen. Mirrors `agent spawn-batch --json`.
@@ -2012,15 +2012,15 @@ async function cmdReportAgent(args: string[]): Promise<void> {
  * `answer-agent` — reply to a blocked pane from outside it (issue #128).
  *
  * Note this one defaults to NO ambient surface: the other verbs are an agent
- * describing itself, where WMUX_SURFACE_ID is exactly right, but answering is
+ * describing itself, where REMOTEA_SURFACE_ID is exactly right, but answering is
  * aimed at a DIFFERENT pane — the whole point is to not be in it. Defaulting to
- * the caller's own pane would make `wmux answer-agent --choice allow` type into
+ * the caller's own pane would make `remotea answer-agent --choice allow` type into
  * whatever terminal you happen to be sitting in.
  */
 async function cmdAnswerAgent(args: string[]): Promise<void> {
   const surfaceId = getFlag(args, '--surface');
   if (!surfaceId) {
-    console.error('answer-agent: --surface required (run `wmux agent-state` to see which panes are blocked)');
+    console.error('answer-agent: --surface required (run `remotea agent-state` to see which panes are blocked)');
     process.exit(1);
   }
   const choiceId = getFlag(args, '--choice') ?? args[1];
@@ -2049,7 +2049,7 @@ async function cmdReportSubagent(args: string[]): Promise<void> {
   const surfaceId = reportingSurface(args, 'report-subagent');
   const id = getFlag(args, '--id') ?? args[1];
   if (!id || id.startsWith('--')) {
-    console.error('report-subagent: an id is required (wmux report-subagent <id> [--name N] [--detail D] [--done])');
+    console.error('report-subagent: an id is required (remotea report-subagent <id> [--name N] [--detail D] [--done])');
     process.exit(1);
   }
   const params: Record<string, any> = { surfaceId, id };
@@ -2100,13 +2100,13 @@ const AGENT_STATE_COMMANDS = {
    *
    * `--file` is the mode worth having: it replays a captured screen through the
    * same engine, with no running detection and without the agent installed. A
-   * rule regression is then debuggable from a `wmux read-screen` capture, on any
+   * rule regression is then debuggable from a `remotea read-screen` capture, on any
    * machine, which is also how the bundled manifests were authored.
    */
   'detect': async (args: string[]) => {
     // args[0] is the command name itself — every handler is called with the
     // full argv, as cmdAgent/cmdPane do. Reading args[0] as the subcommand made
-    // `wmux detect explain` refuse itself.
+    // `remotea detect explain` refuse itself.
     const sub = args[1];
     if (sub === 'reload') {
       print(await sendV2('detect.reload', {}));
@@ -2118,7 +2118,7 @@ const AGENT_STATE_COMMANDS = {
     }
     const rest = args.slice(2);
     const file = getFlag(rest, '--file');
-    const surfaceId = getFlag(rest, '--surface') || process.env.WMUX_SURFACE_ID;
+    const surfaceId = getFlag(rest, '--surface') || process.env.REMOTEA_SURFACE_ID;
     if (file) {
       print(await sendV2('detect.explain', { file, agent: getFlag(rest, '--agent') }));
       return;
@@ -2134,11 +2134,11 @@ const AGENT_STATE_COMMANDS = {
 // ─── Per-command usage + flag validation (issue #143) ────────────────────────
 // `getFlag()` picks out the flags it knows and ignores the rest, so a typo or an
 // exploratory `--help` used to fall through to "run with defaults" — probing the
-// CLI mutated the user's layout (`wmux split --help` split a pane) and returned
+// CLI mutated the user's layout (`remotea split --help` split a pane) and returned
 // a JSON reply that read as success. Every command now declares its flags, so
 // anything else is an error, and `--help` prints usage without touching wmux.
 interface CommandSpec {
-  /** Printed by `--help`, by `wmux help <command>`, and after a rejected flag. */
+  /** Printed by `--help`, by `remotea help <command>`, and after a rejected flag. */
   usage: string;
   /** Flags that consume the following argv token. */
   value?: string[];
@@ -2147,50 +2147,50 @@ interface CommandSpec {
   /**
    * Arguments are free-form text or belong to another program (ssh), so nothing
    * here can be judged a typo. Their argv is never validated and `--help` is
-   * left alone — `wmux send --help` must type "--help" into the pane, not print
-   * usage. `wmux help <command>` is the way in for these.
+   * left alone — `remotea send --help` must type "--help" into the pane, not print
+   * usage. `remotea help <command>` is the way in for these.
    */
   passthrough?: boolean;
 }
 
-const SURFACE_NOTE = '(surface defaults to $WMUX_SURFACE_ID inside a pane)';
+const SURFACE_NOTE = '(surface defaults to $REMOTEA_SURFACE_ID inside a pane)';
 
 export const COMMAND_SPECS = {
   // System
-  ping: { usage: 'wmux ping' },
-  identify: { usage: 'wmux identify' },
-  capabilities: { usage: 'wmux capabilities' },
-  'list-windows': { usage: 'wmux list-windows' },
-  'focus-window': { usage: 'wmux focus-window <windowId>' },
-  'new-window': { usage: 'wmux new-window' },
+  ping: { usage: 'remotea ping' },
+  identify: { usage: 'remotea identify' },
+  capabilities: { usage: 'remotea capabilities' },
+  'list-windows': { usage: 'remotea list-windows' },
+  'focus-window': { usage: 'remotea focus-window <windowId>' },
+  'new-window': { usage: 'remotea new-window' },
 
   // Links
   open: {
-    usage: 'wmux open <http(s) URL>   (open in the wmux browser panel, per Settings → Browser → Links)',
+    usage: 'remotea open <http(s) URL>   (open in the remotea browser panel, per Settings → Browser → Links)',
   },
 
   // Remote management (issue #78)
   bridge: {
     usage: [
-      'wmux bridge [--port P] [--host H] [--wsl]   (expose this remotea\'s pipe over TCP, default 127.0.0.1:9787)',
+      'remotea bridge [--port P] [--host H] [--wsl]   (expose this remotea\'s pipe over TCP, default 127.0.0.1:9787)',
       '  --wsl   bind 0.0.0.0 so a container on this host can reach a bridge running in WSL2',
     ].join('\n'),
     value: ['--port', '--host'],
     bool: ['--wsl'],
   },
-  token: { usage: 'wmux token   (print this instance\'s pipe auth token)' },
+  token: { usage: 'remotea token   (print this instance\'s pipe auth token)' },
 
   // Remote Console (#254) — read-only; everything else is a Settings click
   remote: {
-    usage: 'wmux remote status [--json]   (is the phone Remote Console on, where, and how many devices)',
+    usage: 'remotea remote status [--json]   (is the phone Remote Console on, where, and how many devices)',
     bool: ['--json'],
   },
   workspace: {
-    usage: 'wmux workspace open [path] [--dry-run] [--new] [--json]   (bring up a wmux.workspace.json; asks before running anything)\n'
-      + 'wmux workspace validate [path] [--json]\n'
-      + 'wmux workspace save [--to <dir|file.json>] [--name N] [--workspace <id>] [--force] [--stdout]\n'
-      + 'wmux workspace list   (manifests you allowed to run on this machine; empty until you open one and choose to run it.\n'
-      + '                       Your open workspaces are `wmux list-workspaces`)',
+    usage: 'remotea workspace open [path] [--dry-run] [--new] [--json]   (bring up a wmux.workspace.json; asks before running anything)\n'
+      + 'remotea workspace validate [path] [--json]\n'
+      + 'remotea workspace save [--to <dir|file.json>] [--name N] [--workspace <id>] [--force] [--stdout]\n'
+      + 'remotea workspace list   (manifests you allowed to run on this machine; empty until you open one and choose to run it.\n'
+      + '                       Your open workspaces are `remotea list-workspaces`)',
     value: ['--to', '--name', '--workspace'],
     bool: ['--dry-run', '--new', '--json', '--force', '--stdout'],
     passthrough: true,
@@ -2198,7 +2198,7 @@ export const COMMAND_SPECS = {
 
   // Workspace
   'new-workspace': {
-    usage: 'wmux new-workspace [--title T] [--shell S] [--cwd D] [--panes N] [--layout L] [--worktree B] [--base R]\n'
+    usage: 'remotea new-workspace [--title T] [--shell S] [--cwd D] [--panes N] [--layout L] [--worktree B] [--base R]\n'
       + '  --panes     1-8 terminal panes (default: the [workspace] setting, 3)\n'
       + '  --layout    grid | columns | rows | left | down | single\n'
       + '  --worktree  New branch, checked out in a dedicated Git worktree workspace\n'
@@ -2206,76 +2206,76 @@ export const COMMAND_SPECS = {
       + '  --base      Base branch or commit for the worktree (default: HEAD)',
     value: ['--title', '--shell', '--cwd', '--panes', '--layout', '--worktree', '--base'],
   },
-  ssh: { usage: 'wmux ssh [ssh options] <user@host> [--title T]', passthrough: true },
-  'close-workspace': { usage: 'wmux close-workspace [workspaceId]' },
-  'select-workspace': { usage: 'wmux select-workspace <workspaceId>' },
-  'rename-workspace': { usage: 'wmux rename-workspace <workspaceId> <title>', passthrough: true },
-  'list-workspaces': { usage: 'wmux list-workspaces' },
-  'current-workspace': { usage: 'wmux current-workspace [--surface <id>]', value: ['--surface'] },
-  whoami: { usage: 'wmux whoami [--surface <id>]   (alias of current-workspace)', value: ['--surface'] },
+  ssh: { usage: 'remotea ssh [ssh options] <user@host> [--title T]', passthrough: true },
+  'close-workspace': { usage: 'remotea close-workspace [workspaceId]' },
+  'select-workspace': { usage: 'remotea select-workspace <workspaceId>' },
+  'rename-workspace': { usage: 'remotea rename-workspace <workspaceId> <title>', passthrough: true },
+  'list-workspaces': { usage: 'remotea list-workspaces' },
+  'current-workspace': { usage: 'remotea current-workspace [--surface <id>]', value: ['--surface'] },
+  whoami: { usage: 'remotea whoami [--surface <id>]   (alias of current-workspace)', value: ['--surface'] },
 
   // Surface
   'new-surface': {
-    usage: 'wmux new-surface [--type terminal|browser|markdown|prompts|git] [--color-scheme NAME]',
+    usage: 'remotea new-surface [--type terminal|browser|markdown|prompts|git] [--color-scheme NAME]',
     value: ['--type', '--color-scheme'],
   },
-  'close-surface': { usage: 'wmux close-surface [surfaceId]' },
+  'close-surface': { usage: 'remotea close-surface [surfaceId]' },
   'rename-surface': {
-    usage: 'wmux rename-surface [surfaceId] <title>   (renames the current surface inside a pane)',
+    usage: 'remotea rename-surface [surfaceId] <title>   (renames the current surface inside a pane)',
     passthrough: true,
   },
-  'focus-surface': { usage: 'wmux focus-surface <surfaceId>' },
+  'focus-surface': { usage: 'remotea focus-surface <surfaceId>' },
   'list-surfaces': {
-    usage: 'wmux list-surfaces [--pane <paneId>] [--workspace <workspaceId>]',
+    usage: 'remotea list-surfaces [--pane <paneId>] [--workspace <workspaceId>]',
     value: ['--pane', '--workspace'],
   },
-  'set-color-scheme': { usage: 'wmux set-color-scheme [surfaceId] <scheme>' },
-  'clear-color-scheme': { usage: 'wmux clear-color-scheme [surfaceId]' },
-  'list-themes': { usage: 'wmux list-themes' },
-  themes: { usage: 'wmux themes   (alias of list-themes)' },
+  'set-color-scheme': { usage: 'remotea set-color-scheme [surfaceId] <scheme>' },
+  'clear-color-scheme': { usage: 'remotea clear-color-scheme [surfaceId]' },
+  'list-themes': { usage: 'remotea list-themes' },
+  themes: { usage: 'remotea themes   (alias of list-themes)' },
 
   // User config
-  'reload-config': { usage: 'wmux reload-config' },
-  config: { usage: 'wmux config <show|reload|path>' },
-  locales: { usage: 'wmux locales [list|reload|path]' },
+  'reload-config': { usage: 'remotea reload-config' },
+  config: { usage: 'remotea config <show|reload|path>' },
+  locales: { usage: 'remotea locales [list|reload|path]' },
 
   // Pane
   split: {
-    usage: 'wmux split [--down] [--type terminal|browser|markdown|prompts|git] [--color-scheme NAME]',
+    usage: 'remotea split [--down] [--type terminal|browser|markdown|prompts|git] [--color-scheme NAME]',
     value: ['--type', '--color-scheme'],
     bool: ['--down'],
   },
   pane: {
     usage: [
-      'wmux pane new [--down] [--type T] [--color-scheme NAME]',
-      'wmux pane close <paneId> | focus <paneId> | list [--workspace <id>]',
+      'remotea pane new [--down] [--type T] [--color-scheme NAME]',
+      'remotea pane close <paneId> | focus <paneId> | list [--workspace <id>]',
     ].join('\n'),
     value: ['--type', '--color-scheme', '--workspace'],
     bool: ['--down'],
   },
-  'close-pane': { usage: 'wmux close-pane [paneId]' },
-  'focus-pane': { usage: 'wmux focus-pane <paneId>' },
-  'zoom-pane': { usage: 'wmux zoom-pane [paneId]' },
-  'list-panes': { usage: 'wmux list-panes [--workspace <workspaceId>]', value: ['--workspace'] },
-  tree: { usage: 'wmux tree [--workspace <workspaceId>]', value: ['--workspace'] },
+  'close-pane': { usage: 'remotea close-pane [paneId]' },
+  'focus-pane': { usage: 'remotea focus-pane <paneId>' },
+  'zoom-pane': { usage: 'remotea zoom-pane [paneId]' },
+  'list-panes': { usage: 'remotea list-panes [--workspace <workspaceId>]', value: ['--workspace'] },
+  tree: { usage: 'remotea tree [--workspace <workspaceId>]', value: ['--workspace'] },
 
   // Layout
   layout: {
-    usage: 'wmux layout grid --count <N> [--type T] [--anchor-surface <id>] [--anchor-pane <id>] [--workspace <id>]\n'
-      + 'wmux layout agents --count <N> [--type T] [--coordinator-ratio R] [--anchor-surface <id>] [--anchor-pane <id>] [--workspace <id>]',
+    usage: 'remotea layout grid --count <N> [--type T] [--anchor-surface <id>] [--anchor-pane <id>] [--workspace <id>]\n'
+      + 'remotea layout agents --count <N> [--type T] [--coordinator-ratio R] [--anchor-surface <id>] [--anchor-pane <id>] [--workspace <id>]',
     value: ['--count', '--type', '--coordinator-ratio', '--anchor-surface', '--anchor-pane', '--workspace'],
   },
 
   // Terminal interaction
-  send: { usage: 'wmux send [--surface <id>] <text>', passthrough: true },
+  send: { usage: 'remotea send [--surface <id>] <text>', passthrough: true },
   'send-key': {
-    usage: 'wmux send-key <key> [--ctrl] [--shift] [--alt] [--surface <id>]',
+    usage: 'remotea send-key <key> [--ctrl] [--shift] [--alt] [--surface <id>]',
     value: ['--surface'],
     bool: ['--ctrl', '--shift', '--alt'],
   },
   'read-screen': {
     usage: [
-      `wmux read-screen [--lines N] [--surface <id>] [--events]   ${SURFACE_NOTE}`,
+      `remotea read-screen [--lines N] [--surface <id>] [--events]   ${SURFACE_NOTE}`,
       '  Text of the active buffer, plus which buffer it is, its size and the cursor.',
       '  --events adds the pane\'s recent buffer switches and resizes, oldest first.',
     ].join('\n'),
@@ -2284,7 +2284,7 @@ export const COMMAND_SPECS = {
   },
   prompts: {
     usage: [
-      `wmux prompts [--surface <id>] [--limit N] [--json]   ${SURFACE_NOTE}`,
+      `remotea prompts [--surface <id>] [--limit N] [--json]   ${SURFACE_NOTE}`,
       '  The prompts this pane has been given, oldest first: "#<seq>  <hh:mm>  <summary>".',
       '  --limit N keeps only the N most recent; no --surface reports every tracked pane,',
       '  20 per pane by default (the targeted form is uncapped). Says so when it truncates.',
@@ -2295,15 +2295,15 @@ export const COMMAND_SPECS = {
     value: ['--surface', '--limit'],
     bool: ['--json'],
   },
-  'trigger-flash': { usage: 'wmux trigger-flash [surfaceId]' },
+  'trigger-flash': { usage: 'remotea trigger-flash [surfaceId]' },
 
   // Browser (free-form text for type/fill/eval)
   browser: {
     usage: [
-      'wmux browser open <url> | snapshot | click <ref> | type <ref> <text> | fill <ref> <value>',
-      'wmux browser screenshot [--full] | get-text [ref] | eval <js> | wait <ref> [ms]',
-      'wmux browser back | forward | reload',
-      'wmux browser engine [web|agent]   # print, or switch, this surface\'s engine',
+      'remotea browser open <url> | snapshot | click <ref> | type <ref> <text> | fill <ref> <value>',
+      'remotea browser screenshot [--full] | get-text [ref] | eval <js> | wait <ref> [ms]',
+      'remotea browser back | forward | reload',
+      'remotea browser engine [web|agent]   # print, or switch, this surface\'s engine',
       `  [--surface <id>]   ${SURFACE_NOTE}`,
     ].join('\n'),
     passthrough: true,
@@ -2312,9 +2312,9 @@ export const COMMAND_SPECS = {
   // Agent
   agent: {
     usage: [
-      'wmux agent spawn --cmd <C> [--label L] [--cwd D] [--pane P] [--workspace W] [--replace-tab]',
-      'wmux agent spawn-batch --json \'[...]\' [--strategy distribute|stack|split] [--workspace W]',
-      'wmux agent status <agentId> | list [--workspace <id>] | kill <agentId>',
+      'remotea agent spawn --cmd <C> [--label L] [--cwd D] [--pane P] [--workspace W] [--replace-tab]',
+      'remotea agent spawn-batch --json \'[...]\' [--strategy distribute|stack|split] [--workspace W]',
+      'remotea agent status <agentId> | list [--workspace <id>] | kill <agentId>',
     ].join('\n'),
     value: ['--cmd', '--label', '--cwd', '--pane', '--workspace', '--json', '--strategy'],
     bool: ['--replace-tab'],
@@ -2323,62 +2323,62 @@ export const COMMAND_SPECS = {
   // Markdown (--content takes free-form text)
   markdown: {
     usage: [
-      'wmux markdown <file>                                   (open a file in a new markdown view)',
-      'wmux markdown set <id> --content <text> [--title T]',
-      'wmux markdown set <id> --file <path>',
-      'wmux markdown get <id>',
+      'remotea markdown <file>                                   (open a file in a new markdown view)',
+      'remotea markdown set <id> --content <text> [--title T]',
+      'remotea markdown set <id> --file <path>',
+      'remotea markdown get <id>',
     ].join('\n'),
     passthrough: true,
   },
 
   // Notifications
-  notify: { usage: 'wmux notify <text>', passthrough: true },
-  'list-notifications': { usage: 'wmux list-notifications' },
-  'clear-notifications': { usage: 'wmux clear-notifications [notificationId]' },
+  notify: { usage: 'remotea notify <text>', passthrough: true },
+  'list-notifications': { usage: 'remotea list-notifications' },
+  'clear-notifications': { usage: 'remotea clear-notifications [notificationId]' },
 
   // Sidebar
   'set-status': {
     usage: [
-      'wmux set-status --workspace <id> --state <idle|running|interrupted> [--text "<label>"]',
-      'wmux set-status <key> <value>                          (legacy positional form)',
+      'remotea set-status --workspace <id> --state <idle|running|interrupted> [--text "<label>"]',
+      'remotea set-status <key> <value>                          (legacy positional form)',
     ].join('\n'),
     value: ['--workspace', '--state', '--text'],
   },
-  'set-progress': { usage: 'wmux set-progress <value> [--label L]', value: ['--label'] },
-  log: { usage: 'wmux log <level> <message>', passthrough: true },
-  'sidebar-state': { usage: 'wmux sidebar-state' },
+  'set-progress': { usage: 'remotea set-progress <value> [--label L]', value: ['--label'] },
+  log: { usage: 'remotea log <level> <message>', passthrough: true },
+  'sidebar-state': { usage: 'remotea sidebar-state' },
   'crash-report': {
-    usage: 'wmux crash-report [--events N] [--log-lines N]\n'
+    usage: 'remotea crash-report [--events N] [--log-lines N]\n'
       + '  Collect the crash fingerprint from the Windows Event Log plus remotea\'s own\n'
       + '  process-lifecycle log. Safe to paste into an issue — it contains no memory.\n'
       + '  Needs no running remotea, which is the point: you run it after remotea died.',
     value: ['--events', '--log-lines'],
   },
 
-  diff: { usage: 'wmux diff [--file <path>]', value: ['--file'] },
+  diff: { usage: 'remotea diff [--file <path>]', value: ['--file'] },
   hook: {
-    usage: 'wmux hook --event <type> --tool <name> [--agent <id>] [--prompt <text>]',
+    usage: 'remotea hook --event <type> --tool <name> [--agent <id>] [--prompt <text>]',
     value: ['--event', '--tool', '--agent', '--prompt'],
   },
   'opencode-tui': {
-    usage: 'wmux opencode-tui [--remove]   (the CLI-side OpenCode v2 half, installed in THIS environment)',
+    usage: 'remotea opencode-tui [--remove]   (the CLI-side OpenCode v2 half, installed in THIS environment)',
     bool: ['--remove'],
   },
   'agent-activity': {
-    usage: `wmux agent-activity [--tool T] [--skill S] [--done|--active] [--surface <id>]   ${SURFACE_NOTE}`,
+    usage: `remotea agent-activity [--tool T] [--skill S] [--done|--active] [--surface <id>]   ${SURFACE_NOTE}`,
     value: ['--tool', '--skill', '--surface'],
     bool: ['--done', '--active'],
   },
   'raw-v1': {
-    usage: 'wmux raw-v1 <command> [surfaceId] [args...]   (send a raw V1 line; used by shell integration)',
+    usage: 'remotea raw-v1 <command> [surfaceId] [args...]   (send a raw V1 line; used by shell integration)',
     passthrough: true,
   },
 
   // Declared agent state (issue #128)
   'report-agent': {
     usage: [
-      'wmux report-agent --blocked [reason] [--choices <json>] | --unblocked',
-      'wmux report-agent --run-start | --run-end | --run-depth <N>',
+      'remotea report-agent --blocked [reason] [--choices <json>] | --unblocked',
+      'remotea report-agent --run-start | --run-end | --run-depth <N>',
       `  [--seq N] [--surface <id>]   ${SURFACE_NOTE}`,
     ].join('\n'),
     // --blocked's reason is optional; treating it as value-taking only ever
@@ -2387,35 +2387,35 @@ export const COMMAND_SPECS = {
     bool: ['--unblocked', '--run-start', '--run-end'],
   },
   'report-metadata': {
-    usage: `wmux report-metadata [--model M] [--tokens T] [--context-pct N] [--ttl ms] [--seq N] [--surface <id>]   ${SURFACE_NOTE}`,
+    usage: `remotea report-metadata [--model M] [--tokens T] [--context-pct N] [--ttl ms] [--seq N] [--surface <id>]   ${SURFACE_NOTE}`,
     value: ['--model', '--tokens', '--context-pct', '--ttl', '--seq', '--surface'],
   },
   'report-subagent': {
-    usage: `wmux report-subagent <id> [--name N] [--detail D] [--done] [--surface <id>]   ${SURFACE_NOTE}`,
+    usage: `remotea report-subagent <id> [--name N] [--detail D] [--done] [--surface <id>]   ${SURFACE_NOTE}`,
     value: ['--id', '--name', '--detail', '--surface'],
     bool: ['--done'],
   },
   'report-session': {
-    usage: `wmux report-session <sessionId> [--provider claude|codex|opencode|agy|qwen|omp] [--seq N] [--surface <id>]   ${SURFACE_NOTE}`,
+    usage: `remotea report-session <sessionId> [--provider claude|codex|opencode|agy|qwen|omp] [--seq N] [--surface <id>]   ${SURFACE_NOTE}`,
     value: ['--session', '--provider', '--seq', '--surface'],
   },
   'answer-agent': {
-    usage: 'wmux answer-agent --surface <id> --choice <choiceId>   (reply to ANOTHER pane; no ambient default)',
+    usage: 'remotea answer-agent --surface <id> --choice <choiceId>   (reply to ANOTHER pane; no ambient default)',
     value: ['--surface', '--choice'],
   },
   'release-agent': {
-    usage: `wmux release-agent [--seq N] [--surface <id>] | --provider opencode|omp --session <id>   ${SURFACE_NOTE}`,
+    usage: `remotea release-agent [--seq N] [--surface <id>] | --provider opencode|omp --session <id>   ${SURFACE_NOTE}`,
     value: ['--seq', '--surface', '--provider', '--session'],
   },
   'agent-state': {
-    usage: 'wmux agent-state [--surface <id>]   (no --surface → every pane, the blocked list, and every identified agent)',
+    usage: 'remotea agent-state [--surface <id>]   (no --surface → every pane, the blocked list, and every identified agent)',
     value: ['--surface'],
   },
   detect: {
     usage: [
-      'wmux detect explain [--surface <id>]              (why this pane reads the way it does)',
-      'wmux detect explain --file <path> [--agent <k>]   (replay a captured screen, no live remotea needed)',
-      'wmux detect reload                                (re-read %APPDATA%\\remotea\\agent-detection)',
+      'remotea detect explain [--surface <id>]              (why this pane reads the way it does)',
+      'remotea detect explain --file <path> [--agent <k>]   (replay a captured screen, no live remotea needed)',
+      'remotea detect reload                                (re-read %APPDATA%\\remotea\\agent-detection)',
     ].join('\n'),
     value: ['--surface', '--file', '--agent'],
   },
@@ -2459,7 +2459,7 @@ function fail(command: string, spec: CommandSpec, message: string): never {
   process.exit(1);
 }
 
-/** `wmux help [command]` — the only help route that works for passthrough commands. */
+/** `remotea help [command]` — the only help route that works for passthrough commands. */
 function cmdHelp(args: string[]): void {
   const topic = args[1];
   if (!topic) { printUsage(); return; }
@@ -2513,13 +2513,13 @@ const COMMANDS: Record<CommandName, (args: string[]) => Promise<void> | void> = 
   },
   'close-surface': async (args) => print(await sendV2('surface.close', { id: args[1] })),
   // `rename-surface <id> <title>`, or `rename-surface <title>` from inside a
-  // pane (renames the current surface via WMUX_SURFACE_ID).
+  // pane (renames the current surface via REMOTEA_SURFACE_ID).
   'rename-surface': async (args) => {
     let id = args[1];
     let title = args[2];
-    if (title === undefined && process.env.WMUX_SURFACE_ID) {
+    if (title === undefined && process.env.REMOTEA_SURFACE_ID) {
       title = id;
-      id = process.env.WMUX_SURFACE_ID;
+      id = process.env.REMOTEA_SURFACE_ID;
     }
     print(await sendV2('surface.rename', { id, title }));
   },
@@ -2530,8 +2530,8 @@ const COMMANDS: Record<CommandName, (args: string[]) => Promise<void> | void> = 
   })),
   'set-color-scheme': cmdSetColorScheme,
   'clear-color-scheme': async (args) => {
-    const surfaceId = args[1] || process.env.WMUX_SURFACE_ID || '';
-    if (!surfaceId) { console.error('No surface id. Pass one as argument or run inside a wmux pane.'); process.exit(1); }
+    const surfaceId = args[1] || process.env.REMOTEA_SURFACE_ID || '';
+    if (!surfaceId) { console.error('No surface id. Pass one as argument or run inside a remotea pane.'); process.exit(1); }
     print(await sendV2('surface.set_color_scheme', { surfaceId, colorScheme: null }));
   },
   'list-themes': async () => print(await sendV2('theme.list')),
@@ -2567,7 +2567,7 @@ const COMMANDS: Record<CommandName, (args: string[]) => Promise<void> | void> = 
   send: cmdSend,
   'send-key': cmdSendKey,
   'read-screen': async (args) => {
-    print(await sendV2('surface.read_text', readScreenParams(args, process.env.WMUX_SURFACE_ID)));
+    print(await sendV2('surface.read_text', readScreenParams(args, process.env.REMOTEA_SURFACE_ID)));
   },
   prompts: cmdPrompts,
   'trigger-flash': async (args) => print(await sendV2('surface.trigger_flash', { id: args[1] })),
@@ -2630,8 +2630,8 @@ async function main() {
   let args = process.argv.slice(2);
 
   // Global flags (issue #78 remote management) — may appear anywhere in argv.
-  const remoteSpec = getFlag(args, '--remote') ?? process.env.WMUX_REMOTE;
-  const tokenOverride = getFlag(args, '--token') ?? process.env.WMUX_REMOTE_TOKEN;
+  const remoteSpec = getFlag(args, '--remote') ?? process.env.REMOTEA_REMOTE;
+  const tokenOverride = getFlag(args, '--token') ?? process.env.REMOTEA_REMOTE_TOKEN;
   args = stripFlag(stripFlag(args, '--remote'), '--token');
   if (remoteSpec) remoteTarget = parseRemoteTarget(remoteSpec);
   if (tokenOverride) PIPE_TOKEN = tokenOverride;
@@ -2672,18 +2672,18 @@ async function main() {
 }
 
 function printUsage() {
-  console.log(`remotea desktop CLI — terminals, agents and workspace tools (wmux compatibility command)
+  console.log(`remotea desktop CLI — terminals, agents and workspace tools (remotea compatibility command)
 
-Usage: wmux <command> [options]  (desktop package entrypoint: remotea)
+Usage: remotea <command> [options]  (desktop package entrypoint: remotea)
 
 Endpoint:   identify, capabilities — inspect before using a command family.
-            Host WMUX_REMOTE may expose only status; ping does not prove desktop control.
+            Host REMOTEA_REMOTE may expose only status; ping does not prove desktop control.
             On a host, remotea is the server administration CLI (remotea --help).
             Desktop --remote connects a desktop TCP CLI bridge, not a host session server.
             Local processes end with their window; host sessions detach on desktop close.
 
 System:     ping, identify, capabilities, list-windows, focus-window <id>, new-window
-Links:      open <url>   (open it in the wmux browser panel, per Settings → Browser → Links)
+Links:      open <url>   (open it in the remotea browser panel, per Settings → Browser → Links)
 Workspace:  new-workspace, close-workspace, select-workspace, rename-workspace, list-workspaces
             current-workspace | whoami [--surface <id>]   (the workspace THIS pane is in)
 Remote:     ssh [ssh options] <user@host> [--title T]   (remote terminal in a new workspace)
@@ -2691,7 +2691,7 @@ Remote:     ssh [ssh options] <user@host> [--title T]   (remote terminal in a ne
             token                          (print this instance's auth token, for --token)
             remote status [--json]         (Phone access / desktop phone console: on/off, where, devices)
 Global:     --remote host[:port] --token <T>   (drive a desktop CLI endpoint through an SSH tunnel;
-            env equivalents: WMUX_REMOTE, WMUX_REMOTE_TOKEN)
+            env equivalents: REMOTEA_REMOTE, REMOTEA_REMOTE_TOKEN)
 Surface:    new-surface [--type T] [--color-scheme NAME], close-surface, focus-surface, list-surfaces
             rename-surface [surfaceId] <title>   (renames the current surface when run inside a pane)
             set-color-scheme [surfaceId] <scheme>, clear-color-scheme [surfaceId], list-themes
@@ -2724,13 +2724,13 @@ Agent state: report-agent --blocked [reason] [--choices <json>] | --unblocked
             report-metadata [--model M] [--tokens T] [--context-pct N] [--ttl ms]
             report-session <id> | release-agent | agent-state [--surface <id>]
             report-subagent <id> [--name N] [--detail D] [--done]   # a line under your pane
-            (surface defaults to $WMUX_SURFACE_ID — an agent in a pane needs no id)
+            (surface defaults to $REMOTEA_SURFACE_ID — an agent in a pane needs no id)
 Config:     config show|reload|path   (edits ~/.wmux/config.toml — see docs)
             reload-config             (shorthand for 'config reload')
 Locales:    locales [list|reload|path] (community UI translations in ~/.wmux/locales)
 
-Help:       wmux help <command>       (per-command usage; works for every command)
-            wmux <command> --help     (same, except for free-form commands such as
+Help:       remotea help <command>       (per-command usage; works for every command)
+            remotea <command> --help     (same, except for free-form commands such as
                                        send / notify / log / ssh / browser / markdown,
                                        where --help is part of the text you are sending)
 `);

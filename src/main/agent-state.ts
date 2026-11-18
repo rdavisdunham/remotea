@@ -14,7 +14,7 @@
  * This module holds *declared* state instead: the agent (or a hook acting for
  * it) states what it is doing, and wmux stores it verbatim. No screen scraping,
  * no timing heuristic. The transport is the existing V2 pipe — wmux already
- * injects WMUX=1 / WMUX_SURFACE_ID / WMUX_PIPE / WMUX_PIPE_TOKEN into every
+ * injects REMOTEA=1 / REMOTEA_SURFACE_ID / REMOTEA_PIPE / REMOTEA_PIPE_TOKEN into every
  * spawned shell, which is herdr's three-env-var activation plus authentication.
  *
  * Two facts, three states — `blocked` and a run refcount:

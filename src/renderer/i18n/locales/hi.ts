@@ -114,7 +114,7 @@ export const hi: Translation = {
   'markdown.openInApp': 'डिफ़ॉल्ट ऐप में खोलें',
   'markdown.moreActions': 'अधिक क्रियाएँ',
   'markdown.noFile': 'किसी फ़ाइल से जुड़ा नहीं',
-  'markdown.empty': 'कोई सामग्री नहीं। सामग्री जोड़ने के लिए wmux markdown set उपयोग करें, या फ़ाइल यहाँ ड्रॉप करें।',
+  'markdown.empty': 'कोई सामग्री नहीं। सामग्री जोड़ने के लिए remotea markdown set उपयोग करें, या फ़ाइल यहाँ ड्रॉप करें।',
   'markdown.error.copy': 'क्लिपबोर्ड पर लिखा नहीं जा सका',
   'markdown.error.read': 'फ़ाइल पढ़ी नहीं जा सकी',
   'markdown.error.action': 'क्रिया विफल रही',

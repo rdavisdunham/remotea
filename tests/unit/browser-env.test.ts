@@ -5,14 +5,14 @@ import { BROWSER_SHIM_NAME, WSL_ENV_PASSTHROUGH, browserEnvFor } from '../../src
 
 describe('pane BROWSER routing', () => {
   it('sets BROWSER for WSL panes only', () => {
-    expect(browserEnvFor('wsl')).toEqual({ BROWSER: 'wmux-open-url' });
+    expect(browserEnvFor('wsl')).toEqual({ BROWSER: 'remotea-open-url' });
     expect(browserEnvFor('powershell')).toEqual({});
     expect(browserEnvFor('cmd')).toEqual({});
     expect(browserEnvFor('unknown')).toEqual({});
   });
 
   it('uses a whitespace-free name, because BROWSER is split on whitespace', () => {
-    expect(BROWSER_SHIM_NAME).toBe('wmux-open-url');
+    expect(BROWSER_SHIM_NAME).toBe('remotea-open-url');
     expect(BROWSER_SHIM_NAME).not.toMatch(/\s/);
   });
 
@@ -21,7 +21,7 @@ describe('pane BROWSER routing', () => {
   });
 
   it('ships the shim as an LF bash script', () => {
-    const raw = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'cli-bin', 'wmux-open-url'), 'utf8');
+    const raw = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'cli-bin', 'remotea-open-url'), 'utf8');
     expect(raw.startsWith('#!/usr/bin/env bash')).toBe(true);
     expect(raw).not.toMatch(/\r/);
   });

@@ -1,7 +1,7 @@
 /**
  * Harness question adapters (task 7f9da9f3): the version/hook gate that decides
  * what hello advertises, and the Codex PermissionRequest adapter end to end:
- * the broker with fake timers, and the real wmux-hook.js helper (a fake Codex:
+ * the broker with fake timers, and the real remotea-hook.js helper (a fake Codex:
  * the payload Codex 0.166.0 sends, on stdin) through a real bridge.
  */
 import { spawn } from 'child_process';
@@ -19,7 +19,7 @@ import type { SessionRecord } from '../../src/shared/remote-host-protocol';
 import type { AnswerCommand } from '../../src/shared/eridani-link-protocol';
 import { ManualTimers } from './helpers';
 
-const HOOK_JS = path.resolve(__dirname, '..', '..', 'resources', 'cli', 'wmux-hook.js');
+const HOOK_JS = path.resolve(__dirname, '..', '..', 'resources', 'cli', 'remotea-hook.js');
 const cleanup: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
   while (cleanup.length) await cleanup.pop()!();
@@ -73,21 +73,21 @@ describe('harness-adapters: what is advertised', () => {
     expect(adapterHooks({ home })).toEqual({ claudeAsk: false, codexApproval: false });
     fs.mkdirSync(path.join(home, '.claude'));
     fs.mkdirSync(path.join(home, '.codex'));
-    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify(applyWmuxHooks({}, '/h/wmux-hook.js', { questions: true })));
-    const old = applyCodexHooks({}, '/h/wmux-hook.js');
+    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify(applyWmuxHooks({}, '/h/remotea-hook.js', { questions: true })));
+    const old = applyCodexHooks({}, '/h/remotea-hook.js');
     old.hooks.PermissionRequest[0].hooks[0].timeout = 10; // what installs before this change wrote
     fs.writeFileSync(path.join(home, '.codex', 'hooks.json'), JSON.stringify(old));
     expect(adapterHooks({ home })).toEqual({ claudeAsk: true, codexApproval: false });
-    fs.writeFileSync(path.join(home, '.codex', 'hooks.json'), JSON.stringify(applyCodexHooks({}, '/h/wmux-hook.js')));
+    fs.writeFileSync(path.join(home, '.codex', 'hooks.json'), JSON.stringify(applyCodexHooks({}, '/h/remotea-hook.js')));
     expect(adapterHooks({ home })).toEqual({ claudeAsk: true, codexApproval: true });
     // Claude settings without the question entry (the app's own install): not wired.
-    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify(applyWmuxHooks({}, '/h/wmux-hook.js')));
+    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify(applyWmuxHooks({}, '/h/remotea-hook.js')));
     expect(adapterHooks({ home }).claudeAsk).toBe(false);
   });
 
   it('Codex PermissionRequest is installed with the long timeout, everything else stays short', () => {
-    const out = applyCodexHooks({}, '/h/wmux-hook.js');
-    expect(out.hooks.PermissionRequest[0].hooks[0]).toMatchObject({ command: 'node "/h/wmux-hook.js" --event PermissionRequest --provider codex', timeout: 600 });
+    const out = applyCodexHooks({}, '/h/remotea-hook.js');
+    expect(out.hooks.PermissionRequest[0].hooks[0]).toMatchObject({ command: 'node "/h/remotea-hook.js" --event PermissionRequest --provider codex', timeout: 600 });
     expect(out.hooks.Stop[0].hooks[0].timeout).toBe(10);
     expect(CODEX_TIMEOUTS_S.PermissionRequest).toBeGreaterThan(570);
   });
@@ -289,7 +289,7 @@ function runHelper(env: Record<string, string>, payload: object): Promise<{ code
   });
 }
 
-describe('wmux-hook.js PermissionRequest through a real bridge (fake Codex process)', () => {
+describe('remotea-hook.js PermissionRequest through a real bridge (fake Codex process)', () => {
   async function bridge(holdMs = 570_000) {
     const SECRET = 'qa-secret';
     const SURF = 'surf-1';

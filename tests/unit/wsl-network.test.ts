@@ -8,7 +8,7 @@ import {
 } from '../../src/cli/wsl-network';
 
 /**
- * `wmux bridge --wsl` used to pick `0.0.0.0` on the strength of a comment:
+ * `remotea bridge --wsl` used to pick `0.0.0.0` on the strength of a comment:
  *
  *     // WSL2's NAT gives the distro an address the container resolves as
  *     // host.docker.internal, but 127.0.0.1 inside the distro is not it.
@@ -122,7 +122,7 @@ describe('chooseBridgeHost', () => {
 
   it('upgrades the exposure notice for an explicit bind under mirrored', () => {
     const generic = chooseBridgeHost(req({ explicitHost: '0.0.0.0', mode: 'unknown', wslMode: false, inWsl2: false }));
-    expect(generic.notices.join(' ')).toMatch(/exposes the wmux pipe beyond localhost/);
+    expect(generic.notices.join(' ')).toMatch(/exposes the remotea pipe beyond localhost/);
     expect(generic.notices.join(' ')).not.toMatch(/mirrored/);
 
     const mirrored = chooseBridgeHost(req({ explicitHost: '0.0.0.0', mode: 'mirrored' }));

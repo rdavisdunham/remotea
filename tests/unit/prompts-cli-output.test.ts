@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { emptyPromptNote, promptTruncationNote } from '../../src/cli/wmux';
+import { emptyPromptNote, promptTruncationNote } from '../../src/cli/remotea';
 
 /**
  * `wmux prompts` printing nothing is an answer, and it used to be the same

@@ -1,7 +1,7 @@
-// wmux-plugin-version: 2
+// remotea-plugin-version: 2
 // wmux pi extension — bridges pi's lifecycle events to the wmux sidebar (#231).
-// Auto-installed by wmux to ~/.pi/agent/extensions/wmux.js.
-// No-ops entirely outside wmux (WMUX !== '1').
+// Auto-installed by wmux to ~/.pi/agent/extensions/remotea.js.
+// No-ops entirely outside wmux (REMOTEA !== '1').
 //
 // ── Why this exists ──────────────────────────────────────────────────────────
 //
@@ -84,7 +84,7 @@ const SHUTDOWN_DEADLINE_MS = 2000;
 const READ_ONLY_TOOLS = new Set(["read", "ls", "grep", "find"]);
 
 /**
- * Find something that can run `$WMUX_CLI` (issue #187).
+ * Find something that can run `$REMOTEA_CLI` (issue #187).
  *
  * Deliberately a copy of the OpenCode plugin's resolver rather than an import:
  * both files are installed verbatim as a SINGLE file into another program's
@@ -92,7 +92,7 @@ const READ_ONLY_TOOLS = new Set(["read", "ls", "grep", "find"]);
  * pinned against each other by tests/unit/pi-extension.test.ts so the copy
  * cannot quietly drift.
  *
- * Order matters. `WMUX_NODE` comes first because wmux resolved it in its own
+ * Order matters. `REMOTEA_NODE` comes first because wmux resolved it in its own
  * process, where it could also fall back to its Electron binary — so it is the
  * only link in the chain that cannot come up empty. The rest covers a pi
  * launched from a shell wmux did not spawn. `process.execPath` is checked, not
@@ -106,9 +106,9 @@ function resolveNodeRuntime(
   platform = process.platform,
   exists = existsSync,
 ) {
-  const declared = env.WMUX_NODE;
+  const declared = env.REMOTEA_NODE;
   if (declared && exists(declared)) {
-    return { file: declared, electron: env.WMUX_NODE_ELECTRON === "1" };
+    return { file: declared, electron: env.REMOTEA_NODE_ELECTRON === "1" };
   }
   if (execPath && JS_RUNTIME_RE.test(path.basename(execPath))) {
     return { file: execPath, electron: false };
@@ -203,10 +203,10 @@ function metadataArgs(ctx) {
 }
 
 export default function wmuxExtension(pi) {
-  const surface = process.env.WMUX_SURFACE_ID;
+  const surface = process.env.REMOTEA_SURFACE_ID;
   // Outside wmux this file is inert. pi loads global extensions for every
   // session on the machine, including ones started from a plain terminal.
-  if (process.env.WMUX !== "1" || !surface) return;
+  if (process.env.REMOTEA !== "1" || !surface) return;
 
   // Pi cannot detect wmux's iTerm2 image support. Set this before its UI starts,
   // without overriding an explicit choice. Pi disables iTerm2 images in
@@ -225,11 +225,11 @@ export default function wmuxExtension(pi) {
    * Bounded, because a wedged wmux must not be able to hang pi's exit.
    */
   function wmux(args, { wait = false } = {}) {
-    const cli = process.env.WMUX_CLI;
+    const cli = process.env.REMOTEA_CLI;
     const done = wait ? deferred() : null;
     try {
-      // WMUX_CLI is always set alongside WMUX=1 by any wmux that installed this
-      // file. Without it the only PATH entry on Windows is `wmux.cmd`, which
+      // REMOTEA_CLI is always set alongside REMOTEA=1 by any wmux that installed this
+      // file. Without it the only PATH entry on Windows is `remotea.cmd`, which
       // execFile cannot spawn without a shell — and a shell is exactly what
       // #154 keeps out of this path.
       if (!cli) {

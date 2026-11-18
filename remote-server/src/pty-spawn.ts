@@ -16,6 +16,7 @@ import os from 'os';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import type { IPty } from 'node-pty';
+import { LEGACY_ENV_PREFIX } from '../../src/shared/legacy-names';
 
 export interface PtyLike {
   readonly pid: number;
@@ -46,7 +47,9 @@ export interface SpawnRequest {
 
 export type SpawnFn = (req: SpawnRequest) => PtyLike;
 
-const STRIPPED_ENV_PREFIXES = ['HERDR_', 'WMUX_', 'REMOTEA_'];
+// LEGACY_ENV_PREFIX: a server started from a terminal of the old build must
+// not hand that terminal's WMUX_ variables to the sessions it spawns.
+const STRIPPED_ENV_PREFIXES = ['HERDR_', LEGACY_ENV_PREFIX, 'REMOTEA_'];
 const STRIPPED_ENV = new Set(['INVOCATION_ID', 'JOURNAL_STREAM', 'SYSTEMD_EXEC_PID', 'NOTIFY_SOCKET', 'TMUX', 'TMUX_PANE']);
 
 let cachedShell: string | null = null;

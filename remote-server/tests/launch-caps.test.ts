@@ -234,10 +234,10 @@ describe('build identity', () => {
     const cliDir = tmpDir();
     const sourceDir = tmpDir();
     expect(hookVersion({ cliDir, sourceDir })).toEqual({ installed: null, bundled: null, current: null });
-    fs.writeFileSync(path.join(sourceDir, 'wmux-hook.js'), 'v2');
-    fs.writeFileSync(path.join(cliDir, 'wmux-hook.js'), 'v1');
-    expect(hookVersion({ cliDir, sourceDir })).toMatchObject({ installed: fileVersion(path.join(cliDir, 'wmux-hook.js')), current: false });
-    fs.writeFileSync(path.join(cliDir, 'wmux-hook.js'), 'v2');
+    fs.writeFileSync(path.join(sourceDir, 'remotea-hook.js'), 'v2');
+    fs.writeFileSync(path.join(cliDir, 'remotea-hook.js'), 'v1');
+    expect(hookVersion({ cliDir, sourceDir })).toMatchObject({ installed: fileVersion(path.join(cliDir, 'remotea-hook.js')), current: false });
+    fs.writeFileSync(path.join(cliDir, 'remotea-hook.js'), 'v2');
     expect(hookVersion({ cliDir, sourceDir }).current).toBe(true);
     expect(hookVersion({ cliDir, sourceDir }).installed).toMatch(/^[0-9a-f]{12}$/);
   });
@@ -335,7 +335,7 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
     saveTarget(dir, { id: 'jarvis', repo, worktreeRoot: path.join(repo, '..', 'wt-jarvis'), base: 'main', launch: { claude: {} }, verify: [{ id: 'api', argv: ['uv-not-on-path-zz', 'run', 'pytest'], timeout: 600 }] });
     saveTarget(dir, { id: 'remotea', repo, worktreeRoot: path.join(repo, '..', 'wt-remotea'), base: 'main', launch: { claude: {}, codex: {} }, verify: [{ id: 'test', argv: [process.execPath], timeout: 600 }] });
     const cliDir = tmpDir();
-    fs.writeFileSync(path.join(cliDir, 'wmux-hook.js'), 'helper');
+    fs.writeFileSync(path.join(cliDir, 'remotea-hook.js'), 'helper');
     const registry = Registry.load({ file: null, bootId: 'boot-1' });
     const hub = new Hub({ registry, spawn: fakeSpawner().spawn, bootId: 'boot-1', serverId: 'srv', hostname: 'box', timers: new ManualTimers(), probe: () => ({}) });
     const logs: string[] = [];
@@ -376,7 +376,7 @@ describe('EridaniRuntime hello (caps_version 2)', () => {
       build_sha: 'e'.repeat(40),
       build_dirty: true,
       caps_version: ERIDANI_CAPS_VERSION,
-      hook_version: fileVersion(path.join(cliDir, 'wmux-hook.js')),
+      hook_version: fileVersion(path.join(cliDir, 'remotea-hook.js')),
       proto: 1,
     });
     // 2.0.30 is below the range the AskUserQuestion adapter was tested on: not advertised, hook or no hook.

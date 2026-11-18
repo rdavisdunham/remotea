@@ -1,7 +1,7 @@
 // OSC 7 (`ESC ] 7 ; file://host/path ST`): a shell announcing its working
 // directory IN-BAND, through the bytes it prints (#378). It is how a WSL shell
 // tells the explorer where it is: `wsl` typed into a PowerShell pane gets no
-// WMUX_SURFACE_ID and no pipe, but whatever it prints already reaches the
+// REMOTEA_SURFACE_ID and no pipe, but whatever it prints already reaches the
 // right pane.
 //
 // In-band is also what makes it untrusted. The pipe's report_pwd needs the

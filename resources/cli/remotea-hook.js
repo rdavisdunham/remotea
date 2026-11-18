@@ -5,13 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 /**
- * wmux hook helper — sends a hook event to the wmux pipe.
+ * remotea hook helper — sends a hook event to the remotea pipe.
  * Called by Claude Code hooks (PostToolUse, Notification, Stop, SubagentStop),
  * and by the same hooks registered in Qwen Code's settings with `--provider qwen`.
  *
  * Usage:
- *   node wmux-hook.js <tool-name>        # PostToolUse — sidebar/diff tracking
- *   node wmux-hook.js --event <Event>    # Notification/Stop fire a wmux notification;
+ *   node remotea-hook.js <tool-name>        # PostToolUse — sidebar/diff tracking
+ *   node remotea-hook.js --event <Event>    # Notification/Stop fire a remotea notification;
  *                                        # Stop/SubagentStop also drive sidebar agent lifecycle
  *
  * Reads stdin for the Claude Code hook payload (JSON):
@@ -19,7 +19,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
  *   - Notification           → extracts the `message` (what the agent is waiting for)
  *   - PreToolUse             → extracts `tool_name` (registered matcher-less)
  *   - UserPromptSubmit       → extracts `prompt` (the prompt log, issue #207)
- * WMUX_SURFACE_ID (set by wmux in each pane's shell) ties the event to its pane.
+ * REMOTEA_SURFACE_ID (set by remotea in each pane's shell) ties the event to its pane.
  */
 const fs_1 = __importDefault(require("fs"));
 const net_1 = __importDefault(require("net"));
@@ -63,54 +63,54 @@ if (codexPermission)
  *
  * Taken at process start rather than at send time because the interesting delay
  * is everything after: node boot, reading stdin, connecting to the pipe. Each
- * hook is its own process and they race, so a `PostToolUse` can reach wmux after
- * the `Stop` that followed it and re-assert a run that has already ended. wmux
+ * hook is its own process and they race, so a `PostToolUse` can reach remotea after
+ * the `Stop` that followed it and re-assert a run that has already ended. remotea
  * orders reports by this stamp instead of by arrival.
  */
 const firedAt = Date.now();
-// The fallback tracks WMUX_INSTANCE the way shared/instance.ts's getPipePath()
+// The fallback tracks REMOTEA_INSTANCE the way shared/instance.ts's getPipePath()
 // does — restated rather than imported, because the CLI ships file by file.
-const instance = process.env.WMUX_INSTANCE?.trim() ?? '';
-const pipePath = process.env.WMUX_PIPE || '\\\\.\\pipe\\remotea' + (instance ? '-' + instance : '');
-const surfaceId = process.env.WMUX_SURFACE_ID || '';
+const instance = process.env.REMOTEA_INSTANCE?.trim() ?? '';
+const pipePath = process.env.REMOTEA_PIPE || '\\\\.\\pipe\\remotea' + (instance ? '-' + instance : '');
+const surfaceId = process.env.REMOTEA_SURFACE_ID || '';
 /**
  * Whether this hook fired in a pane of ANOTHER terminal multiplexer (#282).
  *
  * openwong2kim/wmux — a different app with the same name — also exports
- * `WMUX_SURFACE_ID` into its panes, and Claude Code runs this hook from the
+ * `REMOTEA_SURFACE_ID` into its panes, and Claude Code runs this hook from the
  * global ~/.claude/settings.json in every session on the machine. With both
- * installed, every tool call in one of ITS panes was reported to this wmux,
- * attributed to a surface id this wmux never issued.
+ * installed, every tool call in one of ITS panes was reported to this remotea,
+ * attributed to a surface id this remotea never issued.
  *
- * A pane this wmux spawned always carries `WMUX=1` and `WMUX_PIPE` (forwarded
+ * A pane this remotea spawned always carries `REMOTEA=1` and `REMOTEA_PIPE` (forwarded
  * into WSL through WSLENV), and a devcontainer or ssh session reaching it over
- * the bridge carries `WMUX_REMOTE`. The other app sets none of them — it
- * strips every inherited `WMUX_*` before spawning — so a surface id with none
+ * the bridge carries `REMOTEA_REMOTE`. The other app sets none of them — it
+ * strips every inherited `REMOTEA_*` before spawning — so a surface id with none
  * of our markers beside it is not ours. A hook with NO surface id is left to
  * behave exactly as before.
  */
 function isForeignPane(env) {
-    if (!env.WMUX_SURFACE_ID)
+    if (!env.REMOTEA_SURFACE_ID)
         return false;
-    return env.WMUX !== '1' && !env.WMUX_PIPE && !env.WMUX_REMOTE?.trim();
+    return env.REMOTEA !== '1' && !env.REMOTEA_PIPE && !env.REMOTEA_REMOTE?.trim();
 }
 if (isForeignPane(process.env))
     process.exit(0);
 /**
  * TCP transport for a hook firing where the pipe does not exist (issue #19).
  *
- * Inside a devcontainer, Claude Code runs on Linux while wmux runs on the
+ * Inside a devcontainer, Claude Code runs on Linux while remotea runs on the
  * Windows host: `\\.\pipe\wmux` is unreachable, so every hook failed silently
- * and the sidebar never left "Running". WMUX_REMOTE points at a `wmux bridge`
+ * and the sidebar never left "Running". REMOTEA_REMOTE points at a `remotea bridge`
  * (issue #78) instead — same JSON-RPC frame, same auth, different socket. The
  * env-var form is deliberate: Claude Code owns this process's argv, so there is
  * nowhere to put a --remote flag.
  *
  * The token is the REMOTE instance's, which is not this machine's: on the
- * container side WMUX_PIPE_TOKEN is either absent or something else entirely.
+ * container side REMOTEA_PIPE_TOKEN is either absent or something else entirely.
  */
 const remote = (() => {
-    const spec = process.env.WMUX_REMOTE?.trim();
+    const spec = process.env.REMOTEA_REMOTE?.trim();
     if (!spec)
         return null;
     const idx = spec.lastIndexOf(':');
@@ -119,11 +119,11 @@ const remote = (() => {
         ? { host: spec.slice(0, idx) || '127.0.0.1', port }
         : { host: spec, port: 9787 };
 })();
-const token = (remote ? process.env.WMUX_REMOTE_TOKEN : process.env.WMUX_PIPE_TOKEN) || '';
+const token = (remote ? process.env.REMOTEA_REMOTE_TOKEN : process.env.REMOTEA_PIPE_TOKEN) || '';
 // Off Windows the default named pipe does not exist. With no bridge and no
 // explicit pipe either — a Claude or Codex session outside remotea, running
 // the same global hooks — there is nothing to report to: leave before reading stdin.
-if (process.platform !== 'win32' && !remote && !process.env.WMUX_PIPE)
+if (process.platform !== 'win32' && !remote && !process.env.REMOTEA_PIPE)
     process.exit(0);
 let stdinData = '';
 let sent = false;
@@ -160,7 +160,7 @@ const MAX_STDIN = 10 * 1024 * 1024;
  * Deliberately a backstop and not a fix for an observed hang: against an absent
  * server the connect errors out, and against a responsive one the first reply
  * chunk is the exit (see sendHook) — only a wedged server (accepts, never
- * answers) ever reaches this. The wmux CLI has always armed this same timer
+ * answers) ever reaches this. The remotea CLI has always armed this same timer
  * before connecting (see sendV1/sendV2); the hook helper was the one client
  * without it, and matching costs nothing.
  *
@@ -178,7 +178,7 @@ const PIPE_DEADLINE_MS = (0, transport_deadline_1.transportDeadline)(transport_d
 /** Cleared once we stop reading, so the happy path is not held open by it. */
 let stdinTimer = null;
 /**
- * Pull the fields wmux cares about out of the Claude Code hook payload.
+ * Pull the fields remotea cares about out of the Claude Code hook payload.
  *
  * Split out of sendHook so the transport below stays the only thing that
  * function is about — every new field extracted here used to add another branch
@@ -194,7 +194,7 @@ let stdinTimer = null;
  * lands in a renderer (a web context) and is held there per pane, and a pasted
  * 60 KB file would otherwise travel the pipe on every submission to be shown as
  * one truncated line. The renderer clamps again on arrival — this end cannot
- * assume the version at the other end agrees, since wmux-hook.js is written to
+ * assume the version at the other end agrees, since remotea-hook.js is written to
  * the user's ~/.claude and an old copy can outlive an upgrade.
  */
 const MAX_PROMPT = 4000;
@@ -241,7 +241,7 @@ function salvageSessionId(raw) {
  * `notification_type`'s shape: a short snake_case identifier
  * (`permission_prompt`, `idle_prompt`, ...). Anything else is dropped rather
  * than forwarded — this helper's whitelist is what keeps arbitrary payload
- * content off the pipe, and a value that is not an identifier is not one wmux
+ * content off the pipe, and a value that is not an identifier is not one remotea
  * can act on anyway.
  */
 const NOTIFICATION_TYPE_RE = /^[a-z][a-z0-9_]{0,63}$/;
@@ -403,7 +403,7 @@ function readBackgroundTasks(data, toolInput, toolName, out) {
         out.freshSession = true;
 }
 /**
- * Qwen Code's runtime tool ids, in the Claude spelling every consumer in wmux
+ * Qwen Code's runtime tool ids, in the Claude spelling every consumer in remotea
  * already reads (the sidebar label, the diff refresh on Edit/Write). An id not
  * listed passes through unchanged — an unknown tool is still a tool running.
  */
@@ -482,7 +482,7 @@ function parsePayload(raw) {
     }
     return out;
 }
-/** Every field wmux forwards, read off a parsed payload into `out`. */
+/** Every field remotea forwards, read off a parsed payload into `out`. */
 function readPayloadFields(data, out) {
     // Grok Build runs these same hooks out of ~/.claude/settings.json (its Claude
     // compatibility, on by default) but sends a camelCase envelope: `toolInput`,
@@ -498,7 +498,7 @@ function readPayloadFields(data, out) {
     out.message = data.message || '';
     // Which KIND of Notification this is (issue #253). Claude Code fires the one
     // hook for a permission prompt and for the ~60s idle reminder alike, and only
-    // the payload's `notification_type` tells them apart reliably — wmux read the
+    // the payload's `notification_type` tells them apart reliably — remotea read the
     // message alone, so an idle reminder that followed a background subagent was
     // taken for a question and the pane said "Needs you" with nothing to answer.
     const notificationType = data.notification_type ?? data.notificationType;
@@ -511,7 +511,7 @@ function readPayloadFields(data, out) {
     const toolName = data.tool_name ?? data.toolName;
     if (typeof toolName === 'string')
         out.toolName = toolName;
-    // Every Claude Code hook payload carries the conversation's session_id. wmux
+    // Every Claude Code hook payload carries the conversation's session_id. remotea
     // parsed this payload for years and threw it away, which is the only reason
     // `AgentStateRecord.sessionId` — a slot that has always existed and is
     // documented as surviving a restart — was never populated (issue #186).
@@ -529,7 +529,7 @@ function readPayloadFields(data, out) {
     // pass for the main thread's.
     if (!out.subagent && typeof data.tool_use_id === 'string' && TURN_ID_RE.test(data.tool_use_id))
         out.toolUseId = data.tool_use_id;
-    // UserPromptSubmit carries what the user actually typed, and wmux threw it
+    // UserPromptSubmit carries what the user actually typed, and remotea threw it
     // away — which is why the prompt-log features in issue #207 had no source of
     // truth for an agent pane. It cannot be recovered from the screen: an agent
     // TUI repaints over its own input box, so by the time anything looks, the
@@ -545,7 +545,7 @@ function readPayloadFields(data, out) {
     }
     readBackgroundTasks(data, toolInput, toolName, out);
     // The turn's final response, for a remotea server's turn capture. Stop only,
-    // and only toward a remotea server: the local wmux has no use for it.
+    // and only toward a remotea server: the local remotea has no use for it.
     if (remote && event === 'Stop')
         readTurnFields(data, out);
     if (remote)
@@ -555,7 +555,7 @@ const MAX_ANSWER_ECHO = 4000;
 const SOURCES = new Set(['startup', 'resume', 'clear', 'compact']);
 /**
  * What a remotea server reads for Eridani (stage C), and only it: the local
- * wmux has no use for any of it. Identifiers and flags, never free text,
+ * remotea has no use for any of it. Identifiers and flags, never free text,
  * except the answers a question hook confirms.
  */
 function readRemoteaFields(data, out) {
@@ -602,17 +602,17 @@ function readTurnFields(data, out) {
         out.transcriptPath = data.transcript_path;
 }
 /**
- * The event wmux is told about for the hook that fired, or null for none.
+ * The event remotea is told about for the hook that fired, or null for none.
  *
  * Only Grok makes this anything but the identity. Two things differ from Claude
  * Code, and both are about whose event it is:
  *
  * - `StopCancelled` (Ctrl+C, a declined permission, the turn limit) and
- *   `StopFailure` (an API error) run INSTEAD of `Stop`, so to wmux they are the
+ *   `StopFailure` (an API error) run INSTEAD of `Stop`, so to remotea they are the
  *   turn ending — grok-context.ts registers them for exactly that.
  *
  * - A Grok subagent runs its OWN session, and that session fires the same hooks
- *   on the parent's pane (they inherit WMUX_SURFACE_ID), marked with
+ *   on the parent's pane (they inherit REMOTEA_SURFACE_ID), marked with
  *   `subagentType`. Claude Code keeps a subagent inside the parent's session and
  *   gives its ending a name of its own, so none of this arises there. Read as
  *   the pane's own, a child's `SessionEnd` releases the pane's record while the
@@ -706,18 +706,18 @@ function relayHook() {
     // The reply is the signal to leave, and leaving is destroy() — not end().
     //
     // This used to `end()` right after the write and drain the reply until the
-    // server closed. Two things were wrong with that. wmux's server never closed
-    // its side (it does now, but the hook on disk is often older than the wmux
+    // server closed. Two things were wrong with that. remotea's server never closed
+    // its side (it does now, but the hook on disk is often older than the remotea
     // it talks to, and vice versa), so the exit waited on EOF that only ever came
     // from a timer. And the timer is libuv's: on a Windows named pipe a half-close
     // arms a 50 ms `eof_timeout` (libuv src/win/pipe.c) before EOF is reported,
     // so every hook process sat ~60 ms past its reply doing nothing — 95 ms
     // measured for a hook whose pipe round trip is 1 ms; 37 ms with this. The
-    // reply's content is not read: wmux acknowledges a hook.event, and there is
+    // reply's content is not read: remotea acknowledges a hook.event, and there is
     // nothing this process could do with a refusal.
     //
     // The deadline is referenced, not unref'd: it has to be able to fire while the
-    // pending socket is what is holding the loop open — a wmux that accepts and
+    // pending socket is what is holding the loop open — a remotea that accepts and
     // never answers (wedged, or shutting down) is the case it is for.
     const deadline = setTimeout(() => {
         client.destroy();
@@ -734,7 +734,7 @@ function relayHook() {
     });
     client.on('close', () => clearTimeout(deadline));
     client.on('error', () => {
-        // wmux not running — silently ignore.
+        // remotea not running — silently ignore.
         clearTimeout(deadline);
         process.exit(0);
     });

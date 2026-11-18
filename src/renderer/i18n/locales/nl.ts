@@ -103,7 +103,7 @@ export const nl: Translation = {
   'markdown.openInApp': 'Openen in standaardapp',
   'markdown.moreActions': 'Meer acties',
   'markdown.noFile': 'Niet gekoppeld aan een bestand',
-  'markdown.empty': 'Geen inhoud. Gebruik wmux markdown set om inhoud toe te voegen, of sleep hier een bestand naartoe.',
+  'markdown.empty': 'Geen inhoud. Gebruik remotea markdown set om inhoud toe te voegen, of sleep hier een bestand naartoe.',
   'markdown.error.copy': 'Kon niet naar het klembord schrijven',
   'markdown.error.read': 'Het bestand kon niet worden gelezen',
   'markdown.error.action': 'De actie is mislukt',

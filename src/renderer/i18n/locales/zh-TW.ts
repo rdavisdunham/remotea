@@ -198,7 +198,7 @@ export const zhTW: Translation = {
   'markdown.openInApp': '以預設應用程式開啟',
   'markdown.moreActions': '更多動作',
   'markdown.noFile': '沒有對應的檔案',
-  'markdown.empty': '沒有內容。可以用 wmux markdown set 加入內容，或把檔案拖進來。',
+  'markdown.empty': '沒有內容。可以用 remotea markdown set 加入內容，或把檔案拖進來。',
   'markdown.error.copy': '無法寫入剪貼簿',
   'markdown.error.read': '無法讀取檔案',
   'markdown.error.action': '動作執行失敗',
@@ -560,7 +560,7 @@ export const zhTW: Translation = {
   'settings.workspacePanel.sessionSnapshot15': '15 分鐘',
   'settings.workspacePanel.sessionSnapshot30': '30 分鐘',
   'settings.workspacePanel.sessionSnapshot60': '60 分鐘',
-  'settings.workspacePanel.restoreOpencodeSessionsHint': '以 `opencode -s` 在每個還原分頁原本的目錄中重新開啟它的 OpenCode 工作階段。需要 remotea 的 OpenCode 整合（伺服器外掛，或為 OpenCode 2 以 `wmux opencode-tui` 安裝的 TUI 外掛）。正常結束的 OpenCode 不會重新開啟。若工作階段已被刪除，OpenCode 會改為建立新的工作階段。OpenCode 2 在遠端或共用伺服器上由 TUI 外掛記錄；remotea 更新後請在該環境重新執行 `wmux opencode-tui`。',
+  'settings.workspacePanel.restoreOpencodeSessionsHint': '以 `opencode -s` 在每個還原分頁原本的目錄中重新開啟它的 OpenCode 工作階段。需要 remotea 的 OpenCode 整合（伺服器外掛，或為 OpenCode 2 以 `remotea opencode-tui` 安裝的 TUI 外掛）。正常結束的 OpenCode 不會重新開啟。若工作階段已被刪除，OpenCode 會改為建立新的工作階段。OpenCode 2 在遠端或共用伺服器上由 TUI 外掛記錄；remotea 更新後請在該環境重新執行 `remotea opencode-tui`。',
   'settings.workspacePanel.restoreAgySessionsHint': '以 `agy --conversation` 在每個還原分頁原本的目錄中重新開啟它的 agy 對話。需要 remotea 的 agy 外掛（已啟用狀態掛鉤）與 Node.js。對話會在開始時記錄，或在繼續後的第一則訊息時記錄。結束 agy 回到 shell 提示字元後，不會重新開啟。',
   'settings.workspacePanel.restoreOmpSessions': '還原時繼續 omp 工作階段',
   'settings.workspacePanel.restoreOmpSessionsHint': '以 `omp --resume <path>` 在每個還原分頁原本的目錄中重新開啟它的精確 omp 工作階段。需要啟用 remotea 的 omp 擴充功能（狀態掛鉤已開啟）。正常結束的 omp 不會重新開啟。若工作階段檔案已被刪除，該窗格會安全略過，絕不偷偷建立新工作階段。',
@@ -578,7 +578,7 @@ export const zhTW: Translation = {
   'settings.workspacePanel.defaultCwdHint': '未透過其他方式指定目錄時，新終端機使用的起始目錄。分割窗格、「在 remotea 中開啟」、--cwd 和還原的工作階段都會保留各自的目錄。~ 和 %VARIABLES% 會展開；留空則維持舊有行為。',
   // 新工作區的形狀 (issue #212)
   'settings.workspacePanel.newWorkspaceSection': '新工作區',
-  'settings.workspacePanel.newWorkspaceHint': '新工作區開啟時的樣子——側邊欄的「+」、Ctrl+N、第一次啟動和 wmux new-workspace 都會套用。下方標為「預設」的已儲存版面優先於這裡的設定。',
+  'settings.workspacePanel.newWorkspaceHint': '新工作區開啟時的樣子——側邊欄的「+」、Ctrl+N、第一次啟動和 remotea new-workspace 都會套用。下方標為「預設」的已儲存版面優先於這裡的設定。',
   'settings.workspacePanel.panes': '終端機窗格數',
   'settings.workspacePanel.layout': '排列方式',
   'settings.workspacePanel.layoutGrid': '格狀（各列平均）',
@@ -667,7 +667,7 @@ export const zhTW: Translation = {
   'addressBar.engineAgentTitle': '讓這個分頁改用 remotea 外部的完整 Chrome，並在這裡觀看 agent 的操作。首次使用需要安裝。',
   'addressBar.backAgent': 'agent 操作瀏覽器時無法使用瀏覽紀錄',
   'addressBar.reloadViewer': '重新載入活動檢視器（不會重新載入 agent 所在的頁面）',
-  // 還沒有頁面的瀏覽器分頁 (#232)。wmux 以前會開啟自己的
+  // 還沒有頁面的瀏覽器分頁 (#232)。remotea 以前會開啟自己的
   // GitHub repo，之後還把它當成使用者自己選的網址記住。
   'browser.blank.title': '沒有開啟任何頁面',
   'browser.blank.hint': '在上方輸入網址，或到「設定 → 瀏覽器」設定起始頁面。',
@@ -763,7 +763,7 @@ export const zhTW: Translation = {
   'agentNavigator.silent': '未回報狀態',
   'agentNavigator.fromScreen': '從畫面判讀',
   'settings.workspacePanel.detectAgentScreens': '判讀 agent 畫面以推斷狀態',
-  'settings.workspacePanel.detectAgentScreensHint': '對於不會自行回報狀態的 agent（Codex、Gemini、Aider…），用內建規則比對它們畫面上的介面，分辨是在等你還是在工作。完全在這台電腦上執行，也絕不覆蓋 agent 自己宣告的狀態——只會把宣告為閒置、畫面上仍有提問的窗格標為提問；宣告為工作中或在等你的 agent 所在窗格完全不讀取。規則可在 %APPDATA%\\remotea\\agent-detection 覆寫，用 `wmux detect explain` 查看觸發了哪一條規則。',
+  'settings.workspacePanel.detectAgentScreensHint': '對於不會自行回報狀態的 agent（Codex、Gemini、Aider…），用內建規則比對它們畫面上的介面，分辨是在等你還是在工作。完全在這台電腦上執行，也絕不覆蓋 agent 自己宣告的狀態——只會把宣告為閒置、畫面上仍有提問的窗格標為提問；宣告為工作中或在等你的 agent 所在窗格完全不讀取。規則可在 %APPDATA%\\remotea\\agent-detection 覆寫，用 `remotea detect explain` 查看觸發了哪一條規則。',
   'settings.workspacePanel.closeToTray': '關閉時縮小到系統匣',
   'settings.workspacePanel.closeToTrayHint':
     '視窗的 × 按鈕或 Alt+F4 不再結束 remotea，而是把最後一個 remotea 視窗隱藏到系統匣，終端機工作階段和 agent 會繼續執行。按一下系統匣圖示即可還原；選單中的「結束 remotea」才會真正結束。優先於上面的確認設定。',

@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { subcommandError, browserRequest } from '../../src/cli/wmux';
+import { subcommandError, browserRequest } from '../../src/cli/remotea';
 
 /**
- * `wmux browser`, `wmux agent` and `wmux pane` with no subcommand printed the
+ * `remotea browser`, `remotea agent` and `remotea pane` with no subcommand printed the
  * literal word `undefined` (issue #156):
  *
- *     $ wmux browser
+ *     $ remotea browser
  *     Unknown browser command: undefined      (exit 1)
  *
  * Each dispatcher interpolated `args[1]` into its error without checking that
  * it existed, so a MISSING subcommand was reported as an UNKNOWN one named
  * `undefined`. `markdown` and `config`, in the same file, already fell back to
- * usage — and `wmux browser --help` cannot cover the gap, because `browser` is
+ * usage — and `remotea browser --help` cannot cover the gap, because `browser` is
  * passthrough and `--help` is text to send.
  *
  * The typed `failSubcommand(command: CommandName, …)` makes the other half of
@@ -30,8 +30,8 @@ describe('group commands with no subcommand (issue #156)', () => {
   });
 
   it('says which command needs a subcommand, so the usage below it has context', () => {
-    expect(subcommandError('browser', undefined)).toBe('wmux browser needs a subcommand.');
-    expect(subcommandError('agent', undefined)).toBe('wmux agent needs a subcommand.');
+    expect(subcommandError('browser', undefined)).toBe('remotea browser needs a subcommand.');
+    expect(subcommandError('agent', undefined)).toBe('remotea agent needs a subcommand.');
   });
 
   it('still names the offending token when one was actually typed', () => {
@@ -42,7 +42,7 @@ describe('group commands with no subcommand (issue #156)', () => {
   // Derived, not restated: a fifth group command added tomorrow with the old
   // `console.error(\`Unknown x: ${args[1]}\`)` shape fails here rather than
   // shipping the same dead end.
-  const cli = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'cli', 'wmux.ts'), 'utf-8');
+  const cli = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'cli', 'remotea.ts'), 'utf-8');
 
   it('leaves no dispatcher interpolating an unchecked subcommand into its error', () => {
     const raw = [...cli.matchAll(/console\.error\(`Unknown [^`]*\$\{(args\[\d\]|sub|rest\[\d\])\}/g)]
@@ -60,13 +60,13 @@ describe('group commands with no subcommand (issue #156)', () => {
 /**
  * Every handler is invoked as `handler(args)` where args[0] is the COMMAND
  * NAME — cmdAgent and cmdPane both read args[1] for their subcommand. `detect`
- * read args[0], so `wmux detect explain` rejected itself with "expected
+ * read args[0], so `remotea detect explain` rejected itself with "expected
  * `explain` or `reload`". Only running it found this; the unit tests exercised
  * the engine and the RPC, never the argv seam between them.
  */
 describe('subcommand dispatch reads args[1], not args[0]', () => {
   const source = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'src', 'cli', 'wmux.ts'),
+    path.join(__dirname, '..', '..', 'src', 'cli', 'remotea.ts'),
     'utf8',
   );
 
@@ -90,7 +90,7 @@ describe('subcommand dispatch reads args[1], not args[0]', () => {
 });
 
 /**
- * `wmux browser engine [web|agent] [--surface <id>]` — get or flip which
+ * `remotea browser engine [web|agent] [--surface <id>]` — get or flip which
  * engine a browser surface runs on (Task 12). Unlike every other `browser`
  * subcommand, this one is two distinct V2 methods depending on whether a
  * value was given, and it validates that value client-side rather than
@@ -116,7 +116,7 @@ describe('browser engine', () => {
   });
 
   it('carries --surface through as the caller, same as every other browser verb', () => {
-    // cmdBrowser extracts --surface (or $WMUX_SURFACE_ID) and passes it into
+    // cmdBrowser extracts --surface (or $REMOTEA_SURFACE_ID) and passes it into
     // browserRequest as `caller` — the same mechanism every other browser
     // subcommand already uses, so no extra CLI code was needed for this.
     const req = browserRequest(['browser', 'engine', 'web'], 'surf-1');

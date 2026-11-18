@@ -7,7 +7,7 @@ import { WebSocket } from 'ws';
 import { CodexSessionTracker } from '../../src/cli/codex-session-tracker';
 import {
   codexLaunchPlan, resumeTarget, supportsRemote, wmuxRequestPatiently, isTransientWmuxError,
-} from '../../src/cli/wmux-codex';
+} from '../../src/cli/remotea-codex';
 import { createCodexRelay, MAX_BACKENDS, type CodexRelay } from '../../src/cli/codex-relay';
 
 const A = '11111111-2222-3333-4444-555555555555';
@@ -200,7 +200,7 @@ describe('launcher patience during a restore burst', () => {
   });
 
   it('probes `codex --help` once per executable, and remembers only a yes', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'wmux-codex-cap-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'remotea-codex-cap-'));
     dirs.push(dir);
     const exe = path.join(dir, 'codex.exe');
     writeFileSync(exe, 'v1');
@@ -217,7 +217,7 @@ describe('launcher patience during a restore burst', () => {
   });
 
   it('retries a probe that timed out, and does not call silence a "no"', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'wmux-codex-cap-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'remotea-codex-cap-'));
     dirs.push(dir);
     const exe = path.join(dir, 'codex.exe');
     writeFileSync(exe, 'v1');
@@ -251,7 +251,7 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 async function relay(onSession = vi.fn(), yolo = false) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'wmux-codex-relay-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'remotea-codex-relay-'));
   dirs.push(dir);
   const script = path.join(dir, 'server.cjs');
   // \`holdUntil\` names a file: the reply waits until it exists, so a test can
@@ -431,17 +431,17 @@ describe('authenticated local relay', () => {
 // punctuation and embedded quotes before Node ever sees the arguments.
 describe.skipIf(process.platform !== 'win32')('PowerShell launcher arguments', () => {
   it('preserves literal metacharacters, empty arguments and quotes', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'wmux-codex-args-'));
+    const dir = mkdtempSync(path.join(tmpdir(), 'remotea-codex-args-'));
     dirs.push(dir);
     const capture = path.join(dir, 'capture.cjs');
     const output = path.join(dir, 'argv.json');
-    writeFileSync(capture, `require('fs').writeFileSync(process.env.WMUX_TEST_OUTPUT,JSON.stringify(process.argv.slice(2)));`);
+    writeFileSync(capture, `require('fs').writeFileSync(process.env.REMOTEA_TEST_OUTPUT,JSON.stringify(process.argv.slice(2)));`);
     const script = path.join(dir, 'invoke.ps1');
     const shim = path.resolve('src/codex-bin-ps/codex.ps1').replace(/'/g, "''");
     writeFileSync(script, `& '${shim}' 'Explain > and < & | literally' '-c' 'model="a b"' '' 'C:\\space dir\\'`);
     execFileSync('powershell.exe', ['-NoProfile', '-File', script], {
       windowsHide: true, timeout: 60000, // PowerShell 5.1 cold start on a loaded CI runner has exceeded 10 s (ETIMEDOUT flakes)
-      env: { ...process.env, WMUX_CODEX_RUNTIME: process.execPath, WMUX_CODEX_LAUNCHER: capture, WMUX_TEST_OUTPUT: output },
+      env: { ...process.env, REMOTEA_CODEX_RUNTIME: process.execPath, REMOTEA_CODEX_LAUNCHER: capture, REMOTEA_TEST_OUTPUT: output },
     });
     expect(JSON.parse(require('fs').readFileSync(output, 'utf8'))).toEqual([
       'Explain > and < & | literally', '-c', 'model="a b"', '', 'C:\\space dir\\',
@@ -455,12 +455,12 @@ describe.runIf(process.platform === 'win32')('codexShimDirs — which shell gets
 
   async function layout() {
     const { mkdirSync } = await import('fs');
-    const root = mkdtempSync(path.join(tmpdir(), 'wmux-codex-shim-'));
+    const root = mkdtempSync(path.join(tmpdir(), 'remotea-codex-shim-'));
     dirs.push(root);
     for (const d of ['cli-bin', 'codex-bin', 'codex-bin-ps']) mkdirSync(path.join(root, d));
     writeFileSync(path.join(root, 'codex-bin', 'codex.cmd'), '@echo off\r\n');
     writeFileSync(path.join(root, 'codex-bin-ps', 'codex.ps1'), '#\n');
-    const launcher = path.join(root, 'wmux-codex.js');
+    const launcher = path.join(root, 'remotea-codex.js');
     writeFileSync(launcher, '');
     return { root, launcher, cliBinDir: path.join(root, 'cli-bin') };
   }
@@ -471,7 +471,7 @@ describe.runIf(process.platform === 'win32')('codexShimDirs — which shell gets
     const env: Record<string, string> = {};
     const got = codexShimDirs({ shellType: 'powershell', executable: 'C:\codex.exe', cliBinDir, psVerified: false, env, runtime: 'node', launcher });
     expect(got).toEqual([]);
-    expect(env.WMUX_CODEX_EXE).toBeUndefined();
+    expect(env.REMOTEA_CODEX_EXE).toBeUndefined();
   });
 
   it('gives PowerShell the .ps1 ahead of the .cmd when verified, and cmd only the .cmd', async () => {
@@ -480,7 +480,7 @@ describe.runIf(process.platform === 'win32')('codexShimDirs — which shell gets
     const ps: Record<string, string> = {};
     expect(codexShimDirs({ shellType: 'powershell', executable: 'C:\codex.exe', cliBinDir, psVerified: true, env: ps, runtime: 'node', launcher }))
       .toEqual([path.join(root, 'codex-bin-ps'), path.join(root, 'codex-bin')]);
-    expect(ps.WMUX_CODEX_EXE).toBe('C:\codex.exe');
+    expect(ps.REMOTEA_CODEX_EXE).toBe('C:\codex.exe');
     const cmd: Record<string, string> = {};
     expect(codexShimDirs({ shellType: 'cmd', executable: 'C:\codex.exe', cliBinDir, psVerified: false, env: cmd, runtime: 'node', launcher }))
       .toEqual([path.join(root, 'codex-bin')]);
