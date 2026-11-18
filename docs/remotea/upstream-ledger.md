@@ -9,12 +9,12 @@ This ledger covers `29c1d52..f289014`: 175 commits, the last on 2026-11-18. Late
 Every ruling follows one of these rules:
 
 - **ported**: a `fix` commit. It is copied into remotea before any removal or rename in the cleanup.
-- **skipped**: a `feat` commit, unless the owner flags it below; a fix that only touches the browser panel or the legacy orchestrator, both of which remotea is removing; or a fix for an upstream feature remotea doesn't have.
+- **skipped**: a `feat` commit, unless the owner flags it below; a fix that only touches the legacy orchestrator, which remotea is removing; or a fix for an upstream feature remotea doesn't have.
 - **not applicable**: release and Scoop chores, merge commits, documentation, and regenerated `resources/cli` builds.
 
-A fix that also touches the browser keeps only its non-browser part. Hunks for languages remotea is removing are dropped; English, Czech, French and Traditional Chinese stay.
+The owner kept the browser panel and all languages on 2026-11-18. Before that, browser-only fixes were skipped, a fix that also touched the browser kept only its non-browser part, and only the English, Czech, French and Traditional Chinese hunks were taken. The browser fixes and the browser parts of mixed fixes were then ported, as the rows below say. The other languages still lack the strings the earlier ports added, so those strings show in English there.
 
-Totals: 49 ported, 44 skipped, 82 not applicable.
+Totals: 54 ported, 39 skipped, 82 not applicable.
 
 The **ported as** column names the remotea commit. Each port's message ends with `(cherry picked from commit …)` and, where the port differs from upstream, a "remotea port notes" list saying what was left out or resolved by hand.
 
@@ -22,7 +22,7 @@ The **ported as** column names the remotea commit. Each port's message ends with
 
 These rows needed a call the rules don't settle. The owner confirmed all four on 2026-11-18.
 
-- **1c7ebb0** "complete panel docking and browser control handling" is typed as a fix but changes 26 files and adds panel docking (a docked explorer) and wheel zoom. Ruled ported without its browser parts. Two later fixes, ebab909 and 71d89ba, build on its wheel zoom. At port time only the wheel zoom was taken: the docking conflicts with remotea's refreshed explorer and sidebar, and the owner asked that UI changes be ported only where they fit.
+- **1c7ebb0** "complete panel docking and browser control handling" is typed as a fix but changes 26 files and adds panel docking (a docked explorer) and wheel zoom. Ruled ported without its browser parts; those were ported later, once the owner kept the browser panel (2026-11-18). Two later fixes, ebab909 and 71d89ba, build on its wheel zoom. At port time only the wheel zoom was taken: the docking conflicts with remotea's refreshed explorer and sidebar, and the owner asked that UI changes be ported only where they fit.
 - **4a529c7** fixes unreachable overflowing tabs and also adds an immersive mode to the phone console and workspace edge controls. Ruled ported as a whole, without the removed languages.
 - **b283d0b** is a `chore` that deletes a second copy of the agent instructions (`resources/claude-instructions/claude-instructions.md`). remotea has the same copy and a test that keeps it identical to the real file; nothing else reads it. Ruled ported, and the port also drops that test assertion.
 - **Fixes for features remotea doesn't have** are ruled skipped. This rule isn't in the plan: a fix to pi session restore, terminal history, the WSL hooks installer or pane lock can't apply without the feature it fixes. It decides 13 rows. Flagging one of those features brings its fixes back.
@@ -49,21 +49,21 @@ Features are skipped unless the owner flags them. In the 2026-11-18 review the o
 | `915e868` | 2026-10-29 | feat(terminal-history): expose opt-in controls and failure feedback | Part of the terminal history series; see b43247f. |
 | `9bc90e1` | 2026-10-31 | feat: refine desktop workspace frames and navigation | wmux's own design pass; remotea refreshed its chrome its own way. |
 | `017cc13` | 2026-11-01 | feat: add surface refresh and pane zoom controls | **Ported.** |
-| `e8997e5` | 2026-11-03 | feat(browser): label tabs with the page title (#423) | Browser panel; can't be ported, the panel is being removed. |
+| `e8997e5` | 2026-11-03 | feat(browser): label tabs with the page title (#423) | Browser panel feature. The panel stays (2026-11-18), so it can be ported if flagged. |
 | `a661ab7` | 2026-11-03 | Inherit the active terminal’s shell for splits and new tabs (#422) | **Ported.** Has no type prefix but adds behavior. |
 | `72d246b` | 2026-11-04 | feat(terminal): add a Clear terminal buffer action (#434) | **Ported.** |
 | `3402b2e` | 2026-11-04 | feat(wsl): install Claude Code hooks into running WSL distros (#428) | Brings fixes ff2179c, a4a994e, 0d516fb and 67826e0 with it. |
 | `dd21604` | 2026-11-04 | feat: replace pane split dropdown with direct buttons (#436) | Split down is already in the split menu and has a shortcut; the tab bar stays lean. |
-| `a3b4450` | 2026-11-04 | feat(titlebar): add browser panel toggle (#437) | Browser panel; can't be ported. |
+| `a3b4450` | 2026-11-04 | feat(titlebar): add browser panel toggle (#437) | Browser panel feature. The panel stays (2026-11-18), so it can be ported if flagged. |
 | `bbe4fb3` | 2026-11-04 | feat(diagnostics): count live terminals and WebGL renderers in shipped builds (#421) |  |
 | `cd1e4f7` | 2026-11-06 | feat(titlebar): ChatGPT Web dictation, opt-in (#438) |  |
-| `5a9cf39` | 2026-11-07 | feat: browser link menu and hover URL (#439), close to tray (#442) | The browser link menu can't be ported; close to tray could be ported on its own. |
+| `5a9cf39` | 2026-11-07 | feat: browser link menu and hover URL (#439), close to tray (#442) | Either part can be ported if flagged; the panel stays (2026-11-18). e89ebe2 builds on the link menu. |
 | `fa97b16` | 2026-11-10 | feat(tabs): resume the just-closed tab's agent session on Ctrl+Shift+T (#447) | **Ported.** |
 | `73b7980` | 2026-11-13 | feat(diff): wrap long lines toggle in the Diff tab and Git view (#450) |  |
 | `1266792` | 2026-11-15 | feat(panes): show no focused pane in an unfocused window (#459) | **Ported.** |
 | `427db79` | 2026-11-15 | feat(panes): lock a pane against spawned agents and moved tabs (#454) | Brings fix 62724b0 with it. |
 | `3ee1c06` | 2026-11-17 | feat(sidebar): add set-indicator / clear-indicator for a workspace pill (#461) |  |
-| `ad75bd9` | 2026-11-18 | feat(agent-browser): show and control the agent browser page in wmux (#455) | Browser panel; can't be ported. |
+| `ad75bd9` | 2026-11-18 | feat(agent-browser): show and control the agent browser page in wmux (#455) | Browser panel feature. The panel stays (2026-11-18), so it can be ported if flagged. |
 | `4a529c7` | 2026-10-31 | The phone console's immersive mode and workspace edge controls, inside a fix commit | Ported with that fix. |
 
 ## All commits
@@ -77,14 +77,14 @@ Oldest first.
 | `f498f3f` | 2026-10-27 | fix | fix(panes): move focus only when the split happened | ported | Fix. | `b4f3655` |
 | `18669ce` | 2026-10-27 | chore | chore(release): bump to 2.45.1 | not applicable | Release version bump. |  |
 | `17972a4` | 2026-10-27 | chore | chore(scoop): bucket manifest for 2.45.1 | not applicable | Scoop manifest. |  |
-| `26dd221` | 2026-10-27 | fix | fix(browser): keep a hidden browser pane painting while an agent drives it | skipped | Browser only: keeps a hidden browser pane painting while an agent drives it. |  |
+| `26dd221` | 2026-10-27 | fix | fix(browser): keep a hidden browser pane painting while an agent drives it | ported | Browser fix, ported once the owner kept the browser panel (2026-11-18). Its AGENTS.md row went to `docs/remotea/architecture.md`. | `18d78eb` |
 | `e95e883` | 2026-10-27 | feat | feat(paste): downscale and encode pasted images off the main thread (#381) | ported | Feature the owner chose to port in the ledger review (2026-11-18). Pasting a large image no longer freezes the window. | `43b7906` |
 | `fde088e` | 2026-10-27 | feat | feat(resume): restore pi sessions per pane with pi --session (#382) | skipped | Feature. Port only if flagged. |  |
 | `5147b68` | 2026-10-27 | feat | feat(markdown): math, mermaid diagrams and local images in the markdown pane (#380) | skipped | Feature. Port only if flagged. |  |
 | `9d351f2` | 2026-10-27 | fix | fix(renderer): release state that closed surfaces and unread notifications kept (#385) | ported | Fix. | `57039ef` |
 | `ef03d10` | 2026-10-27 | fix | fix(markdown): drop network-path image sources from raw HTML | ported | Fix. | `7b1bb55` |
 | `ff0144b` | 2026-10-27 | merge | Merge pull request #384 from clemrdh/fix/render-hidden-browser-pane | not applicable | Merge commit; its commits have their own rows. |  |
-| `0bacae7` | 2026-10-27 | fix | fix(browser): bound the keep-rendering grant so a hung renderer cannot hang a verb | skipped | Browser only: bounds the keep-rendering grant from 26dd221. |  |
+| `0bacae7` | 2026-10-27 | fix | fix(browser): bound the keep-rendering grant so a hung renderer cannot hang a verb | ported | Browser fix, ported once the owner kept the browser panel (2026-11-18). | `b37bc75` |
 | `0eef2d5` | 2026-10-27 | merge | Merge branch 'feat/381-fast-image-paste' | not applicable | Merge commit; its commits have their own rows. |  |
 | `7c1696b` | 2026-10-27 | merge | Merge branch 'fix/385-renderer-retention' | not applicable | Merge commit; its commits have their own rows. |  |
 | `489a7a9` | 2026-10-27 | merge | Merge branch 'feat/382-pi-resume' | not applicable | Merge commit; its commits have their own rows. |  |
@@ -99,7 +99,7 @@ Oldest first.
 | `ed68e78` | 2026-10-27 | feat | feat(agent-context): ship the Claude Code guidance as a skill (#386) | skipped | Feature. Revisit when the agent instructions are rewritten (U15): the skill would be installed under the old name. |  |
 | `4c4e940` | 2026-10-27 | chore | chore(release): bump to 2.48.0 | not applicable | Release version bump. |  |
 | `646268c` | 2026-10-27 | chore | chore(scoop): bucket manifest for 2.48.0 | not applicable | Scoop manifest. |  |
-| `c26bc22` | 2026-10-28 | fix | fix(browser): clicking into a page focuses its pane (#388) | skipped | Browser only: focus when clicking into a page. |  |
+| `c26bc22` | 2026-10-28 | fix | fix(browser): clicking into a page focuses its pane (#388) | ported | Browser fix, ported once the owner kept the browser panel (2026-11-18). | `dd9a98c` |
 | `40219ce` | 2026-10-28 | docs | docs: replace the manual release procedure with a wmux-release skill (#389) | not applicable | Documentation. |  |
 | `20ea34b` | 2026-10-28 | docs | docs: move the main-process table's notes into each module (#390) | not applicable | Documentation. |  |
 | `8915ab9` | 2026-10-28 | chore | chore(release): bump to 2.48.1 | not applicable | Release version bump. |  |
@@ -152,16 +152,16 @@ Oldest first.
 | `df30c8e` | 2026-10-31 | chore | chore(scoop): bucket manifest for 2.51.0 | not applicable | Scoop manifest. |  |
 | `475f228` | 2026-10-31 | docs | docs: rewrite README with current workflows and desktop screenshots | not applicable | Documentation. |  |
 | `989fa80` | 2026-10-31 | docs | docs: show multi-agent workspace with browser and Git graph | not applicable | Documentation. |  |
-| `86aed78` | 2026-10-31 | fix | fix(browser): stabilize reload, devtools focus, and app zoom | ported | Non-browser hunks only: app zoom (`zoom-factor.ts`). The reload and devtools parts are browser. | `a6cb2b6` |
+| `86aed78` | 2026-10-31 | fix | fix(browser): stabilize reload, devtools focus, and app zoom | ported | Non-browser hunks only: app zoom (`zoom-factor.ts`). The reload and devtools parts are browser. Its browser part (reload, DevTools focus) was ported later, once the owner kept the browser panel. | `a6cb2b6`, `70801d5` (browser part) |
 | `d6c1a4c` | 2026-10-31 | chore | chore(scoop): bucket manifest for 2.52.0 | not applicable | Scoop manifest. |  |
-| `1c7ebb0` | 2026-10-31 | fix | fix: complete panel docking and browser control handling | ported | Wheel zoom only. Panel docking left out at port time: it is a UI feature that conflicts with remotea's refreshed explorer and sidebar, and it is tied to the browser panel and terminal history. | `f4faecb` |
+| `1c7ebb0` | 2026-10-31 | fix | fix: complete panel docking and browser control handling | ported | Wheel zoom only. Panel docking left out at port time: it is a UI feature that conflicts with remotea's refreshed explorer and sidebar, and it is tied to the browser panel and terminal history. Its browser control part was ported later, once the owner kept the browser panel; docking stays out. | `f4faecb`, `fa64f20` (browser part) |
 | `d036e74` | 2026-10-31 | chore | chore(release): bump to 2.53.0 | not applicable | Release version bump. |  |
 | `ebab909` | 2026-10-31 | fix | fix(zoom): handle desktop wheel gestures only once | ported | Builds on the wheel zoom from 1c7ebb0; skipped if 1c7ebb0 is. | `fba8ded` |
 | `e053547` | 2026-10-31 | chore | chore(scoop): bucket manifest for 2.53.0 | not applicable | Scoop manifest. |  |
 | `b283d0b` | 2026-11-01 | chore | chore: remove stale Claude instructions | ported | Deletes a second copy of the agent instructions. remotea has it too, kept identical by the assertion at `tests/unit/agent-instructions.test.ts:75`; the port drops that assertion. | `d784dc1` |
 | `7e1f43a` | 2026-11-01 | docs | docs: simplify AGENTS guidance | not applicable | Documentation. |  |
 | `f8381e9` | 2026-11-01 | fix | fix(sidebar): prevent unread badge overlap | ported | Fix. | `842f10b` |
-| `017cc13` | 2026-11-01 | feat | feat: add surface refresh and pane zoom controls | ported | Feature the owner chose to port in the ledger review (2026-11-18). Per-pane zoom and F5 refresh, needed by fix 71d89ba. Leave out the browser hunk. | `2db10ed` |
+| `017cc13` | 2026-11-01 | feat | feat: add surface refresh and pane zoom controls | ported | Feature the owner chose to port in the ledger review (2026-11-18). Per-pane zoom and F5 refresh, needed by fix 71d89ba. Leave out the browser hunk. Its browser pane refresh was ported later, once the owner kept the browser panel. | `2db10ed`, `1f433ac` (browser part) |
 | `c8d387d` | 2026-11-01 | chore | chore(release): bump to 2.54.0 | not applicable | Release version bump. |  |
 | `ede35f6` | 2026-11-01 | chore | chore(scoop): bucket manifest for 2.54.0 | not applicable | Scoop manifest. |  |
 | `e500087` | 2026-11-03 | fix | fix: equalize spacing around the first pane tab (#426) | not applicable | Spacing for wmux's tab bar; remotea's refreshed tab bar sets its own height. The cherry-pick came up empty. |  |
@@ -183,8 +183,8 @@ Oldest first.
 | `17e0e70` | 2026-11-04 | fix | fix(renderer): stop the WebGL cursor-blink interval when releasing the addon (#421) (#433) | ported | Builds on 9969f1e. | `3ad10f1` |
 | `d64c828` | 2026-11-04 | chore | chore(release): bump to 2.55.2 | not applicable | Release version bump. |  |
 | `a8133fe` | 2026-11-04 | chore | chore(scoop): bucket manifest for 2.55.2 | not applicable | Scoop manifest. |  |
-| `98bbf50` | 2026-11-04 | fix | fix(browser): stop Ctrl+W in the browser panel from quitting wmux (#431) | skipped | Browser only: Ctrl+W inside the browser panel. |  |
-| `6807444` | 2026-11-04 | fix | fix(browser): let Ctrl+W close the browser tab from inside a page (#432) | skipped | Browser only: Ctrl+W inside the browser panel. |  |
+| `98bbf50` | 2026-11-04 | fix | fix(browser): stop Ctrl+W in the browser panel from quitting wmux (#431) | ported | Browser fix, ported once the owner kept the browser panel (2026-11-18). | `76a5ebe` |
+| `6807444` | 2026-11-04 | fix | fix(browser): let Ctrl+W close the browser tab from inside a page (#432) | ported | Browser fix, ported once the owner kept the browser panel (2026-11-18). Conflicts resolved by hand. | `3f2e92c` |
 | `72d246b` | 2026-11-04 | feat | feat(terminal): add a Clear terminal buffer action (#434) | ported | Feature the owner chose to port in the ledger review (2026-11-18). Clear terminal buffer action. | `fc4c8a6` |
 | `9f2cd1f` | 2026-11-04 | fix | fix(sidebar): derive agent rows from the shared roster (#435) | ported | Fix. | `1223f20` |
 | `3402b2e` | 2026-11-04 | feat | feat(wsl): install Claude Code hooks into running WSL distros (#428) | skipped | Feature. Port only if flagged. |  |
@@ -210,7 +210,7 @@ Oldest first.
 | `5a9cf39` | 2026-11-07 | feat | feat: browser link menu and hover URL (#439), close to tray (#442) | skipped | Feature. Port only if flagged. |  |
 | `0c02de5` | 2026-11-07 | chore | chore(release): bump to 2.59.0 | not applicable | Release version bump. |  |
 | `1f2ffa9` | 2026-11-07 | chore | chore(scoop): bucket manifest for 2.59.0 | not applicable | Scoop manifest. |  |
-| `e89ebe2` | 2026-11-09 | fix | fix(browser): open Ctrl+click and middle-click links in a new tab (#446) | skipped | Browser only: Ctrl+click and middle-click inside the browser panel. |  |
+| `e89ebe2` | 2026-11-09 | fix | fix(browser): open Ctrl+click and middle-click links in a new tab (#446) | skipped | Builds on feature 5a9cf39 (the browser link menu, #439), which remotea does not have. Port the two together if the owner flags #439. |  |
 | `f1423b2` | 2026-11-09 | chore | chore(release): bump to 2.59.1 | not applicable | Release version bump. |  |
 | `7f803d2` | 2026-11-09 | chore | chore(scoop): bucket manifest for 2.59.1 | not applicable | Scoop manifest. |  |
 | `fa97b16` | 2026-11-10 | feat | feat(tabs): resume the just-closed tab's agent session on Ctrl+Shift+T (#447) | ported | Feature the owner chose to port in the ledger review (2026-11-18). Ctrl+Shift+T brings back the closed tab's agent session. | `571c9d8` |
