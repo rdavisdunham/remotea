@@ -206,7 +206,7 @@ The window's privileges (sandbox, CSP, permissions, `openExternal`) are audited 
 | Typecheck | `npm run typecheck` |
 | Lint | `npm run lint` |
 
-Design and phasing are in [docs/remotea/plan.md](docs/remotea/plan.md). Notes for agents working in this repo are at the top of [AGENTS.md](AGENTS.md).
+Design and phasing are in [docs/remotea/plan.md](docs/remotea/plan.md). Notes for agents working in this repo are in [AGENTS.md](AGENTS.md), and how the app is put together is in [docs/remotea/architecture.md](docs/remotea/architecture.md).
 
 ## License
 
