@@ -49,7 +49,7 @@ export default function QuickLaunchSettings() {
         {t('settings.quickLaunch.hintPart1', 'One-click tab presets shown in the ')}<strong>+</strong>
         {t('settings.quickLaunch.hintPart2', ' dropdown next to each pane. A terminal profile can pick a shell, auto-')}<code>cd</code>
         {t('settings.quickLaunch.hintPart3', ' into a directory and run startup commands; a browser profile opens a fixed URL. Project-specific profiles can also live in a committed')}
-        <code> .wmux.json</code>{t('settings.quickLaunch.hintPart4', ' at a workspace root.')}
+        <code> .remotea.json</code>{t('settings.quickLaunch.hintPart4', ' at a workspace root.')}
       </p>
 
       <div className="settings-row">

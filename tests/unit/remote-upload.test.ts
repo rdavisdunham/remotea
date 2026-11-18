@@ -91,7 +91,7 @@ describe('toolForSession', () => {
 
 describe('posixShellQuote', () => {
   it('wraps a plain path in single quotes', () => {
-    expect(posixShellQuote('/tmp/wmux-drop-abc.png')).toBe("'/tmp/wmux-drop-abc.png'");
+    expect(posixShellQuote('/tmp/remotea-ssh-drop-abc.png')).toBe("'/tmp/remotea-ssh-drop-abc.png'");
   });
 
   it('survives a path containing spaces', () => {
@@ -110,12 +110,12 @@ describe('posixShellQuote', () => {
 });
 
 describe('remoteDropPath', () => {
-  it('uses the /tmp/wmux-drop-<uuid> shape with a lowercased extension', () => {
-    expect(remoteDropPath('C:\\Temp\\Shot.PNG', 'AB-CD')).toBe('/tmp/wmux-drop-ab-cd.png');
+  it('uses the /tmp/remotea-ssh-drop-<uuid> shape with a lowercased extension', () => {
+    expect(remoteDropPath('C:\\Temp\\Shot.PNG', 'AB-CD')).toBe('/tmp/remotea-ssh-drop-ab-cd.png');
   });
 
   it('omits the suffix for an extensionless file', () => {
-    expect(remoteDropPath('C:\\Temp\\Makefile', 'abc')).toBe('/tmp/wmux-drop-abc');
+    expect(remoteDropPath('C:\\Temp\\Makefile', 'abc')).toBe('/tmp/remotea-ssh-drop-abc');
   });
 
   it('does not carry the local basename onto the remote', () => {
@@ -129,15 +129,15 @@ describe('remoteDropPath', () => {
   });
 
   it('omits unsafe or overly long extensions', () => {
-    expect(remoteDropPath('C:\\Temp\\x.bad;touch', 'abc')).toBe('/tmp/wmux-drop-abc');
-    expect(remoteDropPath(`C:\\Temp\\x.${'a'.repeat(17)}`, 'abc')).toBe('/tmp/wmux-drop-abc');
+    expect(remoteDropPath('C:\\Temp\\x.bad;touch', 'abc')).toBe('/tmp/remotea-ssh-drop-abc');
+    expect(remoteDropPath(`C:\\Temp\\x.${'a'.repeat(17)}`, 'abc')).toBe('/tmp/remotea-ssh-drop-abc');
   });
 
   it('places files inside one private batch directory', () => {
     const directory = remoteBatchDirectory('BATCH');
-    expect(directory).toBe('/tmp/wmux-drop-batch');
+    expect(directory).toBe('/tmp/remotea-ssh-drop-batch');
     expect(remotePathInBatch(directory, 'C:\\Temp\\Shot.PNG', 'FILE'))
-      .toBe('/tmp/wmux-drop-batch/file.png');
+      .toBe('/tmp/remotea-ssh-drop-batch/file.png');
   });
 });
 
@@ -163,7 +163,7 @@ describe('scpDestination', () => {
 
 describe('scpArgs', () => {
   it('composes the baseline transfer', () => {
-    expect(scpArgs(session(), 'C:\\Temp\\a.png', '/tmp/wmux-drop-1.png')).toEqual([
+    expect(scpArgs(session(), 'C:\\Temp\\a.png', '/tmp/remotea-ssh-drop-1.png')).toEqual([
       '-q',
       '-o', 'ConnectTimeout=6',
       '-o', 'ServerAliveInterval=20',
@@ -172,7 +172,7 @@ describe('scpArgs', () => {
       '-o', 'ControlMaster=no',
       '-o', 'ClearAllForwardings=yes',
       'C:\\Temp\\a.png',
-      'fortuna@honoured-accident:/tmp/wmux-drop-1.png',
+      'fortuna@honoured-accident:/tmp/remotea-ssh-drop-1.png',
     ]);
   });
 
@@ -267,23 +267,23 @@ describe('scpArgs', () => {
 
 describe('private batch directory argv', () => {
   it('creates a 0700 directory under a restrictive umask', () => {
-    const command = prepareDirectoryArgs(session(), '/tmp/wmux-drop-batch').at(-1) ?? '';
+    const command = prepareDirectoryArgs(session(), '/tmp/remotea-ssh-drop-batch').at(-1) ?? '';
     expect(command).toContain('umask 077');
     expect(command).toContain('mkdir -m 700 --');
   });
 
   it('removes the whole failed batch recursively', () => {
-    const command = cleanupDirectoryArgs(session(), '/tmp/wmux-drop-batch').at(-1) ?? '';
+    const command = cleanupDirectoryArgs(session(), '/tmp/remotea-ssh-drop-batch').at(-1) ?? '';
     expect(command).toContain('rm -rf --');
-    expect(command).toContain('wmux-drop-batch');
+    expect(command).toContain('remotea-ssh-drop-batch');
   });
 });
 
 describe('cleanupArgs', () => {
   it('builds a quoted rm across every path in the batch', () => {
-    const args = cleanupArgs(session(), ['/tmp/wmux-drop-1.png', '/tmp/wmux-drop-2.png']);
+    const args = cleanupArgs(session(), ['/tmp/remotea-ssh-drop-1.png', '/tmp/remotea-ssh-drop-2.png']);
     expect(args[args.length - 1]).toBe(
-      `sh -c 'rm -f -- '"'"'/tmp/wmux-drop-1.png'"'"' '"'"'/tmp/wmux-drop-2.png'"'"''`
+      `sh -c 'rm -f -- '"'"'/tmp/remotea-ssh-drop-1.png'"'"' '"'"'/tmp/remotea-ssh-drop-2.png'"'"''`
     );
   });
 

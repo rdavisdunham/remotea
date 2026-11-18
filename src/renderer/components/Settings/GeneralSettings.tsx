@@ -155,7 +155,7 @@ export default function GeneralSettings() {
           (issue #147). The path is the discoverable part — `wmux locales`
           reports what loaded and why anything was rejected. */}
       <p className="settings-hint">
-        {t('settings.general.languageCustomHint')} <code>~/.wmux/locales</code>
+        {t('settings.general.languageCustomHint')} <code>~/.remotea/locales</code>
       </p>
 
       <h3 className="settings-section-title">{t('settings.general.appearanceSection')}</h3>

@@ -26,6 +26,7 @@ import {
   removeOpencodeTui,
 } from './opencode-tui-install';
 import { retryTransient, type Patience } from './transport-retry';
+import { defaultForwardDeps, forwardUnknownVerb, unknownVerbMessage } from './forward';
 
 /** The two signals wsl-network.ts uses to decide we are inside a WSL distro. */
 function readWslEnvironment(): WslEnvironment {
@@ -770,8 +771,8 @@ async function cmdConfig(args: string[]): Promise<void> {
     // Ask the instance rather than reconstructing the path here. The config lives
     // on the Windows host, but this CLI routinely runs somewhere that cannot name
     // it: inside WSL, or inside a devcontainer reaching remotea over the TCP bridge.
-    // There $HOME is the Linux home and the old `${home}\.wmux\config.toml` form
-    // produced `/home/vscode\.wmux\config.toml` — neither the file remotea reads nor
+    // There $HOME is the Linux home and the old `${home}\.remotea\config.toml` form
+    // produced `/home/vscode\.remotea\config.toml` — neither the file remotea reads nor
     // a well-formed path on either OS. loadUserConfig() already reports the real
     // one in `path` (user-config.ts), which config.get returns verbatim.
     try {
@@ -786,8 +787,8 @@ async function cmdConfig(args: string[]): Promise<void> {
     }
     const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
     const fallbackPath = home.includes('/') && !home.includes('\\')
-      ? path.posix.join(home, '.wmux', 'config.toml')
-      : path.join(home, '.wmux', 'config.toml');
+      ? path.posix.join(home, '.remotea', 'config.toml')
+      : path.join(home, '.remotea', 'config.toml');
     console.log(fallbackPath);
   } else {
     console.error('Usage: remotea config <show|reload|path>'); process.exit(1);
@@ -811,8 +812,8 @@ async function cmdLocales(args: string[]): Promise<void> {
     // are set, and USERPROFILE is the Windows one leaking in over interop.
     const home = process.env.HOME || process.env.USERPROFILE || '';
     const fallbackPath = home.includes('/') && !home.includes('\\')
-      ? path.posix.join(home, '.wmux', 'locales')
-      : path.join(home, '.wmux', 'locales');
+      ? path.posix.join(home, '.remotea', 'locales')
+      : path.join(home, '.remotea', 'locales');
     console.log(fallbackPath);
   } else {
     console.error('Usage: remotea locales [list|reload|path]'); process.exit(1);
@@ -899,7 +900,7 @@ async function cmdLayout(args: string[]): Promise<void> {
 // cwd, so `remotea workspace open` in a repo means that repo. There is no
 // --trust: trust is a native dialog in remotea, which nothing on the pipe can
 // answer — a pane's agent holds the pipe token and must not be able to.
-const WORKSPACE_FILE = 'wmux.workspace.json';
+const WORKSPACE_FILE = 'remotea.workspace.json';
 
 function printManifestResult(result: any): void {
   for (const w of result?.warnings ?? []) console.error(`warning: ${w}`);
@@ -2186,7 +2187,7 @@ export const COMMAND_SPECS = {
     bool: ['--json'],
   },
   workspace: {
-    usage: 'remotea workspace open [path] [--dry-run] [--new] [--json]   (bring up a wmux.workspace.json; asks before running anything)\n'
+    usage: 'remotea workspace open [path] [--dry-run] [--new] [--json]   (bring up a remotea.workspace.json; asks before running anything)\n'
       + 'remotea workspace validate [path] [--json]\n'
       + 'remotea workspace save [--to <dir|file.json>] [--name N] [--workspace <id>] [--force] [--stdout]\n'
       + 'remotea workspace list   (manifests you allowed to run on this machine; empty until you open one and choose to run it.\n'
@@ -2537,10 +2538,10 @@ const COMMANDS: Record<CommandName, (args: string[]) => Promise<void> | void> = 
   'list-themes': async () => print(await sendV2('theme.list')),
   themes: async () => print(await sendV2('theme.list')),
 
-  // User config (~/.wmux/config.toml)
+  // User config (~/.remotea/config.toml)
   'reload-config': async () => print(await sendV2('config.reload')),
   config: cmdConfig,
-  // Community translations (~/.wmux/locales/*.json)
+  // Community translations (~/.remotea/locales/*.json)
   locales: cmdLocales,
 
   // Pane
@@ -2645,8 +2646,10 @@ async function main() {
 
   const handler = COMMANDS[command as CommandName];
   if (!handler) {
-    console.error(`Unknown command: ${command}`);
-    printUsage();
+    // Not a desktop verb: in a WSL pane the host's remotea may have it (verbs.ts).
+    const forwarded = forwardUnknownVerb(args, defaultForwardDeps(__dirname));
+    if (forwarded !== null) process.exit(forwarded);
+    console.error(unknownVerbMessage(command));
     process.exit(1);
   }
 
@@ -2672,13 +2675,14 @@ async function main() {
 }
 
 function printUsage() {
-  console.log(`remotea desktop CLI — terminals, agents and workspace tools (remotea compatibility command)
+  console.log(`remotea desktop CLI — terminals, agents and workspace tools
 
-Usage: remotea <command> [options]  (desktop package entrypoint: remotea)
+Usage: remotea <command> [options]
 
 Endpoint:   identify, capabilities — inspect before using a command family.
             Host REMOTEA_REMOTE may expose only status; ping does not prove desktop control.
-            On a host, remotea is the server administration CLI (remotea --help).
+            On a host, the same remotea command runs these inside a remotea terminal and
+            administers the host outside one (remotea --help there).
             Desktop --remote connects a desktop TCP CLI bridge, not a host session server.
             Local processes end with their window; host sessions detach on desktop close.
 
@@ -2725,9 +2729,9 @@ Agent state: report-agent --blocked [reason] [--choices <json>] | --unblocked
             report-session <id> | release-agent | agent-state [--surface <id>]
             report-subagent <id> [--name N] [--detail D] [--done]   # a line under your pane
             (surface defaults to $REMOTEA_SURFACE_ID — an agent in a pane needs no id)
-Config:     config show|reload|path   (edits ~/.wmux/config.toml — see docs)
+Config:     config show|reload|path   (edits ~/.remotea/config.toml — see docs)
             reload-config             (shorthand for 'config reload')
-Locales:    locales [list|reload|path] (community UI translations in ~/.wmux/locales)
+Locales:    locales [list|reload|path] (community UI translations in ~/.remotea/locales)
 
 Help:       remotea help <command>       (per-command usage; works for every command)
             remotea <command> --help     (same, except for free-form commands such as

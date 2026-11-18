@@ -11,7 +11,7 @@
  * which is the truth for that browser.
  */
 
-export const DEVICE_KEY_ITEM = 'wmux-remote-key';
+export const DEVICE_KEY_ITEM = 'remotea-remote-key';
 
 /** base64url, what the desktop mints; anything else is not ours to send. */
 const KEY_RE = /^[A-Za-z0-9_-]{16,128}$/;

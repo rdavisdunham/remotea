@@ -163,7 +163,7 @@ export const ko: Translation = {
   'surfaceTab.splitLayout': '분할 레이아웃…',
   'surfaceTab.closePane': '창 닫기 ({binding})',
   'surfaceTab.duplicateTab': '탭 복제',
-  'surfaceTab.profileProject': '프로젝트 프로필 (.wmux.json)',
+  'surfaceTab.profileProject': '프로젝트 프로필 (.remotea.json)',
   'surfaceTab.profileGlobal': '전역 프로필',
   'surfaceTab.splitRight': '오른쪽으로 분할',
   'surfaceTab.splitDown': '아래로 분할',
@@ -357,7 +357,7 @@ export const ko: Translation = {
   'code.reload': '디스크에서 다시 불러오기',
   'code.conflictBody': '편집하는 동안 다른 사람이 이 파일을 변경했습니다. 다시 불러오면 편집 내용이 사라집니다.',
   // 설정 — 빠른 실행 프로필 패널
-  // hintPart1..4는 UI 요소(+ 버튼, cd, .wmux.json)를 사이에 두고 이어 붙는
+  // hintPart1..4는 UI 요소(+ 버튼, cd, .remotea.json)를 사이에 두고 이어 붙는
   // 한 문장의 조각입니다. 한국어 어순에 맞게 조각별 내용을 재배치했습니다.
   'settings.quickLaunch.title': '빠른 실행 프로필',
   'settings.quickLaunch.hintPart1': '각 창 옆의 ',

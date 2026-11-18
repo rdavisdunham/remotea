@@ -36,7 +36,7 @@ app.whenReady().then(async () => {
   // Mark tutorial as seen so we get the clean app view first
   win.loadURL('http://localhost:5199');
   await new Promise(r => setTimeout(r, 4000));
-  await win.webContents.executeJavaScript("localStorage.setItem('wmux-tutorial-seen', '1')");
+  await win.webContents.executeJavaScript("localStorage.setItem('remotea-tutorial-seen', '1')");
   win.reload();
 
   // Wait for terminals to fully render with PS prompts
@@ -58,14 +58,14 @@ app.whenReady().then(async () => {
   await capture(win, 'wmux-browser', { x: 960, y: 0, width: 440, height: 900 });
 
   // 5. Now show tutorial
-  await win.webContents.executeJavaScript("localStorage.removeItem('wmux-tutorial-seen')");
+  await win.webContents.executeJavaScript("localStorage.removeItem('remotea-tutorial-seen')");
   win.reload();
   await new Promise(r => setTimeout(r, 5000));
   await capture(win, 'wmux-tutorial');
 
   // 6. Close tutorial and take one more clean shot
   await win.webContents.executeJavaScript(`
-    localStorage.setItem('wmux-tutorial-seen', '1');
+    localStorage.setItem('remotea-tutorial-seen', '1');
     document.querySelector('.tutorial-overlay')?.remove();
   `);
   await new Promise(r => setTimeout(r, 1000));

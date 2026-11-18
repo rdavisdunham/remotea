@@ -26,7 +26,7 @@ export interface KeepAwakePrefs {
 }
 
 /** settings.json key main persists the choice under. */
-export const KEEP_AWAKE_SETTINGS_KEY = 'wmux-keep-awake';
+export const KEEP_AWAKE_SETTINGS_KEY = 'remotea-keep-awake';
 
 export const DEFAULT_KEEP_AWAKE_PREFS: KeepAwakePrefs = { mode: 'smart', preventDisplaySleep: false };
 

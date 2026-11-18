@@ -24,23 +24,23 @@ import {
 // version, so the production `file://` origin changes between versions and
 // Chromium buckets storage by that path — font/theme customizations appeared to
 // reset on every update (issue #19). We now persist through the main process to
-// %APPDATA%\wmux\settings.json (stable across updates), and migrate any existing
+// %APPDATA%\remotea\settings.json (stable across updates), and migrate any existing
 // localStorage values forward on first launch.
 
 const STORAGE_KEYS = {
-  workspacePrefs:    'wmux-workspace-prefs',
-  terminalPrefs:     'wmux-terminal-prefs',
-  sidebarPrefs:      'wmux-sidebar-prefs',
-  notificationPrefs: 'wmux-notification-prefs',
-  browserPrefs:      'wmux-browser-prefs',
-  shortcuts:         'wmux-shortcuts',
-  shortcutDefaults:  'wmux-shortcut-defaults',
-  quickLaunchProfiles: 'wmux-quick-launch-profiles',
-  savedLayouts:      'wmux-saved-layouts',
-  language:          'wmux-language',
-  appearancePrefs:   'wmux-appearance-prefs',
-  keyboardPrefs:     'wmux-keyboard-prefs',
-  promptPrefs:       'wmux-prompt-prefs',
+  workspacePrefs:    'remotea-workspace-prefs',
+  terminalPrefs:     'remotea-terminal-prefs',
+  sidebarPrefs:      'remotea-sidebar-prefs',
+  notificationPrefs: 'remotea-notification-prefs',
+  browserPrefs:      'remotea-browser-prefs',
+  shortcuts:         'remotea-shortcuts',
+  shortcutDefaults:  'remotea-shortcut-defaults',
+  quickLaunchProfiles: 'remotea-quick-launch-profiles',
+  savedLayouts:      'remotea-saved-layouts',
+  language:          'remotea-language',
+  appearancePrefs:   'remotea-appearance-prefs',
+  keyboardPrefs:     'remotea-keyboard-prefs',
+  promptPrefs:       'remotea-prompt-prefs',
 } as const;
 
 // Read the whole settings file once at module load (synchronous IPC). The
@@ -337,7 +337,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, ShortcutBinding> = {
 // `{ ...DEFAULT_SHORTCUTS, ...stored }` lets that stale copy win forever. The
 // same trap promptDefaultRev and the appearance revs exist for.
 //
-// The rev lives under its own key rather than inside `wmux-shortcuts`: that
+// The rev lives under its own key rather than inside `remotea-shortcuts`: that
 // blob is a Record<ShortcutAction, ShortcutBinding>, and every consumer walks
 // it with Object.values/entries expecting a binding in each slot — a number
 // there would reach bindingsEqual on the keydown path.
@@ -859,7 +859,7 @@ export interface BrowserPrefs {
    * makes this free mechanically and expensive socially: defaulting false
    * switches it off for everyone on upgrade, silently, with no note attached
    * — which is how a pref meant to give people a choice ends up taking one
-   * away. Turn it off here or via `~/.wmux/config.toml` `[browser]
+   * away. Turn it off here or via `~/.remotea/config.toml` `[browser]
    * auto-open`. Detected ports are tracked and shown either way; this governs
    * only the unprompted navigation.
    */
@@ -1023,7 +1023,7 @@ export const DEFAULT_PROMPT_PREFS: PromptPrefs = {
  * 2.4.0 shipped.
  *
  * Add to it when — and only when — you change a value in DEFAULT_PROMPT_PREFS
- * and want the change to reach users who already have a `wmux-prompt-prefs`
+ * and want the change to reach users who already have a `remotea-prompt-prefs`
  * blob on disk. An entry bumps PROMPT_DEFAULT_REV, sets the field AND stamps
  * the new rev in the same closure, so "promoted the value but forgot the rev"
  * — which re-promotes on every launch, overriding the user's own choice
@@ -1388,7 +1388,7 @@ export interface SettingsSlice {
   /** Selected UI language (issue #56). */
   language: Language;
   /**
-   * Bumped when ~/.wmux/locales is re-read (issue #147). Runtime-only: it
+   * Bumped when ~/.remotea/locales is re-read (issue #147). Runtime-only: it
    * exists so `useT` has something to subscribe to, since swapping the
    * dictionaries in place changes no other store value and React would
    * otherwise keep the stale strings on screen until the next unrelated render.
@@ -1435,7 +1435,7 @@ export interface SettingsSlice {
   setQuickLaunchProfiles(profiles: QuickLaunchProfile[]): void;
   setSavedLayouts(layouts: SavedLayout[]): void;
   setLanguage(language: Language): void;
-  /** Re-read ~/.wmux/locales into the i18n registry and repaint (issue #147). */
+  /** Re-read ~/.remotea/locales into the i18n registry and repaint (issue #147). */
   reloadUserLocales(payload: unknown): void;
   toggleBroadcastInput(): void;
 }

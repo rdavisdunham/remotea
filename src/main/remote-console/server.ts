@@ -298,7 +298,7 @@ export function createConsoleServer(deps: ServerDeps): ConsoleServer {
   // a session, and its PTY writes, alive after the console is off.
   let stopping = false;
 
-  // Always select `wmux`, never whatever came first: the other offered
+  // Always select `remotea`, never whatever came first: the other offered
   // protocol is the page key, and a selected protocol is echoed back.
   const wss = new WebSocketServer({
     noServer: true,
@@ -374,7 +374,7 @@ export function createConsoleServer(deps: ServerDeps): ConsoleServer {
   }
 
   /**
-   * The first `wmux_rc` value that verifies — and, given a key, whose device
+   * The first `remotea_rc` value that verifies — and, given a key, whose device
    * that key also proves. Every value is tried (guards.ts readCookies): a junk
    * cookie another server on this host tossed must not shadow the real one.
    * A device authenticated while the listener is a plain-HTTP LAN bind has

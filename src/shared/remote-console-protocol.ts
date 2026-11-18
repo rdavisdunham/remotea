@@ -194,14 +194,14 @@ export type ServerMessage =
 /**
  * The page key (devices.ts header): kept by the phone in origin-scoped
  * storage and presented beside the host-scoped cookie. On the WebSocket it
- * rides as a second offered subprotocol, `wmux-key.<key>`, so it is checked in
+ * rides as a second offered subprotocol, `remotea-key.<key>`, so it is checked in
  * the upgrade gate before ws ever sees the request and never sits in a URL;
- * the server only ever SELECTS `wmux`, so the key is not echoed back. On
+ * the server only ever SELECTS `remotea`, so the key is not echoed back. On
  * `/api/session` it is a request header.
  */
-export const WS_SUBPROTOCOL = 'wmux';
-export const WS_KEY_PROTOCOL_PREFIX = 'wmux-key.';
-export const DEVICE_KEY_HEADER = 'x-wmux-key';
+export const WS_SUBPROTOCOL = 'remotea';
+export const WS_KEY_PROTOCOL_PREFIX = 'remotea-key.';
+export const DEVICE_KEY_HEADER = 'x-remotea-key';
 
 export const CLOSE_CODES = {
   /** First frame was not `hello`, or its version is not ours. */

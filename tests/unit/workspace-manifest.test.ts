@@ -21,7 +21,7 @@ import { resolveSurfaceEnv, expandEnvRefs } from '../../src/main/surface-env';
  */
 
 const ROOT = path.resolve('/repo');
-const MANIFEST = path.join(ROOT, 'wmux.workspace.json');
+const MANIFEST = path.join(ROOT, 'remotea.workspace.json');
 
 const monorepo = {
   version: 1,
@@ -151,8 +151,8 @@ describe('ordering', () => {
 });
 
 describe('the plan', () => {
-  it('resolves folders against the manifest\'s repo, including from .wmux/', () => {
-    expect(manifestRoot(path.join(ROOT, '.wmux', 'workspace.json'))).toBe(ROOT);
+  it('resolves folders against the manifest\'s repo, including from .remotea/', () => {
+    expect(manifestRoot(path.join(ROOT, '.remotea', 'workspace.json'))).toBe(ROOT);
     const plan = buildPlan(ok(monorepo), MANIFEST, new Set());
     expect(plan.panes.find((p) => p.id === 'api')!.cwd).toBe(path.join(ROOT, 'apps', 'api'));
   });

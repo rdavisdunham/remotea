@@ -147,7 +147,7 @@ export const sv: Translation = {
   'surfaceTab.splitLayout': 'Delningslayout…',
   'surfaceTab.closePane': 'Stäng ruta ({binding})',
   'surfaceTab.duplicateTab': 'Duplicera flik',
-  'surfaceTab.profileProject': 'Projektprofil (.wmux.json)',
+  'surfaceTab.profileProject': 'Projektprofil (.remotea.json)',
   'surfaceTab.profileGlobal': 'Global profil',
   'surfaceTab.splitRight': 'Dela till höger',
   'surfaceTab.splitDown': 'Dela nedåt',

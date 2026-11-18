@@ -32,6 +32,7 @@ import {
 } from './workspace-manifest';
 import { getTrustEntry, recordRanOnce, recordTrust, trustKey } from './workspace-trust';
 import { runPlan, type PaneOutcome, type SchedulerIo } from './workspace-scheduler';
+import { oldProjectFileHints } from './old-state-notice';
 import type { ManifestWorkspaceSpec } from '../shared/types';
 
 export type TrustAnswer = 'run' | 'layout-only' | 'cancel';
@@ -70,6 +71,17 @@ export function resolveManifestPath(input: string): string | null {
     try { if (fs.statSync(candidate).isFile()) return candidate; } catch { /* next */ }
   }
   return null;
+}
+
+/**
+ * Why `input` has no manifest, plus a rename hint for each project file the
+ * folder holds only under its old name.
+ */
+export function noManifestErrors(input: string): string[] {
+  return [
+    `no workspace manifest at ${input} (looked for ${MANIFEST_FILENAMES.join(' or ')})`,
+    ...oldProjectFileHints(path.resolve(input)),
+  ];
 }
 
 /** Read once: the bytes that are hashed are the bytes that are planned. */
@@ -143,7 +155,7 @@ async function askTrust(manifestPath: string, plan: WorkspacePlan, hash: string,
 export async function openManifest(input: { path: string; dryRun?: boolean; newCopy?: boolean }, deps: OpenDeps): Promise<OpenResult> {
   const manifestPath = resolveManifestPath(input.path);
   if (!manifestPath) {
-    return { ok: false, errors: [`no workspace manifest at ${input.path} (looked for ${MANIFEST_FILENAMES.join(' or ')})`], warnings: [] };
+    return { ok: false, errors: noManifestErrors(input.path), warnings: [] };
   }
   const analyzed = analyzeManifest(manifestPath);
   if ('errors' in analyzed) return { ok: false, errors: analyzed.errors, warnings: analyzed.warnings };

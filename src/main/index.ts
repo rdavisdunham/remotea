@@ -19,6 +19,7 @@ import {
 } from './webview-navigation';
 import { decidePermission } from './security-policy';
 import { parseSmokeArgs, runSmoke, shutdownSmoke, type SmokeOptions } from './smoke';
+import { isMoveRun, runMoveMode } from './move-mode';
 import { correctedDashboardHeaders, DASHBOARD_HEADER_FILTER } from './dashboard-content-type';
 import {
   agentBrowserNeedsTeardown,
@@ -344,7 +345,7 @@ function routeSpecialV2(
     return handleWindowV2(request.method, request.params, respond, respondError);
   }
   if (request.method === 'pane.codex_restore_config') {
-    const prefs = loadSettings()['wmux-workspace-prefs'] as { restoreCodexSessions?: boolean } | undefined;
+    const prefs = loadSettings()['remotea-workspace-prefs'] as { restoreCodexSessions?: boolean } | undefined;
     respond({ enabled: !isQuitting && ptyManager.has(request.params?.surfaceId) && prefs?.restoreCodexSessions === true });
     return true;
   }
@@ -590,7 +591,7 @@ let lastSnapshotFingerprint = '';
  */
 function snapshotIntervalMinutes(): number {
   try {
-    const prefs = loadSettings()['wmux-workspace-prefs'] as { sessionSnapshotMinutes?: unknown } | undefined;
+    const prefs = loadSettings()['remotea-workspace-prefs'] as { sessionSnapshotMinutes?: unknown } | undefined;
     const raw = prefs?.sessionSnapshotMinutes;
     return typeof raw === 'number' ? raw : DEFAULT_SNAPSHOT_MINUTES;
   } catch {
@@ -702,10 +703,10 @@ const DEFAULT_ALL_PROMPTS_LIMIT = 20;
  * The renderer's prompt-preference key, spelled here because main cannot import
  * it: STORAGE_KEYS lives in src/renderer/store/settings-slice.ts, a zustand
  * module. The FILE is shared though — the renderer persists through main into
- * %APPDATA%\wmux\settings.json — so reading it back here is reading the same
+ * %APPDATA%\remotea\settings.json — so reading it back here is reading the same
  * bytes the renderer wrote, not a second copy of the state.
  */
-const PROMPT_PREFS_KEY = 'wmux-prompt-prefs';
+const PROMPT_PREFS_KEY = 'remotea-prompt-prefs';
 
 /**
  * Is the prompt log switched on at all? (issue #207)
@@ -1012,6 +1013,12 @@ stripMotw();
 }
 const gotInstanceLock = app.requestSingleInstanceLock();
 
+// `--move` (npm run move): bring an install from before the rename over to the
+// new names, then exit. Runs instead of the app — whenReady below returns early —
+// and refuses while the app is open (move-mode.ts).
+const moveRun = isMoveRun(process.argv);
+if (moveRun) void runMoveMode(gotInstanceLock);
+
 /**
  * Open a folder as a new workspace, for the Explorer context-menu verb
  * ("Open in wmux" — see shell-context-menu.ts, which registers
@@ -1036,7 +1043,9 @@ async function openDirectoryAsWorkspace(dirPath: string): Promise<void> {
 
 const isDirectory = (p: string): boolean => fs.statSync(p).isDirectory();
 
-if (!gotInstanceLock) {
+if (moveRun) {
+  // move-mode.ts exits on its own.
+} else if (!gotInstanceLock) {
   app.quit();
 } else {
   // Explorer launches `wmux.exe "C:\folder"`. With the single-instance lock held
@@ -1618,8 +1627,9 @@ process.on('uncaughtExceptionMonitor', (err: unknown) => {
 });
 
 app.whenReady().then(() => {
-  // A losing second instance is already quitting; don't run startup side effects.
-  if (!gotInstanceLock) return;
+  // A losing second instance is already quitting, and a move run is not the
+  // app: no startup side effects for either.
+  if (!gotInstanceLock || moveRun) return;
 
   // First line of the run, so a crash report can state what this process was
   // rather than infer it (#150). `guard` in particular: whether the node-pty
@@ -2116,7 +2126,7 @@ app.whenReady().then(() => {
         break;
       }
       case 'config.get': {
-        // Expose the current ~/.wmux/config.toml state (incl. parse errors).
+        // Expose the current ~/.remotea/config.toml state (incl. parse errors).
         (async () => {
           try {
             const { loadUserConfig } = await import('./user-config');
@@ -2126,7 +2136,7 @@ app.whenReady().then(() => {
         break;
       }
       case 'locales.get': {
-        // What ~/.wmux/locales currently yields, including the reasons any file
+        // What ~/.remotea/locales currently yields, including the reasons any file
         // was rejected — a translator's only feedback loop (issue #147).
         (async () => {
           try {
@@ -2147,7 +2157,7 @@ app.whenReady().then(() => {
         break;
       }
       case 'config.reload': {
-        // Re-read ~/.wmux/config.toml and live-apply to every open window.
+        // Re-read ~/.remotea/config.toml and live-apply to every open window.
         (async () => {
           try {
             const { loadUserConfig, resetConfigWarnings } = await import('./user-config');
@@ -2156,7 +2166,7 @@ app.whenReady().then(() => {
             // problems the file still has rather than staying quiet because the
             // pre-edit version already warned about them.
             resetConfigWarnings();
-            // Same contract as the IPC path: one reload covers all of ~/.wmux,
+            // Same contract as the IPC path: one reload covers all of ~/.remotea,
             // including community translations (issue #147).
             const cfg = { ...loadUserConfig(), locales: loadUserLocales() };
             for (const win of BrowserWindow.getAllWindows()) {
@@ -2638,7 +2648,7 @@ windowManager.beforeClose = (win, isLastWindow) => {
 /** A boolean workspace pref that is on only when the user turned it on. */
 function workspacePrefOn(key: 'confirmAppClose' | 'closeToTray'): boolean {
   try {
-    const prefs = loadSettings()['wmux-workspace-prefs'] as Record<string, unknown> | undefined;
+    const prefs = loadSettings()['remotea-workspace-prefs'] as Record<string, unknown> | undefined;
     return prefs?.[key] === true;
   } catch { return false; }
 }

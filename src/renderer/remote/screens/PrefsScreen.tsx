@@ -29,7 +29,7 @@ export interface RemotePrefs {
 
 export const DEFAULT_PREFS: RemotePrefs = { lang: 'auto', theme: 'system', fontScale: 1 };
 export const FONT_SCALES = [0.85, 1, 1.15, 1.3] as const;
-const PREFS_KEY = 'wmux-remote-prefs';
+const PREFS_KEY = 'remotea-remote-prefs';
 
 export function loadPrefs(): RemotePrefs {
   try {

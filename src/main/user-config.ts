@@ -1,5 +1,5 @@
 /**
- * user-config.ts — Loads `~/.wmux/config.toml` and maps it to partial
+ * user-config.ts — Loads `~/.remotea/config.toml` and maps it to partial
  * TerminalPrefs + named user color schemes.
  *
  * Shape (matches issue #4):
@@ -172,7 +172,7 @@ export interface UserConfig {
 
 export function getConfigPath(): string {
   const home = os.homedir();
-  return path.join(home, '.wmux', 'config.toml');
+  return path.join(home, '.remotea', 'config.toml');
 }
 
 /**

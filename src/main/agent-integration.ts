@@ -16,7 +16,7 @@ import { clearIntegrationFailures } from './integration-failures';
  * "without permission and/or warning". Idempotence and consent pull in opposite
  * directions, and the code only implemented the first.
  *
- * The fix is a decision stored in wmux's OWN settings file (%APPDATA%\wmux),
+ * The fix is a decision stored in wmux's OWN settings file (%APPDATA%\remotea),
  * never in the files being written:
  *
  *   unset     nothing has been written yet; ask on first launch

@@ -11,7 +11,7 @@
 // partial translation never renders blank.
 //
 // On top of the bundled set, users can add or correct languages at runtime by
-// dropping JSON into ~/.wmux/locales (issue #147) — see applyUserLocales below.
+// dropping JSON into ~/.remotea/locales (issue #147) — see applyUserLocales below.
 
 import { en, type Translation, type TranslationKey } from './locales/en';
 import { cs } from './locales/cs';
@@ -64,7 +64,7 @@ export type BuiltinLanguage = (typeof BUILTIN)[number]['code'];
 /**
  * A language code. Bundled codes still autocomplete; the `string & {}` arm
  * keeps that list suggestible while accepting the arbitrary codes a user can
- * introduce via ~/.wmux/locales. Runtime validation is `isLanguage`, which
+ * introduce via ~/.remotea/locales. Runtime validation is `isLanguage`, which
  * checks the *merged* registry — never a hardcoded list.
  */
 export type Language = BuiltinLanguage | (string & {});
@@ -84,10 +84,10 @@ export const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = supported;
 
 /** Exported for the coverage/stale-key test; components should use `useT`. */
 // Keyed by `string`, not `Language`: the set of codes is only known at runtime
-// once ~/.wmux/locales has been merged, so a total Record would be a lie.
+// once ~/.remotea/locales has been merged, so a total Record would be a lie.
 export const DICTIONARIES: Record<string, Translation> = {};
 
-/** What the last ~/.wmux/locales load produced — surfaced by `wmux locales`. */
+/** What the last ~/.remotea/locales load produced — surfaced by `wmux locales`. */
 export interface UserLocaleState {
   /** Codes that came from disk, in load order. */
   codes: Language[];
@@ -124,7 +124,7 @@ interface RawUserLocale {
 
 /**
  * Rebuild the registry from the bundled table plus `payload` (the main
- * process's ~/.wmux/locales scan). Idempotent and total: it always produces a
+ * process's ~/.remotea/locales scan). Idempotent and total: it always produces a
  * registry containing every bundled language, so a broken user file can widen
  * the error list but can never remove a shipped language.
  *
@@ -174,7 +174,7 @@ export function applyUserLocales(payload: unknown): UserLocaleState {
   const overrides: Language[] = [];
 
   // Start from the bundled set; every rebuild is from scratch so removing a
-  // file from ~/.wmux/locales actually removes its effect on the next reload.
+  // file from ~/.remotea/locales actually removes its effect on the next reload.
   const merged = new Map<Language, { label: string; dict: Translation }>();
   for (const { code, label, dict } of BUILTIN) {
     merged.set(code, { label, dict });
@@ -278,7 +278,7 @@ export function detectDefaultLanguage(): Language {
 }
 
 /**
- * Read ~/.wmux/locales through the preload bridge and merge it in. Called once
+ * Read ~/.remotea/locales through the preload bridge and merge it in. Called once
  * at module load — before the settings slice reads the persisted language, so
  * a user-defined code survives a restart instead of being reset to English by
  * the `isLanguage` guard.

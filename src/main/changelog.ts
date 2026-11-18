@@ -16,7 +16,7 @@ import { PRODUCT } from '../shared/product';
  * opening the panel a second time is free, and opening it with no network
  * shows what was there last time rather than an error.
  *
- * The cache is inside `%APPDATA%\wmux`, so it needs no part of the #132 consent
+ * The cache is inside `%APPDATA%\remotea`, so it needs no part of the #132 consent
  * gate — that gate is about writes OUTSIDE wmux's own directory.
  *
  * ## What is deliberately not here

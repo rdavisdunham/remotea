@@ -53,8 +53,9 @@ describe('upload budget and lifecycle', () => {
     const oldest = drop(t, 40 * KiB, 3 * DAY, now);
     const middle = drop(t, 40 * KiB, 2 * DAY, now);
     const newest = drop(t, 40 * KiB, 1 * DAY, now);
-    // Not a drop of ours: never counted, never touched.
-    fs.mkdirSync(path.join(t, 'wmux-drop-x'));
+    // The app's own ssh drop folder (remotea-ssh-drop-<uuid>) is not one of
+    // this store's drops: never counted, never touched.
+    fs.mkdirSync(path.join(t, 'remotea-ssh-drop-11111111-2222-3333-4444-555555555555'));
     const store = new UploadStore({ tmpDir: t, budgetBytes: 100 * KiB, now: () => now, space: PLENTY });
     expect(store.usage()).toMatchObject({ bytes: 130 * KiB, files: 4, budget: 100 * KiB, maxAgeDays: 7 });
     // 20 KiB incoming: the expired one goes, then the oldest (80 + 20 <= 100), and no more.
@@ -63,7 +64,7 @@ describe('upload budget and lifecycle', () => {
     expect(fs.existsSync(oldest)).toBe(false);
     expect(fs.existsSync(middle)).toBe(true);
     expect(fs.existsSync(newest)).toBe(true);
-    expect(fs.existsSync(path.join(t, 'wmux-drop-x'))).toBe(true);
+    expect(fs.existsSync(path.join(t, 'remotea-ssh-drop-11111111-2222-3333-4444-555555555555'))).toBe(true);
     expect(store.usage()).toMatchObject({ bytes: 80 * KiB, files: 2, reclaimed: { files: 2, bytes: 50 * KiB } });
   });
 

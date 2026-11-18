@@ -16,7 +16,7 @@ describe('Keep Awake settings & types', () => {
   it('keeps no renderer copy of the choice: main owns it', () => {
     expect(DEFAULT_WORKSPACE_PREFS).not.toHaveProperty('keepAwakeMode');
     expect(DEFAULT_WORKSPACE_PREFS).not.toHaveProperty('preventDisplaySleep');
-    expect(KEEP_AWAKE_SETTINGS_KEY).toBe('wmux-keep-awake');
+    expect(KEEP_AWAKE_SETTINGS_KEY).toBe('remotea-keep-awake');
   });
 
   it('parses persisted prefs field by field, defaulting what is malformed', () => {

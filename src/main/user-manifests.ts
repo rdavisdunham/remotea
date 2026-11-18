@@ -1,7 +1,7 @@
 /**
  * User-authored detection manifests.
  *
- * `%APPDATA%\wmux\agent-detection\<agent>.json`, one file per agent, replacing
+ * `%APPDATA%\remotea\agent-detection\<agent>.json`, one file per agent, replacing
  * the bundled manifest for that agent entirely.
  *
  * This is the hotfix path, and it is the ONLY part of the prior art's manifest

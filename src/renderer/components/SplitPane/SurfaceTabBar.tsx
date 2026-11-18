@@ -684,7 +684,7 @@ export default function SurfaceTabBar({
                       className="surface-tab-menu__profile"
                       onClick={() => pickProfile(profile)}
                       title={profile.source === 'project'
-                        ? t('surfaceTab.profileProject', 'Project profile (.wmux.json)')
+                        ? t('surfaceTab.profileProject', 'Project profile (.remotea.json)')
                         : t('surfaceTab.profileGlobal', 'Global profile')}
                     >
                       <span className="surface-tab-menu__icon">

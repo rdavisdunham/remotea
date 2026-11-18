@@ -147,7 +147,7 @@ export const de: Translation = {
   'surfaceTab.splitLayout': 'Aufteilungslayout…',
   'surfaceTab.closePane': 'Bereich schließen ({binding})',
   'surfaceTab.duplicateTab': 'Tab duplizieren',
-  'surfaceTab.profileProject': 'Projektprofil (.wmux.json)',
+  'surfaceTab.profileProject': 'Projektprofil (.remotea.json)',
   'surfaceTab.profileGlobal': 'Globales Profil',
   'surfaceTab.splitRight': 'Rechts teilen',
   'surfaceTab.splitDown': 'Unten teilen',

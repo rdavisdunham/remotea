@@ -34,7 +34,7 @@ import { buildGrokHooks } from '../../src/main/grok-context';
 import { ensureAgyPlugin, getAgyPluginDir, removeAgyPlugin } from '../../src/main/agy-context';
 import { isWmuxPluginFile } from '../../src/main/agent-plugin-file';
 import type { HookAgentStatus } from '../../src/shared/remote-host-protocol';
-import { isLegacyRemoteaGrokHooksFile, stripLegacyHookEntries } from '../../src/shared/legacy-cleanup';
+import { countLegacyHookEntries, isLegacyRemoteaGrokHooksFile, stripLegacyHookEntries } from '../../src/shared/legacy-cleanup';
 import { LEGACY_PLUGIN_FILES } from '../../src/shared/legacy-names';
 import type { OwnershipContext } from '../../src/shared/artifact-ownership';
 
@@ -287,6 +287,31 @@ export function hooksStatus(p: HookPaths = defaultHookPaths()): HookTarget[] {
  */
 export function hostOwnershipContext(p: HookPaths): OwnershipContext {
   return { knownDirs: [p.cliDir, p.sourceDir], readFile: readText };
+}
+
+/**
+ * This host's old-named hook entries, by agent: entries whose helper path is
+ * this host's (Claude, Codex, Qwen), and Grok's old hooks file when every
+ * handler in it is. The move rewrites them when any are found.
+ */
+export function legacyHookEntries(p: HookPaths = defaultHookPaths()): Array<{ agent: HookAgent; entries: number }> {
+  const ctx = hostOwnershipContext(p);
+  const out: Array<{ agent: HookAgent; entries: number }> = [];
+  for (const t of targets(p)) {
+    let entries = 0;
+    if (t.kind === 'settings') {
+      try {
+        entries = countLegacyHookEntries(readJson(t.file), ctx);
+      } catch {
+        entries = 0; // not plain JSON: installHooks leaves it too
+      }
+    } else if (t.kind === 'grok') {
+      const old = readText(path.join(path.dirname(t.file), LEGACY_PLUGIN_FILES.grokHooks[0]));
+      entries = old !== null && isLegacyRemoteaGrokHooksFile(old, ctx) ? 1 : 0;
+    }
+    if (entries > 0) out.push({ agent: t.agent, entries });
+  }
+  return out;
 }
 
 /** Install for every agent whose config directory exists. Returns what was written. */

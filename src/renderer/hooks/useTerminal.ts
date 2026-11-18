@@ -1812,7 +1812,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
 
     // Attach custom key handler for Ctrl+C and Ctrl+V (image paste)
     terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
-      // User key remaps from `~/.wmux/config.toml` win over everything,
+      // User key remaps from `~/.remotea/config.toml` win over everything,
       // including wmux's own shortcuts — that is the point of remapping
       // (issue #146). Routed through terminal.input (→ onData) rather than
       // pty.write so broadcast-input fans a remapped key out like any other.

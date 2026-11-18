@@ -12,8 +12,8 @@ import {
 // the change without a promotion — and a promotion that ignored what they hold
 // would overwrite bindings they chose.
 
-const SHORTCUTS_KEY = 'wmux-shortcuts';
-const REV_KEY = 'wmux-shortcut-defaults';
+const SHORTCUTS_KEY = 'remotea-shortcuts';
+const REV_KEY = 'remotea-shortcut-defaults';
 
 const OLD_NEXT = PRE_249_SURFACE_CYCLE.nextSurface!;
 const OLD_PREV = PRE_249_SURFACE_CYCLE.prevSurface!;

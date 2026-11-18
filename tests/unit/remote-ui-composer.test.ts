@@ -148,7 +148,7 @@ describe('draft persistence', () => {
     saveDraft(st, 'surf-b', 'other');
     expect(loadDraft(st, 'surf-a')).toBe('hello');
     saveDraft(st, 'surf-a', '');
-    expect(st.data.has('wmux-remote-draft:surf-a')).toBe(false);
+    expect(st.data.has('remotea-remote-draft:surf-a')).toBe(false);
     expect(loadDraft(st, 'surf-b')).toBe('other');
   });
 

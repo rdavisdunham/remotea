@@ -147,7 +147,7 @@ export const pt: Translation = {
   'surfaceTab.splitLayout': 'Layout de divisão…',
   'surfaceTab.closePane': 'Fechar painel ({binding})',
   'surfaceTab.duplicateTab': 'Duplicar aba',
-  'surfaceTab.profileProject': 'Perfil do projeto (.wmux.json)',
+  'surfaceTab.profileProject': 'Perfil do projeto (.remotea.json)',
   'surfaceTab.profileGlobal': 'Perfil global',
   'surfaceTab.splitRight': 'Dividir à direita',
   'surfaceTab.splitDown': 'Dividir abaixo',

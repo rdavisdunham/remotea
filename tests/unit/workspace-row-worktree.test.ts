@@ -26,7 +26,7 @@ const sampleWorktree: WorktreeMetadata = {
   branch: 'feat/wt-feature',
   baseBranch: 'main',
   baseSha: '0123456789abcdef0123456789abcdef01234567',
-  worktreePath: 'C:\\projects\\wmux\\.wmux\\worktrees\\feat-wt-feature',
+  worktreePath: 'C:\\projects\\wmux\\.remotea\\worktrees\\feat-wt-feature',
 };
 
 const baseWorkspace: WorkspaceInfo = {

@@ -158,7 +158,7 @@ export const tr: Translation = {
   'surfaceTab.splitLayout': 'Bölme düzeni…',
   'surfaceTab.closePane': 'Paneli kapat ({binding})',
   'surfaceTab.duplicateTab': 'Sekmeyi çoğalt',
-  'surfaceTab.profileProject': 'Proje profili (.wmux.json)',
+  'surfaceTab.profileProject': 'Proje profili (.remotea.json)',
   'surfaceTab.profileGlobal': 'Genel profil',
   'surfaceTab.splitRight': 'Sağa böl',
   'surfaceTab.splitDown': 'Aşağı böl',

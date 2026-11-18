@@ -49,7 +49,7 @@ one?" is in the Windows Event Log, and none of it is memory:
 | Additional parameter | For `0xc0000409`, distinguishes a deliberate `__fastfail` from memory corruption |
 
 `remotea crash-report` collects all four, plus the tail of
-`%APPDATA%\wmux\logs\main.log` (remotea 1.1.1+), which records process lifecycle
+`%APPDATA%\remotea\logs\main.log` (remotea 1.1.1+), which records process lifecycle
 only: start, teardown, PTY counts. No pane contents, no working directories, no
 command lines, no environment.
 

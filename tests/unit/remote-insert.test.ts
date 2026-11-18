@@ -70,7 +70,7 @@ describe('insertion text', () => {
   });
 
   it('always single-quotes a remote path', () => {
-    expect(remoteInsertionText(['/tmp/wmux-drop-1.png'])).toBe("'/tmp/wmux-drop-1.png'");
+    expect(remoteInsertionText(['/tmp/remotea-ssh-drop-1.png'])).toBe("'/tmp/remotea-ssh-drop-1.png'");
   });
 });
 
@@ -219,9 +219,9 @@ describe('uploadEnabled', () => {
 
 describe('resolveInsertion — remote outcomes', () => {
   it('uploads and inserts the remote path', async () => {
-    const upload = stubUpload({ ok: true, remotePaths: ['/tmp/wmux-drop-abc.png'] });
+    const upload = stubUpload({ ok: true, remotePaths: ['/tmp/remotea-ssh-drop-abc.png'] });
     const r = await resolveInsertion(files(FILE_A), session(), true);
-    expect(r.text).toBe("'/tmp/wmux-drop-abc.png'");
+    expect(r.text).toBe("'/tmp/remotea-ssh-drop-abc.png'");
     expect(upload).toHaveBeenCalledWith(
       expect.objectContaining({ destination: 'fortuna@honoured-accident' }),
       [FILE_A],

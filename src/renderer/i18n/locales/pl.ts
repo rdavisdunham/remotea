@@ -158,7 +158,7 @@ export const pl: Translation = {
   'surfaceTab.splitLayout': 'Układ podziału…',
   'surfaceTab.closePane': 'Zamknij panel ({binding})',
   'surfaceTab.duplicateTab': 'Duplikuj kartę',
-  'surfaceTab.profileProject': 'Profil projektu (.wmux.json)',
+  'surfaceTab.profileProject': 'Profil projektu (.remotea.json)',
   'surfaceTab.profileGlobal': 'Profil globalny',
   'surfaceTab.splitRight': 'Podziel w prawo',
   'surfaceTab.splitDown': 'Podziel w dół',

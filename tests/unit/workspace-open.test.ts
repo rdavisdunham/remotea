@@ -29,7 +29,7 @@ afterEach(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-function writeManifest(obj: unknown, name = 'wmux.workspace.json'): string {
+function writeManifest(obj: unknown, name = 'remotea.workspace.json'): string {
   const file = path.join(repo, name);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(obj, null, 2));
@@ -155,7 +155,7 @@ describe('trust (#284)', () => {
     const f = fake('run');
     await openManifest({ path: repo }, f.deps);
     expect(fs.existsSync(path.join(tmp, 'appdata', 'remotea', 'workspace-trust.json'))).toBe(true);
-    expect(fs.readdirSync(repo).sort()).toEqual(['apps', 'wmux.workspace.json']);
+    expect(fs.readdirSync(repo).sort()).toEqual(['apps', 'remotea.workspace.json']);
   });
 });
 
@@ -195,8 +195,8 @@ describe('opening (#284)', () => {
     expect(f.created).toHaveLength(1);
   });
 
-  it('finds .wmux/workspace.json and resolves folders from the repo root', async () => {
-    writeManifest(BASIC, path.join('.wmux', 'workspace.json'));
+  it('finds .remotea/workspace.json and resolves folders from the repo root', async () => {
+    writeManifest(BASIC, path.join('.remotea', 'workspace.json'));
     const f = fake();
     await openManifest({ path: repo }, f.deps);
     expect((f.created[0] as { cwd: string }).cwd).toBe(repo);
@@ -237,7 +237,7 @@ describe('opening (#284)', () => {
 
 describe('ordering (#284)', () => {
   function planOf(obj: unknown) {
-    return buildPlan(parseManifest(obj).manifest!, path.join(repo, 'wmux.workspace.json'), new Set()).panes;
+    return buildPlan(parseManifest(obj).manifest!, path.join(repo, 'remotea.workspace.json'), new Set()).panes;
   }
 
   it('a pane waits for every pane in its `after` before its commands are typed', async () => {

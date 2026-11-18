@@ -60,6 +60,8 @@ export const LEGACY_PROJECT_FILES = ['.wmux.json', 'wmux.workspace.json', '.wmux
 export const LEGACY_PLUGIN_FILES = {
   opencode: ['wmux.js'],
   opencodeTui: ['wmux-tui.js', 'wmux-tui-core.js'],
+  /** The folder `wmux opencode-tui` installed under OpenCode's `plugins/`. */
+  opencodeTuiDir: ['wmux-cli'],
   pi: ['wmux.js'],
   omp: ['wmux.js'],
   agy: ['wmux'],
@@ -74,4 +76,21 @@ export const LEGACY_PLUGIN_FILES = {
 export function legacyEnvName(remoteaName: string): string {
   if (!remoteaName.startsWith('REMOTEA_')) throw new Error(`not a remotea variable: ${remoteaName}`);
   return LEGACY_ENV_PREFIX + remoteaName.slice('REMOTEA_'.length);
+}
+
+/**
+ * The old plugin files and folders under `home` that carry no path, so
+ * nothing proves whose they are: a real wmux writes the same ones. The move
+ * lists those that exist and removes them only when the user says yes.
+ */
+export function legacyPluginPaths(home: string, env: Record<string, string | undefined> = {}): string[] {
+  const join = (...parts: string[]) => parts.join('/').replace(/\\/g, '/');
+  const configHome = env.XDG_CONFIG_HOME || join(home, '.config');
+  return [
+    join(configHome, 'opencode', 'plugin', LEGACY_PLUGIN_FILES.opencode[0]),
+    join(configHome, 'opencode', 'plugins', LEGACY_PLUGIN_FILES.opencodeTuiDir[0]),
+    join(home, '.pi', 'agent', 'extensions', LEGACY_PLUGIN_FILES.pi[0]),
+    join(home, '.omp', 'agent', 'extensions', LEGACY_PLUGIN_FILES.omp[0]),
+    join(home, '.gemini', 'config', 'plugins', LEGACY_PLUGIN_FILES.agy[0]),
+  ];
 }

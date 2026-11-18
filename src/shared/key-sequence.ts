@@ -8,7 +8,7 @@
  * for…": ctrl+k should also send DEL, ctrl+w should send a literal command,
  * this key should be swallowed entirely.
  *
- * Config lives in `~/.wmux/config.toml`:
+ * Config lives in `~/.remotea/config.toml`:
  *
  *   [keys]
  *   "ctrl+k"       = "<C-k><Delete>"   # kill-line, then pull the next line up

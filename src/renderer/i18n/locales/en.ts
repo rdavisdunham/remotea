@@ -296,6 +296,8 @@ export const en = {
   'notification.iconChanged.title': 'remotea has a new icon',
   'notification.iconChanged.text':
     'If the taskbar or a pinned button still shows the old one, use Settings → General → Refresh taskbar icons.',
+  'notification.oldState.title': 'Settings not moved yet',
+  'notification.oldState.text': 'Run `npm run move` to bring over your settings from the old names.',
   'notification.gpuRestarted.title': 'remotea restarted its graphics process',
   'notification.gpuRestarted.text':
     'The window had stopped painting while you were using it. Terminals and agents were not affected.',
@@ -333,7 +335,7 @@ export const en = {
   'palette.category.themes': 'Themes',
   'palette.category.layouts': 'Layouts',
   'palette.openMarkdown': 'Open Markdown File…',
-  'palette.openWorkspaceFile': 'Open workspace file… (wmux.workspace.json)',
+  'palette.openWorkspaceFile': 'Open workspace file… (remotea.workspace.json)',
   'palette.resetTerminalLeaveAlt': 'Reset terminal state (leave alternate screen)',
   'palette.saveCurrentLayout': 'Save current layout as new preset',
   'palette.saveCurrentLayoutFailed': 'No active workspace to save as a layout.',
@@ -470,7 +472,7 @@ export const en = {
   'surfaceTab.splitLayout': 'Split layout…',
   'surfaceTab.closePane': 'Close pane ({binding})',
   'surfaceTab.duplicateTab': 'Duplicate tab',
-  'surfaceTab.profileProject': 'Project profile (.wmux.json)',
+  'surfaceTab.profileProject': 'Project profile (.remotea.json)',
   'surfaceTab.profileGlobal': 'Global profile',
   'surfaceTab.splitRight': 'Split right',
   'surfaceTab.splitDown': 'Split down',
@@ -567,10 +569,10 @@ export const en = {
   // Start page (issue #212)
   'settings.browser.defaultUrl': 'Start page',
   'settings.browser.defaultUrlHint':
-    'Where a workspace\'s browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea\'s own page. Also settable in ~/.wmux/config.toml as [browser] default-url.',
+    'Where a workspace\'s browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea\'s own page. Also settable in ~/.remotea/config.toml as [browser] default-url.',
   'settings.browser.autoOpenDevServer': 'Auto-open dev servers in the browser panel',
   'settings.browser.autoOpenDevServerHint':
-    'When on, the browser panel navigates to a dev server (Vite, Next, …) on its own the moment one starts. On by default — turn it off and detected ports are still shown on the workspace row, but nothing opens without you. Also settable in ~/.wmux/config.toml as [browser] auto-open.',
+    'When on, the browser panel navigates to a dev server (Vite, Next, …) on its own the moment one starts. On by default — turn it off and detected ports are still shown on the workspace row, but nothing opens without you. Also settable in ~/.remotea/config.toml as [browser] auto-open.',
   'settings.browser.linksSection': 'Links',
   'settings.browser.openLinksExternally': 'Open links in the system browser',
   'settings.browser.openLinksExternallyHint': 'Clicked links in terminals and markdown go to your default browser instead of the remotea panel. Ctrl+click always does the opposite.',
@@ -919,7 +921,7 @@ export const en = {
   'settings.workspacePanel.layoutLeft': 'Main pane left, rest stacked right',
   'settings.workspacePanel.layoutDown': 'Main pane top, rest across the bottom',
   'settings.workspacePanel.layoutHint':
-    'Also settable in ~/.wmux/config.toml under [workspace]. With one pane there is nothing to arrange.',
+    'Also settable in ~/.remotea/config.toml under [workspace]. With one pane there is nothing to arrange.',
   'settings.workspacePanel.layoutsSection': 'Saved Layouts',
   'settings.workspacePanel.layoutsHint':
     'Arrange panes the way you like in a workspace — geometry, plus whatever shell or command each pane is already running — then save that arrangement here.',
@@ -1488,7 +1490,7 @@ export const en = {
 
   "settings.alignment.scopeDetails": "Scope, apply time & effective preferences",
   "settings.alignment.scopePersistence": "Desktop user / app instance. Ordinary preferences save immediately to settings.json and affect this window or future matching actions. Other windows retain their own loaded snapshot; changes are not generally broadcast.",
-  "settings.alignment.configPrecedence": "Present supported keys in ~/.wmux/config.toml apply at startup and remotea reload-config. Later UI edits win for the running session and persist without rewriting TOML. Removing a TOML key does not generally undo a value it previously saved.",
+  "settings.alignment.configPrecedence": "Present supported keys in ~/.remotea/config.toml apply at startup and remotea reload-config. Later UI edits win for the running session and persist without rewriting TOML. Removing a TOML key does not generally undo a value it previously saved.",
   "settings.alignment.restoreAndRuntime": "Named session restores can replace terminal preferences. Runtime dev-port additions reset on config reload. Transparency may require a window restart; launch and restore preferences affect future launches/restores.",
   "settings.alignment.separateStores": "This section also has main-owned configuration or separate connection stores. Connection credentials, phone pairing and agent file consent are separate from renderer preferences.",
   "settings.alignment.inspectEffective": "Inspect effective preferences in this window",
@@ -1514,7 +1516,7 @@ export const en = {
   "settings.alignment.scope.General": "Desktop appearance and language save immediately. Transparency can require a window restart. Explorer integration changes the desktop registry; taskbar refresh is an explicit system action.",
   "settings.alignment.scope.Sidebar": "Desktop sidebar presentation saves and applies immediately in this window; it does not change host workspace metadata.",
   "settings.alignment.scope.Workspace": "Desktop workspace defaults save immediately and govern future launch, close and restore actions. Saved layouts are local presets; named session restores may replace terminal preferences. Keep-awake is main-owned and controls this desktop computer.",
-  "settings.alignment.scope.Profiles": "Launch profiles save immediately to this desktop user / app instance. Commands, directories and shells apply when a profile is launched. Project .wmux.json profiles are separate files.",
+  "settings.alignment.scope.Profiles": "Launch profiles save immediately to this desktop user / app instance. Commands, directories and shells apply when a profile is launched. Project .remotea.json profiles are separate files.",
   "settings.alignment.scope.Terminal": "Terminal preferences save immediately for this window. Per-pane overrides can take precedence over global colors. Named session restores can replace these preferences.",
   "settings.alignment.scope.Prompts": "Prompt-history presentation and capture preferences save immediately for this desktop window. These controls do not configure an agent provider or Eridani.",
   "settings.alignment.scope.Agents": "Consent is main-owned in settings.json. Changes immediately write or remove integration files in this desktop user’s home directory. Agents may need a new session to load them; remote host integration is configured separately.",

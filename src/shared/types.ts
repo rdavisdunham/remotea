@@ -371,7 +371,7 @@ export type ExplorerDiffResult = ExplorerDiffOk | ExplorerListError;
  * How the panes of a NEW workspace are arranged (issue #212).
  *
  * Lives in shared rather than beside the builder in the renderer's split-utils
- * because both sides of the wire need the same vocabulary: `~/.wmux/config.toml`
+ * because both sides of the wire need the same vocabulary: `~/.remotea/config.toml`
  * is read and validated in main, and the tree is built in the renderer. Two
  * copies of a string union is two lists that can disagree about what a layout
  * name means, with the mismatch showing up as a silently ignored setting.
@@ -421,7 +421,7 @@ export interface SavedLayout {
  * Quick-launch profile (issue #32): a one-click tab preset surfaced in the `+`
  * caret dropdown. Lets a user open a terminal that auto-`cd`s and runs startup
  * commands, picks a specific shell, or opens a browser tab at a fixed URL.
- * Two scopes: `global` (user settings) and `project` (committed `.wmux.json`).
+ * Two scopes: `global` (user settings) and `project` (committed `.remotea.json`).
  */
 export interface QuickLaunchProfile {
   id: string;
@@ -865,6 +865,8 @@ export const IPC_CHANNELS = {
   // native confirm, and the once-per-update "your taskbar may lag" notice.
   SYSTEM_REFRESH_ICON_CACHE: 'system:refreshIconCache',
   SYSTEM_TAKE_ICON_CHANGE_NOTICE: 'system:takeIconChangeNotice',
+  // True while old-named state is on this machine and the move has not run.
+  SYSTEM_OLD_STATE_NOTICE: 'system:oldStateNotice',
   SYSTEM_NATIVE_THEME_UPDATED: 'system:nativeThemeUpdated',
   // Metadata events (main → renderer)
   METADATA_UPDATE: 'metadata:update',
@@ -940,7 +942,7 @@ export const IPC_CHANNELS = {
   SESSION_SAVE_NAMED: 'session:save-named',
   SESSION_LOAD_NAMED: 'session:load-named',
   SESSION_LIST_NAMED: 'session:list-named',
-  /** Pick a wmux.workspace.json and open it (#284). Main does all of it. */
+  /** Pick a remotea.workspace.json and open it (#284). Main does all of it. */
   WORKSPACE_FILE_OPEN: 'workspace-file:open',
   SESSION_DELETE_NAMED: 'session:delete-named',
   // Auto-saved session (the rolling 30s snapshot the main process writes)

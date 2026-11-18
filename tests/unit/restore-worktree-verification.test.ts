@@ -13,7 +13,7 @@ describe('verifyRestoredWorktrees', () => {
     branch: 'feat-test',
     baseBranch: 'main',
     baseSha: 'a1b2c3d4e5',
-    worktreePath: 'C:\\Users\\User\\.wmux\\worktrees\\main-repo\\feat-test',
+    worktreePath: 'C:\\Users\\User\\.remotea\\worktrees\\main-repo\\feat-test',
   };
 
   it('keeps worktree and does not dispatch notice when worktreePath exists', () => {

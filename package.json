@@ -11,6 +11,7 @@
     "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
   },
   "scripts": {
+    "move": "npm run build:main && electron . --move",
     "dev": "concurrently \"vite --port 5199\" \"wait-on http://localhost:5199 && electron .\"",
     "build": "npm run build:main && vite build && electron-builder",
     "build:icons": "electron scripts/build-icons.mjs",

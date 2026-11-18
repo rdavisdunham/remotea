@@ -446,8 +446,8 @@ export function createWsClient(deps: WsClientDeps, now: () => number = Date.now)
 // ── Browser adapter ───────────────────────────────────────────────────────
 
 /**
- * The subprotocols the socket offers: `wmux`, plus the page key as
- * `wmux-key.<key>` (remote-console-protocol.ts). The server selects `wmux`
+ * The subprotocols the socket offers: `remotea`, plus the page key as
+ * `remotea-key.<key>` (remote-console-protocol.ts). The server selects `remotea`
  * only, so the key is never echoed back.
  */
 export function socketProtocols(key: string | null): string[] {

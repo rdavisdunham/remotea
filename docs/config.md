@@ -1,9 +1,33 @@
 # remotea config file
 
-remotea reads `~/.wmux/config.toml` on startup (Windows: `%USERPROFILE%\.wmux\config.toml`).
+remotea reads `~/.remotea/config.toml` on startup (Windows: `%USERPROFILE%\.remotea\config.toml`).
 The file is optional — if it isn't present, built-in defaults apply.
 
 Edit it, then run `remotea reload-config` (or restart remotea) to pick up changes.
+
+## Moving from the old names
+
+Builds from before the rename kept this file in `~/.wmux`, saved settings under
+`wmux-*` keys, and read project files named `.wmux.json` and
+`wmux.workspace.json`. remotea no longer reads any of those. Until you move
+them, the app shows a notice when it starts.
+
+- On the computer running the app: quit remotea (from the tray too) and run
+  `npm run move` in your checkout. It backs up `settings.json` to
+  `settings.json.pre-move`, renames the keys, copies `~/.wmux` to `~/.remotea`
+  (the old folder stays, since a wmux install reads it too), rewrites remotea's
+  own agent hook entries, and moves the Explorer right-click entry when it runs
+  remotea. Old plugin files that could belong to a wmux install are listed,
+  and removed only if you say so (`npm run move -- --yes` says yes).
+- On each host: run `remotea upgrade`, then `remotea move`. Reopen the host
+  terminals that were open before; agents in them won't report status until
+  you do.
+- Project files are yours: rename `.wmux.json` to `.remotea.json`,
+  `wmux.workspace.json` to `remotea.workspace.json`, and `.wmux/workspace.json`
+  to `.remotea/workspace.json`. Opening a workspace from a folder that only has
+  the old name says so.
+
+Running the move again is safe: once it has finished it only tidies leftovers.
 
 ## Full example
 
@@ -240,7 +264,7 @@ remotea invokes the Windows OpenSSH `scp` paired with the detected `ssh` client 
 uses `BatchMode=yes`. The connection must therefore authenticate without an
 interactive password or passphrase prompt, normally with a key or `ssh-agent`.
 Each successful file is inserted as a unique path in a private remote batch
-directory, such as `/tmp/wmux-drop-<batch-id>/<file-id>.png`, and remains there
+directory, such as `/tmp/remotea-ssh-drop-<batch-id>/<file-id>.png`, and remains there
 for the receiving program to use.
 
 Detection covers `remotea ssh` and a direct `ssh` launched from an integrated
@@ -316,10 +340,10 @@ remotea ships English, Français, Español, Deutsch, Português, Italiano,
 Nederlands, Polski, Türkçe, Русский, Українська, 中文, 日本語, 한국어, हिन्दी,
 Svenska and Čeština. You can add a language, or correct a shipped one,
 without waiting for a
-release: drop a JSON file into `~/.wmux/locales/`, next to `config.toml`.
+release: drop a JSON file into `~/.remotea/locales/`, next to `config.toml`.
 
 ```
-~/.wmux/locales/
+~/.remotea/locales/
   tt.json      # adds Татарча to Settings → General → Interface language
   ko.json      # overrides individual bundled Korean strings
 ```
@@ -353,7 +377,7 @@ substituted by the UI, so a renamed or dropped token silently breaks the string.
 
 ```bash
 remotea locales          # what loaded, and why any file was rejected
-remotea locales path     # print ~/.wmux/locales
+remotea locales path     # print ~/.remotea/locales
 remotea locales reload    # re-read and apply live (same as `remotea reload-config`)
 ```
 

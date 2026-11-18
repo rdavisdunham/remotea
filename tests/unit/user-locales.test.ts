@@ -4,7 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { loadUserLocales, getLocalesDir } from '../../src/main/user-locales';
 
-// Community-provided translations (issue #147): ~/.wmux/locales/<code>.json.
+// Community-provided translations (issue #147): ~/.remotea/locales/<code>.json.
 // This is hand-edited, untrusted input read synchronously on the startup path,
 // so the contract under test is "one bad file costs you that file" — never a
 // throw, never the rest of the directory.
@@ -78,8 +78,8 @@ describe('user-locales: loading (issue #147)', () => {
     expect(errors).toEqual([]);
   });
 
-  it('defaults the locales dir to ~/.wmux/locales, beside config.toml', () => {
-    expect(getLocalesDir()).toBe(path.join(os.homedir(), '.wmux', 'locales'));
+  it('defaults the locales dir to ~/.remotea/locales, beside config.toml', () => {
+    expect(getLocalesDir()).toBe(path.join(os.homedir(), '.remotea', 'locales'));
   });
 });
 

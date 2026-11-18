@@ -158,7 +158,7 @@ export const ru: Translation = {
   'surfaceTab.splitLayout': 'Макет разделения…',
   'surfaceTab.closePane': 'Закрыть панель ({binding})',
   'surfaceTab.duplicateTab': 'Дублировать вкладку',
-  'surfaceTab.profileProject': 'Профиль проекта (.wmux.json)',
+  'surfaceTab.profileProject': 'Профиль проекта (.remotea.json)',
   'surfaceTab.profileGlobal': 'Глобальный профиль',
   'surfaceTab.splitRight': 'Разделить вправо',
   'surfaceTab.splitDown': 'Разделить вниз',

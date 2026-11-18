@@ -767,7 +767,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.workspacePanel.layoutHint",
-      "label": "Also settable in ~/.wmux/config.toml under [workspace]. With one pane there is nothing to arrange."
+      "label": "Also settable in ~/.remotea/config.toml under [workspace]. With one pane there is nothing to arrange."
     },
     {
       "key": "settings.workspacePanel.layoutsSection",
@@ -1339,7 +1339,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.browser.defaultUrlHint",
-      "label": "Where a workspace's browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea's own page. Also settable in ~/.wmux/config.toml as [browser] default-url."
+      "label": "Where a workspace's browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea's own page. Also settable in ~/.remotea/config.toml as [browser] default-url."
     },
     {
       "key": "settings.browser.autoOpenDevServer",
@@ -1347,7 +1347,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.browser.autoOpenDevServerHint",
-      "label": "When on, the browser panel navigates to a dev server (Vite, Next, …) on its own the moment one starts. On by default — turn it off and detected ports are still shown on the workspace row, but nothing opens without you. Also settable in ~/.wmux/config.toml as [browser] auto-open."
+      "label": "When on, the browser panel navigates to a dev server (Vite, Next, …) on its own the moment one starts. On by default — turn it off and detected ports are still shown on the workspace row, but nothing opens without you. Also settable in ~/.remotea/config.toml as [browser] auto-open."
     },
     {
       "key": "settings.browser.linksSection",

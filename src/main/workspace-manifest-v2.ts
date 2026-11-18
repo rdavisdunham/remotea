@@ -16,8 +16,8 @@
 
 import * as path from 'path';
 import { BrowserWindow, dialog } from 'electron';
-import { openManifest, resolveManifestPath, analyzeManifest, type OpenDeps, type TrustAnswer } from './workspace-open';
-import { formatPlan, manifestFromWorkspace, MANIFEST_FILENAMES, type WorkspacePlan, type LiveWorkspaceDescription } from './workspace-manifest';
+import { openManifest, resolveManifestPath, analyzeManifest, noManifestErrors, type OpenDeps, type TrustAnswer } from './workspace-open';
+import { formatPlan, manifestFromWorkspace, type WorkspacePlan, type LiveWorkspaceDescription } from './workspace-manifest';
 import { loadTrust } from './workspace-trust';
 import { waitFor, sleep } from './wait-probes';
 import type { ManifestWorkspaceSpec } from '../shared/types';
@@ -148,7 +148,7 @@ export function handleWorkspaceManifestV2(
   if (!manifestInput) return;
   if (method === 'workspace.validate') {
     const manifestPath = resolveManifestPath(manifestInput);
-    if (!manifestPath) { respond({ ok: false, errors: [`no workspace manifest at ${manifestInput} (looked for ${MANIFEST_FILENAMES.join(' or ')})`], warnings: [] }); return; }
+    if (!manifestPath) { respond({ ok: false, errors: noManifestErrors(manifestInput), warnings: [] }); return; }
     const analyzed = analyzeManifest(manifestPath);
     if ('errors' in analyzed) respond({ ok: false, path: manifestPath, ...analyzed });
     else respond({ ok: true, path: manifestPath, warnings: analyzed.warnings, plan: formatPlan(analyzed.plan) });

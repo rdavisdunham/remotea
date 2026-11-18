@@ -144,7 +144,7 @@ export const zh: Translation = {
   'surfaceTab.splitLayout': '拆分布局…',
   'surfaceTab.closePane': '关闭窗格 ({binding})',
   'surfaceTab.duplicateTab': '复制标签',
-  'surfaceTab.profileProject': '项目配置 (.wmux.json)',
+  'surfaceTab.profileProject': '项目配置 (.remotea.json)',
   'surfaceTab.profileGlobal': '全局配置',
   'surfaceTab.splitRight': '向右拆分',
   'surfaceTab.splitDown': '向下拆分',

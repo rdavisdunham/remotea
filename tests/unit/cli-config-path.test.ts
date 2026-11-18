@@ -6,11 +6,11 @@ import path from 'node:path';
 /**
  * `wmux config path` used to build the path client-side:
  *
- *   console.log(`${os.homedir()}\\.wmux\\config.toml`)
+ *   console.log(`${os.homedir()}\\.remotea\\config.toml`)
  *
  * Run from inside WSL or a devcontainer — where this CLI spends most of its
  * life, reaching wmux over the TCP bridge — that prints
- * `/home/vscode\.wmux\config.toml`: neither the file wmux reads (it lives on the
+ * `/home/vscode\.remotea\config.toml`: neither the file wmux reads (it lives on the
  * Windows host) nor a well-formed path on either OS. Someone editing "the config
  * file" at that path is editing nothing, which is a long way to walk before
  * finding out why a setting had no effect.
@@ -28,7 +28,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../..');
 const CLI = path.join(ROOT, 'dist', 'cli', 'remotea.js');
-const WINDOWS_PATH = 'C:\\Users\\lsi2abt\\.wmux\\config.toml';
+const WINDOWS_PATH = 'C:\\Users\\lsi2abt\\.remotea\\config.toml';
 
 // dist/ is gitignored and `npm test` runs ahead of `npm run build:main`, so the
 // file these tests spawn has to be produced here. ~3s, and building unconditionally
@@ -124,14 +124,14 @@ describe('wmux config path', () => {
 
   it('falls back to a well-formed local path when no instance answers', async () => {
     // Still a guess, but a self-consistent one: path.join on POSIX cannot emit
-    // the `/home/vscode\.wmux\config.toml` hybrid the old string template did.
+    // the `/home/vscode\.remotea\config.toml` hybrid the old string template did.
     const out = await runCli(['config', 'path'], {
       REMOTEA_REMOTE: '127.0.0.1:1',
       REMOTEA_REMOTE_TOKEN: 'tok',
     });
     // path.posix, not path.join: $HOME is a POSIX path, and on a Windows runner
     // path.join would spell the expectation with backslashes the CLI no longer emits.
-    const expected = path.posix.join('/home/vscode', '.wmux', 'config.toml');
+    const expected = path.posix.join('/home/vscode', '.remotea', 'config.toml');
     expect(out).toBe(expected);
     expect(out).not.toContain('\\');
   });

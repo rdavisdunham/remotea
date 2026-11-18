@@ -41,6 +41,7 @@ import { loadUserConfig, getConfigPath, resetConfigWarnings } from './user-confi
 import { loadUserLocales } from './user-locales';
 import { WindowManager, supportsBackdropMaterial, supportsTransparency, toWindowMaterial } from './window-manager';
 import { refreshShellIconCache, takeIconChangeNotice } from './icon-cache';
+import { defaultOldStateProbe, oldStateNeedsMove } from './old-state-notice';
 import { CDPBridge } from './cdp-bridge';
 import { CDPProxy } from './cdp-proxy';
 import { keepRenderingLeases } from './browser-keep-rendering';
@@ -932,7 +933,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     return parseGhosttyConfig();
   });
 
-  // Quick-launch profiles (issue #32): read project `.wmux.json` and import WT profiles.
+  // Quick-launch profiles (issue #32): read project `.remotea.json` and import WT profiles.
   ipcMain.handle('config:getProjectProfiles', async (_event, cwd: string, source?: { surfaceId?: string; shell?: string }) => {
     // Old cwd-only callers are explicitly desktop-local. Source-aware callers
     // must name a local launch; host paths are never a desktop profile backend.
@@ -946,7 +947,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     return importWindowsTerminalProfiles();
   });
 
-  // User config (~/.wmux/config.toml) — read on startup, reloadable at runtime.
+  // User config (~/.remotea/config.toml) — read on startup, reloadable at runtime.
   ipcMain.handle(IPC_CHANNELS.CONFIG_GET_USER_CONFIG, async () => {
     return loadUserConfig();
   });
@@ -955,7 +956,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     // See the config.reload pipe handler in index.ts: a reload re-reports the
     // file's remaining problems instead of staying quiet about pre-edit ones.
     resetConfigWarnings();
-    // A reload covers everything under ~/.wmux, so edited community
+    // A reload covers everything under ~/.remotea, so edited community
     // translations (issue #147) apply without a restart too.
     const cfg = { ...loadUserConfig(), locales: loadUserLocales() };
     // Broadcast to every open window so all surfaces live-apply the new prefs.
@@ -1019,7 +1020,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   ipcMain.on(IPC_CHANNELS.NOTIFICATION_FIRE, (_event, data: { surfaceId: string; text: string; title?: string }) => {
     const window = BrowserWindow.fromWebContents(_event.sender);
     // The Settings toggles for both, which this handler used to ignore (#335).
-    const effects = notificationEffects(loadSettings()['wmux-notification-prefs']);
+    const effects = notificationEffects(loadSettings()['remotea-notification-prefs']);
     if (effects.toast) {
       notificationManager.showToast(data.title || 'remotea', data.text, () => {
         if (window && !window.isDestroyed()) {
@@ -1373,7 +1374,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     // leaving a legitimately-restored window empty.
     return toRestorePayload(loadSession()?.windows?.[0] ?? null);
   });
-  // Settings persistence (issue #19) — file-backed in %APPDATA%\wmux so prefs
+  // Settings persistence (issue #19) — file-backed in %APPDATA%\remotea so prefs
   // survive portable-zip updates. get-all is synchronous so the renderer's
   // Zustand settings slice can hydrate at module-load time (no async flash).
   ipcMain.on('settings:get-all-sync', (event) => {
@@ -1383,7 +1384,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     saveSetting(key, value);
   });
 
-  // Community translations (~/.wmux/locales/*.json, issue #147). Synchronous
+  // Community translations (~/.remotea/locales/*.json, issue #147). Synchronous
   // for the same reason as settings:get-all-sync, plus one of its own: the
   // persisted-language guard rejects any code the registry doesn't know, so a
   // user-defined language has to be merged in *before* the store initializes or
@@ -2034,6 +2035,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     return { ran: true };
   });
   ipcMain.handle(IPC_CHANNELS.SYSTEM_TAKE_ICON_CHANGE_NOTICE, () => takeIconChangeNotice());
+  ipcMain.handle(IPC_CHANNELS.SYSTEM_OLD_STATE_NOTICE, () => oldStateNeedsMove(defaultOldStateProbe(loadSettings(), getAppDataDir())));
 
   ipcMain.handle(IPC_CHANNELS.SYSTEM_PICK_FOLDER, async (event) => {
     const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;

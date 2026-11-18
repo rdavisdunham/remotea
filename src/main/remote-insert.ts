@@ -29,7 +29,7 @@ export type { InsertionResult };
 /**
  * Is upload switched on for this gesture?
  *
- * `[remote]` in `~/.wmux/config.toml`; both halves default to on, and the two
+ * `[remote]` in `~/.remotea/config.toml`; both halves default to on, and the two
  * are independent — someone who disables it for paste keeps it for drop.
  * Takes the config section rather than reading it, so the mapping is testable
  * without a config file.

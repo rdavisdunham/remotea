@@ -5,7 +5,7 @@ import { createSettingsSlice, type SettingsSlice } from '../../src/renderer/stor
 import { createWorkspaceSlice, type WorkspaceSlice } from '../../src/renderer/store/workspace-slice';
 import { getAllPaneIds } from '../../src/renderer/store/split-utils';
 
-const KEY = 'wmux-workspace-prefs';
+const KEY = 'remotea-workspace-prefs';
 function makeStore() {
   return create<SettingsSlice & WorkspaceSlice>()((...args) => ({
     ...createSettingsSlice(...args),

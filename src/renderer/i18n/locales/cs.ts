@@ -212,7 +212,7 @@ export const cs: Translation = {
   'surfaceTab.splitLayout': 'Rozvržení rozdělení…',
   'surfaceTab.closePane': 'Zavřít panel ({binding})',
   'surfaceTab.duplicateTab': 'Duplikovat kartu',
-  'surfaceTab.profileProject': 'Profil projektu (.wmux.json)',
+  'surfaceTab.profileProject': 'Profil projektu (.remotea.json)',
   'surfaceTab.profileGlobal': 'Globální profil',
   'surfaceTab.splitRight': 'Rozdělit vpravo',
   'surfaceTab.splitDown': 'Rozdělit dolů',
@@ -796,7 +796,7 @@ export const cs: Translation = {
   'titlebar.restore': 'Obnovit',
   'titlebar.close': 'Zavřít',
   'settings.general.transparencyRestart': 'Změna se projeví po restartu remotea.',
-  'palette.openWorkspaceFile': 'Otevřít soubor pracovního prostoru… (wmux.workspace.json)',
+  'palette.openWorkspaceFile': 'Otevřít soubor pracovního prostoru… (remotea.workspace.json)',
   'titlebar.focusMode': 'Režim soustředění: ztlumit všechny panely kromě aktivního',
   // Historie verzí
   'settings.tab.changelog': 'Historie verzí',
@@ -822,10 +822,10 @@ export const cs: Translation = {
   // Prohlížeč — úvodní stránka a vývojové servery
   'settings.browser.defaultUrl': 'Úvodní stránka',
   'settings.browser.defaultUrlHint':
-    'Stránka, kterou panel prohlížeče otevře v pracovním prostoru před první navigací. Adresa musí začínat http:// nebo https://. Prázdná hodnota použije úvodní stránku remotea. Lze nastavit také v ~/.wmux/config.toml jako [browser] default-url.',
+    'Stránka, kterou panel prohlížeče otevře v pracovním prostoru před první navigací. Adresa musí začínat http:// nebo https://. Prázdná hodnota použije úvodní stránku remotea. Lze nastavit také v ~/.remotea/config.toml jako [browser] default-url.',
   'settings.browser.autoOpenDevServer': 'Automaticky otevírat vývojové servery v panelu prohlížeče',
   'settings.browser.autoOpenDevServerHint':
-    'Panel prohlížeče automaticky přejde na vývojový server (Vite, Next, …), jakmile se spustí. Ve výchozím stavu zapnuto. Po vypnutí se nalezené porty nadále zobrazují u pracovního prostoru, ale žádná stránka se sama neotevře. Lze nastavit také v ~/.wmux/config.toml jako [browser] auto-open.',
+    'Panel prohlížeče automaticky přejde na vývojový server (Vite, Next, …), jakmile se spustí. Ve výchozím stavu zapnuto. Po vypnutí se nalezené porty nadále zobrazují u pracovního prostoru, ale žádná stránka se sama neotevře. Lze nastavit také v ~/.remotea/config.toml jako [browser] auto-open.',
   'settings.browser.mouseAppLinksHint':
     'Pokud program v panelu používá myš (OpenCode, vim se zapnutou myší), běžné kliknutí obsluhuje tento program. Ctrl+kliknutí otevře odkaz podle nastavení výše.',
   // Číselné klávesové zkratky
@@ -907,7 +907,7 @@ export const cs: Translation = {
   'settings.workspacePanel.layoutLeft': 'Hlavní panel vlevo, ostatní nad sebou vpravo',
   'settings.workspacePanel.layoutDown': 'Hlavní panel nahoře, ostatní vedle sebe dole',
   'settings.workspacePanel.layoutHint':
-    'Lze nastavit také v ~/.wmux/config.toml v sekci [workspace]. U jediného panelu není co uspořádat.',
+    'Lze nastavit také v ~/.remotea/config.toml v sekci [workspace]. U jediného panelu není co uspořádat.',
   'settings.workspacePanel.layoutsSection': 'Uložená rozložení',
   'settings.workspacePanel.layoutsHint':
     'Uspořádejte si panely v pracovním prostoru — jejich velikosti a polohy i shell nebo příkaz, který v nich běží — a poté zde rozložení uložte.',

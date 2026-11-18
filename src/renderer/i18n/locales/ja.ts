@@ -158,7 +158,7 @@ export const ja: Translation = {
   'surfaceTab.splitLayout': '分割レイアウト…',
   'surfaceTab.closePane': 'ペインを閉じる ({binding})',
   'surfaceTab.duplicateTab': 'タブを複製',
-  'surfaceTab.profileProject': 'プロジェクトプロファイル (.wmux.json)',
+  'surfaceTab.profileProject': 'プロジェクトプロファイル (.remotea.json)',
   'surfaceTab.profileGlobal': 'グローバルプロファイル',
   'surfaceTab.splitRight': '右に分割',
   'surfaceTab.splitDown': '下に分割',

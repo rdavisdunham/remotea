@@ -65,23 +65,23 @@ Settings are loaded once into each renderer from main's `settings.json`, with le
 
 | Renderer store | settings.json key | Source |
 |---|---|---|
-| workspacePrefs | `wmux-workspace-prefs` | S:31,482,643 |
-| terminalPrefs | `wmux-terminal-prefs` | S:32,687,743 |
-| sidebarPrefs | `wmux-sidebar-prefs` | S:33,421,466 |
-| notificationPrefs | `wmux-notification-prefs` | S:34,760,780 |
-| browserPrefs | `wmux-browser-prefs` | S:35,795,845 |
-| shortcuts | `wmux-shortcuts` | S:36,210 |
-| shortcut-default migration metadata | `wmux-shortcut-defaults` | S:37,353 |
-| quickLaunchProfiles | `wmux-quick-launch-profiles` | S:38,1540 |
-| savedLayouts | `wmux-saved-layouts` | S:39,1545 |
-| language | `wmux-language` | S:40,100,1550 |
-| appearancePrefs | `wmux-appearance-prefs` | S:41,1150,1255 |
-| keyboardPrefs | `wmux-keyboard-prefs` | S:42,1074,1081 |
-| promptPrefs | `wmux-prompt-prefs` | S:43,871,950 |
+| workspacePrefs | `remotea-workspace-prefs` | S:31,482,643 |
+| terminalPrefs | `remotea-terminal-prefs` | S:32,687,743 |
+| sidebarPrefs | `remotea-sidebar-prefs` | S:33,421,466 |
+| notificationPrefs | `remotea-notification-prefs` | S:34,760,780 |
+| browserPrefs | `remotea-browser-prefs` | S:35,795,845 |
+| shortcuts | `remotea-shortcuts` | S:36,210 |
+| shortcut-default migration metadata | `remotea-shortcut-defaults` | S:37,353 |
+| quickLaunchProfiles | `remotea-quick-launch-profiles` | S:38,1540 |
+| savedLayouts | `remotea-saved-layouts` | S:39,1545 |
+| language | `remotea-language` | S:40,100,1550 |
+| appearancePrefs | `remotea-appearance-prefs` | S:41,1150,1255 |
+| keyboardPrefs | `remotea-keyboard-prefs` | S:42,1074,1081 |
+| promptPrefs | `remotea-prompt-prefs` | S:43,871,950 |
 
-Additional stores: `agentIntegration` in settings.json (`src/main/agent-integration.ts:94`); `wmux-keep-awake` in settings.json (`src/main/awake-manager.ts:29`); Windows Explorer registry entries rather than an application boolean; custom notification audio under `getAppDataDir()/notification-sounds/custom.<extension>`; TOML and locales in `~/.wmux/`; detection overrides under `getAppDataDir()/agent-detection`; project profiles in `<workspace cwd>/.wmux.json`. Remote hosts and phone access have separate stores documented below.
+Additional stores: `agentIntegration` in settings.json (`src/main/agent-integration.ts:94`); `remotea-keep-awake` in settings.json (`src/main/awake-manager.ts:29`); Windows Explorer registry entries rather than an application boolean; custom notification audio under `getAppDataDir()/notification-sounds/custom.<extension>`; TOML and locales in `~/.remotea/`; detection overrides under `getAppDataDir()/agent-detection`; project profiles in `<workspace cwd>/.remotea.json`. Remote hosts and phone access have separate stores documented below.
 
-`~/.wmux/config.toml` wins for **present supported keys** at startup and `remotea reload-config`; subsequent UI changes win for the running session and also persist to settings.json. UI edits do not rewrite TOML. Deleting a TOML key does not generally undo the persisted value it previously applied. Runtime dev-port additions are reset from defaults on reload. Exact parser/application sources: `src/main/user-config.ts:58–60,162,631`; `src/renderer/App.tsx:93–114,140–180,871`. This precedence needs visible explanation before adding a generic import/export/sync feature.
+`~/.remotea/config.toml` wins for **present supported keys** at startup and `remotea reload-config`; subsequent UI changes win for the running session and also persist to settings.json. UI edits do not rewrite TOML. Deleting a TOML key does not generally undo the persisted value it previously applied. Runtime dev-port additions are reset from defaults on reload. Exact parser/application sources: `src/main/user-config.ts:58–60,162,631`; `src/renderer/App.tsx:93–114,140–180,871`. This precedence needs visible explanation before adding a generic import/export/sync feature.
 
 ### Additional preference writer: saved workspace snapshots
 
@@ -177,8 +177,8 @@ Persisted `sidebarPrefs`, except Sidebar mode in `appearancePrefs`. All apply li
 | Read agent screens to infer state | `detectAgentScreens=true` | Local screen matching; rules configurable in app-data/agent-detection. Declared state takes precedence | Workspace:368–379 |
 | Show the file explorer by default | `explorerOpenByDefault=true` | Opens when cwd known, per-workspace closure retained; global off hides all | Workspace:384–395 |
 | Auto-open diff tab on agent edits | `autoOpenDiffTab=true` | Opens diff for edit events | Workspace:400–411 |
-| Keep computer awake | main `wmux-keep-awake.mode='smart'` | Smart (when agents are working) / Always (keep awake while remotea is open) / Off (system defaults). Affects desktop machine; smart working-claim expiry 15min | Workspace:416–430; `awake-manager.ts:29–31` |
-| Keep display awake | main `wmux-keep-awake.preventDisplaySleep=false` | on/off; always editable even mode off, takes effect when keep-awake engages | Workspace:435–446 |
+| Keep computer awake | main `remotea-keep-awake.mode='smart'` | Smart (when agents are working) / Always (keep awake while remotea is open) / Off (system defaults). Affects desktop machine; smart working-claim expiry 15min | Workspace:416–430; `awake-manager.ts:29–31` |
+| Keep display awake | main `remotea-keep-awake.preventDisplaySleep=false` | on/off; always editable even mode off, takes effect when keep-awake engages | Workspace:435–446 |
 | Execution location and Shell / Command | `defaultShell=''` | Separate location picker (This computer or a configured host) and free-text local shell / host command. Local suggestions: powershell.exe, pwsh.exe, cmd.exe, bash.exe, wsl.exe. Explicit local system shell uses `local:`; host selection retains `remote:<host> [command]` | Workspace:454–468 |
 | Starting directory | `defaultCwd=''` | Text on selected location; local ~ and %VARIABLES% expansion. Browse… is a local folder picker disabled for host launches. Host paths must begin / or ~/ (or be ~); incompatible saved paths warn and are rejected on launch. Splits/explicit cwd/restores keep own cwd | Workspace:473–489 |
 | Terminal panes | `newWorkspacePanes=1` | 1–8 rounded/clamped on input. Legacy three-pane grid defaults migrate once to one pane. Saved layouts and subsequent explicit choices apply to new workspaces | Workspace:503–518 |
@@ -188,7 +188,7 @@ Local shell suggestions remain a fixed Windows list rather than runtime discover
 
 ### Saved layouts (Workspace → Saved Layouts)
 
-Default `savedLayouts=[]`; each `{id,name,splitTree,createdAt}` persists under `wmux-saved-layouts` (`shared/types.ts:405`). Tree snapshots preserve geometry and surface/shell/cwd/startup state; new instances remint IDs. `workspacePrefs.defaultLayoutId=null` means pane-count/arrangement default wins; a saved default supersedes those controls (`S:558`; UI/Workspace:498).
+Default `savedLayouts=[]`; each `{id,name,splitTree,createdAt}` persists under `remotea-saved-layouts` (`shared/types.ts:405`). Tree snapshots preserve geometry and surface/shell/cwd/startup state; new instances remint IDs. `workspacePrefs.defaultLayoutId=null` means pane-count/arrangement default wins; a saved default supersedes those controls (`S:558`; UI/Workspace:498).
 
 | Control / current label | Stored data or action | Conditional behavior/source |
 |---|---|---|
@@ -290,7 +290,7 @@ File-only `browser.dev-ports` adds detection ports (below). No default browser e
 
 ## Profiles
 
-The navigation label is “Launch profiles” (internal `Profiles`); the panel heading remains “Quick-launch profiles”. Store defaults to empty array. New profile defaults generated UUID, name “New profile”, type terminal; optional values absent. Global profiles are local saved tab presets; project profiles are read separately from .wmux.json and not edited here.
+The navigation label is “Launch profiles” (internal `Profiles`); the panel heading remains “Quick-launch profiles”. Store defaults to empty array. New profile defaults generated UUID, name “New profile”, type terminal; optional values absent. Global profiles are local saved tab presets; project profiles are read separately from .remotea.json and not edited here.
 
 | Exact label / placeholder | Stored field / allowed value | Condition / effect | UI source |
 |---|---|---|---|
@@ -331,7 +331,7 @@ Help: Version read from installed Electron app; update action states Check for u
 
 ## Supported advanced configuration outside Settings
 
-### ~/.wmux/config.toml
+### ~/.remotea/config.toml
 
 This reference does not inspect or edit your configuration. Values omitted from TOML retain corresponding current/default preference. Supported fields below are exhaustive for `UserConfig` and mapping functions at this revision; arbitrary settings.json keys are not implicitly TOML options. Kebab-case keys listed here accept the shown camelCase aliases only where indicated. UI writes do not synchronize back to this file.
 
@@ -372,23 +372,23 @@ TOML `[keys]` accepts `ctrl+shift+key` or vim-style `<C-S-key>`, Ctrl/Control, S
 
 ### User locales
 
-`~/.wmux/locales/<code>.json`: `{label?: string, strings: {translationKey: string}}`, or flat key→string map; label defaults filename code. File codes two or three ASCII letters only; max50 files, max1MiB/file. Built-in `zh-TW` exists but user region-subtagged names are rejected. Strings for known keys override bundled language or add a language; renderer filters unknown keys. `remotea locales` diagnoses; reload-config reloads locale registry. Current language may fall back if its custom locale disappears (`main/user-locales.ts:4–12,54–61,83–128,141–165`; S:1555–1563). These user-controlled translations can override the exact English labels in this report; bundled source is authoritative baseline only.
+`~/.remotea/locales/<code>.json`: `{label?: string, strings: {translationKey: string}}`, or flat key→string map; label defaults filename code. File codes two or three ASCII letters only; max50 files, max1MiB/file. Built-in `zh-TW` exists but user region-subtagged names are rejected. Strings for known keys override bundled language or add a language; renderer filters unknown keys. `remotea locales` diagnoses; reload-config reloads locale registry. Current language may fall back if its custom locale disappears (`main/user-locales.ts:4–12,54–61,83–128,141–165`; S:1555–1563). These user-controlled translations can override the exact English labels in this report; bundled source is authoritative baseline only.
 
 ### Agent detection manifests
 
 `getAppDataDir()/agent-detection/*.json`; active manifest for same agent replaces bundled manifest, does not extend it. Cache reload is explicit (`remotea detect reload` path in detection RPC), not automatic per file edit (`main/detection-store.ts:51–72`). User manifest fields: `agent` known alias, numeric `version` default0, required valid `signatures[]`, `rules[]` (first128). Matcher `{kind,value,ignoreCase?}` uses contains/lineStartsWith/lineEndsWith only; value nonempty≤512 chars; ignoreCase false by default. User rules require id, state blocked/working/idle, region `{id,count?}`, and positive all[] or any[]; none[] optional; priority finite number/default500; count floored min1. Allowed regions whole_recent/bottom_lines/bottom_non_empty_lines/top_non_empty_lines/osc_title. **No user regex, anchored regions, matcher-specific regions, or question rules**; overrides turn that agent's bundled question detection off, with diagnostics. Engine bounds region200 lines/line1000 chars. (`main/user-manifests.ts:31–161`; `shared/detection/types.ts:188–201`). No GUI manifest editor, only global screen inference checkbox and help path.
 
-### Project .wmux.json profiles
+### Project .remotea.json profiles
 
-`<workspace cwd>/.wmux.json`, `{profiles:[...]}` or raw array. Required nonempty trimmed name; type terminal/browser/markdown, invalid type becomes terminal; optional id (generated `project-index-name` if absent), icon, shell, cwd, startupCommands array of nonempty strings, url. `source='project'` set while loading. Invalid/missing file gives empty list. Appears in tab-add menu, not global Profiles editor (`main/config-loader.ts:263–305`; `renderer/components/SplitPane/PaneWrapper.tsx:416`). Local project file reading must not be described as remote server profile synchronization.
+`<workspace cwd>/.remotea.json`, `{profiles:[...]}` or raw array. Required nonempty trimmed name; type terminal/browser/markdown, invalid type becomes terminal; optional id (generated `project-index-name` if absent), icon, shell, cwd, startupCommands array of nonempty strings, url. `source='project'` set while loading. Invalid/missing file gives empty list. Appears in tab-add menu, not global Profiles editor (`main/config-loader.ts:263–305`; `renderer/components/SplitPane/PaneWrapper.tsx:416`). Local project file reading must not be described as remote server profile synchronization.
 
 ## Hidden metadata and adjacent persisted state
 
 Supported exposed settings are all accounted for above. The following are not additional preferences to advertise:
 
-- `appearancePrefs.uiModeDefaultRev=1`, `hubDefaultRev=1`, `promptPrefs.promptDefaultRev=0`, plus `wmux-shortcut-defaults` revision: migration bookkeeping to promote old untouched defaults. Editing them can reapply promotions; do not include in human-facing settings export controls (`S:353,948,1235,1253,1298–1310`).
+- `appearancePrefs.uiModeDefaultRev=1`, `hubDefaultRev=1`, `promptPrefs.promptDefaultRev=0`, plus `remotea-shortcut-defaults` revision: migration bookkeeping to promote old untouched defaults. Editing them can reapply promotions; do not include in human-facing settings export controls (`S:353,948,1235,1253,1298–1310`).
 - Runtime only: `sidebarVisible=true`, `localeRevision`, `broadcastInputActive=false`, `transparencyNeedsRestart=false`, importStatus/importUndo=null. Import undo survives a Settings tab change, not restart; broadcast is deliberately not persisted (`S:1433–1454,1566–1579`).
-- `wmux-focus-mode` localStorage (`'1'`/`'0'`, defaultoff) toggled outside Settings; affects pane dimming/layout presentation. `wmux-tutorial-seen` localStorage `'1'` records tutorial dismissal (`App.tsx:626–630,778–784`). Their storage differs from stable file-backed preferences and can be origin/path scoped.
+- `wmux-focus-mode` localStorage (`'1'`/`'0'`, defaultoff) toggled outside Settings; affects pane dimming/layout presentation. `remotea-tutorial-seen` localStorage `'1'` records tutorial dismissal (`App.tsx:626–630,778–784`). Their storage differs from stable file-backed preferences and can be origin/path scoped.
 - Saved workspace/session data (selected tab, split tree, explicit titles/colors, pinned state, cwd, shell, browser surface engine, explorer state, remote placements/hidden sessions) is user state and per-workspace overrides, not a global setting. The main analysis and connection sections distinguish remote placement and server scope. Do not conflate “restore settings”, “restore layout”, “resume local agent conversation”, “reattach remote session”, and “restart exited remote process”.
 - Agent-browser API accepts an optional configured binary path, but no current parsed config setting or Browser Settings field supplies one; do not document a nonexistent path preference merely from comments in `agent-browser-cli.ts`.
 
@@ -420,7 +420,7 @@ Host records live in `getAppDataDir()/remote-hosts.json`, separate from `setting
 | Token / `token` | Empty draft; password field. Empty edit keeps existing token; nonempty input is trimmed/encrypted on save | Write-only. Shows whether stored; no ordinary “show token” control. Main API can clear with explicit empty token, but this form omits empty input, so that is not a visible clear-token action | **Host access token**; obtain it using the server CLI on the execution host |
 | Enabled / `enabled` | On for new host | Applied on Save; enables/disables the connection, not the server or its sessions | **Connect to this host** |
 | I understand this connection is unencrypted on this network / `acknowledgeUnencrypted` | Off in new draft | Only for plain ws outside approved loopback/Tailscale classification. Test and Save disabled until acknowledged. Stored as acknowledgment of this exact URL, not a universal trust preference | Preserve explicit transport acknowledgment |
-| New terminals open here by default | Off unless `workspacePrefs.defaultShell` names this host; global default initially empty/system shell | Immediate change to `wmux-workspace-prefs.defaultShell = remote:<id>`; unchecking clears to system default, not the previously selected local shell. Existing tabs do not move | **Default execution location for new terminals** once location/shell are separated |
+| New terminals open here by default | Off unless `workspacePrefs.defaultShell` names this host; global default initially empty/system shell | Immediate change to `remotea-workspace-prefs.defaultShell = remote:<id>`; unchecking clears to system default, not the previously selected local shell. Existing tabs do not move | **Default execution location for new terminals** once location/shell are separated |
 | Group Eridani runs by repository / `workspacePrefs.groupEridaniRuns` | On | Repository headings inside the separate Eridani runs section. Off displays a flat list inside that section | Display preference |
 | Skip the recovery dialog when everything restores cleanly / `workspacePrefs.recoverySkipClean` | On | Affects startup/reconnect recovery presentation; exceptions still need attention | **Show recovery only when a decision is needed** |
 
@@ -545,7 +545,7 @@ Evidence: [ServerConfig/defaults:11](https://github.com/rdavisdunham/remotea/blo
 
 ## Appendix: every rebindable action and factory binding
 
-Same storage, scope and recorder behavior for every row: `wmux-shortcuts`, this desktop renderer, effective immediately. Exact English action labels are resolved through current English translation dictionary; default binding values are from S, not user state.
+Same storage, scope and recorder behavior for every row: `remotea-shortcuts`, this desktop renderer, effective immediately. Exact English action labels are resolved through current English translation dictionary; default binding values are from S, not user state.
 
 | Group | English label / compatibility name | Key | Default binding | Source |
 |---|---|---|---|---|

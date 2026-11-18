@@ -158,7 +158,7 @@ export const hi: Translation = {
   'surfaceTab.splitLayout': 'विभाजन लेआउट…',
   'surfaceTab.closePane': 'पैन बंद करें ({binding})',
   'surfaceTab.duplicateTab': 'टैब डुप्लिकेट करें',
-  'surfaceTab.profileProject': 'प्रोजेक्ट प्रोफ़ाइल (.wmux.json)',
+  'surfaceTab.profileProject': 'प्रोजेक्ट प्रोफ़ाइल (.remotea.json)',
   'surfaceTab.profileGlobal': 'ग्लोबल प्रोफ़ाइल',
   'surfaceTab.splitRight': 'दाईं ओर विभाजित करें',
   'surfaceTab.splitDown': 'नीचे विभाजित करें',

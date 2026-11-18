@@ -1,4 +1,4 @@
-# Workspace manifests (`wmux.workspace.json`)
+# Workspace manifests (`remotea.workspace.json`)
 
 A workspace manifest describes a whole dev setup — which panes, in which folders, running which commands, with which browser tabs — in a file that lives in the repo. Commit it, and anyone who clones the repo brings the same setup up with one command:
 
@@ -8,7 +8,7 @@ remotea workspace open            # in the repo (or: remotea workspace open path
 
 Or from the command palette: **Open workspace file…**
 
-remotea looks for `wmux.workspace.json` at the root of the repo, or `.wmux/workspace.json`.
+remotea looks for `remotea.workspace.json` at the root of the repo, or `.remotea/workspace.json`.
 
 ## The file
 

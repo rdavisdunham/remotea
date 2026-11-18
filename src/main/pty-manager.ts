@@ -242,7 +242,7 @@ function codexShimDirsForPane(
   env: Record<string, string>,
 ): string[] {
   if (nodeRuntime.electron || process.platform !== 'win32' || !['powershell', 'cmd'].includes(shellType)) return [];
-  const prefs = loadSettings()['wmux-workspace-prefs'] as { restoreCodexSessions?: boolean } | undefined;
+  const prefs = loadSettings()['remotea-workspace-prefs'] as { restoreCodexSessions?: boolean } | undefined;
   if (prefs?.restoreCodexSessions !== true) return [];
   return codexShimDirs({
     shellType, executable: resolveExistingShellPath('codex.exe'), cliBinDir,

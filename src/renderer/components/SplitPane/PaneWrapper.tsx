@@ -467,7 +467,7 @@ export default function PaneWrapper({
 
   const handleNewSurfaceProfile = (profile: QuickLaunchProfile) => {
     if (!activeWorkspaceId) return;
-    // Relative profile cwd (e.g. "./server" in a project .wmux.json) resolves
+    // Relative profile cwd (e.g. "./server" in a project .remotea.json) resolves
     // against the workspace cwd; otherwise node-pty would resolve it against the
     // app directory. Absolute paths (drive-letter, UNC, or POSIX root) pass through.
     const resolveCwd = (cwd?: string) => resolveLaunchDirectory(cwd, workspace?.cwd, profile.shell || workspace?.shell || useStore.getState().workspacePrefs.defaultShell);

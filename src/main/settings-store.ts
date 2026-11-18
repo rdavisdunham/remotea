@@ -8,7 +8,7 @@ import { getAppDataDir } from '../shared/instance';
 // production `file://` origin changes between versions and Chromium buckets
 // localStorage by that path — so font/theme/shortcut customizations appeared
 // to reset on every update. We now persist settings to a JSON file in the
-// stable %APPDATA%\wmux directory (the same place session.json lives, and
+// stable %APPDATA%\remotea directory (the same place session.json lives, and
 // which handleVersionChange never touches), so they survive updates.
 
 const SETTINGS_FILE = path.join(getAppDataDir(), 'settings.json');
