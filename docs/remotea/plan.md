@@ -7,20 +7,20 @@
 | Cross-device sync: groups, placement, closes, renames/colours, hide/unhide, Load-session hides, offline closes via probes | **done**: planner and store unit tests; needs a two-device run |
 | Agent resume after server restart (Claude via `~/.claude/sessions`, Codex via rollout file / state db) | **done** |
 | First Windows run (laptop): connects, survives sleep. Fixed: doubled output in remote panes (StrictMode's second `create()` wired a second forwarder) | **done** |
-| Phase 4a: hook bridge. wmux-hook.js (Claude Code, Codex) reports to `127.0.0.1:7718` in WSL with a per-session token; the server relays status to every app showing the session and replays the latest state to apps that attach later. `remotea hooks install` | **done**: unit + real-helper + integration + e2e (hook fired in a real shell) |
+| Phase 4a: hook bridge. remotea-hook.js (Claude Code, Codex) reports to `127.0.0.1:7718` in WSL with a per-session token; the server relays status to every app showing the session and replays the latest state to apps that attach later. `remotea hooks install` | **done**: unit + real-helper + integration + e2e (hook fired in a real shell) |
 | Diagnostics: apps send connection/reattach/agent-state events (no content) to the server; `remotea logs`, `remotea screen <id>` | **done** |
 | Paste/drop into remote panes: files and pasted screenshots are uploaded to the host (`POST /upload`, same token, `/tmp/remotea-drop-<uuid>/<name>`) and their paths there typed in | **done**: route + uploader tests; real drop in the desktop test copy |
-| Explorer, code viewer and markdown viewer on remote panes: wmux's own jail and readers run on the server (`fs` message), rooted at the session's directory; git change counts from the server; code-viewer write-back with the same grant + mtime guards | **done**: unit + hub tests; clicked through in the desktop test copy. Markdown viewer edit/save, re-stat and reload go back to the server for a file opened from a remote pane's tree (same grant, server-side mtime guard); checked in the desktop test copy. Not yet: reveal/open-in-app |
+| Explorer, code viewer and markdown viewer on remote panes: remotea's own jail and readers run on the server (`fs` message), rooted at the session's directory; git change counts from the server; code-viewer write-back with the same grant + mtime guards | **done**: unit + hub tests; clicked through in the desktop test copy. Markdown viewer edit/save, re-stat and reload go back to the server for a file opened from a remote pane's tree (same grant, server-side mtime guard); checked in the desktop test copy. Not yet: reveal/open-in-app |
 | A device that does not set a shared terminal's size shows it at the owner's size, scaled down to fit, with "Sized for <device> · C×R [Fit here]" | **done**: two-client integration test; checked in the desktop test copy against a simulated second device |
 | Phase 3 (rest): deflate, snapshots persisted across restarts | open (low value: Tailscale links are fast; restarts respawn and resume by design) |
 | After connecting, the app shows whether agent hooks are installed on that host's agents and offers to install them through the server (Install / Not now / Don't ask again per host) | **done**: hub + client integration tests; clicked through in the desktop test copy |
-| Phase 4b: OpenCode in WSL — `remotea hooks install` (and the app's prompt) installs wmux's OpenCode plugin; sessions get `WMUX_CLI`/`WMUX_NODE`, so the plugin's `node $WMUX_CLI …` reports through the bridge | **done**: install tests; e2e runs the real CLI in a real shell |
-| Phase 4b: pi, omp, Grok, Qwen Code, Antigravity — `remotea hooks install` writes wmux's own file or entries for each one installed (pi/omp extensions, ~/.grok/hooks/wmux.json, Qwen's settings.json, the agy plugin dir); the agy hook gained the `WMUX_REMOTE` transport | **done**: install/remove tests on a scratch home; the Qwen and agy hooks run through a real bridge. Not run against the real agents (none installed here) |
+| Phase 4b: OpenCode in WSL — `remotea hooks install` (and the app's prompt) installs remotea's OpenCode plugin; sessions get `REMOTEA_CLI`/`REMOTEA_NODE`, so the plugin's `node $REMOTEA_CLI …` reports through the bridge | **done**: install tests; e2e runs the real CLI in a real shell |
+| Phase 4b: pi, omp, Grok, Qwen Code, Antigravity — `remotea hooks install` writes remotea's own file or entries for each one installed (pi/omp extensions, ~/.grok/hooks/remotea.json, Qwen's settings.json, the agy plugin dir); the agy hook gained the `REMOTEA_REMOTE` transport | **done**: install/remove tests on a scratch home; the Qwen and agy hooks run through a real bridge. Not run against the real agents (none installed here) |
 | Server-side agent detection | open |
 | Server restarts that keep processes | declined: like herdr, a restart (even of the PC) respawns sessions in their directories and resumes their agents |
 | Desktop test harness (`scripts/desktop-test/harness.mjs`): a test app instance on the Windows side driven over CDP from WSL, against a test server | **done** |
 | Found with the harness: a remote pane was blank after a window reload (now asks the server for a snapshot); screen reads and agent detection looked at the blank bottom of panes taller than 40 rows (now read up to the last printed line) | **fixed** |
-| UI copy says "remotea" (all 18 languages): product-name uses only. The in-pane `wmux` command, `~/.wmux/config.toml`, `.wmux.json` and other real names are unchanged | **done** |
+| UI copy says "remotea" (all 18 languages): product-name uses only. The in-pane `remotea` command, `~/.wmux/config.toml`, `.wmux.json` and other real names are unchanged | **done** |
 | Pending changes (Settings → Remote hosts): each offline action still waiting for a host, or sent without an answer ("uncertain"), listed with what it would do, its age and attempts, and a Forget action (`rhost:outbox-forget`; each says what forgetting it means, e.g. an uncertain close may already have happened on the host) | **done**: outbox + helper unit tests |
 | Host attention row (sidebar, top): per host, the Eridani runs that need you, terminals that exited non-zero, unconfirmed actions and the connection state; click goes to the first such tab | **done**: helper + render tests |
 | One shortcut table (`src/renderer/shortcuts.ts`): the F1 overlay, Settings → Keyboard, the command palette and every tooltip read their labels and live bindings from it; a test fails when a registered accelerator has no entry, or a tooltip hard-codes a combination | **done**: unit tests. The overlay now also lists the Agents category |
@@ -29,20 +29,20 @@
 
 ---
 
-# remotea: wmux GUI backed by a persistent terminal server in WSL
+# remotea: remotea GUI backed by a persistent terminal server in WSL
 
 ## Context
 
-the user runs Claude Code and Codex agents in WSL on the home desktop (`<desktop>`) and works from a Windows laptop (`<laptop>`) over Tailscale. Plain SSH sessions die when the laptop sleeps, and then the session has to be found and restarted. herdr fixes that, because a server owns the terminals, but it is a TUI. wmux (an Electron multiplexer for Windows) has the organizing GUI, but it only runs local ConPTY terminals and has no reconnect logic.
+the user runs Claude Code and Codex agents in WSL on the home desktop (`<desktop>`) and works from a Windows laptop (`<laptop>`) over Tailscale. Plain SSH sessions die when the laptop sleeps, and then the session has to be found and restarted. herdr fixes that, because a server owns the terminals, but it is a TUI. remotea (an Electron multiplexer for Windows) has the organizing GUI, but it only runs local ConPTY terminals and has no reconnect logic.
 
-**Goal:** a lightweight server in WSL that owns every terminal, herdr-style. wmux on both the laptop and the desktop's Windows side connects to it. After sleep, a network drop or a wmux restart, wmux reconnects automatically and repopulates every terminal with its screen and scrollback. New terminals default to this server.
+**Goal:** a lightweight server in WSL that owns every terminal, herdr-style. remotea on both the laptop and the desktop's Windows side connects to it. After sleep, a network drop or a remotea restart, remotea reconnects automatically and repopulates every terminal with its screen and scrollback. New terminals default to this server.
 
 **Decisions made with the user:**
-1. **Own lightweight server, not herdr as the backend.** herdr only sends server-rendered repaint frames, which would degrade wmux's scrollback, search, OSC notifications, cwd tracking and agent detection. The new server streams raw PTY bytes and copies herdr's architecture: a daemon that owns the PTYs, detach and attach, and resume after a restart. herdr stays installed and untouched.
+1. **Own lightweight server, not herdr as the backend.** herdr only sends server-rendered repaint frames, which would degrade remotea's scrollback, search, OSC notifications, cwd tracking and agent detection. The new server streams raw PTY bytes and copies herdr's architecture: a daemon that owns the PTYs, detach and attach, and resume after a restart. herdr stays installed and untouched.
 2. **Transport: WebSocket plus a bearer token over Tailscale.** The server binds only to WSL's Tailscale IP (<tailscale-ip>) and 127.0.0.1. `.wslconfig` uses mirrored networking, so the desktop's Windows side reaches it on localhost.
 3. **Shared sessions, per-device layout.**
    - **The server owns:** the registry of sessions (which terminals exist) and workspaces as groups (id, name, color).
-   - **Each device owns:** split trees, pane sizes, windows and monitor placement, kept in each wmux's local `session.json`.
+   - **Each device owns:** split trees, pane sizes, windows and monitor placement, kept in each remotea's local `session.json`.
    - **Placement:** a session opened on one machine appears on the other as a new tab in that machine's copy of the same workspace. The workspace is created there if it doesn't exist.
 4. **Closing syncs.** Closing a session on either machine closes it on both. Closing a workspace closes all its sessions everywhere.
 5. **"Hide on this device"** removes a session from one machine only. The hidden set is stored on the server, keyed by device id. Hidden sessions stay in a "Hidden sessions" menu where they can be unhidden or killed.
@@ -56,14 +56,14 @@ the user runs Claude Code and Codex agents in WSL on the home desktop (`<desktop
 ```
 Laptop (Windows)                          Desktop
 ┌──────────────────────┐   Tailscale     ┌──────────────── WSL (systemd user svc) ───────────────┐
-│ wmux (Electron)      │  ws://<desktop>   │ remotea server (Node 22, port 7717)                   │
+│ remotea (Electron)      │  ws://<desktop>   │ remotea server (Node 22, port 7717)                   │
 │  renderer: xterm.js  │ ─────────────── │  per session: node-pty + @xterm/headless + serialize  │
 │  main: TerminalRouter│  token auth     │  registry.json: groups, sessions, tombstones, hidden  │
 │   ├ LocalPtyBackend  │                 │  answers terminal queries even with no client attached│
 │   └ RemoteHostClient │                 └───────────────────────────────────────────────────────┘
 └──────────────────────┘                          ▲ ws://127.0.0.1:7717 (mirrored networking)
                                                   │
-                                    Desktop Windows side: wmux (same build)
+                                    Desktop Windows side: remotea (same build)
 ```
 
 ---
@@ -73,7 +73,7 @@ Laptop (Windows)                          Desktop
 ### Package and dependencies
 
 - **Runtime:** node-pty 1.1.0, ws 8.21.0, @xterm/headless 6.0.0, @xterm/addon-serialize 0.14.0, @xterm/addon-unicode11 0.9.0.
-- **xterm versions are pinned** to match wmux's renderer (xterm 6.0.0) so serialized snapshots replay identically.
+- **xterm versions are pinned** to match remotea's renderer (xterm 6.0.0) so serialized snapshots replay identically.
 - **Dev:** typescript, vitest, @types/ws.
 - **tsconfig:** `rootDir: ".."` so it can import `../src/shared/*`.
 
@@ -86,7 +86,7 @@ Laptop (Windows)                          Desktop
 | `src/client-conn.ts` | per-connection dispatch, channel table, ping every 15 s, backpressure |
 | `src/session.ts` | node-pty + headless terminal + seq ring buffer (1 MB) + subscribers + size owner + query responder + startup gate |
 | `src/registry.ts` | groups, sessions, tombstones, devices; atomic persistence to `registry.json`; on boot, every live session becomes `lost` |
-| `src/pty-spawn.ts` | login shell `-l`, `TERM=xterm-256color`, `WMUX_REMOTE_SESSION=<id>`; maps Windows paths to `/mnt/c/...`, falls back to `$HOME` |
+| `src/pty-spawn.ts` | login shell `-l`, `TERM=xterm-256color`, `REMOTEA_REMOTE_SESSION=<id>`; maps Windows paths to `/mnt/c/...`, falls back to `$HOME` |
 | `src/agent-probe.ts` | every 5 s: walk `/proc` descendants and read `~/.claude/sessions/<pid>.json` to get the Claude `sessionId` (used for resume); report foreground cwd via `/proc/<pid>/cwd` |
 | `src/flow.ts` | `pty.pause()` when the parse backlog exceeds 4 MB; mark a client lagging when `ws.bufferedAmount` exceeds 4 MB, then resnapshot it |
 | `systemd/remotea.service` | same shape as `~/.config/systemd/user/cc-g2-backend.service`; `Restart=always`; `UMask=0077` |
@@ -118,7 +118,7 @@ xterm calls a write's callback after parsing that write and before parsing the n
 
 ### Terminal queries
 
-- **The server always answers** DA1/DA2/DSR/CPR/DECRQM, and OSC 10/11/12 when the payload is `?`. It answers through the headless terminal's `onData`, plus an override that sends wmux's DA1 reply (moved from `pty-manager.ts:625`). This works with no client attached, so agents never hang while the laptop sleeps.
+- **The server always answers** DA1/DA2/DSR/CPR/DECRQM, and OSC 10/11/12 when the payload is `?`. It answers through the headless terminal's `onData`, plus an override that sends remotea's DA1 reply (moved from `pty-manager.ts:625`). This works with no client attached, so agents never hang while the laptop sleeps.
 - **Clients swallow the same queries** with `installRemoteQuerySwallow(term)`, so no reply is ever sent twice.
 
 ### Size policy (herdr's model)
@@ -186,7 +186,7 @@ xterm calls a write's callback after parsing that write and before parsing the n
 
 ---
 
-## C. wmux main process
+## C. remotea main process
 
 ### 1. Extract the backend interface
 
@@ -266,7 +266,7 @@ Every `ptyManager.*` use becomes `terminals.*`.
 
 ---
 
-## D. wmux renderer and store
+## D. remotea renderer and store
 
 ### `src/renderer/hooks/useTerminal.ts`
 
@@ -290,7 +290,7 @@ Every `ptyManager.*` use becomes `terminals.*`.
    Reuse `utils/replay-hold.ts`, `restoreSurfaceState` (`:1087`), `resetTerminalModes` and `mouse-modes`.
 4. **`onExit` by reason:**
    - `closed`: silent, because reconcile removes the tab.
-   - `lost`: show "[wmux] <desktop> restarted; session restored", then `resetResume(id)` and `openPty({lost})`.
+   - `lost`: show "[remotea] <desktop> restarted; session restored", then `resetResume(id)` and `openPty({lost})`.
    - `exited`: the existing `[process exited]` banner.
 5. **Focus and input.**
    - Focus in a focused window calls `pty.focus(id)`, which claims size.
@@ -410,7 +410,7 @@ None of these call `pty.kill`.
   - Paste and drop uploads over the WebSocket.
   - A `remotea` CLI: `status`, `token`, `rotate-token`.
 - **Phase 4: agent hooks.**
-  - A per-session relay in WSL so Claude hooks, `wmux hook` and shell integration (`WMUX_REMOTE`/`WMUX_REMOTE_TOKEN`) reach wmux, restricted to a whitelist of methods.
+  - A per-session relay in WSL so Claude hooks, `remotea hook` and shell integration (`REMOTEA_REMOTE`/`REMOTEA_REMOTE_TOKEN`) reach remotea, restricted to a whitelist of methods.
   - Server-side agent detection that reuses `src/shared/detection`.
 
 ---
@@ -421,7 +421,7 @@ Each of these is a default the user can override when reviewing:
 1. **Resume after a server restart:** a new pref "Resume agents when the server restarts", **on** by default for remote hosts. The local resume prefs default to off.
 2. **Load session:** remote surfaces that loading a session drops are **hidden**, not killed.
 3. **Retention:** exited sessions are kept 7 days, tombstones 30 days. The fallback group is named "Inbox".
-4. **Agents spawned from the CLI** (`wmux agent spawn`) stay local until phase 4.
+4. **Agents spawned from the CLI** (`remotea agent spawn`) stay local until phase 4.
 5. **Workspace order** stays per device and isn't synced.
 
 ---

@@ -5,15 +5,15 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-// Exercises the real compiled wmux.js (resources/cli/wmux.js) `bridge` command
+// Exercises the real compiled remotea.js (resources/cli/remotea.js) `bridge` command
 // end-to-end. `wmux bridge` is a pure byte relay: it accepts TCP connections and
 // forwards them to the local wmux via connectTransport(). This verifies the two
 // non-TCP transport branches the bridge must pick between:
-//   * WMUX_PIPE=/path        → Unix-socket upstream
+//   * REMOTEA_PIPE=/path        → Unix-socket upstream
 //   * inside WSL2            → spawn npiperelay.exe and use its stdio
 // so a `wmux bridge` running inside WSL2 reaches the Windows-host named pipe.
 
-const BRIDGE_SCRIPT = path.resolve(__dirname, '../../resources/cli/wmux.js');
+const BRIDGE_SCRIPT = path.resolve(__dirname, '../../resources/cli/remotea.js');
 
 // Bind to :0 to discover a free port, then release it for the bridge to reuse.
 function freePort(): Promise<number> {
@@ -28,7 +28,7 @@ function freePort(): Promise<number> {
   });
 }
 
-// Spawn `node wmux.js bridge --port <port>` and resolve once it logs that it is
+// Spawn `node remotea.js bridge --port <port>` and resolve once it logs that it is
 // listening. Returns the child so the test can kill it in afterEach.
 //
 // Deliberately without --wsl. Every test here connects over 127.0.0.1, so the
@@ -91,7 +91,7 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
     const port = await freePort();
     const { code, stderr } = await new Promise<{ code: number | null; stderr: string }>((resolve, reject) => {
       const child = spawn('node', [BRIDGE_SCRIPT, 'bridge', '--wsl', '--port', String(port)], {
-        env: { ...process.env, WMUX_REMOTE: '', WMUX_PIPE: '' } as Record<string, string>,
+        env: { ...process.env, REMOTEA_REMOTE: '', REMOTEA_PIPE: '' } as Record<string, string>,
       });
       let err = '';
       child.stderr.on('data', (c: Buffer) => { err += c.toString(); });
@@ -108,7 +108,7 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
     expect(stderr).toContain('--host');
   });
 
-  it.skipIf(process.platform === 'win32')('relays TCP ↔ a Unix-socket upstream when WMUX_PIPE is a /path', async () => {
+  it.skipIf(process.platform === 'win32')('relays TCP ↔ a Unix-socket upstream when REMOTEA_PIPE is a /path', async () => {
     // Stand-in for the local pipe: a Unix-socket echo server.
     const sockPath = path.join(os.tmpdir(), `wmux-bridge-test-${process.pid}.sock`);
     try { fs.unlinkSync(sockPath); } catch { /* not present */ }
@@ -117,15 +117,15 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
     cleanups.push(() => { upstream.close(); try { fs.unlinkSync(sockPath); } catch { /* gone */ } });
 
     const port = await freePort();
-    // WMUX_PIPE starting with '/' selects the Unix-socket branch regardless of
-    // WSL detection, so this branch needs no fake npiperelay. WMUX_REMOTE must
+    // REMOTEA_PIPE starting with '/' selects the Unix-socket branch regardless of
+    // WSL detection, so this branch needs no fake npiperelay. REMOTEA_REMOTE must
     // be cleared: it takes precedence (TCP) and is set when this suite itself
     // runs inside a wmux devcontainer.
     const child = await startBridge(port, {
       ...process.env,
-      WMUX_REMOTE: '',
-      WMUX_REMOTE_TOKEN: '',
-      WMUX_PIPE: sockPath,
+      REMOTEA_REMOTE: '',
+      REMOTEA_REMOTE_TOKEN: '',
+      REMOTEA_PIPE: sockPath,
     } as Record<string, string>);
     cleanups.push(() => child.kill());
 
@@ -143,13 +143,13 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
     cleanups.push(() => fs.rmSync(binDir, { recursive: true, force: true }));
 
     const port = await freePort();
-    // WSL_DISTRO_NAME set + WMUX_PIPE cleared (falls back to the \\.\pipe\wmux
+    // WSL_DISTRO_NAME set + REMOTEA_PIPE cleared (falls back to the \\.\pipe\wmux
     // default, which is not a '/path') selects the npiperelay branch;
     // findNpiperelay() picks up our fake via PATH.
     const child = await startBridge(port, {
       ...process.env,
-      WMUX_PIPE: '',
-      WMUX_REMOTE: '',
+      REMOTEA_PIPE: '',
+      REMOTEA_REMOTE: '',
       WSL_DISTRO_NAME: 'test-distro',
       PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
     } as Record<string, string>);
@@ -161,7 +161,7 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
 
   // Regression: the bridge used to destroy BOTH sides on either 'close', so a
   // client that wrote a frame and closed immediately — which is exactly what
-  // wmux-hook.js does for every Claude Code hook — had its frame killed inside a
+  // remotea-hook.js does for every Claude Code hook — had its frame killed inside a
   // still-draining npiperelay relay (the Duplex's destroy() is child.kill()). The
   // hook exited 0, the sidebar never updated, and nothing logged an error.
   //
@@ -197,13 +197,13 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
     const port = await freePort();
     const child = await startBridge(port, {
       ...process.env,
-      WMUX_PIPE: '',
-      WMUX_REMOTE: '',
+      REMOTEA_PIPE: '',
+      REMOTEA_REMOTE: '',
       WSL_DISTRO_NAME: 'test-distro',
       // Comfortably longer than RELAY_DELAY_MS, short enough to keep the suite
       // quick. Pinned rather than inherited so the test does not depend on the
       // shipped default.
-      WMUX_BRIDGE_DRAIN_MS: '8000',
+      REMOTEA_BRIDGE_DRAIN_MS: '8000',
       PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
     } as Record<string, string>);
     cleanups.push(() => child.kill());
@@ -268,10 +268,10 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
       const port = await freePort();
       const child = await startBridge(port, {
         ...process.env,
-        WMUX_PIPE: '',
-        WMUX_REMOTE: '',
+        REMOTEA_PIPE: '',
+        REMOTEA_REMOTE: '',
         WSL_DISTRO_NAME: 'test-distro',
-        WMUX_BRIDGE_WARM: '2',
+        REMOTEA_BRIDGE_WARM: '2',
         PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
       } as Record<string, string>);
       cleanups.push(() => child.kill());
@@ -288,17 +288,17 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
       expect(spawnCount(spawnLog)).toBe(3);
     }, 20000);
 
-    it.skipIf(!isWslRuntime)('spawns nothing ahead of time when WMUX_BRIDGE_WARM=0', async () => {
+    it.skipIf(!isWslRuntime)('spawns nothing ahead of time when REMOTEA_BRIDGE_WARM=0', async () => {
       const { binDir, spawnLog } = makeCountingRelay();
       cleanups.push(() => fs.rmSync(binDir, { recursive: true, force: true }));
 
       const port = await freePort();
       const child = await startBridge(port, {
         ...process.env,
-        WMUX_PIPE: '',
-        WMUX_REMOTE: '',
+        REMOTEA_PIPE: '',
+        REMOTEA_REMOTE: '',
         WSL_DISTRO_NAME: 'test-distro',
-        WMUX_BRIDGE_WARM: '0',
+        REMOTEA_BRIDGE_WARM: '0',
         PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
       } as Record<string, string>);
       cleanups.push(() => child.kill());

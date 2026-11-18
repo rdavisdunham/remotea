@@ -58,11 +58,11 @@ describe('markers (#310)', () => {
 
   it('agrees with pluginNeedsUpdate on the cases that matter', () => {
     const cases: Array<[string, string | null]> = [
-      ['// wmux-plugin-version: 1\nbody', null],
-      ['// wmux-plugin-version: 1\nbody', '// wmux-plugin-version: 1\ndifferent'],
-      ['// wmux-plugin-version: 1\nbody', '// wmux-plugin-version: 0\nbody'],
-      ['// wmux-plugin-version: 1\nbody', 'no marker'],
-      ['no marker', '// wmux-plugin-version: 1\nbody'],
+      ['// remotea-plugin-version: 1\nbody', null],
+      ['// remotea-plugin-version: 1\nbody', '// remotea-plugin-version: 1\ndifferent'],
+      ['// remotea-plugin-version: 1\nbody', '// remotea-plugin-version: 0\nbody'],
+      ['// remotea-plugin-version: 1\nbody', 'no marker'],
+      ['no marker', '// remotea-plugin-version: 1\nbody'],
     ];
     for (const [src, target] of cases) {
       expect(tuiNeedsUpdate(src, target)).toBe(pluginNeedsUpdate(src, target));
@@ -70,7 +70,7 @@ describe('markers (#310)', () => {
   });
 
   it('recognises only marker-bearing files as ours', () => {
-    expect(isWmuxTuiFile('// wmux-plugin-version: 1\nx')).toBe(true);
+    expect(isWmuxTuiFile('// remotea-plugin-version: 1\nx')).toBe(true);
     expect(isWmuxTuiFile('export default { id: "mine" }')).toBe(false);
   });
 });
@@ -79,22 +79,22 @@ describe('install and remove (#310)', () => {
   let tmp: string;
   let sourceDir: string;
   let configDir: string;
-  const ENTRY = 'wmux-plugin-version: 1';
+  const ENTRY = 'remotea-plugin-version: 1';
 
   beforeEach(() => {
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-opencode-tui-'));
     sourceDir = path.join(tmp, 'resources', 'opencode-plugin');
     configDir = path.join(tmp, 'home', '.config', 'opencode');
     fs.mkdirSync(sourceDir, { recursive: true });
-    fs.writeFileSync(path.join(sourceDir, 'wmux-tui.js'), `// wmux-plugin-version: 1\nexport default {}\n`);
-    fs.writeFileSync(path.join(sourceDir, 'wmux-tui-core.js'), `export const core = 1;\n`);
+    fs.writeFileSync(path.join(sourceDir, 'remotea-tui.js'), `// remotea-plugin-version: 1\nexport default {}\n`);
+    fs.writeFileSync(path.join(sourceDir, 'remotea-tui-core.js'), `export const core = 1;\n`);
   });
 
   afterEach(() => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  const targetDir = () => path.join(configDir, 'plugins', 'wmux-cli');
+  const targetDir = () => path.join(configDir, 'plugins', 'remotea-cli');
   const entry = () => path.join(targetDir(), 'tui.js');
   const core = () => path.join(targetDir(), 'core.js');
 
@@ -115,7 +115,7 @@ describe('install and remove (#310)', () => {
 
   it('reinstalls when the shipped marker moves', () => {
     installOpencodeTui({ sourceDir, configDir });
-    fs.writeFileSync(path.join(sourceDir, 'wmux-tui.js'), `// wmux-plugin-version: 2\nexport default {}\n`);
+    fs.writeFileSync(path.join(sourceDir, 'remotea-tui.js'), `// remotea-plugin-version: 2\nexport default {}\n`);
     const result = installOpencodeTui({ sourceDir, configDir });
     expect(result.status).toBe('installed');
     expect(result.version).toBe('2');
@@ -156,8 +156,8 @@ describe('install and remove (#310)', () => {
 });
 
 describe('the shipped entry file (#310)', () => {
-  const entryPath = path.resolve(__dirname, '../../resources/opencode-plugin/wmux-tui.js');
-  const corePath = path.resolve(__dirname, '../../resources/opencode-plugin/wmux-tui-core.js');
+  const entryPath = path.resolve(__dirname, '../../resources/opencode-plugin/remotea-tui.js');
+  const corePath = path.resolve(__dirname, '../../resources/opencode-plugin/remotea-tui-core.js');
   const src = fs.readFileSync(entryPath, 'utf-8');
   const coreSrc = fs.readFileSync(corePath, 'utf-8');
 
@@ -165,7 +165,7 @@ describe('the shipped entry file (#310)', () => {
     // v5 → v6 retries a session report that never landed and reasserts the
     // handle when the pane starts a turn, so a transient CLI failure no longer
     // leaves the sidebar without that pane's session until the next switch.
-    expect(src).toMatch(/wmux-plugin-version:\s*6/);
+    expect(src).toMatch(/remotea-plugin-version:\s*6/);
   });
 
   it('is a v2 CLI plugin definition and the only export', () => {

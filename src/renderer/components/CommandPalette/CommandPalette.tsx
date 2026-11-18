@@ -192,7 +192,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     // the trust prompt and brings the panes up — the renderer only asks.
     items.push({
       id: 'command:open-workspace-file',
-      label: t('palette.openWorkspaceFile', 'Open workspace file… (wmux.workspace.json)'),
+      label: t('palette.openWorkspaceFile', 'Open workspace file… (remotea.workspace.json)'),
       category: t('palette.category.commands'),
       action: () => {
         onClose();

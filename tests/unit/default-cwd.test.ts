@@ -77,7 +77,7 @@ describe('resolveSpawnCwd with a user-typed starting path', () => {
   });
 
   it('falls back rather than spawning in a drive root for an unset var', () => {
-    expect(resolveSpawnCwd('%WMUX_NO_SUCH_VAR%\\projects')).toBe(process.env.USERPROFILE || os.homedir());
+    expect(resolveSpawnCwd('%REMOTEA_NO_SUCH_VAR%\\projects')).toBe(process.env.USERPROFILE || os.homedir());
   });
 
   // Was `toBeUndefined()` — node-pty's default, which is "inherit wmux.exe's own

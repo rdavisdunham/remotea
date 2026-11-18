@@ -55,7 +55,7 @@ interface Rig {
 const rigs: Rig[] = [];
 /** cookie → the page key minted with it (the second half of the credential, devices.ts). */
 const keys = new Map<string, string>();
-const keyed = (cookie: string): Record<string, string> => ({ Cookie: `wmux_rc=${cookie}`, [DEVICE_KEY_HEADER]: keys.get(cookie) ?? '' });
+const keyed = (cookie: string): Record<string, string> => ({ Cookie: `remotea_rc=${cookie}`, [DEVICE_KEY_HEADER]: keys.get(cookie) ?? '' });
 afterEach(async () => {
   for (const r of rigs.splice(0)) await r.server.close();
 });
@@ -139,7 +139,7 @@ function pairDevice(r: Rig, scope: RemoteScope = 'operator'): string {
 function connect(r: Rig, headers: { origin?: string | null; cookie?: string; host?: string; path?: string; key?: string | null } = {}): Promise<{ ws: WebSocket; status: number | 'open' }> {
   return new Promise((resolve) => {
     const h: Record<string, string> = { Host: headers.host ?? r.host };
-    if (headers.cookie) h.Cookie = `wmux_rc=${headers.cookie}`;
+    if (headers.cookie) h.Cookie = `remotea_rc=${headers.cookie}`;
     const origin = headers.origin === undefined ? r.origin : headers.origin;
     const storedKey = headers.cookie ? keys.get(headers.cookie) ?? null : null;
     const key = headers.key === undefined ? storedKey : headers.key;
@@ -263,7 +263,7 @@ describe('remote-console server: upgrade gate (#254)', () => {
     sock.write([
       'GET /ws HTTP/1.1', `Host: ${r.host}`, `Origin: ${r.origin}`, 'Upgrade: websocket', 'Connection: Upgrade',
       `Sec-WebSocket-Key: ${crypto.randomBytes(16).toString('base64')}`, 'Sec-WebSocket-Version: 13',
-      `Cookie: wmux_rc=${cookie}`, `Sec-WebSocket-Protocol: ${WS_SUBPROTOCOL}, ${WS_KEY_PROTOCOL_PREFIX}${keys.get(cookie)}`, '', '',
+      `Cookie: remotea_rc=${cookie}`, `Sec-WebSocket-Protocol: ${WS_SUBPROTOCOL}, ${WS_KEY_PROTOCOL_PREFIX}${keys.get(cookie)}`, '', '',
     ].join('\r\n'));
     await until(() => received.toString('latin1').includes('\r\n\r\n') && r.clients.length === 1);
     expect(received.toString('latin1')).toMatch(/^HTTP\/1\.1 101/);
@@ -395,7 +395,7 @@ describe('remote-console server: pairing endpoints', () => {
     const res = await json(r, { secret: offer.secret, name: 'Pixel' });
     expect(res.status).toBe(200);
     const cookie = String(res.headers['set-cookie']);
-    expect(cookie).toMatch(/^wmux_rc=dev-[0-9a-f-]+\.[A-Za-z0-9_-]+; HttpOnly; SameSite=Strict; Path=\/; Max-Age=2592000$/);
+    expect(cookie).toMatch(/^remotea_rc=dev-[0-9a-f-]+\.[A-Za-z0-9_-]+; HttpOnly; SameSite=Strict; Path=\/; Max-Age=2592000$/);
     expect(cookie).not.toContain('Secure');
     expect(JSON.parse(res.body).device).toMatchObject({ name: 'Pixel', scope: 'operator' });
     expect(res.body).not.toContain(cookie.split('.')[1].split(';')[0]);
@@ -453,10 +453,10 @@ describe('remote-console server: pairing endpoints', () => {
   it('logout without the page key revokes nothing: a lifted cookie cannot unpair the phone (#254)', async () => {
     const r = await rig();
     const cookie = pairDevice(r);
-    const res = await request(r, 'POST', '/api/logout', { Origin: r.origin, Cookie: `wmux_rc=${cookie}` });
+    const res = await request(r, 'POST', '/api/logout', { Origin: r.origin, Cookie: `remotea_rc=${cookie}` });
     expect(res.status).toBe(401);
     expect(r.devices.count()).toBe(1);
-    const wrong = await request(r, 'POST', '/api/logout', { Origin: r.origin, Cookie: `wmux_rc=${cookie}`, [DEVICE_KEY_HEADER]: 'k'.repeat(43) });
+    const wrong = await request(r, 'POST', '/api/logout', { Origin: r.origin, Cookie: `remotea_rc=${cookie}`, [DEVICE_KEY_HEADER]: 'k'.repeat(43) });
     expect(wrong.status).toBe(401);
     expect(r.devices.count()).toBe(1);
   });
@@ -531,7 +531,7 @@ describe('remote-console server: binding and shutdown', () => {
     sock.write([
       'GET /ws HTTP/1.1', `Host: ${r.host}`, `Origin: ${r.origin}`, 'Upgrade: websocket', 'Connection: Upgrade',
       `Sec-WebSocket-Key: ${crypto.randomBytes(16).toString('base64')}`, 'Sec-WebSocket-Version: 13',
-      `Cookie: wmux_rc=${cookie}`, `Sec-WebSocket-Protocol: ${WS_SUBPROTOCOL}, ${WS_KEY_PROTOCOL_PREFIX}${keys.get(cookie)}`, '', '',
+      `Cookie: remotea_rc=${cookie}`, `Sec-WebSocket-Protocol: ${WS_SUBPROTOCOL}, ${WS_KEY_PROTOCOL_PREFIX}${keys.get(cookie)}`, '', '',
     ].join('\r\n'));
     await until(() => received.includes('\r\n\r\n') && r.clients.length === 1);
 
@@ -563,11 +563,11 @@ describe('remote-console server: review fixes, round 3 (#254)', () => {
     const cookie = pairDevice(r);
     expect((await connect(r, { cookie, key: null })).status).toBe(401);
     expect((await connect(r, { cookie, key: 'x'.repeat(43) })).status).toBe(401);
-    expect((await request(r, 'GET', '/api/session', { Cookie: `wmux_rc=${cookie}` })).status).toBe(401);
+    expect((await request(r, 'GET', '/api/session', { Cookie: `remotea_rc=${cookie}` })).status).toBe(401);
     expect((await request(r, 'GET', '/api/session', keyed(cookie))).status).toBe(200);
     const { ws, status } = await connect(r, { cookie });
     expect(status).toBe('open');
-    // The server selects `wmux`, never echoing the key-bearing protocol.
+    // The server selects `remotea`, never echoing the key-bearing protocol.
     expect(ws.protocol).toBe(WS_SUBPROTOCOL);
     ws.close();
   });
@@ -579,7 +579,7 @@ describe('remote-console server: review fixes, round 3 (#254)', () => {
     expect((await request(r, 'GET', '/nope')).status).toBe(429);
     // Everyone is 127.0.0.1 here, as behind tailscale serve; the phone still gets in.
     expect((await request(r, 'GET', '/api/session', keyed(cookie))).status).toBe(200);
-    expect((await request(r, 'GET', '/', { Cookie: `wmux_rc=${cookie}` })).status).toBe(200);
+    expect((await request(r, 'GET', '/', { Cookie: `remotea_rc=${cookie}` })).status).toBe(200);
   });
 
   it('a cookie WITHOUT its page key is throttled like a stranger on the API routes (#254)', async () => {
@@ -587,8 +587,8 @@ describe('remote-console server: review fixes, round 3 (#254)', () => {
     const cookie = pairDevice(r);
     for (let i = 0; i < LIMITS.unauth.limit; i++) await request(r, 'GET', '/nope');
     // The lifted-cookie case: another server on this host was handed it.
-    expect((await request(r, 'GET', '/api/session', { Cookie: `wmux_rc=${cookie}` })).status).toBe(429);
-    expect((await request(r, 'POST', '/api/logout', { Origin: r.origin, Cookie: `wmux_rc=${cookie}` })).status).toBe(429);
+    expect((await request(r, 'GET', '/api/session', { Cookie: `remotea_rc=${cookie}` })).status).toBe(429);
+    expect((await request(r, 'POST', '/api/logout', { Origin: r.origin, Cookie: `remotea_rc=${cookie}` })).status).toBe(429);
     expect(r.devices.count()).toBe(1);
   });
 

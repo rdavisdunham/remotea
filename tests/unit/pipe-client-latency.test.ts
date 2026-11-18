@@ -34,8 +34,8 @@ import path from 'path';
  */
 
 const CLI_DIR = path.resolve(__dirname, '../../resources/cli');
-const HOOK_SCRIPT = path.join(CLI_DIR, 'wmux-hook.js');
-const CLI_SCRIPT = path.join(CLI_DIR, 'wmux.js');
+const HOOK_SCRIPT = path.join(CLI_DIR, 'remotea-hook.js');
+const CLI_SCRIPT = path.join(CLI_DIR, 'remotea.js');
 const TRACER = path.resolve(__dirname, '../helpers/socket-trace.cjs');
 
 /**
@@ -87,7 +87,7 @@ function runClient(script: string, args: string[], env: Record<string, string | 
   const traceFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-socket-trace-')), 'trace.log');
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['--require', TRACER, script, ...args], {
-      env: { ...env, WMUX_SOCKET_TRACE: traceFile } as NodeJS.ProcessEnv,
+      env: { ...env, REMOTEA_SOCKET_TRACE: traceFile } as NodeJS.ProcessEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -122,17 +122,17 @@ describe('pipe clients exit right behind the reply, against a server that never 
     close = undefined;
   });
 
-  it('wmux-hook.js destroys its connection on the reply', async () => {
+  it('remotea-hook.js destroys its connection on the reply', async () => {
     const pipe = uniquePipe();
     const server = await neverClosingServer(pipe, () => JSON.stringify({ result: { ok: true }, id: 1 }));
     close = server.close;
 
     const run = runClient(HOOK_SCRIPT, ['Bash'], {
       ...process.env,
-      WMUX_PIPE: pipe,
-      WMUX_PIPE_TOKEN: 'secret',
-      WMUX_SURFACE_ID: 'surf-1',
-      WMUX_REMOTE: undefined,
+      REMOTEA_PIPE: pipe,
+      REMOTEA_PIPE_TOKEN: 'secret',
+      REMOTEA_SURFACE_ID: 'surf-1',
+      REMOTEA_REMOTE: undefined,
     }, JSON.stringify({ session_id: 'abcdefgh', tool_name: 'Bash' }));
 
     const repliedAt = await server.repliedAt;
@@ -142,12 +142,12 @@ describe('pipe clients exit right behind the reply, against a server that never 
     expect(exitedAt - repliedAt).toBeLessThan(LONG_BEFORE_DEADLINE_MS);
   });
 
-  it('wmux.js ping (sendV1) destroys its connection on pong', async () => {
+  it('remotea.js ping (sendV1) destroys its connection on pong', async () => {
     const pipe = uniquePipe();
     const server = await neverClosingServer(pipe, () => 'pong');
     close = server.close;
 
-    const run = runClient(CLI_SCRIPT, ['ping'], { ...process.env, WMUX_PIPE: pipe, WMUX_REMOTE: undefined });
+    const run = runClient(CLI_SCRIPT, ['ping'], { ...process.env, REMOTEA_PIPE: pipe, REMOTEA_REMOTE: undefined });
     const repliedAt = await server.repliedAt;
     const { exitedAt, code, stdout, trace } = await run;
     expect(code).toBe(0);
@@ -156,12 +156,12 @@ describe('pipe clients exit right behind the reply, against a server that never 
     expect(exitedAt - repliedAt).toBeLessThan(LONG_BEFORE_DEADLINE_MS);
   });
 
-  it('wmux.js identify (sendV2) destroys its connection on the result', async () => {
+  it('remotea.js identify (sendV2) destroys its connection on the result', async () => {
     const pipe = uniquePipe();
     const server = await neverClosingServer(pipe, () => JSON.stringify({ result: { app: 'wmux' }, id: 1 }));
     close = server.close;
 
-    const run = runClient(CLI_SCRIPT, ['identify'], { ...process.env, WMUX_PIPE: pipe, WMUX_REMOTE: undefined });
+    const run = runClient(CLI_SCRIPT, ['identify'], { ...process.env, REMOTEA_PIPE: pipe, REMOTEA_REMOTE: undefined });
     const repliedAt = await server.repliedAt;
     const { exitedAt, code, stdout, trace } = await run;
     expect(code).toBe(0);
@@ -177,10 +177,10 @@ describe('pipe clients exit right behind the reply, against a server that never 
     close = server.close;
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-old-client-'));
     const oldClient = path.join(dir, 'old-client.js');
-    fs.writeFileSync(oldClient, `const c=require('net').connect(process.env.WMUX_PIPE,()=>{c.write('ping\\n');c.end();});
+    fs.writeFileSync(oldClient, `const c=require('net').connect(process.env.REMOTEA_PIPE,()=>{c.write('ping\\n');c.end();});
       c.on('data',()=>{});c.on('close',()=>process.exit(0));`);
     try {
-      const { trace } = await runClient(oldClient, [], { ...process.env, WMUX_PIPE: pipe });
+      const { trace } = await runClient(oldClient, [], { ...process.env, REMOTEA_PIPE: pipe });
       expect(trace.indexOf('end')).toBeGreaterThanOrEqual(0);
       expect(trace.indexOf('end')).toBeLessThan(trace.indexOf('data'));
     } finally {

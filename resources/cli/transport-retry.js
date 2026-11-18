@@ -1,8 +1,8 @@
 "use strict";
 /**
- * The shared retry policy for idempotent wmux pipe requests.
+ * The shared retry policy for idempotent remotea pipe requests.
  *
- * A busy wmux answers `All pipe instances are busy` on the native named pipe,
+ * A busy remotea answers `All pipe instances are busy` on the native named pipe,
  * and on WSL npiperelay exits before it attaches. Restoring a workspace starts
  * many panes at once, so a session/status report can lose that race through no
  * fault of its own. Retrying is safe only for requests that can be asked twice
@@ -13,7 +13,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WmuxBusyError = void 0;
 exports.isTransientWmuxError = isTransientWmuxError;
 exports.retryTransient = retryTransient;
-/** wmux is there but did not answer in time, or dropped the connection. */
+/** remotea is there but did not answer in time, or dropped the connection. */
 class WmuxBusyError extends Error {
 }
 exports.WmuxBusyError = WmuxBusyError;
@@ -29,9 +29,9 @@ function isTransientWmuxError(error) {
     return /All pipe instances are busy|pipe busy|timed out/i.test(message);
 }
 /**
- * Ask again while wmux is merely busy. The caller supplies the idempotent
- * attempt; the timeout grows so a genuinely slow wmux gets more room on each
- * try, and the budget stops a dead wmux from holding a hook process forever.
+ * Ask again while remotea is merely busy. The caller supplies the idempotent
+ * attempt; the timeout grows so a genuinely slow remotea gets more room on each
+ * try, and the budget stops a dead remotea from holding a hook process forever.
  */
 async function retryTransient(attempt, patience, now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))) {
     const deadline = now() + patience.budgetMs;

@@ -73,10 +73,10 @@ function memStorage(entries: Record<string, string>): ListableStorage & { data: 
 
 describe('forgetting this device (#254)', () => {
   it('sweeps drafts and fit modes from both storages, and leaves the prefs', () => {
-    const local = memStorage({ 'wmux-remote-draft:surf-a': 'hunter2', 'wmux-remote-fit:surf-a': 'pan', 'wmux-remote-prefs': '{}' });
-    const session = memStorage({ 'wmux-remote-draft:surf-b': 'sudo password', other: 'x' });
+    const local = memStorage({ 'remotea-remote-draft:surf-a': 'hunter2', 'remotea-remote-fit:surf-a': 'pan', 'remotea-remote-prefs': '{}' });
+    const session = memStorage({ 'remotea-remote-draft:surf-b': 'sudo password', other: 'x' });
     forgetDeviceStorage([local, null, session]);
-    expect([...local.data.keys()]).toEqual(['wmux-remote-prefs']);
+    expect([...local.data.keys()]).toEqual(['remotea-remote-prefs']);
     expect([...session.data.keys()]).toEqual(['other']);
   });
 

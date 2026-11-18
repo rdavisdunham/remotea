@@ -11,7 +11,7 @@ import { useUpdate } from '../../hooks/useUpdate';
  * still go through electron-updater.
  *
  * Opening the release page is still the fallback whenever the running build
- * can't self-update: a dev run, `WMUX_DISABLE_UPDATER=1`, or a release
+ * can't self-update: a dev run, `REMOTEA_DISABLE_UPDATER=1`, or a release
  * published without a usable artifact.
  */
 export default function UpdateBadge() {

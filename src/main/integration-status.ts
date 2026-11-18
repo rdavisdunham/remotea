@@ -40,13 +40,13 @@ function json(content: string): Record<string, any> {
 }
 
 function contextState(content: string): IntegrationFileState {
-  const start = content.indexOf('<!-- wmux:start');
+  const start = content.indexOf('<!-- remotea:start');
   if (start < 0) return 'missing';
-  const end = content.indexOf('<!-- wmux:end -->', start);
+  const end = content.indexOf('<!-- remotea:end -->', start);
   if (end < 0) return 'modified';
   const expected = readRenderedInstructions();
   if (expected === null) throw Object.assign(new Error(), { code: 'RESOURCE_MISSING' });
-  const actual = content.slice(start, end + '<!-- wmux:end -->'.length);
+  const actual = content.slice(start, end + '<!-- remotea:end -->'.length);
   return actual.trim() === expected.trim() ? 'present' : 'modified';
 }
 
@@ -120,7 +120,7 @@ export function readIntegrationStatus(): IntegrationStatus {
     {
       provider: 'OpenCode',
       feature: 'orchestrator',
-      path: path.join(home, '.config/opencode/plugin/wmux.js'),
+      path: path.join(home, '.config/opencode/plugin/remotea.js'),
       inspect: exactFile(getPluginSrcPath),
     },
     {
@@ -180,7 +180,7 @@ export function readIntegrationStatus(): IntegrationStatus {
     {
       provider: 'Antigravity',
       feature: 'hooks',
-      path: path.join(agy, 'wmux-agy-hook.cjs'),
+      path: path.join(agy, 'remotea-agy-hook.cjs'),
       inspect: exactFile(getHookScriptSrcPath),
     },
     {

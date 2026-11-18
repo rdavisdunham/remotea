@@ -1,0 +1,842 @@
+// remotea-plugin-version: 10
+// wmux OpenCode plugin — bridges OpenCode hooks/events to the wmux sidebar.
+// Auto-installed by wmux to ~/.config/opencode/plugin/remotea.js.
+// No-ops entirely outside wmux (REMOTEA !== '1').
+import { execFile, execFileSync } from "node:child_process";
+import { appendFileSync, existsSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+/** Basenames that can execute a .js file we hand them. */
+const JS_RUNTIME_RE = /^(node|bun)(\.exe)?$/i;
+
+/**
+ * Find something that can run `$REMOTEA_CLI` (issue #187).
+ *
+ * v2 used `process.execPath`, which is only a JS runtime by accident of the
+ * host: under Claude Code it is node.exe, under OpenCode it is the compiled
+ * `opencode.exe`. That turned every call into
+ * `opencode.exe remotea.js agent-activity --active`, which prints OpenCode's help
+ * and exits 1 — invisibly, so the sidebar sat on "Running" forever.
+ *
+ * Order matters. `REMOTEA_NODE` comes first because wmux resolved it in its own
+ * process, where it could also fall back to its Electron binary — so it is the
+ * only link in this chain that cannot come up empty. The rest is for a plugin
+ * installed by an older wmux that does not declare it yet.
+ *
+ * Not exported — see the WmuxPlugin.__wmuxInternals note at the end of the file.
+ */
+function resolveNodeRuntime(
+  env = process.env,
+  execPath = process.execPath,
+  platform = process.platform,
+  exists = existsSync,
+) {
+  const declared = env.REMOTEA_NODE;
+  if (declared && exists(declared)) {
+    return { file: declared, electron: env.REMOTEA_NODE_ELECTRON === "1" };
+  }
+  if (execPath && JS_RUNTIME_RE.test(path.basename(execPath))) {
+    return { file: execPath, electron: false };
+  }
+  const win = platform === "win32";
+  const names = win ? ["node.exe", "bun.exe"] : ["node", "bun"];
+  const found = firstExisting(candidateDirs(env, win), names, exists);
+  return found ? { file: found, electron: false } : { file: "node", electron: false };
+}
+
+/** PATH, then the default install locations PATH may not mention. */
+function candidateDirs(env, win) {
+  const pathKey = Object.keys(env).find((k) => k.toLowerCase() === "path");
+  const fromPath = pathKey && env[pathKey] ? env[pathKey].split(path.delimiter) : [];
+  // node can be installed and still absent from the PATH a plugin inherits —
+  // which is precisely what #187 reported.
+  const defaults = win
+    ? [
+        env.ProgramFiles && path.join(env.ProgramFiles, "nodejs"),
+        env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, "Programs", "nodejs"),
+        env.USERPROFILE && path.join(env.USERPROFILE, ".bun", "bin"),
+      ]
+    : [
+        "/usr/local/bin",
+        "/usr/bin",
+        "/opt/homebrew/bin",
+        env.HOME && path.join(env.HOME, ".bun", "bin"),
+      ];
+  return [...fromPath, ...defaults].filter(Boolean);
+}
+
+/** First `dir/name` that exists, or null. Never throws on a malformed entry. */
+function firstExisting(dirs, names, exists) {
+  for (const dir of dirs) {
+    for (const name of names) {
+      try {
+        const candidate = path.join(dir, name);
+        if (exists(candidate)) return candidate;
+      } catch {}
+    }
+  }
+  return null;
+}
+
+/**
+ * Where `REMOTEA_PLUGIN_DEBUG` should write, or null when debugging is off (#190).
+ *
+ * v3 logged to `console.error`, which is unreadable by design here: OpenCode is
+ * a TUI that owns the terminal, and the agent running inside it cannot read its
+ * own process's stderr. So the one flag meant for diagnosing the plugin could
+ * only be used from a second terminal — which is why #189's 17 ms race went
+ * unseen until someone hand-patched `appendFileSync` into an installed copy.
+ *
+ * `1`/`true` picks the default location; anything else is taken as a path, so a
+ * user can drop the log somewhere they are already tailing.
+ *
+ * Not exported — see the WmuxPlugin.__wmuxInternals note at the end of the file.
+ */
+function resolveDebugLog(value, tmpdir = os.tmpdir) {
+  const v = typeof value === "string" ? value.trim() : "";
+  if (!v || v === "0" || v.toLowerCase() === "false") return null;
+  if (v === "1" || v.toLowerCase() === "true") {
+    try {
+      return path.join(tmpdir(), "remotea-plugin-debug.log");
+    } catch {
+      return null;
+    }
+  }
+  return v;
+}
+
+/** One-line, length-capped rendering of anything, including circular values. */
+function summarize(value, max = 300) {
+  let s;
+  try {
+    s = typeof value === "string" ? value : JSON.stringify(value);
+  } catch {
+    s = null;
+  }
+  if (typeof s !== "string") s = String(value);
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+/**
+ * Appender for `file`, or a no-op when debugging is off.
+ *
+ * Synchronous on purpose: the ordering between an event and the CLI call it
+ * caused is the whole diagnostic value, and an async write reorders exactly the
+ * millisecond-scale races this exists to catch. It swallows every error — a
+ * full disk must not take OpenCode down with it.
+ */
+function makeLogger(file) {
+  if (!file) return () => {};
+  return (label, data) => {
+    try {
+      const suffix = data === undefined ? "" : ` ${summarize(data)}`;
+      appendFileSync(file, `${new Date().toISOString()} [wmux] ${label}${suffix}\n`);
+    } catch {}
+  };
+}
+
+/**
+ * OpenCode event names that park the pane on a human, and those that free it.
+ *
+ * Matched exactly rather than by prefix: `permission.updated` fires on both
+ * sides of the exchange in some builds, and a mis-classified one would leave a
+ * pane reading "Needs you" for the rest of the session.
+ */
+const ASK_EVENTS = new Set(["question.asked", "permission.asked", "permission.requested"]);
+const REPLY_EVENTS = new Set([
+  "question.replied",
+  "permission.replied",
+  "question.answered",
+  "permission.answered",
+]);
+
+/** Best available human-readable reason for a blocked pane; never throws. */
+function askReason(event) {
+  const p = (event && event.properties) || {};
+  const nested = p.question || p.permission || {};
+  // `message` and `action` are OpenCode v2's permission fields (#271).
+  for (const c of [p.title, p.text, p.message, nested.title, nested.text, nested.type, p.pattern, p.action]) {
+    if (typeof c === "string" && c.trim()) return c.trim().slice(0, 200);
+  }
+  return String(event.type).startsWith("permission")
+    ? "Permission requested"
+    : "Waiting for your answer";
+}
+
+/** Mirrors OPENCODE_SESSION_ID_RE in wmux's src/main/opencode-resume.ts. */
+const SESSION_ID_RE = /^ses_[A-Za-z0-9_]{8,120}$/;
+
+/** How long one wmux CLI call may run before execFile kills it and reports. */
+const CLI_TIMEOUT_MS = 10_000;
+
+/**
+ * What an event says about sessions (#290): the session it concerns, and — for
+ * the events that describe a session itself — whether that session is a
+ * subagent's. Shapes verified against real builds:
+ *
+ * - v1 (opencode-ai 1.18.35): `session.created`/`session.updated` carry the
+ *   session in `properties.info`, with `info.parentID` set on a task subagent.
+ *   Every other event names its session in `properties.sessionID`.
+ * - v2 (@opencode/cli 2.0.24): `session.created` is FLAT — `data.sessionID`,
+ *   `data.parentID` — and there is no `session.updated`.
+ *
+ * `parentID` is read ONLY off those events. On `message.updated`,
+ * `info.parentID` is the parent MESSAGE (`msg_…`), and reading it as a session
+ * parent would file the user's own conversation as a subagent.
+ */
+function sessionFacts(event) {
+  if (!event || typeof event.type !== "string") return null;
+  const p = event.properties || {};
+  const info = p.info && typeof p.info === "object" ? p.info : null;
+  if (event.type === "session.created" || event.type === "session.updated" || event.type === "session.deleted") {
+    const id = (info && info.id) || p.sessionID;
+    const parentID = info ? info.parentID : p.parentID;
+    return typeof id === "string" ? { id, child: typeof parentID === "string" && !!parentID } : null;
+  }
+  const id = p.sessionID || (info && info.sessionID);
+  return typeof id === "string" ? { id, child: false } : null;
+}
+
+/**
+ * A plugin dispose is not necessarily a process exit: OpenCode also reloads
+ * plugins when their files change. Releasing immediately there cleared every
+ * open private-server handle on `wmux` upgrade. The timer gives a replacement
+ * instance time to start and cancel it; a real exit releases synchronously and
+ * cancels the timer first.
+ */
+const RELEASE_DELAY_MS = 1500;
+const pendingReleases = new Map();
+
+function cancelPendingRelease(surface) {
+  const pending = pendingReleases.get(surface);
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pendingReleases.delete(surface);
+}
+
+function schedulePendingRelease(surface, release) {
+  cancelPendingRelease(surface);
+  const timer = setTimeout(() => {
+    pendingReleases.delete(surface);
+    release();
+  }, RELEASE_DELAY_MS);
+  // A pending release must not keep a quitting OpenCode alive.
+  if (timer && typeof timer.unref === "function") timer.unref();
+  pendingReleases.set(surface, { timer });
+}
+
+/** Test-only: clear delayed releases between cases. */
+function resetPendingReleases() {
+  for (const pending of pendingReleases.values()) clearTimeout(pending.timer);
+  pendingReleases.clear();
+}
+
+export const WmuxPlugin = async (options = {}) => {
+  // Resolved before the REMOTEA gate so "the plugin loaded but did nothing" is
+  // itself a visible log line — otherwise the commonest failure is silence.
+  const log = makeLogger(resolveDebugLog(process.env.REMOTEA_PLUGIN_DEBUG));
+  const surface = process.env.REMOTEA_SURFACE_ID;
+  if (process.env.REMOTEA !== "1" || !surface) {
+    log("init: inactive", { REMOTEA: process.env.REMOTEA, surface });
+    return {};
+  }
+  // A replacement instance cancels the delayed release its predecessor
+  // scheduled on dispose. If this is a real shutdown, the process exit hook
+  // releases synchronously before this line can run.
+  cancelPendingRelease(surface);
+
+  // A shared server sees every pane's sessions while REMOTEA_SURFACE_ID names
+  // only the pane that started it. No pane-specific signal from this process
+  // can be attributed: session handles, activity, blocked state, prompts and
+  // shell env all belong to the TUI half, which runs inside the pane.
+  //
+  // `opencode --standalone` also runs `opencode serve`, but with `--stdio` and
+  // a private port on the TUI's own pipes — that server belongs to one pane.
+  // Only a serve without `--stdio` (or the background `--service`) is shared.
+  const sharedServer =
+    process.argv.includes("--service") ||
+    (process.argv.includes("serve") && !process.argv.includes("--stdio"));
+  if (sharedServer) {
+    log("shared server: pane signals handled by the TUI half");
+    return {};
+  }
+  const sessionHandles = options.sessionHandles !== false;
+  if (!sessionHandles) log("session: handles are reported by the TUI half");
+
+  const runtime = resolveNodeRuntime();
+  log("init", {
+    surface,
+    runtime: runtime.file,
+    electron: runtime.electron,
+    cli: process.env.REMOTEA_CLI,
+    pid: process.pid,
+  });
+
+  /** How to run the wmux CLI with `args`, or null when it cannot be run. */
+  function cliCommand(args) {
+    const cli = process.env.REMOTEA_CLI;
+    const opts = { windowsHide: true };
+    if (cli) {
+      // wmux's own Electron binary is Node only with this set; without it the
+      // same exe opens a second wmux window.
+      if (runtime.electron) opts.env = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+      return { file: runtime.file, argv: [cli, ...args], opts };
+    }
+    // The PATH shim is `remotea.cmd`, which execFile cannot spawn without a
+    // shell. Nothing to do — REMOTEA_CLI is always set alongside REMOTEA=1.
+    if (process.platform === "win32") return null;
+    return { file: "wmux", argv: args, opts };
+  }
+
+  /**
+   * Run one wmux CLI call and resolve its result — never rejects into OpenCode.
+   *
+   * `stdout` is parsed when it is JSON so a caller can tell `accepted: true`
+   * from `accepted: false`; the CLI prints that for report-session. The
+   * timeout matters: a CLI that never returns must not leave an in-flight
+   * report forever.
+   */
+  function wmuxAsync(args) {
+    return new Promise((resolve) => {
+      try {
+        const command = cliCommand(args);
+        if (!command) {
+          log("cli: skipped (no REMOTEA_CLI on win32)", args);
+          resolve({ ok: false, permanent: true });
+          return;
+        }
+        const { file, argv, opts } = command;
+        log("cli", args);
+        execFile(file, argv, { ...opts, timeout: CLI_TIMEOUT_MS }, (err, stdout, stderr) => {
+          if (err) {
+            log(`cli: ${args[0]} failed`, (err && err.message) || String(err));
+            resolve({ ok: false, error: err });
+            return;
+          }
+          // A warning on stderr with exit 0 is not a failure — the CLI uses a
+          // non-zero exit for the ones that matter.
+          if (stderr) log(`cli: ${args[0]} warned`, String(stderr).trim());
+          log(`cli: ${args[0]} ok`);
+          let value = null;
+          if (typeof stdout === "string" && stdout.trim()) {
+            try { value = JSON.parse(stdout); } catch {}
+          }
+          resolve({ ok: true, value });
+        });
+      } catch (err) {
+        log("cli: threw", (err && err.message) || String(err));
+        resolve({ ok: false, error: err });
+      }
+    });
+  }
+
+  /**
+   * Fire-and-forget for signals whose next event corrects them. The promise is
+   * still observed so a failed call is logged rather than becoming an
+   * unhandled rejection.
+   */
+  function wmux(args) {
+    void wmuxAsync(args);
+  }
+
+  // message.part.updated fires per streaming delta (many per second). Throttle
+  // the "active" pings so we don't spawn a CLI process for every token.
+  let lastActivePing = 0;
+  let blocked = false;
+
+  /**
+   * Monotonic stamp for main's `acceptSeq`. Reports arrive from separate CLI
+   * processes and a late `report-session` for the old session must not overwrite
+   * the newer one. Date.now() keeps it roughly time-ordered across reloads.
+   */
+  let seq = Date.now();
+  const nextSeq = () => {
+    seq = Math.max(seq + 1, Date.now());
+    return seq;
+  };
+
+  /**
+   * Real work by the agent also proves it is NOT waiting on a human.
+   *
+   * The self-heal matters because the unblock depends on OpenCode emitting a
+   * matching `*.replied`. If a build renames it, or the user answers in a way
+   * that fires nothing, the pane would otherwise claim "Needs you" forever —
+   * the one failure mode that makes the whole indicator untrustworthy.
+   *
+   * "Real work" is deliberately narrower since #189: a running tool, a reply,
+   * an edited file, a session error. Streaming message parts are NOT in the
+   * set, because the ask itself streams one.
+   */
+  const clearBlocked = () => {
+    if (!blocked) return;
+    blocked = false;
+    wmux(["report-agent", "--surface", surface, "--unblocked", "--seq", String(nextSeq())]);
+  };
+  /** Tell wmux the pane is alive. Says nothing about whether it is blocked. */
+  const ping = () => {
+    const now = Date.now();
+    if (now - lastActivePing < 1000) return;
+    lastActivePing = now;
+    wmux(["agent-activity", "--surface", surface, "--active"]);
+  };
+  const pingActive = () => {
+    clearBlocked();
+    ping();
+  };
+  /**
+   * The tab's conversation, for "Resume OpenCode sessions on restore" (#290).
+   *
+   * The session a pane is about is the last TOP-LEVEL session anything happened
+   * in. A task subagent is its own session, firing the same events on the same
+   * pane, and resuming one would bring back a "reply with pong" instead of the
+   * user's conversation — so every session born with a parent is remembered as
+   * a child and never reported. Its `session.created` arrives before any of its
+   * other events, in both generations (verified on 1.18.35 and 2.0.24).
+   */
+  const childSessions = new Set();
+  let pendingSession = null;
+  let confirmedSession = null;
+  let retryTimer = null;
+  let retryStep = 0;
+  let lastSentAt = 0;
+  let exitHookArmed = false;
+  const SESSION_RETRY_MS = [1000, 3000, 10000];
+  const REASSERT_MS = 30_000;
+
+  const clearRetry = () => {
+    if (retryTimer === null) return;
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  };
+
+  const releaseSession = (id, sync) => {
+    const args = ["release-agent", "--provider", "opencode", "--session", id, "--surface", surface];
+    if (!sync) {
+      wmux(args);
+      return;
+    }
+    // Synchronous on exit: an async spawn would die with the process. Bounded,
+    // because nothing is worth holding OpenCode's exit for. While wmux itself
+    // is quitting, main refuses this — a killed pane did not choose to leave.
+    try {
+      const command = cliCommand(args);
+      if (command) execFileSync(command.file, command.argv, { ...command.opts, timeout: 1500, stdio: "ignore" });
+    } catch {}
+  };
+
+  const scheduleRetry = (id) => {
+    if (pendingSession !== id || retryTimer !== null) return;
+    const delay = SESSION_RETRY_MS[retryStep];
+    if (delay === undefined) {
+      // Let a later event try again: the handle is still the one this pane
+      // wants, even if this burst of reports never landed.
+      pendingSession = null;
+      log("session: gave up", id);
+      return;
+    }
+    retryStep += 1;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (pendingSession === id) sendReport(id);
+    }, delay);
+    // A pending retry must not keep a quitting OpenCode alive.
+    if (retryTimer && typeof retryTimer.unref === "function") retryTimer.unref();
+  };
+
+  const sendReport = (id) => {
+    lastSentAt = Date.now();
+    pendingSession = id;
+    void wmuxAsync([
+      "report-session",
+      id,
+      "--provider",
+      "opencode",
+      "--surface",
+      surface,
+      "--seq",
+      String(nextSeq()),
+    ]).then((result) => {
+      // A newer session, a delete, or a dispose superseded this report.
+      if (pendingSession !== id) return;
+      if (!result.ok) {
+        if (result.permanent) {
+          pendingSession = null;
+          log("session: skipped", id);
+          return;
+        }
+        log("session: report failed", (result.error && result.error.message) || "unknown");
+        scheduleRetry(id);
+        return;
+      }
+      const accepted = result.value && result.value.accepted;
+      if (accepted === false) {
+        pendingSession = null;
+        log("session: rejected", id);
+        return;
+      }
+      confirmedSession = id;
+      pendingSession = null;
+      retryStep = 0;
+      clearRetry();
+    });
+  };
+
+  /**
+   * Repeat a confirmed handle on a later turn. Main can drop a handle after a
+   * successful report (a late PTY clear, or an exit release racing the next
+   * OpenCode in this tab); one report per turn window heals it without turning
+   * the reporter into a poll. A pending report is already retrying.
+   */
+  const reassert = (id) => {
+    if (id !== confirmedSession || pendingSession === id) return;
+    if (Date.now() - lastSentAt < REASSERT_MS) return;
+    log("session: reassert", id);
+    sendReport(id);
+  };
+
+  const armExitHook = () => {
+    if (exitHookArmed) return;
+    exitHookArmed = true;
+    // Quitting OpenCode is choosing to end the conversation: forget it, so a
+    // restore gives back the shell rather than relaunching OpenCode.
+    process.once("exit", releaseNow);
+  };
+
+  /** Synchronous release for a real process exit; cancels a pending dispose. */
+  const releaseNow = () => {
+    cancelPendingRelease(surface);
+    const id = pendingSession || confirmedSession;
+    pendingSession = null;
+    confirmedSession = null;
+    clearRetry();
+    if (id) releaseSession(id, true);
+  };
+
+  /**
+   * A dispose may be a shutdown OR a plugin reload. Wait one short window; a
+   * replacement instance cancels this at setup, while a real shutdown is
+   * already covered by the synchronous exit hook. If the process stays alive
+   * after dispose, the async release still lands.
+   */
+  const releaseOnDispose = () => {
+    const id = pendingSession || confirmedSession;
+    if (!id) return;
+    schedulePendingRelease(surface, () => {
+      if (pendingSession !== id && confirmedSession !== id) return;
+      pendingSession = null;
+      confirmedSession = null;
+      clearRetry();
+      releaseSession(id, false);
+    });
+  };
+
+  const noteSession = (event) => {
+    if (!sessionHandles) return;
+    const facts = sessionFacts(event);
+    if (!facts || !SESSION_ID_RE.test(facts.id)) return;
+    if (facts.child) {
+      childSessions.add(facts.id);
+      return;
+    }
+    if (event.type === "session.deleted") {
+      // Resuming a deleted id makes OpenCode start an empty session instead.
+      // Release even a pending id: a timed-out report may have landed, and a
+      // release for one that did not is a harmless no-op.
+      if (facts.id === pendingSession || facts.id === confirmedSession) {
+        pendingSession = null;
+        confirmedSession = null;
+        clearRetry();
+        releaseSession(facts.id, false);
+      }
+      return;
+    }
+    if (childSessions.has(facts.id)) return;
+    if (facts.id === pendingSession) return;
+    if (facts.id === confirmedSession) {
+      reassert(facts.id);
+      return;
+    }
+    // A new top-level session supersedes any pending retry for the old one.
+    cancelPendingRelease(surface);
+    pendingSession = facts.id;
+    confirmedSession = null;
+    retryStep = 0;
+    clearRetry();
+    log("session", facts.id);
+    sendReport(facts.id);
+    armExitHook();
+  };
+
+  /**
+   * The cap `remotea-hook.js` applies to Claude Code prompts (#304). A prompt
+   * travels as an argv value here rather than stdin, so it must stay well
+   * under the Windows command-line limit; 4000 is the number the other
+   * producer already uses.
+   */
+  const MAX_PROMPT = 4000;
+
+  /**
+   * One submitted user prompt, on its way to the wmux prompt log (#304).
+   *
+   * The log's only agent-side producer is a `UserPromptSubmit` hook event, and
+   * nothing on the OpenCode side used to send one. The text cannot be
+   * recovered from the screen afterwards — an agent TUI repaints over its own
+   * input box — so v2's prompt-admission hook (see setupV2) is the one moment
+   * it exists.
+   *
+   * `messageID` dedupes admission: v2 documents the hook as retry-safe, not
+   * exactly-once, and two entries would put two jump marks on one line. A
+   * missing id skips the check; the renderer's own identical-text window is
+   * the backstop.
+   */
+  const seenPrompts = new Set();
+  const reportPrompt = (text, messageID) => {
+    const clean = typeof text === "string" ? text.trim() : "";
+    if (!clean) return;
+    if (messageID) {
+      if (seenPrompts.has(messageID)) return;
+      seenPrompts.add(messageID);
+      if (seenPrompts.size > 100) seenPrompts.delete(seenPrompts.values().next().value);
+    }
+    log("prompt", { chars: clean.length });
+    wmux(["hook", "--event", "UserPromptSubmit", "--prompt", clean.slice(0, MAX_PROMPT)]);
+  };
+
+  const activeTool = (input) => {
+    log("tool", { tool: input && input.tool, blocked });
+    clearBlocked();
+    const tool = String((input && input.tool) || "");
+    const args = ["agent-activity", "--surface", surface, "--active"];
+    if (tool) args.push("--tool", tool);
+    wmux(args);
+  };
+
+  const hooks = {
+    "tool.execute.after": async (input) => {
+      const tool = String((input && input.tool) || "");
+      if (tool) wmux(["hook", "--event", "PostToolUse", "--tool", tool]);
+      activeTool(input);
+    },
+    "tool.execute.before": async (input) => {
+      activeTool(input);
+    },
+    // v2's prompt-admission hook, registered in setupV2 (#304). v2 itself
+    // excludes synthetic messages, shell messages and compaction controls, so
+    // what arrives here is what a human submitted. v1 has no equivalent wired
+    // up; the key is inert there.
+    "session.prompt": async ({ prompt, messageID } = {}) => {
+      reportPrompt(prompt && prompt.text, messageID);
+    },
+    // `sessionSource` is v2's raw event (see setupV2): the session facts live
+    // on events it has no other use for, which `fromV2Event` maps to null.
+    event: async ({ event, sessionSource }) => {
+      noteSession(sessionSource || event);
+      if (!event || !event.type) return;
+      const type = event.type;
+      log("event", { type, properties: event.properties });
+      if (type === "session.idle") {
+        // NOT an unblock: a pane waiting on a permission prompt is idle by
+        // definition, and clearing here would erase "Needs you" the moment it
+        // appeared.
+        wmux(["agent-activity", "--surface", surface, "--done"]);
+      } else if (type === "session.error") {
+        clearBlocked();
+        wmux(["agent-activity", "--surface", surface, "--done"]);
+      } else if (type === "message.part.updated") {
+        // Activity ping ONLY — never an unblock (#189).
+        //
+        // This fires for tool status transitions, and the ask's own tool part
+        // goes to "running" ~17 ms after question.asked. Treating that as "the
+        // agent resumed" cleared the block within one frame, so "Needs you"
+        // flashed and vanished ten seconds before the user actually answered.
+        // The question being presented is not the question being answered.
+        //
+        // The self-heal that motivated the old clearBlocked() here still holds
+        // through tool.execute.before/after (real tool work), the *.replied
+        // events, and session.error — all of which mean the agent moved on.
+        ping();
+      } else if (type === "session.created") {
+        pingActive();
+      } else if (ASK_EVENTS.has(type)) {
+        // Issue #188: the sidebar's whole point is telling a user with ten
+        // panes open which one is waiting for them.
+        blocked = true;
+        wmux(["report-agent", "--surface", surface, "--blocked", askReason(event), "--seq", String(nextSeq())]);
+      } else if (REPLY_EVENTS.has(type)) {
+        clearBlocked();
+        pingActive();
+      } else if (type === "file.edited") {
+        // Feeds the diff view the same way Claude Code's PostToolUse hook does.
+        wmux(["hook", "--event", "PostToolUse", "--tool", "Edit"]);
+        pingActive();
+      }
+    },
+    "shell.env": async (input, output) => {
+      output.env.REMOTEA = "1";
+      output.env.REMOTEA_SURFACE_ID = surface;
+      if (process.env.REMOTEA_PIPE) output.env.REMOTEA_PIPE = process.env.REMOTEA_PIPE;
+      if (process.env.REMOTEA_CLI) output.env.REMOTEA_CLI = process.env.REMOTEA_CLI;
+      // Children need the runtime too, or they re-derive it and hit #187.
+      if (process.env.REMOTEA_NODE) output.env.REMOTEA_NODE = process.env.REMOTEA_NODE;
+      if (process.env.REMOTEA_NODE_ELECTRON) output.env.REMOTEA_NODE_ELECTRON = process.env.REMOTEA_NODE_ELECTRON;
+    },
+  };
+  // For v2's dispose (setupV2). Non-enumerable, so a loader walking the hooks
+  // object never mistakes it for a hook.
+  Object.defineProperty(hooks, "__wmuxShutdown", { value: releaseOnDispose });
+  return hooks;
+};
+
+/**
+ * OpenCode v2 event → the v1 shape `WmuxPlugin`'s `event` hook reads, or null
+ * for an event it has no use for (#271).
+ *
+ * v2 renamed most session events and moved the payload from `properties` to
+ * `data`. Translating here keeps ONE set of handlers for both generations, so a
+ * fix to the blocked/idle logic cannot land in one and miss the other.
+ *
+ * `filesystem.changed` is deliberately NOT mapped to v1's `file.edited`: it is a
+ * watcher event, so it also fires when the USER saves a file in their editor —
+ * and `file.edited` clears "Needs you". The diff view is still fed, by
+ * `tool.execute.after`, which v2 does route through `execute.after`.
+ */
+const V2_STREAMING_EVENTS = new Set([
+  "session.execution.started",
+  "session.text.delta",
+  "session.reasoning.delta",
+  "session.tool.input.delta",
+  "session.step.started",
+]);
+
+/** The raw v2 event in the v1 shape `sessionFacts` reads: `properties` from `data`. */
+function v2SessionSource(raw) {
+  return raw && typeof raw.type === "string"
+    ? { type: raw.type, properties: raw.data || raw.properties || {} }
+    : null;
+}
+
+function fromV2Event(event) {
+  if (!event || typeof event.type !== "string") return null;
+  const properties = event.data || event.properties || {};
+  switch (event.type) {
+    case "session.idle": // deprecated in v2's schema and not published by its core; kept in case a bridge does
+    case "session.created":
+    case "permission.asked":
+    case "permission.replied":
+      return { type: event.type, properties };
+    // How a v2 turn actually ends: one terminal event per busy period.
+    case "session.execution.succeeded":
+      return { type: "session.idle", properties };
+    case "session.status":
+      return properties.status && properties.status.type === "idle" ? { type: "session.idle", properties } : null;
+    // An interrupt abandons any pending ask along with the turn, so it clears
+    // the block the way an error does, rather than idling past it.
+    case "session.execution.interrupted":
+    case "session.execution.failed":
+      return { type: "session.error", properties };
+    default:
+      // Activity pings only (throttled) — the v1 `message.part.updated` path,
+      // which never unblocks (#189).
+      return V2_STREAMING_EVENTS.has(event.type) ? { type: "message.part.updated", properties } : null;
+  }
+}
+
+/**
+ * OpenCode v2's `setup(ctx)`, adapting its hook and event API onto the very
+ * same handlers `WmuxPlugin` returns for v1 (#271).
+ *
+ * Every registration is guarded: a v2 build that renames one domain loses that
+ * signal, never the plugin, and never OpenCode's startup.
+ */
+async function setupV2(ctx) {
+  const log = makeLogger(resolveDebugLog(process.env.REMOTEA_PLUGIN_DEBUG));
+  // v2 has a TUI process per pane and its TUI half knows which session is on
+  // screen. The server half cannot tell a background session from the viewed
+  // one, so it must not write the restore handle. It keeps activity, blocked
+  // state and prompts for private servers; a shared server returned {} above.
+  const hooks = await WmuxPlugin({ sessionHandles: false });
+  if (!hooks.event) return; // outside wmux — WmuxPlugin already logged why
+
+  const registrations = [];
+  const register = async (domain, name, callback) => {
+    try {
+      const hook = ctx && ctx[domain] && ctx[domain].hook;
+      if (typeof hook !== "function") {
+        log(`v2: no ${domain}.hook`);
+        return;
+      }
+      registrations.push(await hook(name, callback));
+    } catch (err) {
+      log(`v2: ${domain}.${name} failed`, (err && err.message) || String(err));
+    }
+  };
+  await register("tool", "execute.before", (e) => hooks["tool.execute.before"]({ tool: e && e.tool }));
+  await register("tool", "execute.after", (e) => hooks["tool.execute.after"]({ tool: e && e.tool }));
+  await register("shell", "create.before", (e) => {
+    if (e && e.env) return hooks["shell.env"]({}, { env: e.env });
+  });
+  // Prompt admission (#304). A v2 build that renames or lacks the hook loses
+  // the prompt log, never its own startup — the register() guard already
+  // reports it to the debug log.
+  await register("session", "prompt", (e) => hooks["session.prompt"](e));
+
+  const controller = new AbortController();
+  const task = (async () => {
+    const subscribe = ctx && ctx.event && ctx.event.subscribe;
+    if (typeof subscribe !== "function") {
+      log("v2: no event.subscribe");
+      return;
+    }
+    for await (const raw of subscribe.call(ctx.event, { signal: controller.signal })) {
+      const event = fromV2Event(raw);
+      if (!event) log("v2: unmapped event", raw && raw.type);
+      await hooks.event({ event, sessionSource: v2SessionSource(raw) });
+    }
+  })().catch((err) => {
+    if (!controller.signal.aborted) log("v2: event stream ended", (err && err.message) || String(err));
+  });
+
+  return async () => {
+    controller.abort();
+    await task;
+    // v2 disposes plugins on shutdown, where `exit` may never run for them.
+    if (typeof hooks.__wmuxShutdown === "function") hooks.__wmuxShutdown();
+    for (const r of registrations) {
+      try {
+        if (r && typeof r.dispose === "function") await r.dispose();
+      } catch {}
+    }
+  };
+}
+
+/**
+ * The one definition both OpenCode generations accept (#271).
+ *
+ * v2 requires `export default { id, effect | setup }` and rejects the file
+ * outright without it. v1 (since 1.3.4) reads the same default export: an `id`
+ * there switches it from "call every export" to "call `default.server`", so
+ * the named `WmuxPlugin` export is never invoked twice. v2's schema ignores
+ * `server`; v1 ignores `setup`.
+ *
+ * OpenCode 1.3.3 and older call every export as a factory, this object
+ * included — they cannot load a v2-compatible file at all.
+ */
+export default { id: "wmux", server: WmuxPlugin, setup: setupV2 };
+
+/**
+ * The helpers above, reachable by wmux's own test suite (issue #191).
+ *
+ * They are a property rather than four exports because OpenCode's
+ * auto-discovery loader calls EVERY export of a plugin file as if it were a
+ * plugin factory, then invokes a `config` hook on whatever came back. v3 and v4
+ * exported these four, so the loader called e.g. `summarize(ctx)`, got a string,
+ * and dereferenced `null.config` — taking OpenCode down at startup with
+ * "Unexpected server error" for anyone launching it OUTSIDE wmux. Inside wmux it
+ * crashed just the same, but the REMOTEA gate meant nobody testing wmux ever saw
+ * the export loop as the cause.
+ *
+ * `WmuxPlugin` and the default definition must stay the only exports in this
+ * file. A test asserts it.
+ */
+WmuxPlugin.__wmuxInternals = { resolveNodeRuntime, resolveDebugLog, summarize, askReason, fromV2Event, v2SessionSource, sessionFacts, resetPendingReleases };

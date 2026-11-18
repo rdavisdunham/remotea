@@ -2,10 +2,10 @@
  * user-locales.ts — Community-provided UI translations (issue #147).
  *
  * Anyone can add or correct a language without waiting for a wmux release by
- * dropping a JSON file into `~/.wmux/locales/`, next to `config.toml`:
+ * dropping a JSON file into `~/.remotea/locales/`, next to `config.toml`:
  *
- *   ~/.wmux/locales/tt.json      → adds Tatar to the language dropdown
- *   ~/.wmux/locales/ko.json      → overrides individual bundled Korean strings
+ *   ~/.remotea/locales/tt.json      → adds Tatar to the language dropdown
+ *   ~/.remotea/locales/ko.json      → overrides individual bundled Korean strings
  *
  * File shape (`label` optional, `strings` may be flattened to the top level):
  *
@@ -39,7 +39,7 @@ export interface UserLocale {
 
 export interface UserLocalesResult {
   locales: UserLocale[];
-  /** Non-fatal problems, surfaced via `wmux locales`. */
+  /** Non-fatal problems, surfaced via `remotea locales`. */
   errors: string[];
   /** The directory that was scanned, whether or not it exists. */
   dir: string;
@@ -58,7 +58,7 @@ const MAX_FILES = 50;
 const MAX_BYTES = 1024 * 1024;
 
 export function getLocalesDir(): string {
-  return path.join(os.homedir(), '.wmux', 'locales');
+  return path.join(os.homedir(), '.remotea', 'locales');
 }
 
 /** A per-file outcome: either a locale, or the reason it was rejected. */

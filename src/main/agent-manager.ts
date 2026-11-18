@@ -55,7 +55,7 @@ export class AgentManager {
     const created = this.ptyManager.create({
       shell: '',  // Use default shell (resolves to pwsh/powershell/bash, not hardcoded cmd.exe)
       cwd: params.cwd || process.env.USERPROFILE || os.homedir(),
-      env: { ...(params.env || {}), WMUX_AGENT_ID: agentId, WMUX_AGENT_LABEL: params.label },
+      env: { ...(params.env || {}), REMOTEA_AGENT_ID: agentId, REMOTEA_AGENT_LABEL: params.label },
       startupCommands: [params.cmd],
     });
     const surfaceId = created.id;

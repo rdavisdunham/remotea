@@ -8,17 +8,17 @@
  * - Codex CLI: ~/.codex/hooks.json, the same helper with `--provider codex`.
  * - OpenCode, pi and omp: wmux's plugin for each (~/.config/opencode/plugin,
  *   ~/.pi/agent/extensions, ~/.omp/agent/extensions). They report through the
- *   wmux CLI (`node $WMUX_CLI …`), which sessions are told about in hookEnv,
+ *   wmux CLI (`node $REMOTEA_CLI …`), which sessions are told about in hookEnv,
  *   and do nothing outside a remotea pane.
- * - Grok: ~/.grok/hooks/wmux.json, a file of wmux's own (Claude's hooks plus
+ * - Grok: ~/.grok/hooks/remotea.json, a file of wmux's own (Claude's hooks plus
  *   Grok's two extra turn endings).
  * - Qwen Code: ~/.qwen/settings.json, wmux's Qwen entries (`--provider qwen`).
- * - Antigravity (agy): wmux's plugin directory, ~/.gemini/config/plugins/wmux.
+ * - Antigravity (agy): wmux's plugin directory, ~/.gemini/config/plugins/remotea.
  *
  * The same files the Windows app writes for its own agents, built by the same
  * code (src/main/*-context.ts), pointed at this machine's copy of the helper.
  *
- * Only entries whose command runs `wmux-hook` are ours; every other hook (the
+ * Only entries whose command runs `remotea-hook` are ours; every other hook (the
  * user's, herdr's, anything else) is left exactly as it was. The helper itself
  * is copied to ~/.local/share/remotea/cli, so the hooks keep working if the
  * repository moves, and it exits at once in a session that is not remotea's.
@@ -34,10 +34,14 @@ import { buildGrokHooks } from '../../src/main/grok-context';
 import { ensureAgyPlugin, getAgyPluginDir, removeAgyPlugin } from '../../src/main/agy-context';
 import { isWmuxPluginFile } from '../../src/main/agent-plugin-file';
 import type { HookAgentStatus } from '../../src/shared/remote-host-protocol';
+import { countLegacyHookEntries, isLegacyRemoteaGrokHooksFile, stripLegacyHookEntries } from '../../src/shared/legacy-cleanup';
+import { LEGACY_PLUGIN_FILES } from '../../src/shared/legacy-names';
+import type { OwnershipContext } from '../../src/shared/artifact-ownership';
 
-const MARKER = 'wmux-hook';
+// The helper's file name, not a bare prefix (see claude-hooks.ts).
+const MARKER = 'remotea-hook.js';
 
-/** Codex's hook events, and what wmux-hook reports each as (PermissionRequest → a permission Notification). */
+/** Codex's hook events, and what remotea-hook reports each as (PermissionRequest → a permission Notification). */
 export const CODEX_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Stop', 'SessionEnd'] as const;
 
 export interface HookPaths {
@@ -191,13 +195,13 @@ function writeJson(file: string, value: Json): void {
 /** The hook helper and the wmux CLI with the modules it loads (resources/cli), copied together. */
 function copyHelper(p: HookPaths): string {
   fs.mkdirSync(p.cliDir, { recursive: true });
-  for (const f of ['wmux-hook.js', 'transport-deadline.js', 'wmux.js']) {
+  for (const f of ['remotea-hook.js', 'transport-deadline.js', 'remotea.js']) {
     if (!fs.existsSync(path.join(p.sourceDir, f))) throw new Error(`missing ${path.join(p.sourceDir, f)} (is the repository intact?)`);
   }
   for (const f of fs.readdirSync(p.sourceDir)) {
     if (f.endsWith('.js')) fs.copyFileSync(path.join(p.sourceDir, f), path.join(p.cliDir, f));
   }
-  return path.join(p.cliDir, 'wmux-hook.js');
+  return path.join(p.cliDir, 'remotea-hook.js');
 }
 
 function readText(file: string): string | null {
@@ -249,12 +253,12 @@ function targets(p: HookPaths): Target[] {
   return [
     { agent: 'claude', dir: h('.claude'), file: h('.claude', 'settings.json'), kind: 'settings', apply: (c, script) => applyWmuxHooks(c, script, { questions: true }), remove: removeWmuxHooks },
     { agent: 'codex', dir: h('.codex'), file: h('.codex', 'hooks.json'), kind: 'settings', apply: applyCodexHooks, remove: removeCodexHooks },
-    { agent: 'opencode', dir: h('.config', 'opencode'), file: h('.config', 'opencode', 'plugin', 'wmux.js'), kind: 'plugin', source: res('opencode-plugin', 'wmux.js') },
-    { agent: 'pi', dir: h('.pi'), file: h('.pi', 'agent', 'extensions', 'wmux.js'), kind: 'plugin', source: res('pi-extension', 'wmux.js') },
-    { agent: 'omp', dir: h('.omp'), file: h('.omp', 'agent', 'extensions', 'wmux.js'), kind: 'plugin', source: res('omp-extension', 'wmux.js') },
-    { agent: 'grok', dir: h('.grok'), file: h('.grok', 'hooks', 'wmux.json'), kind: 'grok' },
+    { agent: 'opencode', dir: h('.config', 'opencode'), file: h('.config', 'opencode', 'plugin', 'remotea.js'), kind: 'plugin', source: res('opencode-plugin', 'remotea.js') },
+    { agent: 'pi', dir: h('.pi'), file: h('.pi', 'agent', 'extensions', 'remotea.js'), kind: 'plugin', source: res('pi-extension', 'remotea.js') },
+    { agent: 'omp', dir: h('.omp'), file: h('.omp', 'agent', 'extensions', 'remotea.js'), kind: 'plugin', source: res('omp-extension', 'remotea.js') },
+    { agent: 'grok', dir: h('.grok'), file: h('.grok', 'hooks', 'remotea.json'), kind: 'grok' },
     { agent: 'qwen', dir: h('.qwen'), file: h('.qwen', 'settings.json'), kind: 'settings', apply: applyQwenHooks, remove: removeQwenHooksFrom },
-    { agent: 'agy', dir: h('.gemini', 'antigravity-cli'), file: path.join(getAgyPluginDir(p.home), 'wmux-agy-hook.cjs'), kind: 'agy' },
+    { agent: 'agy', dir: h('.gemini', 'antigravity-cli'), file: path.join(getAgyPluginDir(p.home), 'remotea-agy-hook.cjs'), kind: 'agy' },
   ];
 }
 
@@ -277,9 +281,44 @@ export function hooksStatus(p: HookPaths = defaultHookPaths()): HookTarget[] {
   return targets(p).map((t) => ({ agent: t.agent, file: t.file, present: fs.existsSync(t.dir), entries: entriesOf(t) }));
 }
 
+/**
+ * The folders that prove an old-named hook entry is this host's: the helper
+ * copy and the checkout it came from. A wmux install's entries never match.
+ */
+export function hostOwnershipContext(p: HookPaths): OwnershipContext {
+  return { knownDirs: [p.cliDir, p.sourceDir], readFile: readText };
+}
+
+/**
+ * This host's old-named hook entries, by agent: entries whose helper path is
+ * this host's (Claude, Codex, Qwen), and Grok's old hooks file when every
+ * handler in it is. The move rewrites them when any are found.
+ */
+export function legacyHookEntries(p: HookPaths = defaultHookPaths()): Array<{ agent: HookAgent; entries: number }> {
+  const ctx = hostOwnershipContext(p);
+  const out: Array<{ agent: HookAgent; entries: number }> = [];
+  for (const t of targets(p)) {
+    let entries = 0;
+    if (t.kind === 'settings') {
+      try {
+        entries = countLegacyHookEntries(readJson(t.file), ctx);
+      } catch {
+        entries = 0; // not plain JSON: installHooks leaves it too
+      }
+    } else if (t.kind === 'grok') {
+      const old = readText(path.join(path.dirname(t.file), LEGACY_PLUGIN_FILES.grokHooks[0]));
+      entries = old !== null && isLegacyRemoteaGrokHooksFile(old, ctx) ? 1 : 0;
+    }
+    if (entries > 0) out.push({ agent: t.agent, entries });
+  }
+  return out;
+}
+
 /** Install for every agent whose config directory exists. Returns what was written. */
 export function installHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
   const script = copyHelper(p);
+  // Old-named entries go only when their path is this host's (KTD8).
+  const ctx = hostOwnershipContext(p);
   for (const t of targets(p)) {
     if (!fs.existsSync(t.dir)) continue;
     switch (t.kind) {
@@ -293,7 +332,7 @@ export function installHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
           if (t.agent === 'qwen') continue;
           throw err;
         }
-        writeJson(t.file, t.apply(current ?? {}, script));
+        writeJson(t.file, t.apply(stripLegacyHookEntries(current ?? {}, ctx), script));
         break;
       }
       case 'plugin':
@@ -302,12 +341,16 @@ export function installHooks(p: HookPaths = defaultHookPaths()): HookTarget[] {
         fs.mkdirSync(path.dirname(t.file), { recursive: true });
         fs.copyFileSync(t.source, t.file);
         break;
-      case 'grok':
+      case 'grok': {
+        const oldFile = path.join(path.dirname(t.file), LEGACY_PLUGIN_FILES.grokHooks[0]);
+        const old = readText(oldFile);
+        if (old !== null && isLegacyRemoteaGrokHooksFile(old, ctx)) fs.rmSync(oldFile);
         if (fs.existsSync(t.file) && !isOurGrokFile(t.file)) continue;
         writeJson(t.file, buildGrokHooks(script));
         break;
+      }
       case 'agy':
-        ensureAgyPlugin(p.home, path.resolve(p.sourceDir, '..', 'agy-plugin', 'wmux-agy-hook.cjs'));
+        ensureAgyPlugin(p.home, path.resolve(p.sourceDir, '..', 'agy-plugin', 'remotea-agy-hook.cjs'));
         break;
     }
   }
@@ -421,7 +464,7 @@ export function codexTrust(configToml: string | null, hooksFile: string, handler
 
 /** Claude Code's, Codex's and OpenCode's remotea hooks against what an install writes now. */
 export function agentHookChecks(p: HookPaths = defaultHookPaths()): AgentHookCheck[] {
-  const script = path.join(p.cliDir, 'wmux-hook.js');
+  const script = path.join(p.cliDir, 'remotea-hook.js');
   const all = targets(p);
   const out: AgentHookCheck[] = [];
   for (const agent of ['claude', 'codex'] as const) {

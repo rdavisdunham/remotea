@@ -10,7 +10,7 @@ import {
 // off once, including profiles that had it on, through the same promotion that
 // TRACE used in 1.5.0. The two promotions must not interfere.
 
-const APPEARANCE_KEY = 'wmux-appearance-prefs';
+const APPEARANCE_KEY = 'remotea-appearance-prefs';
 
 // The settings file is read ONCE at module load, so a stored blob can only be
 // injected by stubbing window before a fresh import of the slice.

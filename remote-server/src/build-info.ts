@@ -79,8 +79,8 @@ export interface HookVersion {
 
 /** The installed hook helper's version and whether it matches the one this build ships. */
 export function hookVersion(p: { cliDir: string; sourceDir: string }): HookVersion {
-  const installed = fileVersion(path.join(p.cliDir, 'wmux-hook.js'));
-  const bundled = fileVersion(path.join(p.sourceDir, 'wmux-hook.js'));
+  const installed = fileVersion(path.join(p.cliDir, 'remotea-hook.js'));
+  const bundled = fileVersion(path.join(p.sourceDir, 'remotea-hook.js'));
   return { installed, bundled, current: installed && bundled ? installed === bundled : null };
 }
 

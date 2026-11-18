@@ -16,7 +16,7 @@ import {
   INTEGRATION_FEATURES,
 } from '../../src/main/agent-integration';
 
-const HOOK = '/res/cli/wmux-hook.js';
+const HOOK = '/res/cli/remotea-hook.js';
 
 // Issue #132: wmux wrote into ~/.claude on every launch with no prompt and no
 // record of a decision, so deleting any of it was futile — the next launch put
@@ -69,7 +69,7 @@ describe('removeWmuxHooks (issue #132)', () => {
 });
 
 describe('stripWmuxBlock (issue #132)', () => {
-  const BLOCK = '<!-- wmux:start -->\ninstructions here\n<!-- wmux:end -->';
+  const BLOCK = '<!-- remotea:start -->\ninstructions here\n<!-- remotea:end -->';
 
   it('reports nothing to do when the document has no wmux block', () => {
     // null, not '' — the caller skips the write entirely rather than rewriting
@@ -99,7 +99,7 @@ describe('stripWmuxBlock (issue #132)', () => {
   it('removes a block whose end marker was lost to a hand-edit', () => {
     // Matches how ensureClaudeContext repairs the same damage: an unterminated
     // block is taken to run to end-of-file.
-    expect(stripWmuxBlock('# Mine\n\n<!-- wmux:start -->\ndangling\n')).toBe('# Mine\n');
+    expect(stripWmuxBlock('# Mine\n\n<!-- remotea:start -->\ndangling\n')).toBe('# Mine\n');
   });
 
   it('is idempotent', () => {
@@ -195,7 +195,7 @@ describe('safe agent integration defaults', () => {
     ]) {
       expect(INTEGRATION_CONSENT_DETAIL).toContain(event);
     }
-    expect(INTEGRATION_CONSENT_DETAIL).toContain('~/.config/opencode/plugin/wmux.js');
+    expect(INTEGRATION_CONSENT_DETAIL).toContain('~/.config/opencode/plugin/remotea.js');
     expect(INTEGRATION_CONSENT_DETAIL).toContain('pinned chrome-devtools-mcp');
   });
 
@@ -206,7 +206,7 @@ describe('safe agent integration defaults', () => {
     const panel = fs.readFileSync(
       path.resolve(__dirname, '../../src/renderer/components/Settings/AgentIntegrationSettings.tsx'), 'utf-8',
     );
-    for (const written of ['~/.grok/rules/wmux.md', '~/.grok/hooks/wmux.json']) {
+    for (const written of ['~/.grok/rules/remotea.md', '~/.grok/hooks/remotea.json']) {
       expect(INTEGRATION_CONSENT_DETAIL).toContain(written);
       expect(panel).toContain(written);
     }

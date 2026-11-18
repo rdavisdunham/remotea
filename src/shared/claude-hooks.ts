@@ -1,10 +1,12 @@
 /**
- * Claude Code hook entries for wmux-hook.js — pure, so both the app (which
+ * Claude Code hook entries for remotea-hook.js — pure, so both the app (which
  * installs them on Windows, claude-context.ts) and the remotea server (which
  * installs them inside WSL) build exactly the same entries.
  */
 
-const HOOK_MARKER = 'wmux-hook';
+// The helper's file name, not a bare prefix: a path such as /tmp/remotea-hooks-x/
+// would otherwise make anyone's command look like ours.
+const HOOK_MARKER = 'remotea-hook.js';
 
 /** Tools tracked via PostToolUse hooks for the sidebar/diff view. */
 // PowerShell is Claude Code's other shell tool; like Bash it can run in the
@@ -30,7 +32,7 @@ const stripWmux = (entries: any): any[] =>
  * this same list — or declining the integration would leave orphans behind
  * (issue #132).
  */
-export const WMUX_HOOK_EVENTS = [
+export const REMOTEA_HOOK_EVENTS = [
   'PostToolUse', 'Notification', 'Stop', 'SubagentStop',
   'SessionStart', 'UserPromptSubmit', 'PreToolUse', 'SessionEnd',
   'SubagentStart',
@@ -49,7 +51,7 @@ export function removeWmuxHooks(settings: any): any {
   const next = { ...(settings || {}) };
   if (!next.hooks || typeof next.hooks !== 'object') return next;
   const hooks = { ...next.hooks };
-  for (const event of WMUX_HOOK_EVENTS) {
+  for (const event of REMOTEA_HOOK_EVENTS) {
     if (!(event in hooks)) continue;
     const kept = stripWmux(hooks[event]);
     if (kept.length > 0) hooks[event] = kept;
@@ -62,7 +64,7 @@ export function removeWmuxHooks(settings: any): any {
 
 /**
  * Pure builder for the wmux hook blocks. Given the parsed settings object and
- * the absolute path to wmux-hook.js, returns a new settings object whose
+ * the absolute path to remotea-hook.js, returns a new settings object whose
  * `hooks` contains fresh wmux PostToolUse/Notification/Stop/SubagentStop
  * entries, with any prior wmux entries replaced and all non-wmux (user) hooks
  * preserved. Extracted so the merge logic is unit-testable without touching

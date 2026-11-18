@@ -18,9 +18,9 @@ import { WSL_ENV_PASSTHROUGH } from '../../src/main/pane-browser-env';
  */
 
 const ROOT = path.join(__dirname, '..', '..');
-const SH = path.join(ROOT, 'src', 'shell-integration', 'wmux-bash-integration.sh');
+const SH = path.join(ROOT, 'src', 'shell-integration', 'remotea-bash-integration.sh');
 const INTEGRATION_DIR = path.dirname(SH);
-const CLI = path.join(ROOT, 'resources', 'cli', 'wmux.js');
+const CLI = path.join(ROOT, 'resources', 'cli', 'remotea.js');
 const GIT_BASH = path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git', 'bin', 'bash.exe');
 const hasGitBash = process.platform === 'win32' && fs.existsSync(GIT_BASH);
 
@@ -34,16 +34,16 @@ describe('shell scripts ship with LF (#428)', () => {
       .filter((l) => l.trim() && !l.startsWith('#'));
     expect(rules).toContain('*.sh text eol=lf');
     // No later line may take the integration back to CRLF.
-    expect(rules.filter((l) => /wmux-bash-integration|\.sh\b/.test(l) && /eol=crlf/.test(l))).toEqual([]);
+    expect(rules.filter((l) => /remotea-bash-integration|\.sh\b/.test(l) && /eol=crlf/.test(l))).toEqual([]);
   });
 });
 
 describe('Git Bash loads the integration (#427)', () => {
-  const script = 'C:\\wmux\\resources\\shell-integration\\wmux-bash-integration.sh';
+  const script = 'C:\\wmux\\resources\\shell-integration\\remotea-bash-integration.sh';
 
   it('a login "Git Bash" pane trades --login for --init-file and asks the script for the login files', () => {
     expect(gitBashIntegrationArgs(GIT_BASH, GIT_BASH_LOGIN_ARGS, script)).toEqual({
-      args: ['--init-file', 'C:/wmux/resources/shell-integration/wmux-bash-integration.sh', '-i'],
+      args: ['--init-file', 'C:/wmux/resources/shell-integration/remotea-bash-integration.sh', '-i'],
       login: true,
     });
   });
@@ -63,11 +63,11 @@ describe('Git Bash loads the integration (#427)', () => {
   it('sets the prologue\'s variables only when it injects', () => {
     const env: Record<string, string> = {};
     expect(gitBashArgs(GIT_BASH, GIT_BASH_LOGIN_ARGS, INTEGRATION_DIR, env)?.[0]).toBe('--init-file');
-    expect(env).toEqual({ WMUX_BASH_INIT: '1', WMUX_BASH_LOGIN: '1' });
+    expect(env).toEqual({ REMOTEA_BASH_INIT: '1', REMOTEA_BASH_LOGIN: '1' });
 
     const plain: Record<string, string> = {};
     gitBashArgs(GIT_BASH, [], INTEGRATION_DIR, plain);
-    expect(plain).toEqual({ WMUX_BASH_INIT: '1' });
+    expect(plain).toEqual({ REMOTEA_BASH_INIT: '1' });
   });
 
   it('starts bash as asked when the script is missing, rather than skipping ~/.bashrc', () => {
@@ -84,30 +84,30 @@ describe('WSLENV lets a Windows helper started in the pane reach wmux (#428)', (
   }));
 
   it('carries the surface, the pipe and the token both ways', () => {
-    for (const name of ['WMUX', 'WMUX_SURFACE_ID', 'WMUX_PIPE', 'WMUX_PIPE_TOKEN']) {
+    for (const name of ['REMOTEA', 'REMOTEA_SURFACE_ID', 'REMOTEA_PIPE', 'REMOTEA_PIPE_TOKEN']) {
       expect(flags.get(name), name).toBe('');
     }
     // Translated both ways: /mnt/c/... inside, C:\... for node.exe.
-    expect(flags.get('WMUX_CLI')).toBe('p');
+    expect(flags.get('REMOTEA_CLI')).toBe('p');
   });
 
   it('keeps one-way what Windows must not get back', () => {
     expect(flags.get('BROWSER')).toBe('u');
-    expect(flags.get('WMUX_REMOTE')).toBe('u');
-    expect(flags.get('WMUX_REMOTE_TOKEN')).toBe('u');
-    expect(flags.get('WMUX_WSL_NODE')).toBe('up');
+    expect(flags.get('REMOTEA_REMOTE')).toBe('u');
+    expect(flags.get('REMOTEA_REMOTE_TOKEN')).toBe('u');
+    expect(flags.get('REMOTEA_WSL_NODE')).toBe('up');
   });
 
-  it('never hands WMUX_NODE in: the cli-bin shim would run node.exe on a /mnt script path', () => {
-    expect(flags.has('WMUX_NODE')).toBe(false);
+  it('never hands REMOTEA_NODE in: the cli-bin shim would run node.exe on a /mnt script path', () => {
+    expect(flags.has('REMOTEA_NODE')).toBe(false);
   });
 
   it('a WSL pane gets the runtime and the script the integration needs', () => {
-    const env: Record<string, string> = { WMUX_NODE: 'C:\\Program Files\\nodejs\\node.exe' };
+    const env: Record<string, string> = { REMOTEA_NODE: 'C:\\Program Files\\nodejs\\node.exe' };
     buildShellArgs('wsl', env, INTEGRATION_DIR, undefined);
-    expect(env.WMUX_WSL_NODE).toBe('C:\\Program Files\\nodejs\\node.exe');
-    expect(env.WMUX_BASH_SCRIPT).toBe(SH);
-    expect(env.WSLENV).toContain('WMUX_BASH_SCRIPT/up');
+    expect(env.REMOTEA_WSL_NODE).toBe('C:\\Program Files\\nodejs\\node.exe');
+    expect(env.REMOTEA_BASH_SCRIPT).toBe(SH);
+    expect(env.WSLENV).toContain('REMOTEA_BASH_SCRIPT/up');
   });
 });
 
@@ -124,7 +124,7 @@ function resolvedTransport(setup: string[]): string {
   const sq = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   const script = [
     ...setup,
-    'unset WMUX_SURFACE_ID WMUX_REMOTE',
+    'unset REMOTEA_SURFACE_ID REMOTEA_REMOTE',
     `source ${sq(SH.replace(/\\/g, '/'))}`,
     'trap - DEBUG',
     'printf "%s|%s|%s" "$_wmux_windows" "$_wmux_cli_node" "$_wmux_cli_script"',
@@ -135,25 +135,26 @@ function resolvedTransport(setup: string[]): string {
 describe.skipIf(!hasGitBash)('transport resolution', () => {
   const node = process.execPath;
 
-  it('Git Bash runs WMUX_CLI with WMUX_NODE', () => {
-    const out = resolvedTransport([`export WMUX_NODE='${node}' WMUX_CLI='C:\\wmux\\wmux.js'`]);
-    expect(out).toBe(`1|${node}|C:\\wmux\\wmux.js`);
+  it('Git Bash runs REMOTEA_CLI with REMOTEA_NODE', () => {
+    const out = resolvedTransport([`export REMOTEA_NODE='${node}' REMOTEA_CLI='C:\\wmux\\remotea.js'`]);
+    expect(out).toBe(`1|${node}|C:\\wmux\\remotea.js`);
   });
 
-  it('WSL runs the Windows-spelled CLI with WMUX_WSL_NODE', () => {
+  it('WSL runs the Windows-spelled CLI with REMOTEA_WSL_NODE', () => {
     const out = resolvedTransport([
       'OSTYPE=linux-gnu',
-      `export WSL_DISTRO_NAME=Ubuntu WMUX_WSL_NODE='${node}' WMUX_CLI=/mnt/c/wmux/wmux.js`,
-      'wslpath() { [ "$1" = -w ] && printf "C:\\\\wmux\\\\wmux.js\\n"; }',
+      `export WSL_DISTRO_NAME=Ubuntu REMOTEA_WSL_NODE='${node}' REMOTEA_CLI=/mnt/c/wmux/remotea.js`,
+      // %s, not the format string: printf would read the `\\r` of `\\remotea` as a carriage return.
+      'wslpath() { [ "$1" = -w ] && printf "%s\\n" "C:\\\\wmux\\\\remotea.js"; }',
     ]);
-    expect(out).toBe(`|${node}|C:\\wmux\\wmux.js`);
+    expect(out).toBe(`|${node}|C:\\wmux\\remotea.js`);
   });
 
   it('WSL without a Windows runtime stays silent rather than guessing', () => {
     const out = resolvedTransport([
       'OSTYPE=linux-gnu',
-      'export WSL_DISTRO_NAME=Ubuntu WMUX_CLI=/mnt/c/wmux/wmux.js',
-      'unset WMUX_WSL_NODE',
+      'export WSL_DISTRO_NAME=Ubuntu REMOTEA_CLI=/mnt/c/wmux/remotea.js',
+      'unset REMOTEA_WSL_NODE',
     ]);
     expect(out).toBe('||');
   });
@@ -189,8 +190,8 @@ async function gitBashSession(login: boolean, commands: string[]): Promise<{ out
     const env: Record<string, string> = {
       ...(process.env as Record<string, string>),
       HOME: home,
-      WMUX: '1', WMUX_SURFACE_ID: 'surf-gitbash', WMUX_PIPE: pipe, WMUX_PIPE_TOKEN: 'tok',
-      WMUX_CLI: CLI, WMUX_NODE: process.execPath,
+      REMOTEA: '1', REMOTEA_SURFACE_ID: 'surf-gitbash', REMOTEA_PIPE: pipe, REMOTEA_PIPE_TOKEN: 'tok',
+      REMOTEA_CLI: CLI, REMOTEA_NODE: process.execPath,
     };
     const args = gitBashArgs(GIT_BASH, login ? GIT_BASH_LOGIN_ARGS : [], INTEGRATION_DIR, env);
     expect(args).not.toBeNull();
@@ -228,7 +229,7 @@ describe.skipIf(!hasGitBash)('a Git Bash pane reports a cwd wmux can restore (#4
   }, 60_000);
 
   it('reads the login files for a login pane, ~/.bashrc otherwise, and clears its own variables', async () => {
-    const probe = 'echo "INIT=${WMUX_BASH_INIT-unset} LOGIN=${WMUX_BASH_LOGIN-unset}"';
+    const probe = 'echo "INIT=${REMOTEA_BASH_INIT-unset} LOGIN=${REMOTEA_BASH_LOGIN-unset}"';
     const login = await gitBashSession(true, [probe]);
     expect(login.output).toContain('RC=profile');
     expect(login.output).not.toContain('RC=bashrc');

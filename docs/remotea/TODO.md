@@ -71,7 +71,7 @@ Apply the one-terminal default consistently across the normal workspace-creation
 
 Goal: push a tagged release and have both pieces update themselves, from the CLI (`remotea update`) or from the app (an Update button that updates the server and then the app).
 
-What already exists (from wmux): `electron-updater` + zip fallback (`src/main/updater.ts`, `zip-updater.ts`), the GitHub changelog reader (`changelog.ts`), and `electron-builder.json` publishing to `rdavisdunham/remotea`. The app side only lacks releases to point at.
+What already exists (from remotea): `electron-updater` + zip fallback (`src/main/updater.ts`, `zip-updater.ts`), the GitHub changelog reader (`changelog.ts`), and `electron-builder.json` publishing to `rdavisdunham/remotea`. The app side only lacks releases to point at.
 
 Work, in order:
 1. **Releases.** One tag versions both pieces (`vX.Y.Z` bumps `package.json` and `remote-server/package.json` together). A GitHub Actions release workflow builds the Windows app on tag and publishes the release with the electron-builder update manifest (`latest.yml`) and a server tarball (or the server uses the tag directly). No secrets or local config in artifacts.

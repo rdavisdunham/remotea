@@ -328,7 +328,7 @@ export interface HelloBody {
   build_dirty?: boolean;
   /** ERIDANI_CAPS_VERSION: how to read `harnesses` and `targets`. Absent: 1. */
   caps_version?: number;
-  /** The installed hook helper (wmux-hook.js): the first 12 hex of its sha256, null when not installed. */
+  /** The installed hook helper (remotea-hook.js): the first 12 hex of its sha256, null when not installed. */
   hook_version?: string | null;
   caps: LinkCap[];
   harnesses: CapabilityMatrix;

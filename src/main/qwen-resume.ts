@@ -3,7 +3,7 @@
 // The fifth provider beside Claude (#186), Codex (#261), OpenCode (#290) and
 // agy. Qwen Code's hooks are Claude Code's hooks in all but name — same events,
 // same snake_case payload, `session_id` on every one — so the handle arrives the
-// way Claude's does: wmux-hook.js reads it off the payload and `handleHookEvent`
+// way Claude's does: remotea-hook.js reads it off the payload and `handleHookEvent`
 // records it, tagged `provider: 'qwen'` because qwen-context.ts registers every
 // Qwen hook with `--provider qwen`. Restore types `qwen --resume <id>`.
 //

@@ -27,7 +27,7 @@ import { execFileSync } from 'child_process';
  * read back out of the script.
  */
 
-const SCRIPT = path.join(__dirname, '..', '..', 'src', 'shell-integration', 'wmux-powershell-integration.ps1');
+const SCRIPT = path.join(__dirname, '..', '..', 'src', 'shell-integration', 'remotea-powershell-integration.ps1');
 // Normalized to LF: the script is CRLF on disk, and every offset below looks
 // for a brace on its own line.
 const source = fs.readFileSync(SCRIPT, 'utf8').replace(/\r\n/g, '\n');
@@ -614,7 +614,7 @@ describe('PR poller wiring', () => {
     // <temp>\wmux is wmux's scratch directory (remote-insert.ts uses it too);
     // sharing it keeps this from becoming a second scratch location, and makes
     // the leftovers easy to find if the exit handler ever misses one.
-    expect(source).toMatch(/Join-Path \(\[System\.IO\.Path\]::GetTempPath\(\)\) "wmux"/);
+    expect(source).toMatch(/Join-Path \(\[System\.IO\.Path\]::GetTempPath\(\)\) "remotea"/);
     expect(source).toContain('PSEngineEvent]::Exiting');
   });
 

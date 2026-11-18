@@ -6,7 +6,7 @@ import { pluginNeedsUpdate } from '../../src/main/agent-plugin-file';
 /**
  * Issue #231 — the SHIPPED extension, not a copy of its logic.
  *
- * resources/pi-extension/wmux.js is installed verbatim into
+ * resources/pi-extension/remotea.js is installed verbatim into
  * ~/.pi/agent/extensions/, so the file itself is the contract. Loaded here for
  * the same reason the OpenCode plugin is (#187): that bug was one token
  * (`process.execPath`) and no test of a paraphrase would have caught it.
@@ -22,13 +22,13 @@ vi.mock('node:child_process', () => ({
   },
 }));
 
-const EXTENSION = path.resolve(__dirname, '../../resources/pi-extension/wmux.js');
-const OPENCODE_PLUGIN = path.resolve(__dirname, '../../resources/opencode-plugin/wmux.js');
+const EXTENSION = path.resolve(__dirname, '../../resources/pi-extension/remotea.js');
+const OPENCODE_PLUGIN = path.resolve(__dirname, '../../resources/opencode-plugin/remotea.js');
 
 const load = () => import(/* @vite-ignore */ EXTENSION);
 
 const SURFACE = 'surf-1';
-const CLI = 'C:\\wmux\\resources\\cli\\wmux.js';
+const CLI = 'C:\\wmux\\resources\\cli\\remotea.js';
 
 /** Every wmux CLI invocation the extension made, as flat argv minus the script. */
 const verbs = () => calls.map((c) => c.argv.slice(1));
@@ -50,10 +50,10 @@ function fakePi() {
 
 async function extensionWith(env: Record<string, string | undefined> = {}) {
   Object.assign(process.env, {
-    WMUX: '1',
-    WMUX_SURFACE_ID: SURFACE,
-    WMUX_CLI: CLI,
-    WMUX_NODE: process.execPath,
+    REMOTEA: '1',
+    REMOTEA_SURFACE_ID: SURFACE,
+    REMOTEA_CLI: CLI,
+    REMOTEA_NODE: process.execPath,
     ...env,
   });
   for (const [k, v] of Object.entries(env)) if (v === undefined) delete process.env[k];
@@ -71,7 +71,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const key of ['WMUX', 'WMUX_SURFACE_ID', 'WMUX_CLI', 'WMUX_NODE', 'WMUX_NODE_ELECTRON', 'PI_IMAGE_PROTOCOL']) {
+  for (const key of ['REMOTEA', 'REMOTEA_SURFACE_ID', 'REMOTEA_CLI', 'REMOTEA_NODE', 'REMOTEA_NODE_ELECTRON', 'PI_IMAGE_PROTOCOL']) {
     if (savedEnv[key] === undefined) delete process.env[key];
     else process.env[key] = savedEnv[key];
   }
@@ -83,14 +83,14 @@ describe('#231 pi extension: activation', () => {
     // pi loads global extensions for every session on the machine, including
     // ones started from a plain terminal. Registering handlers there would
     // spawn a CLI process per event for a wmux that is not running.
-    const pi = await extensionWith({ WMUX: '0', PI_IMAGE_PROTOCOL: undefined });
+    const pi = await extensionWith({ REMOTEA: '0', PI_IMAGE_PROTOCOL: undefined });
     expect(pi.handlers.size).toBe(0);
     expect(calls).toEqual([]);
     expect(process.env.PI_IMAGE_PROTOCOL).toBeUndefined();
   });
 
   it('is inert with no surface id', async () => {
-    const pi = await extensionWith({ WMUX_SURFACE_ID: undefined });
+    const pi = await extensionWith({ REMOTEA_SURFACE_ID: undefined });
     expect(pi.handlers.size).toBe(0);
   });
 
@@ -107,10 +107,10 @@ describe('#231 pi extension: activation', () => {
 
   it('updates previously installed extensions through the version marker', () => {
     const source = readFileSync(EXTENSION, 'utf8');
-    expect(pluginNeedsUpdate(source, '// wmux-plugin-version: 1\nold source')).toBe(true);
+    expect(pluginNeedsUpdate(source, '// remotea-plugin-version: 1\nold source')).toBe(true);
   });
 
-  it('runs the CLI through WMUX_NODE, never the host binary (#187)', async () => {
+  it('runs the CLI through REMOTEA_NODE, never the host binary (#187)', async () => {
     // pi also ships as a compiled single-executable binary, where
     // process.execPath is `pi` and handing it a .js file prints pi's help and
     // exits 1 — silently, which is how #187 survived a whole release line.
@@ -121,7 +121,7 @@ describe('#231 pi extension: activation', () => {
   });
 
   it('declares ELECTRON_RUN_AS_NODE when the runtime is wmux itself', async () => {
-    const pi = await extensionWith({ WMUX_NODE_ELECTRON: '1' });
+    const pi = await extensionWith({ REMOTEA_NODE_ELECTRON: '1' });
     await pi.fire('agent_start');
     expect(calls[0].opts.env.ELECTRON_RUN_AS_NODE).toBe('1');
   });
@@ -358,9 +358,9 @@ describe('#231 pi extension: the copied runtime resolver', () => {
       .WmuxPlugin.__wmuxInternals.resolveNodeRuntime;
 
     const cases: Array<[Record<string, string>, string, NodeJS.Platform]> = [
-      [{ WMUX_NODE: process.execPath }, '/opt/pi/pi', 'linux'],
-      [{ WMUX_NODE: process.execPath, WMUX_NODE_ELECTRON: '1' }, '/opt/pi/pi', 'linux'],
-      [{ WMUX_NODE: '/definitely/not/here/node' }, process.execPath, 'linux'],
+      [{ REMOTEA_NODE: process.execPath }, '/opt/pi/pi', 'linux'],
+      [{ REMOTEA_NODE: process.execPath, REMOTEA_NODE_ELECTRON: '1' }, '/opt/pi/pi', 'linux'],
+      [{ REMOTEA_NODE: '/definitely/not/here/node' }, process.execPath, 'linux'],
       [{}, '/usr/local/bin/pi', 'linux'],
       [{}, 'C:\\pi\\pi.exe', 'win32'],
     ];

@@ -11,7 +11,7 @@ const BLOCK = fs.readFileSync(
 
 /**
  * The block wmux writes lands in three GLOBAL files — ~/.claude/CLAUDE.md,
- * ~/.config/opencode/AGENTS.md and ~/.kiro/steering/wmux.md — so it is read by
+ * ~/.config/opencode/AGENTS.md and ~/.kiro/steering/remotea.md — so it is read by
  * every session on the machine, not only the ones inside wmux (issue #152).
  *
  * It used to open by asserting "You are running inside wmux…" and then, on the
@@ -31,9 +31,9 @@ describe('global agent-context block (issue #152)', () => {
 
   it('discovers endpoint capabilities before selecting a command family', () => {
     const beforeBrowser = BLOCK.substring(0, BLOCK.indexOf('## Browser'));
-    expect(beforeBrowser).toContain('wmux identify');
-    expect(beforeBrowser).toContain('wmux capabilities');
-    expect(beforeBrowser).toMatch(/successful `wmux ping`[^]*does \*\*not\*\* establish/);
+    expect(beforeBrowser).toContain('remotea identify');
+    expect(beforeBrowser).toContain('remotea capabilities');
+    expect(beforeBrowser).toMatch(/successful `remotea ping`[^]*does \*\*not\*\* establish/);
     expect(beforeBrowser).toContain('features: ["status"]');
   });
 
@@ -46,8 +46,8 @@ describe('global agent-context block (issue #152)', () => {
   it('checks the install directly when PATH names a missing or different CLI', () => {
     expect(BLOCK).toMatch(/anything else[^]*do not\s+conclude yet/i);
     expect(BLOCK).toMatch(/PATH may omit this install or name a different\s+program/i);
-    const absolute = BLOCK.indexOf('{{WMUX_CLI_BIN}}/wmux" identify');
-    const capabilities = BLOCK.indexOf('{{WMUX_CLI_BIN}}/wmux" capabilities');
+    const absolute = BLOCK.indexOf('{{REMOTEA_CLI_BIN}}/remotea" identify');
+    const capabilities = BLOCK.indexOf('{{REMOTEA_CLI_BIN}}/remotea" capabilities');
     const conclusion = BLOCK.search(/endpoint is unavailable to this session/i);
     expect(absolute).toBeGreaterThan(-1);
     expect(capabilities).toBeGreaterThan(absolute);
@@ -83,7 +83,7 @@ describe('global agent-context block (issue #152)', () => {
 /**
  * Copies of the block written before it was marker-delimited (and before the
  * smux→wmux rename) were never updated and never removed: splicing keys off the
- * first `<!-- wmux:start -->`, so anything without markers just accumulated. The
+ * first `<!-- remotea:start -->`, so anything without markers just accumulated. The
  * machine this was found on had six, several disagreeing about the CLI's name,
  * all loaded into every session.
  */
@@ -118,8 +118,8 @@ describe('legacy marker-less copies (issue #152)', () => {
 
   it('leaves the managed block alone — it has the same heading', () => {
     const out = stripLegacyBlocks(`${legacy}\n${BLOCK}`);
-    expect(out).toContain('<!-- wmux:start');
-    expect(out).toContain('<!-- wmux:end -->');
+    expect(out).toContain('<!-- remotea:start');
+    expect(out).toContain('<!-- remotea:end -->');
     expect(out).not.toContain('You are running inside wmux');
   });
 
@@ -151,7 +151,7 @@ describe('legacy marker-less copies (issue #152)', () => {
   it('cleans up on the OpenCode path too, where the same block is written', () => {
     const out = injectWmuxBlock(`# Setup\n\nmine\n\n${legacy}`, BLOCK);
     expect(out).toContain('mine');
-    expect(out.match(/<!-- wmux:start/g)).toHaveLength(1);
+    expect(out.match(/<!-- remotea:start/g)).toHaveLength(1);
     expect(out).not.toContain('You are running inside wmux');
   });
 
@@ -166,13 +166,13 @@ describe('legacy marker-less copies (issue #152)', () => {
 // every later marker pair as managed and kept them all, forever.
 describe('stale MARKED duplicates of the block', () => {
   const stale = [
-    '<!-- wmux:start — AUTO-MANAGED BY wmux. Do not edit this section manually. -->',
+    '<!-- remotea:start — AUTO-MANAGED BY remotea. Do not edit this section manually. -->',
     '',
     '# wmux',
     '',
     'You are running inside wmux, a terminal multiplexer with a browser panel.',
     '',
-    '<!-- wmux:end -->',
+    '<!-- remotea:end -->',
     '',
   ].join('\n');
   const theirs = '<!-- smux-suez:start v=1 -->\n# Suez notes\nkeep me\n<!-- smux-suez:end -->\n';
@@ -180,8 +180,8 @@ describe('stale MARKED duplicates of the block', () => {
   it('keeps the first (managed) block and drops every later copy', () => {
     const doc = `${BLOCK}\n# My notes\n\nkeep this\n\n${stale}\n${stale}\n${theirs}\n${stale}`;
     const out = stripLegacyBlocks(doc);
-    expect(out.split('<!-- wmux:start').length - 1).toBe(1);
-    expect(out.split('<!-- wmux:end -->').length - 1).toBe(1);
+    expect(out.split('<!-- remotea:start').length - 1).toBe(1);
+    expect(out.split('<!-- remotea:end -->').length - 1).toBe(1);
     expect(out).toContain('keep this');
     // Another tool's own marked block is not ours to touch.
     expect(out).toContain('keep me');
@@ -194,13 +194,13 @@ describe('stale MARKED duplicates of the block', () => {
   });
 
   it('an unterminated later start is left alone rather than eating the user\'s text', () => {
-    const doc = `${BLOCK}\n<!-- wmux:start broken\nuser text after\n`;
+    const doc = `${BLOCK}\n<!-- remotea:start broken\nuser text after\n`;
     expect(stripLegacyBlocks(doc)).toContain('user text after');
   });
 
   it('uninstall removes the duplicates too, not only the first block', () => {
     const out = stripWmuxBlock(`# Mine\n\n${BLOCK}\n${stale}\n${stale}\ntail\n`);
-    expect(out).not.toContain('wmux:start');
+    expect(out).not.toContain('remotea:start');
     expect(out).toContain('# Mine');
     expect(out).toContain('tail');
   });

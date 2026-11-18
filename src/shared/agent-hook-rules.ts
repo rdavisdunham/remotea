@@ -39,7 +39,7 @@ export const KNOWN_EVENTS: ClaudeHookEvent[] = [
  * Which event a `hook.event` wire payload denotes, or null for one outside the
  * model.
  *
- * This exists because the payload does not always say. `wmux-hook.js` is
+ * This exists because the payload does not always say. `remotea-hook.js` is
  * invoked two ways (see its usage block): `--event <Event>` for the lifecycle
  * hooks, and a bare `<tool-name>` for the per-tool PostToolUse entries
  * claude-context.ts installs — and the bare form sends `{ tool }` with NO
@@ -122,7 +122,7 @@ export interface HookTurnContext {
  *
  * That distinction is not academic, because every hook a pane's agent fires —
  * including its background shells and its parallel subagents — carries the same
- * WMUX_SURFACE_ID and lands on the one surface. So an agent that kicks off a
+ * REMOTEA_SURFACE_ID and lands on the one surface. So an agent that kicks off a
  * background command and then asks the user a question is, from wmux's side,
  * a pane that is blocked AND busy at the same time. That is a legitimate state,
  * and `resolveState` in agent-state.ts already renders it correctly: `blocked`
@@ -245,7 +245,7 @@ export function hookToAgentReport(
     // dialog would have stopped the tool from running at all". That premise
     // holds only for an agent doing one thing at a time, and it is false for the
     // two things agents do most: a BACKGROUND shell, and PARALLEL SUBAGENTS.
-    // Both carry the pane's WMUX_SURFACE_ID, so their tool lifecycle reports to
+    // Both carry the pane's REMOTEA_SURFACE_ID, so their tool lifecycle reports to
     // the surface that is asking the question — and the pane snapped back to
     // "Running" with the prompt still on screen and no event left to correct it
     // (Claude Code arms the 60s idle nudge only after a turn ENDS, and the turn
@@ -268,7 +268,7 @@ export function hookToAgentReport(
     //
     // This used to decrement the refcount, which was wrong in the way that
     // produced the loudest half of issue #151. Subagent hooks inherit the
-    // parent's WMUX_SURFACE_ID, so all of them report to ONE pane: three
+    // parent's REMOTEA_SURFACE_ID, so all of them report to ONE pane: three
     // subagents' PostToolUse events each pin the depth to the absolute value 1,
     // and then the FIRST SubagentStop drains it to 0 — the pane reads `idle`
     // with the parent and two siblings still working. A refcount only survives

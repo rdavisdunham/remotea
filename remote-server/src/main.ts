@@ -65,7 +65,7 @@ async function main(): Promise<void> {
     config: { resumeAgents: config.resumeAgents, scrollback: config.scrollback, snapshotScrollback: config.snapshotScrollback, ringBytes: config.ringBytes, stallMinutes: Number.isFinite(config.stallMinutes) && config.stallMinutes >= 0 ? config.stallMinutes : 15 },
     log,
     sessionEnv: config.hookPort
-      ? (id) => hookEnv(hookSecret, config.hookPort, id, { cliPath: path.join(defaultHookPaths().cliDir, 'wmux.js'), nodePath: process.execPath })
+      ? (id) => hookEnv(hookSecret, config.hookPort, id, { cliPath: path.join(defaultHookPaths().cliDir, 'remotea.js'), nodePath: process.execPath })
       : undefined,
     diag: (device, events) => diag.write(device, events),
     hooks: { status: () => toAgentStatus(hooksStatus()), install: () => toAgentStatus(installHooks()) },

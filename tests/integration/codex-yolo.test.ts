@@ -1,4 +1,4 @@
-/** Opt in with WMUX_TEST_CODEX_EXE=<native codex.exe>, after build:main.
+/** Opt in with REMOTEA_TEST_CODEX_EXE=<native codex.exe>, after build:main.
  * Real Windows TUI + app-server, isolated CODEX_HOME, no account or inference.
  * A localhost HTTP error materializes a fixture conversation without a model.
  */
@@ -13,7 +13,7 @@ import { stripVTControlCharacters } from 'util';
 import { WebSocket } from 'ws';
 import { createCodexRelay, type CodexRelay } from '../../src/cli/codex-relay';
 
-const executable = process.env.WMUX_TEST_CODEX_EXE;
+const executable = process.env.REMOTEA_TEST_CODEX_EXE;
 const cleanup: Array<() => void | Promise<void>> = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
 
@@ -45,7 +45,7 @@ async function client(relay: CodexRelay) {
 
 it.skipIf(process.platform !== 'win32' || !executable)('resumes with full access through the real Windows TUI and keeps automatic restore tracking', async () => {
   const { spawn } = await import('node-pty');
-  const dir = mkdtempSync(path.join(tmpdir(), 'wmux-codex-yolo-'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'remotea-codex-yolo-'));
   cleanup.push(() => rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
   const http = createServer((_req, res) => { res.writeHead(503); res.end('No inference in this test'); });
   await new Promise<void>(resolve => http.listen(0, '127.0.0.1', resolve));
@@ -83,7 +83,7 @@ trust_level = "trusted"
   await expect.poll(() => seed.completed, { timeout: 20000 }).toBe(true);
   await first.close();
 
-  const pipe = `\\\\.\\pipe\\wmux-codex-yolo-test-${process.pid}-${Date.now()}`;
+  const pipe = `\\\\.\\pipe\\remotea-codex-yolo-test-${process.pid}-${Date.now()}`;
   const calls: Array<{ method: string; params: any }> = [];
   const wmux = net.createServer(socket => {
     let buffer = '';
@@ -98,9 +98,9 @@ trust_level = "trusted"
   });
   await new Promise<void>(resolve => wmux.listen(pipe, resolve));
   cleanup.push(() => new Promise<void>(resolve => wmux.close(() => resolve())));
-  const tui = spawn(process.execPath, [path.resolve('dist/cli/wmux-codex.js'), 'resume', threadId, '--yolo'], {
+  const tui = spawn(process.execPath, [path.resolve('dist/cli/remotea-codex.js'), 'resume', threadId, '--yolo'], {
     name: 'xterm-256color', cols: 100, rows: 30, cwd: dir,
-    env: { ...env, WMUX_CODEX_EXE: executable!, WMUX_PIPE: pipe, WMUX_PIPE_TOKEN: 'test-only', WMUX_SURFACE_ID: 'surf-yolo-test' },
+    env: { ...env, REMOTEA_CODEX_EXE: executable!, REMOTEA_PIPE: pipe, REMOTEA_PIPE_TOKEN: 'test-only', REMOTEA_SURFACE_ID: 'surf-yolo-test' },
   });
   let output = '';
   let exited = false;

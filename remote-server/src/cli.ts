@@ -48,6 +48,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
+import { spawnSync } from 'child_process';
+import readline from 'readline';
 import http from 'http';
 import WebSocket from 'ws';
 import { LEGACY_TIMER_HINT, configDir, ensureToken, loadConfig, loadEridaniConfig, rotateToken, type CollectorMode, type ServerConfig } from './config';
@@ -62,6 +64,8 @@ import { doctorCommand } from './doctor';
 import { launcherCommand } from './launcher-cli';
 import { fmtKeeper, observeKeeperStatus, type KeeperObservation } from './pty-backend';
 import { upgrade } from './upgrade';
+import { formatHostMoveResult, runHostMove } from './move';
+import { DESKTOP_VERBS, FORWARDED_ENV } from '../../src/cli/verbs';
 import { checkMainRef, defaultCheckoutDir, describeMainRef, mainRefSubject, type MainRefStatus } from './main-ref';
 import type { GitRunner } from './worktrees';
 import { PROTO, parseServerMsg, type AgentStateInfo, type ServerMsg, type SessionRecord, type VerifyAttemptStatus } from '../../src/shared/remote-host-protocol';
@@ -573,8 +577,10 @@ export function parseUpgradeArgs(argv: string[]): { yes: boolean; json: boolean;
 
 const USAGE = `Remotea host CLI — run beside the Linux/WSL session server.
 This administers host terminals, not the desktop UI or its phone console.
-wmux in a host pane may expose a status-only hook bridge: inspect wmux identify
-and wmux capabilities. ping does not establish desktop browser/workspace control.
+Inside a remotea terminal the same command runs the desktop CLI's verbs over a
+status-only hook bridge: inspect remotea identify and remotea capabilities there,
+and remotea token prints that bridge's token. ping does not establish desktop
+browser/workspace control.
 Host tokens, desktop bridge tokens, phone pairing and Eridani keys are separate.
 Task/run outcomes belong to Eridani; agent idle or terminal exit is not acceptance.
 
@@ -583,6 +589,8 @@ usage:
   remotea doctor [--json] [--probe]                             readiness report (ok/warn/fail per check; exit 1 on a fail)
   remotea upgrade [--yes] [--timeout <s>] [--unit <name>] [--json]
                                                                 drain, restart the server only, check the sessions came back
+  remotea move [--yes] [--json]                                 once, after the upgrade that renamed wmux: rewrite old hook entries,
+                                                                remove the old helper files (--yes also removes old plugin files)
   remotea open --group <name> [--cwd <dir>] [--title <t>] [--id surf-...] [--json] -- <command...>
   remotea close <surf-id>
   remotea token
@@ -601,9 +609,63 @@ usage:
                                                                 probe the launchers for managed runs now (re-probes unchanged binaries)
   remotea launcher status [--json]                              the recorded conformance probes`;
 
-export async function main(argv: string[]): Promise<number> {
-  const dir = configDir();
+/** The verbs this CLI runs itself. `token` is also the desktop CLI's (see hostRoute). */
+export const HOST_VERBS: ReadonlySet<string> = new Set([
+  'doctor', 'upgrade', 'status', 'open', 'close', 'token', 'hooks', 'logs', 'screen', 'eridani', 'launcher', 'rotate-token', 'move',
+]);
+
+export type HostRoute = 'host' | 'delegate' | 'outside-terminal' | 'unknown';
+
+/**
+ * Who runs `cmd` (KTD11). Inside a remotea terminal (REMOTEA_SURFACE_ID and
+ * REMOTEA_CLI both set) the desktop CLI's verbs go to it, and so does `token`,
+ * so an agent is handed the bridge token rather than the host admin token by
+ * default. A call already handed over once (REMOTEA_FORWARDED=1) is never
+ * handed on. Host verbs other than `token` always run here, `open` included:
+ * the hook bridge does not carry the desktop's `open <url>`.
+ */
+export function hostRoute(cmd: string | undefined, env: NodeJS.ProcessEnv): HostRoute {
+  const inside = !!env.REMOTEA_SURFACE_ID && !!env.REMOTEA_CLI;
+  const canDelegate = inside && env[FORWARDED_ENV] !== '1';
+  if (cmd === 'token' && canDelegate) return 'delegate';
+  if (cmd === undefined || HOST_VERBS.has(cmd) || cmd === 'help' || cmd === '--help') return 'host';
+  if ((DESKTOP_VERBS as readonly string[]).includes(cmd)) {
+    if (canDelegate) return 'delegate';
+    return inside ? 'unknown' : 'outside-terminal';
+  }
+  return 'unknown';
+}
+
+/** One y/N question on the terminal; anything but y/yes is no. */
+function askYesNo(question: string): Promise<boolean> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => rl.question(question, (a) => {
+    rl.close();
+    resolve(/^y(es)?$/i.test(a.trim()));
+  }));
+}
+
+/** Run the desktop CLI the session was given, with the call marked as handed over. */
+function delegateToDesktopCli(argv: string[], env: NodeJS.ProcessEnv): number {
+  const node = env.REMOTEA_NODE || process.execPath;
+  const r = spawnSync(node, [env.REMOTEA_CLI as string, ...argv], { stdio: 'inherit', env: { ...env, [FORWARDED_ENV]: '1' } });
+  if (r.error) throw new Error(`could not run the desktop CLI at ${env.REMOTEA_CLI}: ${r.error.message}`);
+  return r.status ?? 1;
+}
+
+export async function main(argv: string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
   const [cmd, ...rest] = argv;
+  const route = hostRoute(cmd, env);
+  if (route === 'delegate') return delegateToDesktopCli(argv, env);
+  if (route === 'outside-terminal') {
+    process.stderr.write(`remotea ${cmd} only works inside a remotea terminal. Outside one, remotea administers this host:\n\n${USAGE}\n`);
+    return 2;
+  }
+  if (route === 'unknown') {
+    process.stderr.write(`remotea: unknown command ${cmd}: neither this host's remotea nor the desktop CLI it reaches from a remotea terminal has it.\n\n${USAGE}\n`);
+    return 2;
+  }
+  const dir = configDir();
   switch (cmd) {
     case 'doctor':
       return doctorCommand(dir, rest);
@@ -676,6 +738,19 @@ export async function main(argv: string[]): Promise<number> {
       return eridaniCommand(dir, rest, () => healthy(loadConfig(dir).port));
     case 'launcher':
       return launcherCommand(dir, rest);
+    case 'move': {
+      const json = rest.includes('--json');
+      const yes = rest.includes('--yes') || rest.includes('-y');
+      const bad = rest.find((f) => !['--json', '--yes', '-y'].includes(f));
+      if (bad) throw new Error(`unknown option ${bad} (usage: remotea move [--yes] [--json])`);
+      const res = await runHostMove({
+        confirmRemovePlugins: (paths) => (yes ? true : json || !process.stdin.isTTY ? false : askYesNo(
+          `These old plugin files carry no path, so nothing shows whether remotea or a wmux install wrote them:\n  ${paths.join('\n  ')}\nRemove them? [y/N] `,
+        )),
+      });
+      process.stdout.write(json ? JSON.stringify(res, null, 2) + '\n' : formatHostMoveResult(res) + '\n');
+      return res.ok ? 0 : 1;
+    }
     case 'rotate-token':
       process.stdout.write(rotateToken(dir) + '\n');
       process.stderr.write('token rotated: the old token is revoked and apps using it are disconnected (sessions keep running).\nUpdate it in every app\'s Settings → Remote hosts to reconnect.\n');

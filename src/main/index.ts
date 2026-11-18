@@ -19,6 +19,7 @@ import {
 } from './webview-navigation';
 import { decidePermission } from './security-policy';
 import { parseSmokeArgs, runSmoke, shutdownSmoke, type SmokeOptions } from './smoke';
+import { isMoveRun, runMoveMode } from './move-mode';
 import { correctedDashboardHeaders, DASHBOARD_HEADER_FILTER } from './dashboard-content-type';
 import {
   agentBrowserNeedsTeardown,
@@ -123,7 +124,7 @@ type CallerBrowserResolution =
   | { kind: 'unresolved' };
 
 /**
- * Resolve which browser surface a terminal `caller` (e.g. $WMUX_SURFACE_ID) is
+ * Resolve which browser surface a terminal `caller` (e.g. $REMOTEA_SURFACE_ID) is
  * effectively bound to, for `browser.get_engine` / `browser.set_engine`.
  *
  * `wmux browser <verb>` already resolves a caller to ITS OWN browser surface
@@ -215,7 +216,7 @@ async function handleGetEngine(
   if (!surfaceId) {
     const caller: string | undefined = params?.caller;
     if (!caller) {
-      respondError(-32602, 'browser.get_engine: surface required — pass --surface <id>, or run from inside a pane so $WMUX_SURFACE_ID is set');
+      respondError(-32602, 'browser.get_engine: surface required — pass --surface <id>, or run from inside a pane so $REMOTEA_SURFACE_ID is set');
       return;
     }
     const resolution = await resolveCallerBrowserSurface(caller);
@@ -252,7 +253,7 @@ async function handleSetEngine(
   if (!surfaceId) {
     const caller: string | undefined = params?.caller;
     if (!caller) {
-      respondError(-32602, 'browser.set_engine: surface required — pass --surface <id>, or run from inside a pane so $WMUX_SURFACE_ID is set');
+      respondError(-32602, 'browser.set_engine: surface required — pass --surface <id>, or run from inside a pane so $REMOTEA_SURFACE_ID is set');
       return;
     }
     const resolution = await resolveCallerBrowserSurface(caller);
@@ -288,7 +289,7 @@ async function handleSetEngine(
  * Params carry either an explicit `surfaceId` (a known browser surface —
  * always used as-is) or a `caller` (a terminal surface, the shape every other
  * `browser.*` verb already accepts, forwarded here by `cmdBrowser`'s existing
- * `--surface`/`$WMUX_SURFACE_ID` handling with no CLI-side special-casing).
+ * `--surface`/`$REMOTEA_SURFACE_ID` handling with no CLI-side special-casing).
  * Neither present is the one case Part 2 asks for directly: -32602, since
  * there is nothing to resolve.
  */
@@ -344,7 +345,7 @@ function routeSpecialV2(
     return handleWindowV2(request.method, request.params, respond, respondError);
   }
   if (request.method === 'pane.codex_restore_config') {
-    const prefs = loadSettings()['wmux-workspace-prefs'] as { restoreCodexSessions?: boolean } | undefined;
+    const prefs = loadSettings()['remotea-workspace-prefs'] as { restoreCodexSessions?: boolean } | undefined;
     respond({ enabled: !isQuitting && ptyManager.has(request.params?.surfaceId) && prefs?.restoreCodexSessions === true });
     return true;
   }
@@ -519,9 +520,9 @@ function handleWindowV2(
 }
 // Per-instance secret that authenticates privileged (V2) pipe requests.
 // Generated/persisted once per APPDATA dir and injected into spawned shells
-// as WMUX_PIPE_TOKEN so the CLI and hooks can authenticate.
+// as REMOTEA_PIPE_TOKEN so the CLI and hooks can authenticate.
 const pipeToken = ensurePipeToken();
-process.env.WMUX_PIPE_TOKEN = pipeToken;
+process.env.REMOTEA_PIPE_TOKEN = pipeToken;
 const pipeServer = new PipeServer(getPipePath(), pipeToken);
 const portScanner = new PortScanner();
 const cdpProxy = new CDPProxy();
@@ -590,7 +591,7 @@ let lastSnapshotFingerprint = '';
  */
 function snapshotIntervalMinutes(): number {
   try {
-    const prefs = loadSettings()['wmux-workspace-prefs'] as { sessionSnapshotMinutes?: unknown } | undefined;
+    const prefs = loadSettings()['remotea-workspace-prefs'] as { sessionSnapshotMinutes?: unknown } | undefined;
     const raw = prefs?.sessionSnapshotMinutes;
     return typeof raw === 'number' ? raw : DEFAULT_SNAPSHOT_MINUTES;
   } catch {
@@ -702,10 +703,10 @@ const DEFAULT_ALL_PROMPTS_LIMIT = 20;
  * The renderer's prompt-preference key, spelled here because main cannot import
  * it: STORAGE_KEYS lives in src/renderer/store/settings-slice.ts, a zustand
  * module. The FILE is shared though — the renderer persists through main into
- * %APPDATA%\wmux\settings.json — so reading it back here is reading the same
+ * %APPDATA%\remotea\settings.json — so reading it back here is reading the same
  * bytes the renderer wrote, not a second copy of the state.
  */
-const PROMPT_PREFS_KEY = 'wmux-prompt-prefs';
+const PROMPT_PREFS_KEY = 'remotea-prompt-prefs';
 
 /**
  * Is the prompt log switched on at all? (issue #207)
@@ -984,7 +985,7 @@ function startRemoteConsole(): void {
 }
 
 // Set Windows AppUserModelId so taskbar pinning uses the correct icon & identity.
-// Suffixed per instance: a WMUX_INSTANCE build must not seize the installed
+// Suffixed per instance: a REMOTEA_INSTANCE build must not seize the installed
 // app's taskbar identity out from under it (see getAppUserModelId).
 app.setAppUserModelId(getAppUserModelId());
 
@@ -1000,7 +1001,7 @@ stripMotw();
 // Electron keys that lock on userData, which was `%APPDATA%\wmux` — also the
 // default of openwong2kim/wmux, a different app with the same name, so the two
 // could not run at once (#282). Electron's profile now lives in its own
-// subdirectory of this instance's data dir (WMUX_INSTANCE included, so dev and
+// subdirectory of this instance's data dir (REMOTEA_INSTANCE included, so dev and
 // prod still coexist), carried over once; see chromium-profile.ts. Must run
 // before anything opens the profile, which is why it is here, at module load.
 {
@@ -1011,6 +1012,12 @@ stripMotw();
   if (result.status === 'failed') logDiagnostic('profile-migration-failed', { kept: dir, error: result.error });
 }
 const gotInstanceLock = app.requestSingleInstanceLock();
+
+// `--move` (npm run move): bring an install from before the rename over to the
+// new names, then exit. Runs instead of the app — whenReady below returns early —
+// and refuses while the app is open (move-mode.ts).
+const moveRun = isMoveRun(process.argv);
+if (moveRun) void runMoveMode(gotInstanceLock);
 
 /**
  * Open a folder as a new workspace, for the Explorer context-menu verb
@@ -1036,7 +1043,9 @@ async function openDirectoryAsWorkspace(dirPath: string): Promise<void> {
 
 const isDirectory = (p: string): boolean => fs.statSync(p).isDirectory();
 
-if (!gotInstanceLock) {
+if (moveRun) {
+  // move-mode.ts exits on its own.
+} else if (!gotInstanceLock) {
   app.quit();
 } else {
   // Explorer launches `wmux.exe "C:\folder"`. With the single-instance lock held
@@ -1618,8 +1627,9 @@ process.on('uncaughtExceptionMonitor', (err: unknown) => {
 });
 
 app.whenReady().then(() => {
-  // A losing second instance is already quitting; don't run startup side effects.
-  if (!gotInstanceLock) return;
+  // A losing second instance is already quitting, and a move run is not the
+  // app: no startup side effects for either.
+  if (!gotInstanceLock || moveRun) return;
 
   // First line of the run, so a crash report can state what this process was
   // rather than infer it (#150). `guard` in particular: whether the node-pty
@@ -1638,7 +1648,7 @@ app.whenReady().then(() => {
   // Find out whether PowerShell will run the .ps1 shim before the renderer asks
   // for its first PTY (issue #154). Unawaited on purpose: the answer only
   // decides one PATH entry, and a pane that wins the race just gets the old
-  // wmux.cmd behaviour rather than a slower startup for everyone.
+  // remotea.cmd behaviour rather than a slower startup for everyone.
   ensurePowerShellShim().catch(() => {});
 
   // IPC: renderer pushes session state (auto-save response or explicit save).
@@ -1708,7 +1718,7 @@ app.whenReady().then(() => {
     if (meta.cwd) broadcastMetadataUpdate({ command: 'report_pwd', surfaceId, args: [meta.cwd] });
   });
   // Agent status from a remote session — the server's hook bridge relays
-  // what wmux-hook.js (and the wmux plugins) would have sent to the named pipe
+  // what remotea-hook.js (and the wmux plugins) would have sent to the named pipe
   // had the agent run here. The bridge authenticated it per session and the
   // WebSocket authenticated the server, so it goes to the same handlers the
   // pipe feeds, pinned to the session it came from. Only status methods.
@@ -1850,7 +1860,7 @@ app.whenReady().then(() => {
     // Remove what past portable-zip updates left in %TEMP% (#3): the apply
     // helper no longer deletes itself, and nothing else reclaims it. Outside
     // initAutoUpdater() on purpose — that returns early on zip installs and
-    // under WMUX_DISABLE_UPDATER, and leftovers from an earlier update are
+    // under REMOTEA_DISABLE_UPDATER, and leftovers from an earlier update are
     // still there either way. Delayed a minute because the helper that just
     // started this process is still running `rmdir` on its payload, and to
     // keep the I/O out of startup (#176). Unawaited and unref'd, so it never
@@ -2032,7 +2042,7 @@ app.whenReady().then(() => {
     // it does cross, on its own channel; the command line never does.
     if (cmd.command === 'report_command') return;
     // A notify from a process that outlived its pane (a detached job that
-    // inherited WMUX_SURFACE_ID) names a surface no window owns. Since #392
+    // inherited REMOTEA_SURFACE_ID) names a surface no window owns. Since #392
     // each window keeps only notifications for surfaces it owns, so that one
     // would be dropped everywhere; sent surface-less, the active workspace
     // takes it as before. Only main knows which surfaces still exist.
@@ -2116,7 +2126,7 @@ app.whenReady().then(() => {
         break;
       }
       case 'config.get': {
-        // Expose the current ~/.wmux/config.toml state (incl. parse errors).
+        // Expose the current ~/.remotea/config.toml state (incl. parse errors).
         (async () => {
           try {
             const { loadUserConfig } = await import('./user-config');
@@ -2126,7 +2136,7 @@ app.whenReady().then(() => {
         break;
       }
       case 'locales.get': {
-        // What ~/.wmux/locales currently yields, including the reasons any file
+        // What ~/.remotea/locales currently yields, including the reasons any file
         // was rejected — a translator's only feedback loop (issue #147).
         (async () => {
           try {
@@ -2147,7 +2157,7 @@ app.whenReady().then(() => {
         break;
       }
       case 'config.reload': {
-        // Re-read ~/.wmux/config.toml and live-apply to every open window.
+        // Re-read ~/.remotea/config.toml and live-apply to every open window.
         (async () => {
           try {
             const { loadUserConfig, resetConfigWarnings } = await import('./user-config');
@@ -2156,7 +2166,7 @@ app.whenReady().then(() => {
             // problems the file still has rather than staying quiet because the
             // pre-edit version already warned about them.
             resetConfigWarnings();
-            // Same contract as the IPC path: one reload covers all of ~/.wmux,
+            // Same contract as the IPC path: one reload covers all of ~/.remotea,
             // including community translations (issue #147).
             const cfg = { ...loadUserConfig(), locales: loadUserLocales() };
             for (const win of BrowserWindow.getAllWindows()) {
@@ -2279,7 +2289,7 @@ app.whenReady().then(() => {
               const hit = await promptsForSurface(surfaceId, limit);
               if (hit) { respond({ surfaceId, prompts: hit.prompts, truncated: hit.truncated, enabled }); return; }
               if (!(await surfaceExists(surfaceId))) {
-                respondError(-32000, `surface ${surfaceId} not found (closed, or never existed). Pass an id from \`wmux list-surfaces\`.`);
+                respondError(-32000, `surface ${surfaceId} not found (closed, or never existed). Pass an id from \`remotea list-surfaces\`.`);
                 return;
               }
               respond({ surfaceId, prompts: [], truncated: false, enabled });
@@ -2323,7 +2333,7 @@ app.whenReady().then(() => {
             // Normalize to an absolute path before handing it to the renderer:
             // a path-aware surface (issue #116) has to show and reload something
             // unambiguous. The CLI already resolves against the caller's cwd
-            // (src/cli/wmux.ts), so this only normalizes; a raw pipe client that
+            // (src/cli/remotea.ts), so this only normalizes; a raw pipe client that
             // sends a relative path gets the same main-cwd resolution fs would
             // have applied anyway, just made explicit and visible in the pane.
             const filePath = path.resolve(requested);
@@ -2638,7 +2648,7 @@ windowManager.beforeClose = (win, isLastWindow) => {
 /** A boolean workspace pref that is on only when the user turned it on. */
 function workspacePrefOn(key: 'confirmAppClose' | 'closeToTray'): boolean {
   try {
-    const prefs = loadSettings()['wmux-workspace-prefs'] as Record<string, unknown> | undefined;
+    const prefs = loadSettings()['remotea-workspace-prefs'] as Record<string, unknown> | undefined;
     return prefs?.[key] === true;
   } catch { return false; }
 }

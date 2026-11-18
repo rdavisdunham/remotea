@@ -168,7 +168,7 @@ export const cs: Translation = {
   'markdown.openInApp': 'Otevřít ve výchozí aplikaci',
   'markdown.moreActions': 'Další akce',
   'markdown.noFile': 'Není podložen souborem',
-  'markdown.empty': 'Žádný obsah. Přidejte jej příkazem wmux markdown set, nebo sem přetáhněte soubor.',
+  'markdown.empty': 'Žádný obsah. Přidejte jej příkazem remotea markdown set, nebo sem přetáhněte soubor.',
   'markdown.error.copy': 'Nepodařilo se zapsat do schránky',
   'markdown.error.read': 'Nepodařilo se přečíst soubor',
   'markdown.error.action': 'Akce se nezdařila',
@@ -212,7 +212,7 @@ export const cs: Translation = {
   'surfaceTab.splitLayout': 'Rozvržení rozdělení…',
   'surfaceTab.closePane': 'Zavřít panel ({binding})',
   'surfaceTab.duplicateTab': 'Duplikovat kartu',
-  'surfaceTab.profileProject': 'Profil projektu (.wmux.json)',
+  'surfaceTab.profileProject': 'Profil projektu (.remotea.json)',
   'surfaceTab.profileGlobal': 'Globální profil',
   'surfaceTab.splitRight': 'Rozdělit vpravo',
   'surfaceTab.splitDown': 'Rozdělit dolů',
@@ -796,7 +796,7 @@ export const cs: Translation = {
   'titlebar.restore': 'Obnovit',
   'titlebar.close': 'Zavřít',
   'settings.general.transparencyRestart': 'Změna se projeví po restartu remotea.',
-  'palette.openWorkspaceFile': 'Otevřít soubor pracovního prostoru… (wmux.workspace.json)',
+  'palette.openWorkspaceFile': 'Otevřít soubor pracovního prostoru… (remotea.workspace.json)',
   'titlebar.focusMode': 'Režim soustředění: ztlumit všechny panely kromě aktivního',
   // Historie verzí
   'settings.tab.changelog': 'Historie verzí',
@@ -822,10 +822,10 @@ export const cs: Translation = {
   // Prohlížeč — úvodní stránka a vývojové servery
   'settings.browser.defaultUrl': 'Úvodní stránka',
   'settings.browser.defaultUrlHint':
-    'Stránka, kterou panel prohlížeče otevře v pracovním prostoru před první navigací. Adresa musí začínat http:// nebo https://. Prázdná hodnota použije úvodní stránku remotea. Lze nastavit také v ~/.wmux/config.toml jako [browser] default-url.',
+    'Stránka, kterou panel prohlížeče otevře v pracovním prostoru před první navigací. Adresa musí začínat http:// nebo https://. Prázdná hodnota použije úvodní stránku remotea. Lze nastavit také v ~/.remotea/config.toml jako [browser] default-url.',
   'settings.browser.autoOpenDevServer': 'Automaticky otevírat vývojové servery v panelu prohlížeče',
   'settings.browser.autoOpenDevServerHint':
-    'Panel prohlížeče automaticky přejde na vývojový server (Vite, Next, …), jakmile se spustí. Ve výchozím stavu zapnuto. Po vypnutí se nalezené porty nadále zobrazují u pracovního prostoru, ale žádná stránka se sama neotevře. Lze nastavit také v ~/.wmux/config.toml jako [browser] auto-open.',
+    'Panel prohlížeče automaticky přejde na vývojový server (Vite, Next, …), jakmile se spustí. Ve výchozím stavu zapnuto. Po vypnutí se nalezené porty nadále zobrazují u pracovního prostoru, ale žádná stránka se sama neotevře. Lze nastavit také v ~/.remotea/config.toml jako [browser] auto-open.',
   'settings.browser.mouseAppLinksHint':
     'Pokud program v panelu používá myš (OpenCode, vim se zapnutou myší), běžné kliknutí obsluhuje tento program. Ctrl+kliknutí otevře odkaz podle nastavení výše.',
   // Číselné klávesové zkratky
@@ -877,7 +877,7 @@ export const cs: Translation = {
   'settings.workspacePanel.sessionSnapshot30': '30 minut',
   'settings.workspacePanel.sessionSnapshot60': '60 minut',
   'settings.workspacePanel.restoreOpencodeSessionsHint':
-    'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje integraci OpenCode v remotea (serverový plugin, nebo TUI plugin nainstalovaný pomocí `wmux opencode-tui` pro OpenCode 2). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. OpenCode 2 na vzdáleném nebo sdíleném serveru zachytává TUI plugin; po aktualizaci remotea spusťte v daném prostředí znovu `wmux opencode-tui`.',
+    'Znovu otevře relaci OpenCode každé obnovené karty pomocí „opencode -s“ v původním adresáři. Vyžaduje integraci OpenCode v remotea (serverový plugin, nebo TUI plugin nainstalovaný pomocí `remotea opencode-tui` pro OpenCode 2). Běžně ukončené relace OpenCode se neotevřou. Pokud byla relace mezitím smazána, OpenCode místo ní zahájí novou. OpenCode 2 na vzdáleném nebo sdíleném serveru zachytává TUI plugin; po aktualizaci remotea spusťte v daném prostředí znovu `remotea opencode-tui`.',
   'settings.workspacePanel.restoreQwenSessionsHint':
     'Znovu spustí Qwen Code v každé obnovené kartě, kde běžel, pomocí „qwen --resume“ v původním adresáři. Vyžaduje hooky remotea pro Qwen (zapnuté stavové hooky) a Qwen Code 0.14 nebo novější. Karty, jejichž relace už Qwen nemá, se přeskočí. Řádně ukončené relace Qwen se neobnovují.',
   'settings.workspacePanel.restoreAgySessionsHint':
@@ -898,7 +898,7 @@ export const cs: Translation = {
   // Pracovní prostor — rozložení a uložené předvolby
   'settings.workspacePanel.newWorkspaceSection': 'Nový pracovní prostor',
   'settings.workspacePanel.newWorkspaceHint':
-    'Určuje, co se otevře v novém pracovním prostoru — používá ho tlačítko „+“ v postranním panelu, Ctrl+N, první spuštění i wmux new-workspace. Přednost má uložené rozložení označené níže jako Výchozí.',
+    'Určuje, co se otevře v novém pracovním prostoru — používá ho tlačítko „+“ v postranním panelu, Ctrl+N, první spuštění i remotea new-workspace. Přednost má uložené rozložení označené níže jako Výchozí.',
   'settings.workspacePanel.panes': 'Terminálové panely',
   'settings.workspacePanel.layout': 'Uspořádání',
   'settings.workspacePanel.layoutGrid': 'Mřížka (vyvážené řádky)',
@@ -907,7 +907,7 @@ export const cs: Translation = {
   'settings.workspacePanel.layoutLeft': 'Hlavní panel vlevo, ostatní nad sebou vpravo',
   'settings.workspacePanel.layoutDown': 'Hlavní panel nahoře, ostatní vedle sebe dole',
   'settings.workspacePanel.layoutHint':
-    'Lze nastavit také v ~/.wmux/config.toml v sekci [workspace]. U jediného panelu není co uspořádat.',
+    'Lze nastavit také v ~/.remotea/config.toml v sekci [workspace]. U jediného panelu není co uspořádat.',
   'settings.workspacePanel.layoutsSection': 'Uložená rozložení',
   'settings.workspacePanel.layoutsHint':
     'Uspořádejte si panely v pracovním prostoru — jejich velikosti a polohy i shell nebo příkaz, který v nich běží — a poté zde rozložení uložte.',
@@ -976,7 +976,7 @@ export const cs: Translation = {
   'agentNavigator.fromScreen': 'přečteno z obrazovky',
   'settings.workspacePanel.detectAgentScreens': 'Odhadovat stav agentů podle obsahu obrazovky',
   'settings.workspacePanel.detectAgentScreensHint':
-    'U agentů, kteří sami nehlásí stav (Codex, Gemini, Aider…), porovnává obsah jejich obrazovky s přiloženými pravidly a rozlišuje čekání na vás od probíhající práce. Vše probíhá pouze na tomto počítači a nikdy nepřepisuje stav oznámený agentem — pouze upřesňuje nečinnost, pokud na obrazovce zůstala otázka. Panely, jejichž agent hlásí práci nebo čekání na vás, se vůbec nečtou. Pravidla můžete upravit v %APPDATA%\\remotea\\agent-detection; příkaz „wmux detect explain“ ukáže, které pravidlo se použilo.',
+    'U agentů, kteří sami nehlásí stav (Codex, Gemini, Aider…), porovnává obsah jejich obrazovky s přiloženými pravidly a rozlišuje čekání na vás od probíhající práce. Vše probíhá pouze na tomto počítači a nikdy nepřepisuje stav oznámený agentem — pouze upřesňuje nečinnost, pokud na obrazovce zůstala otázka. Panely, jejichž agent hlásí práci nebo čekání na vás, se vůbec nečtou. Pravidla můžete upravit v %APPDATA%\\remotea\\agent-detection; příkaz „remotea detect explain“ ukáže, které pravidlo se použilo.',
   'settings.workspacePanel.closeToTray': 'Zavírat do oznamovací oblasti',
   'settings.workspacePanel.closeToTrayHint':
     'Tlačítko × okna nebo Alt+F4 skryje poslední okno remotea do oznamovací oblasti místo ukončení, takže relace terminálu i agenti dál běží. Kliknutím na ikonu ho vrátíte; „Ukončit remotea“ v její nabídce aplikaci skutečně ukončí. Má přednost před potvrzením výše.',

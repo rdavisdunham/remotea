@@ -334,7 +334,7 @@ describe('remotea hooks --remove-legacy-collector', () => {
       'python3 /home/u/jarvis/scripts/session_collector/session_hook.py.bak',
       'bash -c "python3 /home/u/jarvis/scripts/session_collector/session_hook.py"',
       'session_hook.py',
-      'node "/home/u/.local/share/remotea/cli/wmux-hook.js" --event SessionStart',
+      'node "/home/u/.local/share/remotea/cli/remotea-hook.js" --event SessionStart',
       42,
       undefined,
     ]) expect(isLegacyCollectorCommand(no, h), String(no)).toBe(false);
@@ -356,7 +356,7 @@ describe('remotea hooks --remove-legacy-collector', () => {
             ],
           },
           { hooks: [{ type: 'command', command: `${p.home}/jarvis/scripts/session_collector/session_hook.py` }] },
-          { hooks: [{ type: 'command', command: 'node "/x/wmux-hook.js" --event SessionStart' }] },
+          { hooks: [{ type: 'command', command: 'node "/x/remotea-hook.js" --event SessionStart' }] },
         ],
         Stop: [{ hooks: [{ type: 'command', command: legacy }] }],
       },
@@ -380,7 +380,7 @@ describe('remotea hooks --remove-legacy-collector', () => {
           { type: 'command', command: 'python3 /somewhere/else/session_hook.py' },
         ],
       },
-      { hooks: [{ type: 'command', command: 'node "/x/wmux-hook.js" --event SessionStart' }] },
+      { hooks: [{ type: 'command', command: 'node "/x/remotea-hook.js" --event SessionStart' }] },
     ]);
     // Only SessionStart is the collector's: the same command under another event is someone else's choice.
     expect(after.hooks.Stop).toEqual(original.hooks.Stop);

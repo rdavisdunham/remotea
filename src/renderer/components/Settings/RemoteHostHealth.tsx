@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useT } from '../../i18n';
 import type { HostStatus, RemoteRegistryView } from '../../../shared/remote-hosts-types';
-import { connectionHealth, tabsHealth, type HealthTone } from '../../remote-sessions/host-health';
+import { connectionHealth, serverNotice, tabsHealth, type HealthTone } from '../../remote-sessions/host-health';
 
 /**
  * Settings → Remote hosts, one host's health: the host connection, each tab's
@@ -18,9 +18,10 @@ function Chip({ tone, children, kind }: { tone: HealthTone; children: ReactNode;
   );
 }
 
-export default function RemoteHostHealth({ status, view, now }: { status: HostStatus | undefined; view: RemoteRegistryView | undefined; now: number }) {
+export default function RemoteHostHealth({ status, view, now, hostName }: { status: HostStatus | undefined; view: RemoteRegistryView | undefined; now: number; hostName?: string }) {
   const t = useT();
   const conn = connectionHealth(status, now, t);
+  const notice = serverNotice(status, hostName, t);
   const tabs = tabsHealth(view, t);
   const anyRun = tabs.some((tab) => tab.run);
   return (
@@ -30,6 +31,12 @@ export default function RemoteHostHealth({ status, view, now }: { status: HostSt
         <Chip tone={conn.tone} kind="connection">{conn.label}</Chip>
         <span className="remote-host-health__detail">{conn.detail}</span>
       </div>
+      {notice && (
+        <div className="remote-host-health__row" data-kind="server-version" role="status">
+          <Chip tone={notice.tone} kind="server">{notice.label}</Chip>
+          <span className="remote-host-health__detail">{notice.detail}</span>
+        </div>
+      )}
       {tabs.length > 0 && (
         <table className="remote-host-health__tabs">
           <thead>

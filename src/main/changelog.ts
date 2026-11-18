@@ -16,7 +16,7 @@ import { PRODUCT } from '../shared/product';
  * opening the panel a second time is free, and opening it with no network
  * shows what was there last time rather than an error.
  *
- * The cache is inside `%APPDATA%\wmux`, so it needs no part of the #132 consent
+ * The cache is inside `%APPDATA%\remotea`, so it needs no part of the #132 consent
  * gate — that gate is about writes OUTSIDE wmux's own directory.
  *
  * ## What is deliberately not here
@@ -137,7 +137,7 @@ export function fetchReleases(limit = CHANGELOG_LIMIT): Promise<unknown | null> 
       redirect: 'follow',
     });
     req.setHeader('Accept', 'application/vnd.github+json');
-    req.setHeader('User-Agent', `wmux/${app.getVersion()}`);
+    req.setHeader('User-Agent', `remotea/${app.getVersion()}`);
     let body = '';
     req.on('response', (res) => {
       if (res.statusCode !== 200) {

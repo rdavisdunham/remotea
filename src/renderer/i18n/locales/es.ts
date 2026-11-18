@@ -104,7 +104,7 @@ export const es: Translation = {
   'markdown.moreActions': 'Más acciones',
   'markdown.noFile': 'Sin archivo asociado',
   'markdown.empty':
-    'Sin contenido. Usa wmux markdown set para añadirlo, o arrastra aquí un archivo.',
+    'Sin contenido. Usa remotea markdown set para añadirlo, o arrastra aquí un archivo.',
   'markdown.error.copy': 'No se pudo escribir en el portapapeles',
   'markdown.error.read': 'No se pudo leer el archivo',
   'markdown.error.action': 'La acción ha fallado',
@@ -148,7 +148,7 @@ export const es: Translation = {
   'surfaceTab.splitLayout': 'Diseño de división…',
   'surfaceTab.closePane': 'Cerrar panel ({binding})',
   'surfaceTab.duplicateTab': 'Duplicar pestaña',
-  'surfaceTab.profileProject': 'Perfil de proyecto (.wmux.json)',
+  'surfaceTab.profileProject': 'Perfil de proyecto (.remotea.json)',
   'surfaceTab.profileGlobal': 'Perfil global',
   'surfaceTab.splitRight': 'Dividir a la derecha',
   'surfaceTab.splitDown': 'Dividir abajo',

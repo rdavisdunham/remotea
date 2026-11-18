@@ -26,7 +26,7 @@ import { execFileSync } from 'child_process';
 import * as path from 'path';
 
 /** Verb key name — also the subkey under each root. */
-const VERB = 'wmux';
+const VERB = 'remotea';
 
 /** The three Explorer object types that need their own copy of the verb. */
 export const REG_ROOTS = [
@@ -57,8 +57,12 @@ export function iconFor(exePath: string): string {
   return `"${exePath}",0`;
 }
 
+function regExe(): string {
+  return path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'reg.exe');
+}
+
 function reg(args: string[]): void {
-  execFileSync(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'reg.exe'), args, {
+  execFileSync(regExe(), args, {
     windowsHide: true,
     stdio: 'ignore',
   });
@@ -91,6 +95,32 @@ export function installContextMenu(exePath: string, label = 'Open in remotea'): 
     reg(['add', key, '/v', 'Icon', '/t', 'REG_SZ', '/d', iconFor(exePath), '/f']);
     reg(['add', `${key}\\command`, '/ve', '/t', 'REG_SZ', '/d', commandFor(exePath), '/f']);
   }
+}
+
+/**
+ * The command a verb named `verb` runs under `root`, or null when it is not
+ * registered there. The move uses it with the old verb name, to check whose
+ * executable it points at before removing it.
+ */
+export function registeredVerbCommand(verb: string, root: string): string | null {
+  if (process.platform !== 'win32') return null;
+  try {
+    const out = execFileSync(regExe(), ['query', `HKCU\\Software\\Classes\\${root}\\shell\\${verb}\\command`, '/ve'], {
+      windowsHide: true,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const m = /REG_(?:EXPAND_)?SZ\s+(.*)$/m.exec(out);
+    return m ? m[1].trim() : '';
+  } catch {
+    return null;
+  }
+}
+
+/** Remove a verb named `verb` from one root. */
+export function deleteVerb(verb: string, root: string): void {
+  if (process.platform !== 'win32') return;
+  reg(['delete', `HKCU\\Software\\Classes\\${root}\\shell\\${verb}`, '/f']);
 }
 
 /** Remove the verb from all three roots. Missing keys are not an error. */

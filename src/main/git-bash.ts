@@ -133,7 +133,7 @@ export function isGitBashLauncher(resolved: string): boolean {
  * cmd get their script injected; bash has `--init-file`, which is what VS Code
  * uses for Git Bash too. It replaces ~/.bashrc and is ignored by a login shell,
  * so `--login` is dropped and `login` asks the script to read the login files
- * itself (the prologue of wmux-bash-integration.sh). Only the two argument
+ * itself (the prologue of remotea-bash-integration.sh). Only the two argument
  * lists wmux itself would use: none, or GIT_BASH_LOGIN_ARGS. A user's own args
  * (`--norc`, `-c ...`) mean a shell wmux does not get to rearrange.
  */

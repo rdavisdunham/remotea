@@ -11,6 +11,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getCliBinPath } from './cli-paths';
+import { stripLegacyBlocks as stripOldRemoteaBlocks } from '../shared/legacy-cleanup';
+import { desktopOwnershipContext } from './ownership-context';
 
 /**
  * Placeholder replaced with this install's absolute cli-bin directory.
@@ -40,15 +42,15 @@ import { getCliBinPath } from './cli-paths';
  * that relocated the install from %LOCALAPPDATA% to Program Files and left a
  * hand-added PATH entry dangling.
  */
-export const CLI_BIN_PLACEHOLDER = '{{WMUX_CLI_BIN}}';
+export const CLI_BIN_PLACEHOLDER = '{{REMOTEA_CLI_BIN}}';
 
 /** Absolute path to the `wmux` entry point a session off PATH should call. */
 export function getCliBinDirForInstructions(): string {
   return getCliBinPath();
 }
 
-const START_MARKER = '<!-- wmux:start';
-const END_MARKER = '<!-- wmux:end -->';
+const START_MARKER = '<!-- remotea:start';
+const END_MARKER = '<!-- remotea:end -->';
 
 /**
  * Splice the wmux block into a context file the user also writes in.
@@ -72,7 +74,8 @@ export function injectWmuxBlock(rawExisting: string, wmuxBlock: string, stripLeg
   const block = wmuxBlock.trimEnd();
   // Marker-less copies from older versions are ours and stale; splicing keys off
   // the markers, so without this they would sit beside the managed block forever.
-  const existing = stripLegacy(rawExisting);
+  // Old-named blocks go only when their path is this install's (KTD8).
+  const existing = stripLegacy(stripOldRemoteaBlocks(rawExisting, desktopOwnershipContext()));
   if (existing.trim() === '') return block;
   const startIdx = existing.indexOf(START_MARKER);
   const endIdx = existing.indexOf(END_MARKER);

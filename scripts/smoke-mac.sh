@@ -23,7 +23,7 @@ mkdir -p "$(dirname "$out")"
 out_full="$(cd "$(dirname "$out")" && pwd)/$(basename "$out")"
 rm -f "$out_full"
 
-export WMUX_INSTANCE="$instance"
+export REMOTEA_INSTANCE="$instance"
 echo "smoke: $exe --smoke --smoke-out=$out_full --smoke-timeout=$timeout_ms (instance $instance)"
 "$exe" --smoke "--smoke-out=$out_full" "--smoke-timeout=$timeout_ms" &
 pid=$!

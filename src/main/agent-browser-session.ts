@@ -39,7 +39,7 @@ export const STREAM_PORT_BASE = 9300;
  * tell a wmux-owned session from one the user made by hand. Never close a
  * session without this prefix.
  */
-export const WMUX_SESSION_PREFIX = 'wmux-';
+export const REMOTEA_SESSION_PREFIX = 'wmux-';
 
 /**
  * wmux mints surface ids itself as `surf-<uuid>`, so this should never reject
@@ -63,7 +63,7 @@ export const WMUX_SESSION_PREFIX = 'wmux-';
 export const SURFACE_ID_RE = /^surf-[A-Za-z0-9-]{1,128}$/;
 
 /**
- * Characters a `WMUX_INSTANCE` name may contribute to a session name.
+ * Characters a `REMOTEA_INSTANCE` name may contribute to a session name.
  *
  * That variable is user-supplied and this value ends up on a command line, so
  * it is filtered rather than trusted — same reasoning as `SURFACE_ID_RE`.
@@ -74,7 +74,7 @@ const INSTANCE_NAME_RE = /[^A-Za-z0-9-]/g;
 /**
  * This wmux instance's session-name prefix.
  *
- * `WMUX_INSTANCE=<name>` runs wmux side by side with another wmux (the
+ * `REMOTEA_INSTANCE=<name>` runs wmux side by side with another wmux (the
  * documented use is a dev build alongside an installed one — see
  * shared/instance.ts, which suffixes the pipe and the APPDATA dir the same
  * way). agent-browser's session namespace is MACHINE-global and has no such
@@ -95,9 +95,9 @@ const INSTANCE_NAME_RE = /[^A-Za-z0-9-]/g;
  * builds a different string (`-name`, for a path).
  */
 export function sessionPrefix(env: NodeJS.ProcessEnv = process.env): string {
-  const raw = env.WMUX_INSTANCE?.trim() ?? '';
+  const raw = env.REMOTEA_INSTANCE?.trim() ?? '';
   const name = raw.replace(INSTANCE_NAME_RE, '').slice(0, 32);
-  return name ? `${WMUX_SESSION_PREFIX}${name}-` : WMUX_SESSION_PREFIX;
+  return name ? `${REMOTEA_SESSION_PREFIX}${name}-` : REMOTEA_SESSION_PREFIX;
 }
 
 export function sessionNameFor(surfaceId: SurfaceId, env?: NodeJS.ProcessEnv): string {

@@ -28,7 +28,7 @@ const path_1 = __importDefault(require("path"));
  * original by a test: two answers to "is this ours?" is the bug that file
  * exists to prevent.
  */
-exports.TUI_PLUGIN_VERSION_RE = /wmux-plugin-version:\s*(\S+)/;
+exports.TUI_PLUGIN_VERSION_RE = /remotea-plugin-version:\s*(\S+)/;
 /**
  * Pure: compare embedded version markers to decide whether to re-install.
  * Semantics are `pluginNeedsUpdate`'s: an unversioned SOURCE always
@@ -43,7 +43,7 @@ function tuiNeedsUpdate(src, target) {
         return true;
     return s !== t;
 }
-/** Is this file one wmux installed? The guard on the uninstall path. */
+/** Is this file one remotea installed? The guard on the uninstall path. */
 function isWmuxTuiFile(contents) {
     return exports.TUI_PLUGIN_VERSION_RE.test(contents);
 }
@@ -62,8 +62,8 @@ function opencodeConfigDir(env, homedir) {
 /**
  * Where the shipped TUI files live, relative to the running CLI.
  *
- * Packaged: `resources/cli/wmux.js` → `resources/opencode-plugin/` (siblings
- * through extraResources). Dev: `dist/cli/wmux.js` → `resources/opencode-plugin`.
+ * Packaged: `resources/cli/remotea.js` → `resources/opencode-plugin/` (siblings
+ * through extraResources). Dev: `dist/cli/remotea.js` → `resources/opencode-plugin`.
  */
 function opencodePluginSourceDir(cliDir, exists = fs_1.default.existsSync) {
     const candidates = [
@@ -72,14 +72,14 @@ function opencodePluginSourceDir(cliDir, exists = fs_1.default.existsSync) {
     ];
     return candidates.find(exists) ?? null;
 }
-const ENTRY_SRC = 'wmux-tui.js';
-const CORE_SRC = 'wmux-tui-core.js';
+const ENTRY_SRC = 'remotea-tui.js';
+const CORE_SRC = 'remotea-tui-core.js';
 const ENTRY_DST = 'tui.js';
 const CORE_DST = 'core.js';
 /**
- * Write `<config>/plugins/wmux-cli/{tui,core}.js`.
+ * Write `<config>/plugins/remotea-cli/{tui,core}.js`.
  *
- * The discovery path is the one verified live on Windows wmux + a WSL pane
+ * The discovery path is the one verified live on Windows remotea + a WSL pane
  * against a remote OpenCode server: a directory under `plugins/` resolves
  * `<dir>/tui` through the host's resolver, no package.json needed.
  *
@@ -88,7 +88,7 @@ const CORE_DST = 'core.js';
  * marker in place and the next run writes both again.
  */
 function installOpencodeTui(opts) {
-    const dir = path_1.default.join(opts.configDir, 'plugins', 'wmux-cli');
+    const dir = path_1.default.join(opts.configDir, 'plugins', 'remotea-cli');
     const entrySrc = fs_1.default.readFileSync(path_1.default.join(opts.sourceDir, ENTRY_SRC), 'utf-8');
     const coreSrc = fs_1.default.readFileSync(path_1.default.join(opts.sourceDir, CORE_SRC), 'utf-8');
     const entryPath = path_1.default.join(dir, ENTRY_DST);
@@ -107,7 +107,7 @@ function installOpencodeTui(opts) {
  * never guess that its sibling `core.js` is ours either.
  */
 function removeOpencodeTui(opts) {
-    const dir = path_1.default.join(opts.configDir, 'plugins', 'wmux-cli');
+    const dir = path_1.default.join(opts.configDir, 'plugins', 'remotea-cli');
     const entryPath = path_1.default.join(dir, ENTRY_DST);
     if (!fs_1.default.existsSync(entryPath))
         return { status: 'absent', dir };

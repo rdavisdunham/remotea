@@ -16,7 +16,7 @@ import {
 } from '../../src/renderer/i18n/core';
 
 // The renderer half of community translations (issue #147): merging
-// ~/.wmux/locales into the bundled registry. The loader's job is IO and shape;
+// ~/.remotea/locales into the bundled registry. The loader's job is IO and shape;
 // this module's job is key validation and the add-vs-override semantics.
 //
 // applyUserLocales rebuilds module-level singletons, so every test restores the
@@ -25,7 +25,7 @@ import {
 const BUILTIN_CODES = ['en', 'fr', 'es', 'de', 'pt', 'it', 'nl', 'pl', 'tr', 'ru', 'uk', 'zh', 'zh-TW', 'ja', 'ko', 'hi', 'sv', 'cs'];
 
 function payload(...locales: Array<Record<string, unknown>>) {
-  return { locales, errors: [], dir: '/home/u/.wmux/locales' };
+  return { locales, errors: [], dir: '/home/u/.remotea/locales' };
 }
 
 afterEach(() => {
@@ -147,10 +147,10 @@ describe('applyUserLocales: rejecting bad input (issue #147)', () => {
   });
 
   it('carries loader errors through to the reported state', () => {
-    applyUserLocales({ locales: [], errors: ['tt.json: broken'], dir: '/home/u/.wmux/locales' });
+    applyUserLocales({ locales: [], errors: ['tt.json: broken'], dir: '/home/u/.remotea/locales' });
 
     expect(getUserLocaleState().errors).toEqual(['tt.json: broken']);
-    expect(getUserLocaleState().dir).toBe('/home/u/.wmux/locales');
+    expect(getUserLocaleState().dir).toBe('/home/u/.remotea/locales');
   });
 });
 

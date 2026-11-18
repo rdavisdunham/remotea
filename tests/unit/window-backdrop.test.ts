@@ -117,7 +117,7 @@ describe('startup backdrop reassertion', () => {
   });
 
   it.skipIf(process.platform !== 'win32')('remembers a material applied at window creation', () => {
-    mocks.settings = { 'wmux-appearance-prefs': { windowTransparency: true, windowMaterial: 'mica' } };
+    mocks.settings = { 'remotea-appearance-prefs': { windowTransparency: true, windowMaterial: 'mica' } };
     const manager = new WindowManager();
     manager.createWindow();
     const win = mocks.windows[0];

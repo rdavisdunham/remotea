@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { planQuit, PTY_EXIT_DRAIN_MS } from '../../src/main/quit-sequence';
-import { correlateShutdown } from '../../src/cli/wmux';
+import { correlateShutdown } from '../../src/cli/remotea';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Issue #214 — the 0xc0000409 abort is a SHUTDOWN race, not a runtime crash.

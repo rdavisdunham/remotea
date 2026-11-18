@@ -181,7 +181,7 @@ export const en = {
   "tutorial.return.title": "Leave and return",
   "tutorial.return.body": "Hide on this device removes a host view without ending its session; End session on this host affects other attached devices. Workspace snapshots save all workspaces, tabs and terminal preferences in this window, not process memory. Restore, reconnect and resume a provider conversation are different operations.",
 
-  "settings.help.credits": "Credits \u2014 built on wmux and inspired by herdr",
+  "settings.help.credits": "Credits \u2014 built on remotea and inspired by herdr",
   "settings.help.tasks": "Help by task",
   "settings.help.search": "Search help",
   "settings.help.noResults": "No matching help topics.",
@@ -203,7 +203,7 @@ export const en = {
   "help.task.phone.title": "Pair a phone",
   "help.task.phone.body": "Settings \u2192 Phone access serves a browser console from this desktop. View only cannot type; Control permits input separately. Pairing credentials differ from host and Eridani credentials. The desktop must remain running and reachable; quitting it disconnects phone access even if host terminals continue.",
   "help.task.cli.title": "Automate the correct endpoint",
-  "help.task.cli.body": "The desktop package exposes remotea and injects working wmux compatibility shims. On a host, remotea administers the server; wmux may reach only a status bridge. Run wmux identify and wmux capabilities before using a command family. A successful ping does not establish browser or workspace control. Desktop --remote addresses a desktop CLI bridge, not a session-server WebSocket.",
+  "help.task.cli.body": "The desktop package exposes remotea and injects working remotea compatibility shims. On a host, remotea administers the server; remotea may reach only a status bridge. Run remotea identify and remotea capabilities before using a command family. A successful ping does not establish browser or workspace control. Desktop --remote addresses a desktop CLI bridge, not a session-server WebSocket.",
   "help.task.customize.title": "Customize and troubleshoot",
   "help.task.customize.body": "Settings search finds controls and their scope. User TOML configuration can override UI preferences after reload; custom locale files fall back to English. F1 shows live shortcuts; Settings \u2192 Shortcuts and the command palette reflect rebinding. TRACE, agent navigator/office, prompt outline, browser engines and snapshots remain available. Report desktop/host versions and redacted diagnostics; never include tokens. Windows desktop and Linux/WSL host are current support boundaries.",
   'execution.savedHost': 'Saved host: {host} (configuration not confirmed)',
@@ -296,6 +296,8 @@ export const en = {
   'notification.iconChanged.title': 'remotea has a new icon',
   'notification.iconChanged.text':
     'If the taskbar or a pinned button still shows the old one, use Settings → General → Refresh taskbar icons.',
+  'notification.oldState.title': 'Settings not moved yet',
+  'notification.oldState.text': 'Run `npm run move` to bring over your settings from the old names.',
   'notification.gpuRestarted.title': 'remotea restarted its graphics process',
   'notification.gpuRestarted.text':
     'The window had stopped painting while you were using it. Terminals and agents were not affected.',
@@ -333,7 +335,7 @@ export const en = {
   'palette.category.themes': 'Themes',
   'palette.category.layouts': 'Layouts',
   'palette.openMarkdown': 'Open Markdown File…',
-  'palette.openWorkspaceFile': 'Open workspace file… (wmux.workspace.json)',
+  'palette.openWorkspaceFile': 'Open workspace file… (remotea.workspace.json)',
   'palette.resetTerminalLeaveAlt': 'Reset terminal state (leave alternate screen)',
   'palette.saveCurrentLayout': 'Save current layout as new preset',
   'palette.saveCurrentLayoutFailed': 'No active workspace to save as a layout.',
@@ -424,7 +426,7 @@ export const en = {
   'markdown.openInApp': 'Open in default app',
   'markdown.moreActions': 'More actions',
   'markdown.noFile': 'Not backed by a file',
-  'markdown.empty': 'No content. Use wmux markdown set to add content, or drop a file here.',
+  'markdown.empty': 'No content. Use remotea markdown set to add content, or drop a file here.',
   'markdown.error.copy': 'Could not write to the clipboard',
   'markdown.error.read': 'Could not read the file',
   'markdown.error.action': 'The action failed',
@@ -470,7 +472,7 @@ export const en = {
   'surfaceTab.splitLayout': 'Split layout…',
   'surfaceTab.closePane': 'Close pane ({binding})',
   'surfaceTab.duplicateTab': 'Duplicate tab',
-  'surfaceTab.profileProject': 'Project profile (.wmux.json)',
+  'surfaceTab.profileProject': 'Project profile (.remotea.json)',
   'surfaceTab.profileGlobal': 'Global profile',
   'surfaceTab.splitRight': 'Split right',
   'surfaceTab.splitDown': 'Split down',
@@ -567,10 +569,10 @@ export const en = {
   // Start page (issue #212)
   'settings.browser.defaultUrl': 'Start page',
   'settings.browser.defaultUrlHint':
-    'Where a workspace\'s browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea\'s own page. Also settable in ~/.wmux/config.toml as [browser] default-url.',
+    'Where a workspace\'s browser panel opens before it has been anywhere. Needs a scheme (http:// or https://). Leave empty for remotea\'s own page. Also settable in ~/.remotea/config.toml as [browser] default-url.',
   'settings.browser.autoOpenDevServer': 'Auto-open dev servers in the browser panel',
   'settings.browser.autoOpenDevServerHint':
-    'When on, the browser panel navigates to a dev server (Vite, Next, …) on its own the moment one starts. On by default — turn it off and detected ports are still shown on the workspace row, but nothing opens without you. Also settable in ~/.wmux/config.toml as [browser] auto-open.',
+    'When on, the browser panel navigates to a dev server (Vite, Next, …) on its own the moment one starts. On by default — turn it off and detected ports are still shown on the workspace row, but nothing opens without you. Also settable in ~/.remotea/config.toml as [browser] auto-open.',
   'settings.browser.linksSection': 'Links',
   'settings.browser.openLinksExternally': 'Open links in the system browser',
   'settings.browser.openLinksExternallyHint': 'Clicked links in terminals and markdown go to your default browser instead of the remotea panel. Ctrl+click always does the opposite.',
@@ -861,7 +863,7 @@ export const en = {
   "settings.workspacePanel.sessionSnapshotHint": "Keeps the last three changed arrangements under Restore workspace snapshot. Restore rebuilds saved tabs and supported launch details, not process memory. Named snapshots include all workspaces and terminal preferences in this window; restoring applies those preferences.",
   "settings.workspacePanel.restoreCodexSessions": "Resume local Codex conversations when restoring",
   "settings.workspacePanel.restoreOpencodeSessions": "Resume local OpenCode conversations when restoring",
-  'settings.workspacePanel.restoreOpencodeSessionsHint': "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode integration (the server plugin, or the TUI plugin installed with `wmux opencode-tui` for OpenCode 2). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 on a remote or shared server is captured by the TUI plugin; re-run `wmux opencode-tui` in that environment after a remotea update.",
+  'settings.workspacePanel.restoreOpencodeSessionsHint': "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode integration (the server plugin, or the TUI plugin installed with `remotea opencode-tui` for OpenCode 2). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 on a remote or shared server is captured by the TUI plugin; re-run `remotea opencode-tui` in that environment after a remotea update.",
   "settings.workspacePanel.restoreQwenSessions": "Resume local Qwen Code conversations when restoring",
   'settings.workspacePanel.restoreQwenSessionsHint': "Re-launches each restored tab that was running Qwen Code with `qwen --resume`, in the directory it was in. Needs the remotea Qwen hooks (Status hooks on) and Qwen Code 0.14 or later. Tabs whose session Qwen no longer has are skipped, and a Qwen you exited cleanly is not resumed.",
   "settings.workspacePanel.restoreAgySessions": "Resume local Antigravity conversations when restoring",
@@ -878,7 +880,7 @@ export const en = {
   'settings.workspacePanel.keepAwakeAlways': 'Always (keep awake while remotea is open)',
   'settings.workspacePanel.keepAwakeOff': 'Off (system defaults)',
   'settings.workspacePanel.keepAwakeHint':
-    'Prevents Windows from sleeping while coding agents are working. Smart mode only engages for agents that report a working state through hooks — Claude Code, Qwen Code, Grok, the OpenCode plugin, or `wmux report-agent` — and releases it when they are idle or waiting on you. A working claim not renewed for 15 minutes stops counting.',
+    'Prevents Windows from sleeping while coding agents are working. Smart mode only engages for agents that report a working state through hooks — Claude Code, Qwen Code, Grok, the OpenCode plugin, or `remotea report-agent` — and releases it when they are idle or waiting on you. A working claim not renewed for 15 minutes stops counting.',
   'settings.workspacePanel.preventDisplaySleep': 'Keep display awake',
   'settings.workspacePanel.preventDisplaySleepHint':
     'Also keep screens awake to prevent Windows lock screen or display timeout. When disabled (default), system sleep is prevented while screens may turn off.',
@@ -910,7 +912,7 @@ export const en = {
   // New-workspace shape (issue #212)
   'settings.workspacePanel.newWorkspaceSection': 'New Workspace',
   'settings.workspacePanel.newWorkspaceHint':
-    'What a new workspace opens with — the sidebar "+", Ctrl+N, first launch and wmux new-workspace all use this. A saved layout marked Default below wins over it.',
+    'What a new workspace opens with — the sidebar "+", Ctrl+N, first launch and remotea new-workspace all use this. A saved layout marked Default below wins over it.',
   'settings.workspacePanel.panes': 'Terminal panes',
   'settings.workspacePanel.layout': 'Arrangement',
   'settings.workspacePanel.layoutGrid': 'Grid (balanced rows)',
@@ -919,7 +921,7 @@ export const en = {
   'settings.workspacePanel.layoutLeft': 'Main pane left, rest stacked right',
   'settings.workspacePanel.layoutDown': 'Main pane top, rest across the bottom',
   'settings.workspacePanel.layoutHint':
-    'Also settable in ~/.wmux/config.toml under [workspace]. With one pane there is nothing to arrange.',
+    'Also settable in ~/.remotea/config.toml under [workspace]. With one pane there is nothing to arrange.',
   'settings.workspacePanel.layoutsSection': 'Saved Layouts',
   'settings.workspacePanel.layoutsHint':
     'Arrange panes the way you like in a workspace — geometry, plus whatever shell or command each pane is already running — then save that arrangement here.',
@@ -1063,7 +1065,7 @@ export const en = {
   'addressBar.engineAgentTitle': 'Hand this tab to a real Chrome outside remotea, and watch what your agent does to it here. Needs a one-time install.',
   'addressBar.backAgent': 'History is not available while the agent drives the browser',
   'addressBar.reloadViewer': 'Reload the activity viewer (does not reload the page the agent is on)',
-  // A browser surface with no page yet (#232). wmux used to answer this with its
+  // A browser surface with no page yet (#232). remotea used to answer this with its
   // own GitHub repo, which it then remembered as if the user had chosen it.
   'browser.blank.title': 'No page open',
   'browser.blank.hint': 'Type a URL above, or set a start page in Settings → Browser.',
@@ -1168,7 +1170,7 @@ export const en = {
   'agentNavigator.silent': 'reports no state',
   'agentNavigator.fromScreen': 'read from the screen',
   'settings.workspacePanel.detectAgentScreens': 'Read agent screens to infer state',
-  'settings.workspacePanel.detectAgentScreensHint': 'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `wmux detect explain` to see which rule fired.',
+  'settings.workspacePanel.detectAgentScreensHint': 'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `remotea detect explain` to see which rule fired.',
   'settings.workspacePanel.closeToTray': 'Close to tray',
   'settings.workspacePanel.closeToTrayHint':
     'The window\'s × button or Alt+F4 hides the last remotea window to the system tray instead of quitting, so terminal sessions and agents keep running. Click the tray icon to bring it back; Quit remotea in its menu quits for real. Takes priority over the confirmation above.',
@@ -1461,6 +1463,8 @@ export const en = {
   "health.tab": "Tab",
   "health.terminalProcess": "Terminal process",
   "health.none": "none",
+  "health.serverUpdate": "Update needed",
+  "health.serverPredatesRename": "This host ({host}) runs an older remotea server. Run `remotea upgrade` on it.",
   "health.connection.disabled": "Off",
   "health.connection.connecting": "Connecting…",
   "health.connection.ready": "Connected",
@@ -1486,7 +1490,7 @@ export const en = {
 
   "settings.alignment.scopeDetails": "Scope, apply time & effective preferences",
   "settings.alignment.scopePersistence": "Desktop user / app instance. Ordinary preferences save immediately to settings.json and affect this window or future matching actions. Other windows retain their own loaded snapshot; changes are not generally broadcast.",
-  "settings.alignment.configPrecedence": "Present supported keys in ~/.wmux/config.toml apply at startup and wmux reload-config. Later UI edits win for the running session and persist without rewriting TOML. Removing a TOML key does not generally undo a value it previously saved.",
+  "settings.alignment.configPrecedence": "Present supported keys in ~/.remotea/config.toml apply at startup and remotea reload-config. Later UI edits win for the running session and persist without rewriting TOML. Removing a TOML key does not generally undo a value it previously saved.",
   "settings.alignment.restoreAndRuntime": "Named session restores can replace terminal preferences. Runtime dev-port additions reset on config reload. Transparency may require a window restart; launch and restore preferences affect future launches/restores.",
   "settings.alignment.separateStores": "This section also has main-owned configuration or separate connection stores. Connection credentials, phone pairing and agent file consent are separate from renderer preferences.",
   "settings.alignment.inspectEffective": "Inspect effective preferences in this window",
@@ -1512,7 +1516,7 @@ export const en = {
   "settings.alignment.scope.General": "Desktop appearance and language save immediately. Transparency can require a window restart. Explorer integration changes the desktop registry; taskbar refresh is an explicit system action.",
   "settings.alignment.scope.Sidebar": "Desktop sidebar presentation saves and applies immediately in this window; it does not change host workspace metadata.",
   "settings.alignment.scope.Workspace": "Desktop workspace defaults save immediately and govern future launch, close and restore actions. Saved layouts are local presets; named session restores may replace terminal preferences. Keep-awake is main-owned and controls this desktop computer.",
-  "settings.alignment.scope.Profiles": "Launch profiles save immediately to this desktop user / app instance. Commands, directories and shells apply when a profile is launched. Project .wmux.json profiles are separate files.",
+  "settings.alignment.scope.Profiles": "Launch profiles save immediately to this desktop user / app instance. Commands, directories and shells apply when a profile is launched. Project .remotea.json profiles are separate files.",
   "settings.alignment.scope.Terminal": "Terminal preferences save immediately for this window. Per-pane overrides can take precedence over global colors. Named session restores can replace these preferences.",
   "settings.alignment.scope.Prompts": "Prompt-history presentation and capture preferences save immediately for this desktop window. These controls do not configure an agent provider or Eridani.",
   "settings.alignment.scope.Agents": "Consent is main-owned in settings.json. Changes immediately write or remove integration files in this desktop user’s home directory. Agents may need a new session to load them; remote host integration is configured separately.",

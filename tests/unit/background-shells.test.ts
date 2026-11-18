@@ -26,14 +26,14 @@ import { SplitNode, SurfaceId, PaneId } from '../../src/shared/types';
  * turn, which fires UserPromptSubmit. These tests pin both ends of that.
  */
 
-const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/wmux-hook.js');
+const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/remotea-hook.js');
 
 function runHook(args: string[], port: number, stdin: string): Promise<void> {
   const env = {
     ...process.env,
-    WMUX_REMOTE: `127.0.0.1:${port}`,
-    WMUX_REMOTE_TOKEN: 't',
-    WMUX_SURFACE_ID: 'surf-bg',
+    REMOTEA_REMOTE: `127.0.0.1:${port}`,
+    REMOTEA_REMOTE_TOKEN: 't',
+    REMOTEA_SURFACE_ID: 'surf-bg',
   } as Record<string, string>;
   return new Promise((resolve, reject) => {
     const child = execFile(process.execPath, [HOOK_SCRIPT, ...args], { env, timeout: 15000 }, (err) => {
@@ -72,7 +72,7 @@ const NOTIFICATION = (id: string, status = 'completed') =>
   `<output-file>C:\\tmp\\${id}.output</output-file>\n<status>${status}</status>\n` +
   `<summary>Background command "Run tests" completed (exit code 0)</summary>\n</task-notification>`;
 
-describe('wmux-hook.js background shells (#276)', () => {
+describe('remotea-hook.js background shells (#276)', () => {
   it('reports the task id of a Bash call moved to the background, with its description', async () => {
     const params = await hookParams(['Bash'], {
       hook_event_name: 'PostToolUse',

@@ -101,6 +101,23 @@ export function connectionHealth(status: HostStatus | undefined, now: number, t:
   return { state, label, tone, detail };
 }
 
+export interface ServerNotice {
+  label: string;
+  tone: HealthTone;
+  detail: string;
+}
+
+/**
+ * A connected host whose session server predates the rename (its welcome
+ * lacks `remoteaNames`): it works, but its agents won't report status until
+ * it is upgraded. Null when there is nothing to say. Never blocks anything.
+ */
+export function serverNotice(status: HostStatus | undefined, hostName: string | undefined, t: Translator = makeT('en')): ServerNotice | null {
+  if (!status?.serverPredatesRename) return null;
+  const host = hostName || status.serverHostname || status.hostId;
+  return { label: t('health.serverUpdate'), tone: 'pending', detail: t('health.serverPredatesRename').replace('{host}', host) };
+}
+
 /** A tab's terminal process, as the registry and this app's open confirmations report it. */
 export function processHealth(s: SessionRecord, view: Pick<RemoteRegistryView, 'connected' | 'restoring'>, t: Translator = makeT('en')): ProcessHealth {
   const stale = !view.connected;

@@ -2,7 +2,7 @@
  * Git worktree workspaces (#366) — the main-process half.
  *
  * A worktree workspace is a checkout wmux created for one branch, under
- * `%LOCALAPPDATA%\wmux\wt\<repo-slug>\<branch-dir>`. Creating one is cheap;
+ * `%LOCALAPPDATA%\remotea\wt\<repo-slug>\<branch-dir>`. Creating one is cheap;
  * REMOVING one is where user work dies, so the whole module is organised
  * around one rule: **wmux never destroys work it was not explicitly told to
  * destroy, and when in doubt it leaves the files on disk and says so.**

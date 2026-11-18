@@ -118,7 +118,7 @@ export function isHttpsRequest(host: string | undefined, lists: Allowlists): boo
   return normalizeHost(host) === lists.publicHost;
 }
 
-export const COOKIE_NAME = 'wmux_rc';
+export const COOKIE_NAME = 'remotea_rc';
 /** 30 days — the same window after which an idle device is forgotten (devices.ts). */
 export const COOKIE_MAX_AGE_S = 2592000;
 
@@ -132,18 +132,18 @@ export function clearCookieHeader(secure: boolean): string {
   return secure ? `${base}; Secure` : base;
 }
 
-/** The `wmux_rc` value from a Cookie header, or null. First occurrence wins. */
+/** The `remotea_rc` value from a Cookie header, or null. First occurrence wins. */
 export function readCookie(header: string | undefined): string | null {
   return readCookies(header)[0] ?? null;
 }
 
-/** At most this many `wmux_rc` values are tried from one Cookie header. */
+/** At most this many `remotea_rc` values are tried from one Cookie header. */
 export const MAX_COOKIE_CANDIDATES = 4;
 
 /**
- * Every non-empty `wmux_rc` value, in header order, capped. Another server on
+ * Every non-empty `remotea_rc` value, in header order, capped. Another server on
  * this host can SET cookies for it too (plain http is not port-scoped), and a
- * `wmux_rc=<junk>; Path=/api` it tosses is sent BEFORE the phone's own
+ * `remotea_rc=<junk>; Path=/api` it tosses is sent BEFORE the phone's own
  * Path=/ one — so taking only the first made a paired phone read as "not
  * paired" and throw its page key away. The server tries each instead.
  */
@@ -194,7 +194,7 @@ export function rejectedOriginValue(origin: string | undefined, host: string | u
   return value.slice(0, 200);
 }
 
-/** The page key offered as `wmux-key.<key>` in Sec-WebSocket-Protocol, or null. */
+/** The page key offered as `remotea-key.<key>` in Sec-WebSocket-Protocol, or null. */
 export function keyFromProtocols(header: string | undefined): string | null {
   if (!header) return null;
   for (const raw of header.split(',')) {

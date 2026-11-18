@@ -279,7 +279,7 @@ export default function RemoteHostsSettings() {
                 <button className="settings-button settings-button--danger" onClick={() => void remove(h.id)}>{t('remote.host.remove')}</button>
               </div>
             </div>
-            <RemoteHostHealth status={hostStatus} view={views.find((v) => v.hostId === h.id)} now={now} />
+            <RemoteHostHealth status={hostStatus} view={views.find((v) => v.hostId === h.id)} now={now} hostName={h.name} />
             {hostStatus?.error && st !== 'ready' && (
               <div className="remote-host-message remote-host-message--error">{hostStatus.error}</div>
             )}

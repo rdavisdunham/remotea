@@ -93,7 +93,7 @@ describe('handleVersionChange (issue #35)', () => {
   beforeEach(async () => {
     savedAppData = process.env.APPDATA;
     process.env.APPDATA = APPDATA_OVERRIDE;
-    delete process.env.WMUX_INSTANCE;
+    delete process.env.REMOTEA_INSTANCE;
     vi.resetModules();
     mod = await import('../../src/main/session-persistence');
     mod.ensureDirectories();
@@ -305,7 +305,7 @@ describe('saveSession never leaves the session file missing', () => {
   beforeEach(async () => {
     savedAppData = process.env.APPDATA;
     process.env.APPDATA = APPDATA_OVERRIDE;
-    delete process.env.WMUX_INSTANCE;
+    delete process.env.REMOTEA_INSTANCE;
     vi.resetModules();
     mod = await import('../../src/main/session-persistence');
     mod.ensureDirectories();
@@ -373,7 +373,7 @@ describe('explorer panel state persistence', () => {
   beforeEach(async () => {
     savedAppData = process.env.APPDATA;
     process.env.APPDATA = APPDATA_OVERRIDE;
-    delete process.env.WMUX_INSTANCE;
+    delete process.env.REMOTEA_INSTANCE;
     vi.resetModules();
     mod = await import('../../src/main/session-persistence');
     mod.ensureDirectories();
@@ -466,13 +466,13 @@ describe('worktree metadata persistence (#366)', () => {
     branch: 'feat/test-worktree',
     baseBranch: 'main',
     baseSha: '0123456789abcdef0123456789abcdef01234567',
-    worktreePath: 'C:\\Users\\user\\.wmux\\wt\\my-repo\\feat-test-worktree-abc123',
+    worktreePath: 'C:\\Users\\user\\.remotea\\wt\\my-repo\\feat-test-worktree-abc123',
   };
 
   beforeEach(async () => {
     savedAppData = process.env.APPDATA;
     process.env.APPDATA = APPDATA_OVERRIDE;
-    delete process.env.WMUX_INSTANCE;
+    delete process.env.REMOTEA_INSTANCE;
     vi.resetModules();
     mod = await import('../../src/main/session-persistence');
     mod.ensureDirectories();

@@ -12,7 +12,7 @@ import {
 const STYLES = path.join(__dirname, '..', '..', 'src', 'renderer', 'styles');
 const trace = fs.readFileSync(path.join(STYLES, 'trace.css'), 'utf-8');
 
-const APPEARANCE_KEY = 'wmux-appearance-prefs';
+const APPEARANCE_KEY = 'remotea-appearance-prefs';
 
 // The settings file is read ONCE at module load, so a stored blob can only be
 // injected by stubbing window before a fresh import of the slice.

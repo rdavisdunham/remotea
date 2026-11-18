@@ -8,7 +8,7 @@
  * `useBlockedAlert`, which is why the toggle looked as if it did something.)
  *
  * The prefs are read off settings.json at fire time — the renderer's
- * `persist()` writes `wmux-notification-prefs` there synchronously, the way
+ * `persist()` writes `remotea-notification-prefs` there synchronously, the way
  * `confirmAppClose` and `gpuWatchdog` are read — so no IPC and no restart.
  * Only an explicit `false` turns an effect off: an absent block is an install
  * that never opened the panel, and a corrupt one is not a reason to go silent.

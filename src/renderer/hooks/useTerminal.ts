@@ -1728,7 +1728,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     });
 
     // OSC 7: the shell's working directory, reported through its own output
-    // (#378) — how a WSL shell, which has no pipe and no WMUX_SURFACE_ID when
+    // (#378) — how a WSL shell, which has no pipe and no REMOTEA_SURFACE_ID when
     // `wsl` is typed into a PowerShell pane, moves the explorer. Forwarded raw;
     // main decides whether the path is one wmux may act on.
     terminal.parser.registerOscHandler(7, (data) => {
@@ -1812,7 +1812,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
 
     // Attach custom key handler for Ctrl+C and Ctrl+V (image paste)
     terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
-      // User key remaps from `~/.wmux/config.toml` win over everything,
+      // User key remaps from `~/.remotea/config.toml` win over everything,
       // including wmux's own shortcuts — that is the point of remapping
       // (issue #146). Routed through terminal.input (→ onData) rather than
       // pty.write so broadcast-input fans a remapped key out like any other.

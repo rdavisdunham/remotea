@@ -188,7 +188,7 @@ export function initPipeBridge(): void {
   };
 
   // The caller's OWN workspace, identity included. Main injects the workspace
-  // id it resolved from the caller's WMUX_SURFACE_ID (callerScoped), so there
+  // id it resolved from the caller's REMOTEA_SURFACE_ID (callerScoped), so there
   // is deliberately NO fallback to the active workspace here: an agent in a
   // background pane has to be able to tell "I don't know" from "it's this one",
   // and the active workspace would answer the second when it only knows the

@@ -77,7 +77,7 @@ describe('#231 pi context', () => {
     expect(fs.existsSync(agentsMd())).toBe(false);
     ensurePiContext();
     expect(fs.existsSync(agentsMd())).toBe(true);
-    expect(read()).toContain('wmux browser open');
+    expect(read()).toContain('remotea browser open');
   });
 
   it('renders the CLI path like every other agent gets it (#158)', () => {
@@ -99,7 +99,7 @@ describe('#231 pi context', () => {
     expect(getPiContextFilePath()).toBe(path.join(agentDir(), 'AGENTS.override.md'));
 
     ensurePiContext();
-    expect(read(path.join(agentDir(), 'AGENTS.override.md'))).toContain('wmux browser open');
+    expect(read(path.join(agentDir(), 'AGENTS.override.md'))).toContain('remotea browser open');
     expect(fs.existsSync(agentsMd())).toBe(false);
   });
 
@@ -119,7 +119,7 @@ describe('#231 pi context', () => {
     fs.mkdirSync(path.join(agentDir(), 'AGENTS.override.md'), { recursive: true });
     expect(getPiContextFilePath()).toBe(agentsMd());
     expect(() => ensurePiContext()).not.toThrow();
-    expect(read()).toContain('wmux browser open');
+    expect(read()).toContain('remotea browser open');
   });
 
   it("leaves the user's own instructions alone", () => {
@@ -127,11 +127,11 @@ describe('#231 pi context', () => {
 
     ensurePiContext();
     expect(read()).toContain('Always run the tests.');
-    expect(read()).toContain('wmux browser open');
+    expect(read()).toContain('remotea browser open');
 
     removePiContext();
     expect(read()).toContain('Always run the tests.');
-    expect(read()).not.toContain('wmux browser open');
+    expect(read()).not.toContain('remotea browser open');
   });
 
   it('is idempotent and does not churn the file', () => {
@@ -146,7 +146,7 @@ describe('#231 pi context', () => {
   it('replaces its own block rather than stacking copies', () => {
     ensurePiContext();
     ensurePiContext();
-    expect(read().split('<!-- wmux:start').length - 1).toBe(1);
+    expect(read().split('<!-- remotea:start').length - 1).toBe(1);
   });
 
   it('removes the file entirely when nothing of the user\'s is left', () => {
@@ -158,7 +158,7 @@ describe('#231 pi context', () => {
   /**
    * An uninstall that cannot uninstall is the original #132 complaint.
    *
-   * wmux writes AGENTS.md; the user later adds an AGENTS.override.md, which
+   * remotea writes AGENTS.md; the user later adds an AGENTS.override.md, which
    * changes which file `ensure` targets. A removal that only looked at today's
    * target would leave the old block orphaned in a file nothing reads and
    * nothing can ever clean up.
@@ -173,7 +173,7 @@ describe('#231 pi context', () => {
     expect(fs.existsSync(agentsMd())).toBe(false);
   });
 
-  it('never touches a candidate file that holds no wmux block', () => {
+  it('never touches a candidate file that holds no remotea block', () => {
     write('AGENTS.md', '# Mine only\n');
     removePiContext();
     expect(read()).toBe('# Mine only\n');
@@ -215,13 +215,13 @@ describe('#231 pi extension install', () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  const dest = () => path.join(tmp, '.pi', 'agent', 'extensions', 'wmux.js');
+  const dest = () => path.join(tmp, '.pi', 'agent', 'extensions', 'remotea.js');
 
   it('installs into the global extensions dir pi auto-discovers', () => {
     expect(getPiExtensionPath()).toBe(dest());
     ensurePiExtension();
     expect(fs.existsSync(dest())).toBe(true);
-    expect(fs.readFileSync(dest(), 'utf-8')).toContain('wmux-plugin-version:');
+    expect(fs.readFileSync(dest(), 'utf-8')).toContain('remotea-plugin-version:');
   });
 
   it('is idempotent once the marker matches', () => {
@@ -233,7 +233,7 @@ describe('#231 pi extension install', () => {
 
   it('reinstalls when the marker differs', () => {
     fs.mkdirSync(path.dirname(dest()), { recursive: true });
-    fs.writeFileSync(dest(), '// wmux-plugin-version: 0\n// stale\n', 'utf-8');
+    fs.writeFileSync(dest(), '// remotea-plugin-version: 0\n// stale\n', 'utf-8');
     ensurePiExtension();
     expect(fs.readFileSync(dest(), 'utf-8')).not.toContain('// stale');
   });
@@ -243,8 +243,8 @@ describe('#231 pi extension install', () => {
     removePiExtension();
     expect(fs.existsSync(dest())).toBe(false);
 
-    // A wmux.js the user wrote themselves carries no marker and must survive:
-    // uninstalling wmux's integration is not a licence to delete a file that
+    // A remotea.js the user wrote themselves carries no marker and must survive:
+    // uninstalling remotea's integration is not a licence to delete a file that
     // merely shares a name.
     fs.mkdirSync(path.dirname(dest()), { recursive: true });
     fs.writeFileSync(dest(), 'export default () => {};\n', 'utf-8');

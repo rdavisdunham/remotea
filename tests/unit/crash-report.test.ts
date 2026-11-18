@@ -4,12 +4,12 @@ import {
   joinCrashRecords,
   describeWerConfig,
   formatCrashReport,
-} from '../../src/cli/wmux';
+} from '../../src/cli/remotea';
 
 /**
- * `wmux crash-report` (issue #174).
+ * `remotea crash-report` (issue #174).
  *
- * The command exists because "wmux crashed, here's a dump" is a request
+ * The command exists because "remotea crashed, here's a dump" is a request
  * maintainers make casually and users answer casually, and on Windows a
  * minidump carries the process environment block — which for this project's
  * users is where the credentials live. The reporter who raised it found live
@@ -139,10 +139,10 @@ describe('formatCrashReport', () => {
     expect(report).toContain('0x0000000000000007');
   });
 
-  it('reports the version of the wmux that ran, taken from its own log', () => {
+  it('reports the version of the remotea that ran, taken from its own log', () => {
     // Not from a package.json next to the CLI: mid-upgrade those differ, and
     // the crash belongs to the build that was running.
-    expect(formatCrashReport(base)).toContain('wmux version: 1.1.1');
+    expect(formatCrashReport(base)).toContain('remotea version: 1.1.1');
   });
 
   it('uses the most recent start line when the log spans several runs', () => {
@@ -154,8 +154,8 @@ describe('formatCrashReport', () => {
         '2026-08-15T09:00:00.000Z pid=2 start version=1.1.1 guard=true',
       ],
     });
-    expect(report).toContain('wmux version: 1.1.1');
-    expect(report).not.toContain('wmux version: 1.1.0');
+    expect(report).toContain('remotea version: 1.1.1');
+    expect(report).not.toContain('remotea version: 1.1.0');
   });
 
   it('admits it does not know the version rather than guessing', () => {

@@ -3,7 +3,7 @@
  *
  * wmux auto-navigates a workspace's browser to a detected dev-server port. The
  * recognized set is the built-in defaults plus any the user adds via
- * `[browser] dev-ports = [...]` in ~/.wmux/config.toml. Kept separate from
+ * `[browser] dev-ports = [...]` in ~/.remotea/config.toml. Kept separate from
  * App.tsx so the logic is unit-testable without the React/Electron surface.
  */
 

@@ -36,6 +36,11 @@ export interface HostStatus {
   };
   /** Registry changes made here (close, hide, rename, move, group edits) not yet confirmed by the server. */
   outbox?: OutboxSummary;
+  /**
+   * Connected, and the server's welcome lacks `remoteaNames`: it predates the
+   * rename, so its agents won't report status until `remotea upgrade` runs there.
+   */
+  serverPredatesRename?: boolean;
 }
 
 /** A host's outbox as the UI sees it. */

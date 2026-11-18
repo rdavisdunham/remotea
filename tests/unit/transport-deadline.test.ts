@@ -59,12 +59,12 @@ describe('isWslHost (#288)', () => {
 
   it('still detects WSL from inside a distro', () => {
     expect(isWslHost({ WSL_DISTRO_NAME: 'Ubuntu' }, 'linux')).toBe(true);
-    expect(isWslHost({ WSLENV: 'WMUX/u' }, 'linux')).toBe(true);
+    expect(isWslHost({ WSLENV: 'REMOTEA/u' }, 'linux')).toBe(true);
     expect(isWslHost({}, 'linux')).toBe(false);
   });
 
   it('the CLI dials through the shared check, not its own env test', () => {
-    const src = fs.readFileSync(path.join(__dirname, '../../src/cli/wmux.ts'), 'utf8');
+    const src = fs.readFileSync(path.join(__dirname, '../../src/cli/remotea.ts'), 'utf8');
     expect(src).toMatch(/if \(isWslHost\(process\.env\)\) return connectViaNpiperelay/);
     expect(src).not.toMatch(/process\.env\.WSL_DISTRO_NAME \|\| process\.env\.WSLENV/);
   });
@@ -88,17 +88,17 @@ describe('transportDeadline', () => {
     expect(transportDeadline(45000, t({ remote: true }))).toBe(45000);
   });
 
-  it('lets WMUX_RPC_TIMEOUT_MS lengthen a deadline but never shorten one', () => {
-    const env = { WMUX_RPC_TIMEOUT_MS: '90000' };
+  it('lets REMOTEA_RPC_TIMEOUT_MS lengthen a deadline but never shorten one', () => {
+    const env = { REMOTEA_RPC_TIMEOUT_MS: '90000' };
     expect(transportDeadline(DEFAULT_V2_TIMEOUT_MS, t({ env }))).toBe(90000);
     // Below the base it cannot truncate: the override is itself a floor, so
     // setting it can never cause the mid-flight cutoff this all exists to avoid.
-    expect(transportDeadline(45000, t({ env: { WMUX_RPC_TIMEOUT_MS: '1000' } }))).toBe(45000);
+    expect(transportDeadline(45000, t({ env: { REMOTEA_RPC_TIMEOUT_MS: '1000' } }))).toBe(45000);
   });
 
   it('ignores an override that is not a positive number', () => {
     for (const raw of ['', 'soon', '0', '-1', 'NaN']) {
-      expect(transportDeadline(DEFAULT_V2_TIMEOUT_MS, t({ env: { WMUX_RPC_TIMEOUT_MS: raw } }))).toBe(
+      expect(transportDeadline(DEFAULT_V2_TIMEOUT_MS, t({ env: { REMOTEA_RPC_TIMEOUT_MS: raw } }))).toBe(
         DEFAULT_V2_TIMEOUT_MS,
       );
     }
@@ -109,7 +109,7 @@ describe('the CLI and the hook agree', () => {
   const read = (f: string): string => fs.readFileSync(path.resolve(__dirname, '../../src/cli', f), 'utf8');
 
   it('both derive their deadline from this module', () => {
-    for (const file of ['wmux.ts', 'wmux-hook.ts']) {
+    for (const file of ['remotea.ts', 'remotea-hook.ts']) {
       expect(read(file), `${file} should import the shared derivation`).toMatch(
         /from '\.\/transport-deadline'/,
       );
@@ -121,9 +121,9 @@ describe('the CLI and the hook agree', () => {
     // regression that already happened once, so it is asserted rather than
     // trusted: `remote ? 30000 : 5000` in the hook was a copy of the CLI's rule
     // that stopped tracking it. (A bare /30000/ scan would be stricter but wrong
-    // — wmux.ts legitimately spends 30s elsewhere, on CDP navigation and the
+    // — remotea.ts legitimately spends 30s elsewhere, on CDP navigation and the
     // warm-pool backoff.)
-    for (const file of ['wmux.ts', 'wmux-hook.ts']) {
+    for (const file of ['remotea.ts', 'remotea-hook.ts']) {
       const code = read(file).replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
       expect(code, `${file} should import the floor, not redeclare it`).not.toMatch(
         /const\s+(DEFAULT_V2_TIMEOUT_MS|SLOW_TRANSPORT_FLOOR_MS)\s*=/,

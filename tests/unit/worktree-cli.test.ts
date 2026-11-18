@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { COMMAND_SPECS } from '../../src/cli/wmux';
+import { COMMAND_SPECS } from '../../src/cli/remotea';
 import { validateWorkspaceCreateParams, prepareWorkspaceCreateParams, handleBridgeV2 } from '../../src/main/v2-bridge';
 import { initPipeBridge } from '../../src/renderer/pipe-bridge';
 import { useStore } from '../../src/renderer/store';

@@ -101,7 +101,7 @@ function findLeafFromTree(node: SplitNode, paneId: PaneId): (SplitNode & { type:
   return findLeafFromTree(node.children[0], paneId) || findLeafFromTree(node.children[1], paneId);
 }
 
-/** Apply `~/.wmux/config.toml`'s `[terminal]` section onto the terminal prefs slice. */
+/** Apply `~/.remotea/config.toml`'s `[terminal]` section onto the terminal prefs slice. */
 function applyUserConfigTerminal(state: ReturnType<typeof useStore.getState>, terminal: any): void {
   if (!terminal) return;
   const patch: Partial<typeof state.terminalPrefs> = {};
@@ -133,11 +133,11 @@ function applyUserConfigTerminal(state: ReturnType<typeof useStore.getState>, te
 // (via the renderer → main NOTIFICATION_FIRE chokepoint).
 
 // Effective runtime values — seeded from the built-in defaults, then widened/
-// toggled by ~/.wmux/config.toml at startup and on `wmux reload-config`.
+// toggled by ~/.remotea/config.toml at startup and on `wmux reload-config`.
 let activeDevPorts: number[] = DEFAULT_DEV_PORTS;
 
 /**
- * Apply `~/.wmux/config.toml`'s `[browser]` section: dev-port detection + auto-open.
+ * Apply `~/.remotea/config.toml`'s `[browser]` section: dev-port detection + auto-open.
  * Resets to the built-in defaults first so `wmux reload-config` is idempotent —
  * deleting a key (or the whole section) from the file reverts its effect instead
  * of leaving the previous run's values sticky until restart.
@@ -658,11 +658,11 @@ export default function App() {
   // re-renders when it flips. Remembered per window in localStorage, which can
   // throw or come back empty, so it degrades to "off".
   const [focusMode, setFocusMode] = useState(() => {
-    try { return localStorage.getItem('wmux-focus-mode') === '1'; } catch { return false; }
+    try { return localStorage.getItem('remotea-focus-mode') === '1'; } catch { return false; }
   });
   useEffect(() => {
     document.documentElement.classList.toggle('wmux-focus-mode', focusMode);
-    try { localStorage.setItem('wmux-focus-mode', focusMode ? '1' : '0'); } catch { /* storage unavailable: keep the in-memory state */ }
+    try { localStorage.setItem('remotea-focus-mode', focusMode ? '1' : '0'); } catch { /* storage unavailable: keep the in-memory state */ }
   }, [focusMode]);
   // A window without OS focus shows no focused pane, so two windows side by
   // side do not both claim the keyboard. A class for the same reason as focus
@@ -828,13 +828,13 @@ export default function App() {
   // Settings (issue #22). The "seen" flag still prevents re-showing it.
   useEffect(() => {
     const showWelcome = useStore.getState().workspacePrefs.showWelcomeScreen;
-    if (showWelcome && !localStorage.getItem('wmux-tutorial-seen')) {
+    if (showWelcome && !localStorage.getItem('remotea-tutorial-seen')) {
       setTutorialOpen(true);
     }
   }, []);
 
   const handleTutorialClose = useCallback(() => {
-    localStorage.setItem('wmux-tutorial-seen', '1');
+    localStorage.setItem('remotea-tutorial-seen', '1');
     setTutorialOpen(false);
   }, []);
 
@@ -912,7 +912,7 @@ export default function App() {
     };
   }, []);
 
-  // Load ~/.wmux/config.toml on startup and listen for `wmux reload-config`.
+  // Load ~/.remotea/config.toml on startup and listen for `wmux reload-config`.
   // File-wins-at-startup, app-wins-at-runtime: file values are applied over
   // persisted Zustand state, then in-app edits take over until reload/restart.
   useEffect(() => {
@@ -938,8 +938,8 @@ export default function App() {
       const wrapTitles = result?.sidebar?.wrapTitles;
       if (typeof wrapTitles === 'boolean') state.setSidebarPrefs({ wrapTitles });
 
-      // Community translations from ~/.wmux/locales (issue #147) ride the same
-      // reload so `wmux reload-config` refreshes everything under ~/.wmux, not
+      // Community translations from ~/.remotea/locales (issue #147) ride the same
+      // reload so `wmux reload-config` refreshes everything under ~/.remotea, not
       // just config.toml. Absent on the startup read — the registry already
       // loaded them synchronously before the store existed.
       if (result?.locales) state.reloadUserLocales(result.locales);
@@ -970,6 +970,29 @@ export default function App() {
         title: t('notification.iconChanged.title', 'remotea has a new icon'),
         text: t('notification.iconChanged.text',
           'If the taskbar or a pinned button still shows the old one, use Settings → General → Refresh taskbar icons.'),
+      });
+    }).catch(() => { /* no main, or an old preload */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Settings or ~/.wmux still under the old names and the move not run yet:
+  // the app runs on the new names regardless, so say why things look reset.
+  // Shown each launch until the move writes its marker (old-state-notice.ts).
+  useEffect(() => {
+    const ask = window.wmux?.system?.oldStateNotice;
+    if (!ask) return;
+    let cancelled = false;
+    ask().then((due: boolean) => {
+      if (!due || cancelled) return;
+      const st = useStore.getState();
+      const ws = st.workspaces.find((w) => w.id === st.activeWorkspaceId) ?? st.workspaces[0];
+      if (!ws) return;
+      addNotification({
+        surfaceId: '' as SurfaceId,
+        workspaceId: ws.id,
+        title: t('notification.oldState.title', 'Settings not moved yet'),
+        text: t('notification.oldState.text',
+          'Run `npm run move` to bring over your settings from the old names.'),
       });
     }).catch(() => { /* no main, or an old preload */ });
     return () => { cancelled = true; };

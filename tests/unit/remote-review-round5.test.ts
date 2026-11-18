@@ -135,11 +135,11 @@ describe('a demoted Control device is told the real reason (#254)', () => {
 });
 
 describe('cookies and nonces (#254)', () => {
-  it('readCookies returns every wmux_rc value in order, capped', () => {
-    expect(readCookies('wmux_rc=junk; a=1; wmux_rc=dev-1.abc')).toEqual(['junk', 'dev-1.abc']);
-    expect(readCookie('wmux_rc=junk; wmux_rc=dev-1.abc')).toBe('junk');
-    expect(readCookies(Array.from({ length: 10 }, (_, i) => `wmux_rc=v${i}`).join('; '))).toHaveLength(MAX_COOKIE_CANDIDATES);
-    expect(readCookies('wmux_rc=; b=2')).toEqual([]);
+  it('readCookies returns every remotea_rc value in order, capped', () => {
+    expect(readCookies('remotea_rc=junk; a=1; remotea_rc=dev-1.abc')).toEqual(['junk', 'dev-1.abc']);
+    expect(readCookie('remotea_rc=junk; remotea_rc=dev-1.abc')).toBe('junk');
+    expect(readCookies(Array.from({ length: 10 }, (_, i) => `remotea_rc=v${i}`).join('; '))).toHaveLength(MAX_COOKIE_CANDIDATES);
+    expect(readCookies('remotea_rc=; b=2')).toEqual([]);
   });
 
   it('actionNonceOf finds the nonce of an action frame, valid or not, and nothing else', () => {

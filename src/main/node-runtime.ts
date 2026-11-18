@@ -2,20 +2,20 @@
  * Which binary on this machine can run a `.js` file (issue #187).
  *
  * Every wmux integration point that is "a JS file plus something to run it"
- * — the `wmux`/`wmux.cmd` CLI shims, the Claude Code hook, the OpenCode plugin
+ * — the `wmux`/`remotea.cmd` CLI shims, the Claude Code hook, the OpenCode plugin
  * — has so far assumed `node` is on PATH, or that the host process is itself a
  * JS runtime. Neither holds in general:
  *
  *   - Claude Code's `process.execPath` IS node.exe, so the OpenCode plugin's
  *     `execFile(process.execPath, [cli, ...])` worked and nobody noticed.
  *   - OpenCode ships as one compiled Bun binary, so the same line becomes
- *     `opencode.exe wmux.js agent-activity ...`, which prints OpenCode's help
+ *     `opencode.exe remotea.js agent-activity ...`, which prints OpenCode's help
  *     page and exits — silently, because the callback discarded the error.
  *   - Node can be installed and still be absent from PATH inside a given
  *     process, which is exactly what #187 reported.
  *
  * So wmux answers the question once, in the process that has the best view of
- * the machine, and hands the answer down as `WMUX_NODE`. The last resort is
+ * the machine, and hands the answer down as `REMOTEA_NODE`. The last resort is
  * wmux's own Electron binary, which runs plain Node when spawned with
  * `ELECTRON_RUN_AS_NODE=1` — meaning the chain never dead-ends, even on a
  * machine with no Node installed at all.

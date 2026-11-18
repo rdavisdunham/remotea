@@ -14,7 +14,7 @@ import { CLI_BIN_PLACEHOLDER, injectWmuxBlock } from '../../src/main/agent-instr
 
 
 /**
- * Issue #165: a team running omp (Oh My Pi) on Windows 11 read wmux as
+ * Issue #165: a team running omp (Oh My Pi) on Windows 11 read remotea as
  * "only for Claude". omp's `native` discovery provider reads
  * ~/.omp/agent/AGENTS.md at user scope for every session, at the highest
  * discovery priority of any provider — so that is where the block belongs.
@@ -65,7 +65,7 @@ describe('#165 omp context', () => {
     expect(fs.existsSync(agentsMd())).toBe(false);
     ensureOmpContext();
     expect(fs.existsSync(agentsMd())).toBe(true);
-    expect(read()).toContain('wmux browser open');
+    expect(read()).toContain('remotea browser open');
   });
 
   it('renders the CLI path like every other agent gets it (#158)', () => {
@@ -82,11 +82,11 @@ describe('#165 omp context', () => {
 
     ensureOmpContext();
     expect(read()).toContain('Always run the tests.');
-    expect(read()).toContain('wmux browser open');
+    expect(read()).toContain('remotea browser open');
 
     removeOmpContext();
     expect(read()).toContain('Always run the tests.');
-    expect(read()).not.toContain('wmux browser open');
+    expect(read()).not.toContain('remotea browser open');
   });
 
   it('is idempotent and does not churn the file', () => {
@@ -103,12 +103,12 @@ describe('#165 omp context', () => {
   it('replaces its own block rather than stacking copies', () => {
     ensureOmpContext();
     ensureOmpContext();
-    const occurrences = read().split('<!-- wmux:start').length - 1;
+    const occurrences = read().split('<!-- remotea:start').length - 1;
     expect(occurrences).toBe(1);
   });
 
   it('removes the file entirely when nothing of the user\'s is left', () => {
-    // #132's inverse requirement. A file that exists only because wmux wrote it
+    // #132's inverse requirement. A file that exists only because remotea wrote it
     // should not survive as a stray artefact of an integration just switched off.
     ensureOmpContext();
     removeOmpContext();
@@ -127,7 +127,7 @@ describe('#165 omp context', () => {
     // through the file, because this is the property that has to hold.
     // Markers are what make the block re-findable, so the fixture needs them —
     // and the trailing newline is the whole point of the test.
-    const block = '<!-- wmux:start -->\nhi\n<!-- wmux:end -->\n';
+    const block = '<!-- remotea:start -->\nhi\n<!-- remotea:end -->\n';
     const once = injectWmuxBlock('# Mine\n', block, s => s);
     const twice = injectWmuxBlock(once, block, s => s);
     expect(twice).toBe(once);
@@ -139,9 +139,9 @@ describe('#165 omp context', () => {
     expect(injectWmuxBlock('user text\n', 'BLOCK', s => s)).toBe('user text\n\nBLOCK');
   });
   it('installs and removes only its own status extension', () => {
-    const extension = path.join(tmp, '.omp', 'agent', 'extensions', 'wmux.js');
+    const extension = path.join(tmp, '.omp', 'agent', 'extensions', 'remotea.js');
     ensureOmpExtension();
-    expect(fs.readFileSync(extension, 'utf-8')).toContain('wmux-plugin-version:');
+    expect(fs.readFileSync(extension, 'utf-8')).toContain('remotea-plugin-version:');
     const mtime = fs.statSync(extension).mtimeMs;
     ensureOmpExtension();
     expect(fs.statSync(extension).mtimeMs).toBe(mtime);
@@ -150,7 +150,7 @@ describe('#165 omp context', () => {
   });
 
   it('does not overwrite or delete a user-owned extension', () => {
-    const extension = path.join(tmp, '.omp', 'agent', 'extensions', 'wmux.js');
+    const extension = path.join(tmp, '.omp', 'agent', 'extensions', 'remotea.js');
     fs.mkdirSync(path.dirname(extension), { recursive: true });
     fs.writeFileSync(extension, 'export default function mine() {}');
     ensureOmpExtension();
@@ -166,9 +166,9 @@ describe('#165 omp context', () => {
 
     ensureOmpContext();
     ensureOmpExtension();
-    expect(fs.readFileSync(path.join(agentDir, 'AGENTS.md'), 'utf-8')).toContain('wmux browser open');
-    const extension = path.join(agentDir, 'extensions', 'wmux.js');
-    expect(fs.readFileSync(extension, 'utf-8')).toContain('wmux-plugin-version:');
+    expect(fs.readFileSync(path.join(agentDir, 'AGENTS.md'), 'utf-8')).toContain('remotea browser open');
+    const extension = path.join(agentDir, 'extensions', 'remotea.js');
+    expect(fs.readFileSync(extension, 'utf-8')).toContain('remotea-plugin-version:');
     // Nothing is written into the default root while the override is set.
     expect(fs.existsSync(path.join(tmp, '.omp'))).toBe(false);
 
@@ -195,16 +195,16 @@ describe('#165 omp context', () => {
     process.env.PI_CONFIG_DIR = '.omp-dev';
     const agentDir = path.join(tmp, '.omp-dev', 'agent');
     ensureOmpExtension();
-    const extension = path.join(agentDir, 'extensions', 'wmux.js');
-    expect(fs.readFileSync(extension, 'utf-8')).toContain('wmux-plugin-version:');
-    expect(fs.existsSync(path.join(tmp, '.omp', 'agent', 'extensions', 'wmux.js'))).toBe(false);
+    const extension = path.join(agentDir, 'extensions', 'remotea.js');
+    expect(fs.readFileSync(extension, 'utf-8')).toContain('remotea-plugin-version:');
+    expect(fs.existsSync(path.join(tmp, '.omp', 'agent', 'extensions', 'remotea.js'))).toBe(false);
     removeOmpExtension();
     expect(fs.existsSync(extension)).toBe(false);
   });
 
   it('protects a user-owned extension under a custom agent dir too', () => {
     process.env.PI_CODING_AGENT_DIR = path.join(tmp, 'elsewhere');
-    const extension = path.join(tmp, 'elsewhere', 'extensions', 'wmux.js');
+    const extension = path.join(tmp, 'elsewhere', 'extensions', 'remotea.js');
     fs.mkdirSync(path.dirname(extension), { recursive: true });
     fs.writeFileSync(extension, 'export default function mine() {}');
     ensureOmpExtension();

@@ -162,6 +162,10 @@ contextBridge.exposeInMainWorld('wmux', {
     // changed the app icon — the renderer turns it into a bell notification.
     takeIconChangeNotice: (): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_TAKE_ICON_CHANGE_NOTICE),
+    // True while settings or ~/.wmux are still under the old names and the
+    // move has not run (old-state-notice.ts); the renderer shows one line.
+    oldStateNotice: (): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_OLD_STATE_NOTICE),
     getContextMenu: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_GET_CONTEXT_MENU) as Promise<boolean>,
     setContextMenu: (enabled: boolean, label?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_SET_CONTEXT_MENU, enabled, label) as Promise<{
@@ -321,7 +325,7 @@ contextBridge.exposeInMainWorld('wmux', {
         return [];
       }
     },
-    // Community translations from ~/.wmux/locales (issue #147). Synchronous:
+    // Community translations from ~/.remotea/locales (issue #147). Synchronous:
     // the i18n registry is built at module load, before the store reads the
     // persisted language and validates it against the shipped language set.
     getUserLocalesSync: (): unknown => {

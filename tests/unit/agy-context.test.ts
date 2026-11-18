@@ -13,7 +13,7 @@ import {
 } from '../../src/main/agy-context';
 import { INTEGRATION_CONSENT_DETAIL } from '../../src/main/agent-integration';
 
-const SCRIPT = path.join(__dirname, '../../resources/agy-plugin/wmux-agy-hook.cjs');
+const SCRIPT = path.join(__dirname, '../../resources/agy-plugin/remotea-agy-hook.cjs');
 const require = createRequire(import.meta.url);
 const { conversationToReport, inWmuxPane } = require(SCRIPT) as {
   conversationToReport: (raw: string, event: string) => string | null;
@@ -30,7 +30,7 @@ const pluginFile = (name: string) => path.join(getAgyPluginDir(home), name);
 
 describe('agy plugin install', () => {
   it('is named in the consent prompt, like every other file wmux writes (#132)', () => {
-    expect(INTEGRATION_CONSENT_DETAIL).toContain('~/.gemini/config/plugins/wmux/');
+    expect(INTEGRATION_CONSENT_DETAIL).toContain('~/.gemini/config/plugins/remotea/');
   });
 
   it('writes nothing where agy has never run (#132)', () => {
@@ -41,18 +41,18 @@ describe('agy plugin install', () => {
   it('installs a manifest, its hooks and the hook script', () => {
     agyInstalled();
     ensureAgyPlugin(home, SCRIPT);
-    expect(JSON.parse(fs.readFileSync(pluginFile('plugin.json'), 'utf-8'))).toEqual({ name: 'wmux' });
-    expect(fs.readFileSync(pluginFile('wmux-agy-hook.cjs'), 'utf-8')).toBe(fs.readFileSync(SCRIPT, 'utf-8'));
+    expect(JSON.parse(fs.readFileSync(pluginFile('plugin.json'), 'utf-8'))).toEqual({ name: 'remotea' });
+    expect(fs.readFileSync(pluginFile('remotea-agy-hook.cjs'), 'utf-8')).toBe(fs.readFileSync(SCRIPT, 'utf-8'));
     const hooks = JSON.parse(fs.readFileSync(pluginFile('hooks.json'), 'utf-8'));
-    expect(Object.keys(hooks['wmux-session']).sort()).toEqual(['PreInvocation', 'SessionStart']);
+    expect(Object.keys(hooks['remotea-session']).sort()).toEqual(['PreInvocation', 'SessionStart']);
   });
 
   // agy 1.4 hands a quoted argument to node with its quotes on, and runs a hook
   // from its hooks.json's folder: a bare relative command is the form that works.
   it('registers commands with no path and no quotes', () => {
-    const hooks = JSON.parse(buildAgyHooks())['wmux-session'];
+    const hooks = JSON.parse(buildAgyHooks())['remotea-session'];
     for (const [event, handlers] of Object.entries<any[]>(hooks)) {
-      expect(handlers).toEqual([{ type: 'command', command: `node wmux-agy-hook.cjs ${event}`, timeout: 5 }]);
+      expect(handlers).toEqual([{ type: 'command', command: `node remotea-agy-hook.cjs ${event}`, timeout: 5 }]);
     }
   });
 
@@ -63,7 +63,7 @@ describe('agy plugin install', () => {
     ensureAgyPlugin(home, SCRIPT);
     removeAgyPlugin(home);
     expect(fs.readFileSync(pluginFile('plugin.json'), 'utf-8')).toBe('{"name":"mine"}');
-    expect(fs.existsSync(pluginFile('wmux-agy-hook.cjs'))).toBe(false);
+    expect(fs.existsSync(pluginFile('remotea-agy-hook.cjs'))).toBe(false);
   });
 
   it('removes exactly what it installed', () => {
@@ -89,9 +89,9 @@ describe('agy hook script', () => {
   });
 
   it('only acts in a pane of this wmux (#282)', () => {
-    expect(inWmuxPane({ WMUX: '1', WMUX_SURFACE_ID: 'surf-1' })).toBe(true);
-    expect(inWmuxPane({ WMUX_SURFACE_ID: 'surf-1' })).toBe(false);
-    expect(inWmuxPane({ WMUX: '1' })).toBe(false);
+    expect(inWmuxPane({ REMOTEA: '1', REMOTEA_SURFACE_ID: 'surf-1' })).toBe(true);
+    expect(inWmuxPane({ REMOTEA_SURFACE_ID: 'surf-1' })).toBe(false);
+    expect(inWmuxPane({ REMOTEA: '1' })).toBe(false);
   });
 
   /** Run the script the way agy does, against a stand-in for wmux's pipe. */
@@ -109,7 +109,7 @@ describe('agy hook script', () => {
     await new Promise<void>((resolve) => server.listen(pipe, resolve));
     try {
       const child = spawn(process.execPath, [SCRIPT, event], {
-        env: { PATH: process.env.PATH, WMUX_PIPE: pipe, ...env },
+        env: { PATH: process.env.PATH, REMOTEA_PIPE: pipe, ...env },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       let stdout = '';
@@ -124,7 +124,7 @@ describe('agy hook script', () => {
 
   it('reports the pane\'s conversation over the pipe and answers agy with {}', async () => {
     const { code, stdout, frames } = await runHook('SessionStart', { conversationId: ID },
-      { WMUX: '1', WMUX_SURFACE_ID: 'surf-agy', WMUX_PIPE_TOKEN: 'tok' });
+      { REMOTEA: '1', REMOTEA_SURFACE_ID: 'surf-agy', REMOTEA_PIPE_TOKEN: 'tok' });
     expect(code).toBe(0);
     expect(stdout).toBe('{}');
     expect(frames).toEqual([{

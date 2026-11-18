@@ -1,5 +1,5 @@
-// Project-local workspace manifests (#284): `wmux.workspace.json` (or
-// `.wmux/workspace.json`) — panes, their folders, what each runs, extra env,
+// Project-local workspace manifests (#284): `remotea.workspace.json` (or
+// `.remotea/workspace.json`) — panes, their folders, what each runs, extra env,
 // ordering, browser tabs — committed next to the code it brings up.
 //
 // Pure: reading the file, asking for trust, creating panes and typing commands
@@ -21,7 +21,7 @@ import * as crypto from 'crypto';
 import * as path from 'path';
 import { ENV_KEY_RE, isReservedEnvKey } from './surface-env';
 
-export const MANIFEST_FILENAMES = ['wmux.workspace.json', path.join('.wmux', 'workspace.json')] as const;
+export const MANIFEST_FILENAMES = ['remotea.workspace.json', path.join('.remotea', 'workspace.json')] as const;
 export const MAX_MANIFEST_BYTES = 256 * 1024;
 export const MAX_PANES = 8;
 export const MAX_BROWSER_TABS = 10;
@@ -179,7 +179,7 @@ function parseEnv(value: unknown, where: string, errors: string[], warnings: str
   const env: Record<string, string> = {};
   for (const [key, val] of Object.entries(value)) {
     if (!ENV_KEY_RE.test(key)) { errors.push(`${where}.${key}: not a valid variable name`); continue; }
-    if (isReservedEnvKey(key)) { errors.push(`${where}.${key}: WMUX_* variables belong to remotea`); continue; }
+    if (isReservedEnvKey(key)) { errors.push(`${where}.${key}: REMOTEA_* variables belong to remotea`); continue; }
     if (typeof val !== 'string') { errors.push(`${where}.${key}: value must be a string`); continue; }
     if (SECRET_KEY_RE.test(key) && val !== '' && !val.includes('${env:')) {
       warnings.push(`${where}.${key} looks like a credential written into a file that gets committed — use "\${env:${key}}" to read it from your environment instead`);
@@ -362,10 +362,10 @@ export interface WorkspacePlan {
   browserActive: number;
 }
 
-/** The repo root a manifest describes: its folder, or the parent of `.wmux`. */
+/** The repo root a manifest describes: its folder, or the parent of `.remotea`. */
 export function manifestRoot(manifestPath: string): string {
   const dir = path.dirname(manifestPath);
-  return path.basename(dir).toLowerCase() === '.wmux' ? path.dirname(dir) : dir;
+  return path.basename(dir).toLowerCase() === '.remotea' ? path.dirname(dir) : dir;
 }
 
 /**

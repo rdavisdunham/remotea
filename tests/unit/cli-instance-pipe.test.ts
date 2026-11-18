@@ -1,22 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { cliPipePath, sendKeyParams } from '../../src/cli/wmux';
+import { cliPipePath, sendKeyParams } from '../../src/cli/remotea';
 
 // A CLI run outside a wmux pane against a side-by-side instance
-// (`WMUX_INSTANCE=dev`) read that instance's token but dialled the INSTALLED
+// (`REMOTEA_INSTANCE=dev`) read that instance's token but dialled the INSTALLED
 // wmux's pipe, so every privileged verb failed authentication there. The hook
-// (wmux-hook.ts) already followed the instance; the CLI now does too.
+// (remotea-hook.ts) already followed the instance; the CLI now does too.
 describe('cliPipePath', () => {
-  it('follows WMUX_INSTANCE the way shared/instance.ts names the pipe', () => {
-    expect(cliPipePath({ WMUX_INSTANCE: 'dev' })).toBe('\\\\.\\pipe\\remotea-dev');
+  it('follows REMOTEA_INSTANCE the way shared/instance.ts names the pipe', () => {
+    expect(cliPipePath({ REMOTEA_INSTANCE: 'dev' })).toBe('\\\\.\\pipe\\remotea-dev');
   });
 
-  it('lets an explicit WMUX_PIPE win, as a pane spawned by wmux sets it', () => {
-    expect(cliPipePath({ WMUX_PIPE: '\\\\.\\pipe\\custom', WMUX_INSTANCE: 'dev' })).toBe('\\\\.\\pipe\\custom');
+  it('lets an explicit REMOTEA_PIPE win, as a pane spawned by wmux sets it', () => {
+    expect(cliPipePath({ REMOTEA_PIPE: '\\\\.\\pipe\\custom', REMOTEA_INSTANCE: 'dev' })).toBe('\\\\.\\pipe\\custom');
   });
 
   it('is the installed pipe with no instance, or a blank one', () => {
     expect(cliPipePath({})).toBe('\\\\.\\pipe\\remotea');
-    expect(cliPipePath({ WMUX_INSTANCE: '  ' })).toBe('\\\\.\\pipe\\remotea');
+    expect(cliPipePath({ REMOTEA_INSTANCE: '  ' })).toBe('\\\\.\\pipe\\remotea');
   });
 });
 

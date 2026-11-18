@@ -7,7 +7,7 @@
  *
  * Isolation:
  *   - app:    %USERPROFILE%\remotea-dev\app, portable Node in ...\remotea-dev\node,
- *             WMUX_INSTANCE=test (own pipe, %APPDATA%\remotea-test, own Electron
+ *             REMOTEA_INSTANCE=test (own pipe, %APPDATA%\remotea-test, own Electron
  *             profile), agent integration skipped (never touches ~\.claude),
  *             DevTools protocol on 127.0.0.1:9333 only while it runs.
  *   - server: transient systemd unit `remotea-test`, ports 7719 (+7720 hooks) on
@@ -204,7 +204,7 @@ async function appStart() {
   writeLaunchers();
   const token = fs.readFileSync(path.join(cfgDir, 'token'), 'utf8').trim();
   const env = {
-    WMUX_INSTANCE: 'test',
+    REMOTEA_INSTANCE: 'test',
     VITE_DEV_PORT: String(VITE_PORT),
     REMOTEA_NO_DEVTOOLS: '1',
     REMOTEA_SKIP_AGENT_INTEGRATION: '1',

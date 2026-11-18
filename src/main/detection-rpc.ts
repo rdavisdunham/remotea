@@ -50,7 +50,7 @@ export function handleDetectionV2(
     return true;
   }
 
-  /** Re-read %APPDATA%\wmux\agent-detection after editing an override. */
+  /** Re-read %APPDATA%\remotea\agent-detection after editing an override. */
   if (method === 'detect.reload') {
     const { manifests, warnings } = reloadManifests();
     BrowserWindow.getAllWindows().forEach((win) => {

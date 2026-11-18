@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { browserRequest, timeoutMessage } from '../../src/cli/wmux';
+import { browserRequest, timeoutMessage } from '../../src/cli/remotea';
 
 /**
  * `wmux browser open <url>` failed with a bare `Error: timeout` after ~5s on any
@@ -141,7 +141,7 @@ describe('browser command deadlines outlast the main process', () => {
   it('covers every verb the CLI dispatches', () => {
     // Keeps the sweep above honest: a subcommand added to BROWSER_CMDS without a
     // deadline opinion would otherwise never be measured by it.
-    const cli = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'cli', 'wmux.ts'), 'utf-8');
+    const cli = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'cli', 'remotea.ts'), 'utf-8');
     const start = cli.indexOf('const BROWSER_CMDS');
     const end = cli.indexOf('export function browserRequest');
     expect(start).toBeGreaterThan(-1);
@@ -200,7 +200,7 @@ describe('the agent engine fits inside the same client deadlines', () => {
 describe('--surface targets a browser from outside a pane', () => {
   // The rest of the CLI already takes --surface (send, read-screen,
   // agent-activity, report-agent). Browser commands only ever read
-  // $WMUX_SURFACE_ID, so a shell wmux did not spawn had no way to say which
+  // $REMOTEA_SURFACE_ID, so a shell wmux did not spawn had no way to say which
   // pane's browser it meant.
   it('sends the surface as the caller the isolation routing expects', () => {
     const req = browserRequest(['browser', 'snapshot'], 'surf-abc');

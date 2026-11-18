@@ -21,7 +21,7 @@ import { resolveSurfaceEnv, expandEnvRefs } from '../../src/main/surface-env';
  */
 
 const ROOT = path.resolve('/repo');
-const MANIFEST = path.join(ROOT, 'wmux.workspace.json');
+const MANIFEST = path.join(ROOT, 'remotea.workspace.json');
 
 const monorepo = {
   version: 1,
@@ -103,8 +103,8 @@ describe('what a committed file may not do', () => {
     expect(errorsOf({ version: 1, panes: [{ run: ['x'], waitFor: { http: 'file:///C:/x' } }] }).join()).toMatch(/http\(s\)/);
   });
 
-  it('WMUX_* variables belong to wmux', () => {
-    expect(errorsOf({ version: 1, panes: [{ run: ['x'], env: { WMUX_SURFACE_ID: 'x' } }] }).join()).toMatch(/belong to remotea/);
+  it('REMOTEA_* variables belong to remotea', () => {
+    expect(errorsOf({ version: 1, panes: [{ run: ['x'], env: { REMOTEA_SURFACE_ID: 'x' } }] }).join()).toMatch(/belong to remotea/);
   });
 
   it('a credential written literally is a warning that names the fix', () => {
@@ -151,8 +151,8 @@ describe('ordering', () => {
 });
 
 describe('the plan', () => {
-  it('resolves folders against the manifest\'s repo, including from .wmux/', () => {
-    expect(manifestRoot(path.join(ROOT, '.wmux', 'workspace.json'))).toBe(ROOT);
+  it('resolves folders against the manifest\'s repo, including from .remotea/', () => {
+    expect(manifestRoot(path.join(ROOT, '.remotea', 'workspace.json'))).toBe(ROOT);
     const plan = buildPlan(ok(monorepo), MANIFEST, new Set());
     expect(plan.panes.find((p) => p.id === 'api')!.cwd).toBe(path.join(ROOT, 'apps', 'api'));
   });
@@ -207,8 +207,8 @@ describe('surface env at spawn', () => {
     expect(expandEnvRefs('${env:UNSET_ONE}', {})).toBe('');
   });
 
-  it('drops invalid keys and every WMUX_* identity key', () => {
-    expect(resolveSurfaceEnv({ PORT: '4000', WMUX_SURFACE_ID: 'x', wmux_pipe: 'y', 'BAD KEY': 'z', NUM: 3 as unknown as string }, {}))
+  it('drops invalid keys and every REMOTEA_* identity key', () => {
+    expect(resolveSurfaceEnv({ PORT: '4000', REMOTEA_SURFACE_ID: 'x', remotea_pipe: 'y', 'BAD KEY': 'z', NUM: 3 as unknown as string }, {}))
       .toEqual({ PORT: '4000' });
   });
 });

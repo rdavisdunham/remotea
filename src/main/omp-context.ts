@@ -31,7 +31,7 @@ import { reportIntegrationFailure } from './integration-failures';
  * spliced between markers exactly as it is for Claude Code and OpenCode, and
  * everything outside the markers is left alone.
  *
- * Status is reported by resources/omp-extension/wmux.js, installed under the
+ * Status is reported by resources/omp-extension/remotea.js, installed under the
  * separate "Status hooks" consent toggle. Omp discovers global extensions in
  * ~/.omp/agent/extensions. Main-session snapshots keep async child jobs busy
  * after the foreground turn ends; rebound child factories do not report.
@@ -133,21 +133,21 @@ export function removeOmpContext(): void {
   }
 }
 
-/** Where the extension lands: `<agentDir>/extensions/wmux.js`. */
+/** Where the extension lands: `<agentDir>/extensions/remotea.js`. */
 export function getOmpExtensionPath(): string {
-  return path.join(getOmpAgentDir(), 'extensions', 'wmux.js');
+  return path.join(getOmpAgentDir(), 'extensions', 'remotea.js');
 }
 
 export function getOmpExtensionSrcPath(): string {
-  let source = path.join(__dirname, '../../resources/omp-extension/wmux.js');
+  let source = path.join(__dirname, '../../resources/omp-extension/remotea.js');
   try {
     const { app } = require('electron') as typeof Electron;
-    if (app.isPackaged) source = path.join(process.resourcesPath, 'omp-extension', 'wmux.js');
+    if (app.isPackaged) source = path.join(process.resourcesPath, 'omp-extension', 'remotea.js');
   } catch { /* Node unit tests use the development resource. */ }
   return source;
 }
 
-/** Installs the status bridge without modifying a user's own wmux.js. */
+/** Installs the status bridge without modifying a user's own remotea.js. */
 export function ensureOmpExtension(): void {
   try {
     const source = getOmpExtensionSrcPath();

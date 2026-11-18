@@ -43,7 +43,7 @@ import { reportIntegrationFailure } from './integration-failures';
  * pi is that follow-up's other half. It auto-discovers extensions from
  * `~/.pi/agent/extensions/`, globally, for every session — one file, in the
  * user's own config root, removable, and gated behind the same consent as
- * everything else. No repository is touched. See resources/pi-extension/wmux.js
+ * everything else. No repository is touched. See resources/pi-extension/remotea.js
  * for what it reports and why each event maps the way it does.
  */
 import * as fs from 'fs';
@@ -162,9 +162,9 @@ export function removePiContext(): void {
   }
 }
 
-/** Where the extension lands: `<agentDir>/extensions/wmux.js`. */
+/** Where the extension lands: `<agentDir>/extensions/remotea.js`. */
 export function getPiExtensionPath(agentDir = getPiAgentDir()): string {
-  return path.join(agentDir, 'extensions', 'wmux.js');
+  return path.join(agentDir, 'extensions', 'remotea.js');
 }
 
 /**
@@ -180,10 +180,10 @@ export function getPiExtensionSrcPath(): string {
   try {
     const { app } = require('electron') as typeof import('electron');
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'pi-extension', 'wmux.js');
+      return path.join(process.resourcesPath, 'pi-extension', 'remotea.js');
     }
   } catch { /* not running under Electron */ }
-  return path.join(__dirname, '../../resources/pi-extension/wmux.js');
+  return path.join(__dirname, '../../resources/pi-extension/remotea.js');
 }
 
 /** Installs/updates the wmux pi extension into `<agentDir>/extensions/`. */
@@ -211,7 +211,7 @@ export function ensurePiExtension(): void {
  * Remove the wmux pi extension (#132).
  *
  * Guarded on the version marker, exactly as the OpenCode plugin is: a
- * `wmux.js` the user wrote or vendored themselves has no marker and stays where
+ * `remotea.js` the user wrote or vendored themselves has no marker and stays where
  * it is. Uninstalling wmux's integration must never delete somebody else's file
  * that happens to share a name.
  */

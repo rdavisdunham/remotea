@@ -1,5 +1,5 @@
 /**
- * Deciding what `wmux bridge` may bind to, and why, when it runs inside WSL2.
+ * Deciding what `remotea bridge` may bind to, and why, when it runs inside WSL2.
  *
  * `--wsl` exists so a container on the Windows host can reach a bridge running
  * inside the distro (issue #19): `127.0.0.1` in the distro is not an address the
@@ -26,7 +26,7 @@
  *                      `Set-NetFirewallHyperVVMSetting -Name
  *                      '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}'
  *                      -DefaultInboundAction Allow`. Mirrored mode plus that
- *                      setting puts wmux's control pipe on the LAN.
+ *                      setting puts remotea's control pipe on the LAN.
  *
  * The pipe token still authenticates every request in both cases, so mirrored
  * mode is exposure rather than an open door. It is still not something to pick
@@ -35,7 +35,7 @@
  * explicit `--host 0.0.0.0` is always honoured — that is a stated choice.
  *
  * Everything here is pure so the decision can be tested off Windows entirely;
- * `readWslEnvironment()` in wmux.ts does the I/O.
+ * `readWslEnvironment()` in remotea.ts does the I/O.
  */
 
 export type WslNetworkingMode = 'nat' | 'mirrored' | 'unknown';
@@ -125,7 +125,7 @@ function exposureNotice(host: string, req: BindRequest): string[] {
     ];
   }
   return [
-    `WARNING: binding ${host} exposes the wmux pipe beyond localhost.`,
+    `WARNING: binding ${host} exposes the remotea pipe beyond localhost.`,
     `Prefer the default 127.0.0.1 + an SSH tunnel: ssh -L ${req.port}:127.0.0.1:${req.port} user@host`,
   ];
 }

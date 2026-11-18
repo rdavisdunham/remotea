@@ -84,7 +84,7 @@ export function needsTransparentWindow(enabled: boolean, material: WindowMateria
 }
 
 /**
- * The transparency pref, read straight off %APPDATA%\wmux\settings.json.
+ * The transparency pref, read straight off %APPDATA%\remotea\settings.json.
  *
  * Read here rather than pushed from the renderer so the window can be CREATED
  * with the right backdrop. Applying it after the renderer boots works, but the
@@ -93,7 +93,7 @@ export function needsTransparentWindow(enabled: boolean, material: WindowMateria
  */
 function storedBackdrop(): { enabled: boolean; material: WindowMaterial } {
   try {
-    const prefs = loadSettings()['wmux-appearance-prefs'] as
+    const prefs = loadSettings()['remotea-appearance-prefs'] as
       | { windowTransparency?: boolean; windowMaterial?: WindowMaterial }
       | undefined;
     return {

@@ -747,7 +747,7 @@ describe('surface close wiring', () => {
 
 // ─── side-by-side wmux instances ───────────────────────────────────────────
 //
-// `WMUX_INSTANCE=<name>` runs a second wmux beside the first (the documented
+// `REMOTEA_INSTANCE=<name>` runs a second wmux beside the first (the documented
 // case is a dev build alongside an installed one). agent-browser's session
 // namespace is MACHINE-global with no such suffix, so without an instance
 // segment in the name, reconciliation — whose premise is "every wmux- session
@@ -758,23 +758,23 @@ describe('surface close wiring', () => {
 describe('sessionPrefix', () => {
   it('leaves the default instance exactly as it was', () => {
     expect(sessionPrefix({})).toBe('wmux-');
-    expect(sessionPrefix({ WMUX_INSTANCE: '  ' })).toBe('wmux-');
+    expect(sessionPrefix({ REMOTEA_INSTANCE: '  ' })).toBe('wmux-');
     expect(sessionNameFor(A, {})).toBe(`wmux-${A}`);
   });
 
   it('carves out its own namespace for a named instance', () => {
-    expect(sessionPrefix({ WMUX_INSTANCE: 'dev' })).toBe('wmux-dev-');
-    expect(sessionNameFor(A, { WMUX_INSTANCE: 'dev' })).toBe(`wmux-dev-${A}`);
+    expect(sessionPrefix({ REMOTEA_INSTANCE: 'dev' })).toBe('wmux-dev-');
+    expect(sessionNameFor(A, { REMOTEA_INSTANCE: 'dev' })).toBe(`wmux-dev-${A}`);
   });
 
-  // WMUX_INSTANCE is user-supplied and this value reaches a command line, so
+  // REMOTEA_INSTANCE is user-supplied and this value reaches a command line, so
   // it is filtered rather than trusted — and bounded, because an unbounded
   // pattern is not a boundary.
   it('filters and bounds whatever the environment says', () => {
-    expect(sessionPrefix({ WMUX_INSTANCE: 'de v;--all' })).toBe('wmux-dev--all-');
-    expect(sessionPrefix({ WMUX_INSTANCE: '$(calc)' })).toBe('wmux-calc-');
-    expect(sessionPrefix({ WMUX_INSTANCE: '/\\.' })).toBe('wmux-');
-    expect(sessionPrefix({ WMUX_INSTANCE: 'x'.repeat(500) })).toBe(`wmux-${'x'.repeat(32)}-`);
+    expect(sessionPrefix({ REMOTEA_INSTANCE: 'de v;--all' })).toBe('wmux-dev--all-');
+    expect(sessionPrefix({ REMOTEA_INSTANCE: '$(calc)' })).toBe('wmux-calc-');
+    expect(sessionPrefix({ REMOTEA_INSTANCE: '/\\.' })).toBe('wmux-');
+    expect(sessionPrefix({ REMOTEA_INSTANCE: 'x'.repeat(500) })).toBe(`wmux-${'x'.repeat(32)}-`);
   });
 
   /**
@@ -782,7 +782,7 @@ describe('sessionPrefix', () => {
    * `SURFACE_ID_RE` anchoring on `surf-` rather than from a special case.
    */
   it('never claims the other instance sessions', () => {
-    const dev = { WMUX_INSTANCE: 'dev' };
+    const dev = { REMOTEA_INSTANCE: 'dev' };
     expect(isWmuxSessionName(`wmux-dev-${A}`, {})).toBe(false);
     expect(isWmuxSessionName(`wmux-${A}`, dev)).toBe(false);
     expect(isWmuxSessionName(`wmux-dev-${A}`, dev)).toBe(true);

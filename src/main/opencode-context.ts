@@ -58,10 +58,10 @@ export function getPluginSrcPath(): string {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { app } = require('electron') as typeof import('electron');
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'opencode-plugin', 'wmux.js');
+      return path.join(process.resourcesPath, 'opencode-plugin', 'remotea.js');
     }
   } catch { /* not running under Electron */ }
-  return path.join(__dirname, '../../resources/opencode-plugin/wmux.js');
+  return path.join(__dirname, '../../resources/opencode-plugin/remotea.js');
 }
 
 /** Installs/updates the wmux OpenCode plugin into ~/.config/opencode/plugin/. */
@@ -74,7 +74,7 @@ export function ensureOpencodePlugin(): void {
     }
     const src = fs.readFileSync(srcPath, 'utf-8');
     const destDir = path.join(os.homedir(), '.config', 'opencode', 'plugin');
-    const dest = path.join(destDir, 'wmux.js');
+    const dest = path.join(destDir, 'remotea.js');
     const target = fs.existsSync(dest) ? fs.readFileSync(dest, 'utf-8') : null;
     if (!pluginNeedsUpdate(src, target)) return;
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
@@ -113,12 +113,12 @@ export function removeOpencodeContext(): void {
  * Remove the wmux OpenCode plugin (issue #132).
  *
  * Guarded on the version marker wmux stamps into its own plugin source: a
- * wmux.js the user wrote or vendored themselves has no marker and is left where
+ * remotea.js the user wrote or vendored themselves has no marker and is left where
  * it is, because uninstalling our integration must not delete their file.
  */
 export function removeOpencodePlugin(): void {
   try {
-    const dest = path.join(os.homedir(), '.config', 'opencode', 'plugin', 'wmux.js');
+    const dest = path.join(os.homedir(), '.config', 'opencode', 'plugin', 'remotea.js');
     if (!fs.existsSync(dest)) return;
     if (!isWmuxPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
     fs.unlinkSync(dest);

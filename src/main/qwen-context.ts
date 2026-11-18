@@ -16,7 +16,7 @@ import { reportIntegrationFailure } from './integration-failures';
  *
  * ── Why every hook carries `--provider qwen` ────────────────────────────────
  *
- * The payload is shaped like Claude's, so without a tag wmux-hook.js would
+ * The payload is shaped like Claude's, so without a tag remotea-hook.js would
  * forward Qwen's `session_id` as a Claude session and a restore would type
  * `claude --resume <qwen-id>`. The tag makes the hook tell main whose id it is,
  * and lets the helper translate the two places Qwen's payload differs: tool
@@ -36,6 +36,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { injectWmuxBlock, readRenderedInstructions } from './agent-instructions';
+import { isLegacyRemoteaQwenStub, stripLegacyHookEntries } from '../shared/legacy-cleanup';
+import { LEGACY_PLUGIN_FILES } from '../shared/legacy-names';
+import type { OwnershipContext } from '../shared/artifact-ownership';
+import { desktopOwnershipContext } from './ownership-context';
 import {
   applyChromeDevtoolsMcp,
   getHookScriptPath,
@@ -131,7 +135,7 @@ const QWEN_TRACKED_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'Ag
  * Lifecycle events, and whether each runs in the background. Claude's set
  * (claude-context.ts explains each choice) plus StopFailure, which Qwen fires
  * INSTEAD of Stop on an API error or loop detection — without it such a turn
- * left the pane reading `working`. wmux-hook.js reports it as `Stop`.
+ * left the pane reading `working`. remotea-hook.js reports it as `Stop`.
  * `async` needs Qwen 0.15.0+; older versions ignore the field.
  */
 const QWEN_EVENT_HOOKS: ReadonlyArray<{ event: string; async: boolean }> = [
@@ -157,7 +161,7 @@ export const QWEN_HOOK_EVENTS = ['PostToolUse', ...QWEN_EVENT_HOOKS.map(h => h.e
  * runs a hook as `spawn(ComSpec, ['/d', '/s', '/c', command], {shell: false})`
  * WITHOUT `windowsVerbatimArguments` — so Node escapes every `"` in the command
  * as `\"`, cmd.exe does not unescape it, and node receives a literal quote:
- * `node "C:/Users/me/OneDrive - Org/…/wmux-hook.js"` arrived as
+ * `node "C:/Users/me/OneDrive - Org/…/remotea-hook.js"` arrived as
  * `"C:/Users/me/OneDrive` and died on MODULE_NOT_FOUND, so a Qwen pane started
  * from pwsh never reported a single event. Measured on Qwen 0.26.1; from Git
  * Bash it picks bash instead, which is why a probe run THERE passes. A command
@@ -176,10 +180,10 @@ export function qwenEventHookCommand(hookScript: string, event: string): string 
 }
 
 /**
- * Every shape wmux has written: the quoted path to resources/cli/wmux-hook.js
+ * Every shape wmux has written: the quoted path to resources/cli/remotea-hook.js
  * (≤ 2.42.0) and the bare or quoted path to the stub in Qwen's home.
  */
-const WMUX_QWEN_COMMAND_RE = /^node (?:"[^"]*(?:wmux-hook\.js|wmux-qwen-hook\.cjs)"|\S*(?:wmux-hook\.js|wmux-qwen-hook\.cjs)) .*--provider qwen$/;
+const REMOTEA_QWEN_COMMAND_RE = /^node (?:"[^"]*(?:remotea-hook\.js|remotea-qwen-hook\.cjs)"|\S*(?:remotea-hook\.js|remotea-qwen-hook\.cjs)) .*--provider qwen$/;
 
 /**
  * The stub Qwen's hooks run: one `require` of the real helper, written into
@@ -191,11 +195,11 @@ const WMUX_QWEN_COMMAND_RE = /^node (?:"[^"]*(?:wmux-hook\.js|wmux-qwen-hook\.cj
  * Known gap: a Qwen home WITH a space still gets the quoted form, which cmd
  * breaks — only Qwen passing `windowsVerbatimArguments` fixes that.
  */
-export const QWEN_HOOK_STUB = 'wmux-qwen-hook.cjs';
-const STUB_MARKER = '// wmux-qwen-hook: written by wmux';
+export const QWEN_HOOK_STUB = 'remotea-qwen-hook.cjs';
+const STUB_MARKER = '// remotea-qwen-hook: written by remotea';
 
 export function qwenHookStubSource(hookScript: string): string {
-  return `${STUB_MARKER}. Qwen Code hooks run this; regenerated on every wmux launch.\nrequire(${JSON.stringify(hookScript)});\n`;
+  return `${STUB_MARKER}. Qwen Code hooks run this; regenerated on every remotea launch.\nrequire(${JSON.stringify(hookScript)});\n`;
 }
 
 const stubPathIn = (home: string) => path.join(home, QWEN_HOOK_STUB);
@@ -218,9 +222,17 @@ function removeQwenHookStub(home: string): void {
   } catch { /* absent */ }
 }
 
+/** Deletes the old-named stub, only when it requires this install's helper. */
+function removeOldQwenStub(home: string, ctx: OwnershipContext): void {
+  const oldPath = path.join(home, LEGACY_PLUGIN_FILES.qwenStub[0]);
+  if (isLegacyRemoteaQwenStub(ctx.readFile(oldPath), ctx)) {
+    try { fs.unlinkSync(oldPath); } catch { /* already gone */ }
+  }
+}
+
 function isWmuxQwenEntry(entry: unknown): boolean {
   const hooks = (entry as { hooks?: unknown })?.hooks;
-  return Array.isArray(hooks) && hooks.some((h: any) => typeof h?.command === 'string' && WMUX_QWEN_COMMAND_RE.test(h.command));
+  return Array.isArray(hooks) && hooks.some((h: any) => typeof h?.command === 'string' && REMOTEA_QWEN_COMMAND_RE.test(h.command));
 }
 
 const stripWmuxEntries = (entries: unknown): unknown[] =>
@@ -309,9 +321,13 @@ export function ensureQwenHooks(): void {
   try {
     if (!isDirectory(getQwenHome())) return;
     const hookScript = ensureQwenHookStub(getQwenHome(), getHookScriptPath());
-    if (updateQwenSettings(getQwenSettingsPath(), s => applyQwenHooks(s, hookScript), true)) {
+    // Old-named entries go only when their stub requires this install's helper
+    // (KTD8); the old stub goes after them, since proving them reads it.
+    const ctx = desktopOwnershipContext();
+    if (updateQwenSettings(getQwenSettingsPath(), s => applyQwenHooks(stripLegacyHookEntries(s, ctx), hookScript), true)) {
       console.log(`[remotea] Configured ${QWEN_HOOK_EVENTS.join('/')} hooks in`, getQwenSettingsPath());
     }
+    removeOldQwenStub(getQwenHome(), ctx);
   } catch (err) {
     reportIntegrationFailure('Qwen Code', 'write', err);
     console.warn('[remotea] Failed to update Qwen hooks:', err);
@@ -322,7 +338,7 @@ export function removeQwenHooks(): void {
   for (const home of qwenHomes()) {
     try {
       if (updateQwenSettings(settingsPathIn(home), removeQwenHooksFrom, false)) {
-        console.log('[remotea] Removed wmux hooks from', settingsPathIn(home));
+        console.log('[remotea] Removed remotea hooks from', settingsPathIn(home));
       }
       removeQwenHookStub(home);
     } catch (err) {

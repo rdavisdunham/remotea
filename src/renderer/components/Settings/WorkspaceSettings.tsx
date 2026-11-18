@@ -543,7 +543,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint">
         {t(
           'settings.workspacePanel.layoutHint',
-          'Also settable in ~/.wmux/config.toml under [workspace]. With one pane there is nothing to arrange.',
+          'Also settable in ~/.remotea/config.toml under [workspace]. With one pane there is nothing to arrange.',
         )}
       </p>
 

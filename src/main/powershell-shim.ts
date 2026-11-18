@@ -3,16 +3,16 @@
  * `wmux` (issue #154).
  *
  * The bug: wmux prepends its cli-bin dir to PATH, PowerShell resolves `wmux` to
- * `wmux.cmd` there, and a .cmd puts cmd.exe's parser between the caller and the
+ * `remotea.cmd` there, and a .cmd puts cmd.exe's parser between the caller and the
  * CLI. PowerShell strips the user's quoting when invoking a batch file, so any
  * `>`, `|`, `&` or `<` inside free-form text is re-read as shell syntax —
  * `wmux browser eval "document.title.length>0"` silently redirects its own
  * output into a file named `0`, and `wmux send "npm run build > out.log"` sends
  * different text than the user typed. The redirect is applied to cmd.exe's
- * invocation line BEFORE wmux.cmd runs, so nothing inside the batch file can
+ * invocation line BEFORE remotea.cmd runs, so nothing inside the batch file can
  * recover the arguments; only keeping cmd.exe off the path can.
  *
- * The fix is a wmux.ps1, which PowerShell resolves ahead of every PATHEXT entry
+ * The fix is a remotea.ps1, which PowerShell resolves ahead of every PATHEXT entry
  * and which passes `@args` through natively. The catch is that a .ps1 PowerShell
  * refuses to run is a hard error with NO fallback to the .cmd sitting next to
  * it — and two ordinary conditions cause exactly that:
@@ -28,13 +28,13 @@
  * the Mark of the Web where it can, then actually execute a probe script from
  * the shim's own directory in each installed PowerShell host. Only if the probe
  * prints its marker is the dir put on PATH. Anything else and PowerShell keeps
- * resolving wmux.cmd, exactly as before.
+ * resolving remotea.cmd, exactly as before.
  */
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-export const SHIM_PROBE_MARKER = 'wmux-shim-ok';
+export const SHIM_PROBE_MARKER = 'remotea-shim-ok';
 
 /** PowerShell hosts whose resolution of `wmux` the shim would change. */
 export const POWERSHELL_HOSTS = ['powershell.exe', 'pwsh.exe'];
@@ -60,7 +60,7 @@ export interface ShimProbeDeps {
  * would then be unverified rather than merely unused.
  */
 export async function probePowerShellShim(dir: string, deps: ShimProbeDeps): Promise<boolean> {
-  const script = path.join(dir, 'wmux-shim-probe.ps1');
+  const script = path.join(dir, 'remotea-shim-probe.ps1');
   let confirmed = 0;
   for (const host of deps.hosts) {
     const outcome = await deps.run(host, script);
@@ -110,7 +110,7 @@ function runProbe(exe: string, script: string): Promise<ProbeOutcome> {
   });
 }
 
-/** Dir holding wmux.ps1 — packaged next to cli-bin, kept separate so it can be left off PATH. */
+/** Dir holding remotea.ps1 — packaged next to cli-bin, kept separate so it can be left off PATH. */
 export function getPsShimPath(): string {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -135,14 +135,14 @@ let inFlight: Promise<boolean> | null = null;
 export function ensurePowerShellShim(dir = getPsShimPath()): Promise<boolean> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    if (!fs.existsSync(path.join(dir, 'wmux.ps1'))) return false;
-    for (const file of ['wmux.ps1', 'wmux-shim-probe.ps1']) stripMarkOfTheWeb(path.join(dir, file));
+    if (!fs.existsSync(path.join(dir, 'remotea.ps1'))) return false;
+    for (const file of ['remotea.ps1', 'remotea-shim-probe.ps1']) stripMarkOfTheWeb(path.join(dir, file));
     const ok = await probePowerShellShim(dir, { hosts: POWERSHELL_HOSTS, run: runProbe });
     shimDir = ok ? dir : null;
     console.log(
       ok
         ? `[remotea] PowerShell shim enabled: ${dir}`
-        : '[remotea] PowerShell shim disabled (execution policy or Mark of the Web) — falling back to wmux.cmd',
+        : '[remotea] PowerShell shim disabled (execution policy or Mark of the Web) — falling back to remotea.cmd',
     );
     return ok;
   })();

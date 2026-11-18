@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { injectWmuxBlock } from '../../src/main/opencode-context';
 import { pluginNeedsUpdate } from '../../src/main/opencode-context';
 
-const START = '<!-- wmux:start';
-const END = '<!-- wmux:end -->';
+const START = '<!-- remotea:start';
+const END = '<!-- remotea:end -->';
 const BLOCK = `${START} v1 -->\nUse the wmux CLI.\n${END}`;
 
 describe('injectWmuxBlock', () => {
@@ -39,17 +39,17 @@ describe('injectWmuxBlock', () => {
 });
 
 describe('pluginNeedsUpdate', () => {
-  const srcV2 = '// wmux-plugin-version: 2\ncode';
+  const srcV2 = '// remotea-plugin-version: 2\ncode';
   it('true when target missing', () => {
     expect(pluginNeedsUpdate(srcV2, null)).toBe(true);
   });
   it('false when version markers match', () => {
-    expect(pluginNeedsUpdate(srcV2, '// wmux-plugin-version: 2\nDIFFERENT BODY')).toBe(false);
+    expect(pluginNeedsUpdate(srcV2, '// remotea-plugin-version: 2\nDIFFERENT BODY')).toBe(false);
   });
   it('true when version markers differ', () => {
-    expect(pluginNeedsUpdate(srcV2, '// wmux-plugin-version: 1\ncode')).toBe(true);
+    expect(pluginNeedsUpdate(srcV2, '// remotea-plugin-version: 1\ncode')).toBe(true);
   });
   it('true (fail-safe) when source has no version marker', () => {
-    expect(pluginNeedsUpdate('no marker here', '// wmux-plugin-version: 2\ncode')).toBe(true);
+    expect(pluginNeedsUpdate('no marker here', '// remotea-plugin-version: 2\ncode')).toBe(true);
   });
 });

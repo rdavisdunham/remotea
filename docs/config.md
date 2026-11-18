@@ -1,9 +1,33 @@
-# wmux config file
+# remotea config file
 
-wmux reads `~/.wmux/config.toml` on startup (Windows: `%USERPROFILE%\.wmux\config.toml`).
+remotea reads `~/.remotea/config.toml` on startup (Windows: `%USERPROFILE%\.remotea\config.toml`).
 The file is optional — if it isn't present, built-in defaults apply.
 
-Edit it, then run `wmux reload-config` (or restart wmux) to pick up changes.
+Edit it, then run `remotea reload-config` (or restart remotea) to pick up changes.
+
+## Moving from the old names
+
+Builds from before the rename kept this file in `~/.wmux`, saved settings under
+`wmux-*` keys, and read project files named `.wmux.json` and
+`wmux.workspace.json`. remotea no longer reads any of those. Until you move
+them, the app shows a notice when it starts.
+
+- On the computer running the app: quit remotea (from the tray too) and run
+  `npm run move` in your checkout. It backs up `settings.json` to
+  `settings.json.pre-move`, renames the keys, copies `~/.wmux` to `~/.remotea`
+  (the old folder stays, since a wmux install reads it too), rewrites remotea's
+  own agent hook entries, and moves the Explorer right-click entry when it runs
+  remotea. Old plugin files that could belong to a wmux install are listed,
+  and removed only if you say so (`npm run move -- --yes` says yes).
+- On each host: run `remotea upgrade`, then `remotea move`. Reopen the host
+  terminals that were open before; agents in them won't report status until
+  you do.
+- Project files are yours: rename `.wmux.json` to `.remotea.json`,
+  `wmux.workspace.json` to `remotea.workspace.json`, and `.wmux/workspace.json`
+  to `.remotea/workspace.json`. Opening a workspace from a folder that only has
+  the old name says so.
+
+Running the move again is safe: once it has finished it only tidies leftovers.
 
 ## Full example
 
@@ -14,7 +38,7 @@ font-size        = 14
 cursor-style     = "block"        # block | underline | bar
 cursor-blink     = true
 scrollback-lines = 10000
-# Name tabs, and workspaces wmux named by default, after the window title their
+# Name tabs, and workspaces remotea named by default, after the window title their
 # program sets (Claude Code sets the conversation title). A name you chose
 # always wins. Both default to true.
 osc-title-tabs       = true
@@ -26,11 +50,11 @@ touch-pan-gain   = 0.33
 
 [terminal.colors]
 # Default scheme for every new pane. Any bundled theme name works
-# (see `wmux list-themes`), or the key of a user-defined scheme below.
+# (see `remotea list-themes`), or the key of a user-defined scheme below.
 default = "Dracula"
 
 # User-defined named schemes — override individual fields of the base theme.
-# Invoke them with:   wmux split --color-scheme prod
+# Invoke them with:   remotea split --color-scheme prod
 [terminal.colors.schemes.prod]
 background = "#2b0b0b"
 foreground = "#ffdddd"
@@ -74,7 +98,7 @@ wrap-titles = true
 
 [workspace]
 # What a NEW workspace opens with — the sidebar "+", Ctrl+N, first launch and
-# `wmux new-workspace` all use this.
+# `remotea new-workspace` all use this.
 panes  = 3         # 1-8 terminal panes
 layout = "grid"    # grid | columns | rows | left | down | single
 # Snapshot the live layout this often, as an "Auto-save …" session. 0 = never.
@@ -111,7 +135,7 @@ downscale-images = true
 ## New workspace shape
 
 `[workspace]` decides what a fresh workspace opens with. Every entry point reads
-it — the sidebar `+`, Ctrl+N, first launch, and `wmux new-workspace`:
+it — the sidebar `+`, Ctrl+N, first launch, and `remotea new-workspace`:
 
 ```toml
 [workspace]
@@ -121,23 +145,23 @@ layout = "grid"
 
 | `layout`  | Arrangement |
 |-----------|-------------|
-| `grid`    | Balanced rows. At 3 panes this is wmux's classic T: two across the top, one below. **Default.** |
+| `grid`    | Balanced rows. At 3 panes this is remotea's classic T: two across the top, one below. **Default.** |
 | `columns` | All side by side. |
 | `rows`    | All stacked. |
 | `left`    | One full-height pane on the left, the rest stacked to its right. |
 | `down`    | One full-width pane on top, the rest side by side below. |
 | `single`  | Shorthand for `panes = 1`. |
 
-`panes` accepts 1 to 8; anything outside that is clamped, and `wmux config show`
+`panes` accepts 1 to 8; anything outside that is clamped, and `remotea config show`
 says so. Before 2.8.0 the sidebar `+` always made three panes and
-`wmux new-workspace` always made one — both now follow this setting, and
-`wmux new-workspace --panes 1 --layout single` pins the old CLI shape for a
+`remotea new-workspace` always made one — both now follow this setting, and
+`remotea new-workspace --panes 1 --layout single` pins the old CLI shape for a
 script that depends on it.
 
 ## Keep awake
 
 `[workspace.keep-awake]` (Settings → Workspace → *Keep computer awake*, or the
-coffee cup in the titlebar) stops Windows from sleeping while wmux has work to
+coffee cup in the titlebar) stops Windows from sleeping while remotea has work to
 do (issue #363).
 
 ```toml
@@ -147,22 +171,22 @@ prevent-display-sleep = false
 ```
 
 - `smart` (default) holds a sleep blocker only while at least one pane reports
-  itself **working** — Claude Code, Qwen Code and Grok through wmux's hooks, the
-  OpenCode plugin, or anything calling `wmux report-agent`. A pane waiting on
+  itself **working** — Claude Code, Qwen Code and Grok through remotea's hooks, the
+  OpenCode plugin, or anything calling `remotea report-agent`. A pane waiting on
   you, idle, or with an agent that reports nothing does not keep the machine
   up, and a `working` claim nobody has renewed for 15 minutes stops counting.
-- `always` holds it for as long as wmux runs; `off` never takes it.
+- `always` holds it for as long as remotea runs; `off` never takes it.
 - `prevent-display-sleep = true` keeps the screen on too; otherwise the display
   may still turn off and lock while the system stays awake.
 
-The choice is stored by wmux itself and applies from the next launch onward
+The choice is stored by remotea itself and applies from the next launch onward
 whichever window it was made in. When this section is present it is applied at
 every startup and reload, over what was picked in the UI.
 
 ## Session snapshots
 
 `snapshot-minutes` (Settings → Workspace → *Snapshot sessions every*) decides how
-often wmux saves the live layout as a named session. `0` switches it off; the
+often remotea saves the live layout as a named session. `0` switches it off; the
 default is every 5 minutes.
 
 ```toml
@@ -170,7 +194,7 @@ default is every 5 minutes.
 snapshot-minutes = 5
 ```
 
-wmux already rewrites `session.json` every 30 seconds, but in place — so it only
+remotea already rewrites `session.json` every 30 seconds, but in place — so it only
 ever holds the layout you have *now*, which is no help at all once something has
 gone wrong. Snapshots land under **Load session** as `Auto-save <date> <time>`,
 and restore like any other saved session (layout only; PTYs respawn).
@@ -204,7 +228,7 @@ file; a tab with a custom title after that. The title is set once, at creation,
 and renamed like any other. When no tab has a name of its own — the plain
 `Terminal + Terminal + Terminal` of the shape above with no directory or shell —
 the workspace is called `Workspace N` instead. An explicit title always wins:
-`wmux new-workspace --title`, **Open folder as workspace**, and a restored
+`remotea new-workspace --title`, **Open folder as workspace**, and a restored
 session keep theirs.
 
 ## Browser start page
@@ -217,7 +241,7 @@ default-url = "http://localhost:3000"
 Where a workspace's browser panel opens before it has been anywhere. A scheme is
 required — a bare `localhost:3000` is refused with an explanation, because a
 webview handed one loads nothing and says nothing. Leave it empty (or omit it)
-for wmux's own page. This is the start page, and is separate from the default
+for remotea's own page. This is the start page, and is separate from the default
 search engine, which decides where a typed non-URL goes.
 
 ## Remote file upload
@@ -236,25 +260,25 @@ file inserted with either paste shortcut; ordinary clipboard text is never
 uploaded. `upload-on-drop` covers one or more files dropped onto the terminal.
 Hold Shift while dropping to bypass upload for that drop.
 
-wmux invokes the Windows OpenSSH `scp` paired with the detected `ssh` client and
+remotea invokes the Windows OpenSSH `scp` paired with the detected `ssh` client and
 uses `BatchMode=yes`. The connection must therefore authenticate without an
 interactive password or passphrase prompt, normally with a key or `ssh-agent`.
 Each successful file is inserted as a unique path in a private remote batch
-directory, such as `/tmp/wmux-drop-<batch-id>/<file-id>.png`, and remains there
+directory, such as `/tmp/remotea-ssh-drop-<batch-id>/<file-id>.png`, and remains there
 for the receiving program to use.
 
-Detection covers `wmux ssh` and a direct `ssh` launched from an integrated
+Detection covers `remotea ssh` and a direct `ssh` launched from an integrated
 PowerShell or Bash pane. Nested SSH (running a second `ssh` after reaching the
 first host) is not supported because that second client is outside the Windows
-process tree. wmux may still identify the outer Windows SSH process, so turn the
+process tree. remotea may still identify the outer Windows SSH process, so turn the
 relevant setting off (or hold Shift for a drop) while working on the inner host.
 
-Run `wmux reload-config` after changing either value.
+Run `remotea reload-config` after changing either value.
 
 ## Pasted images
 
 A pasted image (a screenshot, or anything else copied as an image) is written to
-`%TEMP%\wmux\screenshot-<time>.png` and its path is typed into the pane, or
+`%TEMP%\remotea\screenshot-<time>.png` and its path is typed into the pane, or
 uploaded first in an SSH pane (see above).
 
 ```toml
@@ -274,7 +298,7 @@ off the UI thread), so it can be larger than one saved by an image editor.
 
 ## Key remaps
 
-`[keys]` maps a key chord to the bytes wmux should send to the program running in
+`[keys]` maps a key chord to the bytes remotea should send to the program running in
 the terminal. Each entry is `"chord" = "sequence"`.
 
 ```toml
@@ -303,23 +327,23 @@ presses Enter. An empty value (`""`) swallows the key.
 Notes:
 
 - Remaps apply **inside terminal panes only**, and they take priority over
-  wmux's own shortcuts there — remapping `ctrl+t` means Ctrl+T no longer opens a
+  remotea's own shortcuts there — remapping `ctrl+t` means Ctrl+T no longer opens a
   tab while a terminal has focus.
 - Modifiers match exactly: a `ctrl+k` remap does not fire on Ctrl+Shift+K.
-- A binding that doesn't parse is reported by `wmux config show` and skipped;
+- A binding that doesn't parse is reported by `remotea config show` and skipped;
   the rest of your bindings still apply.
-- `wmux reload-config` applies edits live, including removing bindings.
+- `remotea reload-config` applies edits live, including removing bindings.
 
 ## UI translations
 
-wmux ships English, Français, Español, Deutsch, Português, Italiano,
+remotea ships English, Français, Español, Deutsch, Português, Italiano,
 Nederlands, Polski, Türkçe, Русский, Українська, 中文, 日本語, 한국어, हिन्दी,
 Svenska and Čeština. You can add a language, or correct a shipped one,
 without waiting for a
-release: drop a JSON file into `~/.wmux/locales/`, next to `config.toml`.
+release: drop a JSON file into `~/.remotea/locales/`, next to `config.toml`.
 
 ```
-~/.wmux/locales/
+~/.remotea/locales/
   tt.json      # adds Татарча to Settings → General → Interface language
   ko.json      # overrides individual bundled Korean strings
 ```
@@ -352,9 +376,9 @@ Placeholders like `{count}` and `{name}` must survive verbatim — they are
 substituted by the UI, so a renamed or dropped token silently breaks the string.
 
 ```bash
-wmux locales          # what loaded, and why any file was rejected
-wmux locales path     # print ~/.wmux/locales
-wmux locales reload    # re-read and apply live (same as `wmux reload-config`)
+remotea locales          # what loaded, and why any file was rejected
+remotea locales path     # print ~/.remotea/locales
+remotea locales reload    # re-read and apply live (same as `remotea reload-config`)
 ```
 
 Notes and limits:
@@ -362,12 +386,12 @@ Notes and limits:
 - Codes must be **base tags** (`de`, not `de-AT`). Language auto-detection
   collapses the OS locale to its base tag, so a region-subtagged file would
   define a language that could never be selected automatically.
-- Keys that are not in the English dictionary are ignored, and `wmux locales`
+- Keys that are not in the English dictionary are ignored, and `remotea locales`
   reports how many — that is usually a typo or a key removed by a later release.
 - A malformed file costs you that file only; the rest of the directory and every
   bundled language still load.
 - Once you select a user-defined language it survives restarts. If you later
-  delete the file, wmux falls back to your OS language rather than showing raw
+  delete the file, remotea falls back to your OS language rather than showing raw
   keys.
 - Translations are welcome upstream too — a PR adding
   `src/renderer/i18n/locales/xx.ts` makes it a bundled language for everyone.
@@ -377,20 +401,20 @@ Notes and limits:
 1. Built-in defaults
 2. Settings UI values (persisted to Zustand / localStorage)
 3. **`config.toml`** — applied over 1 and 2 at startup and on `reload-config`
-4. Per-pane overrides (e.g. `wmux split --color-scheme prod`) — always win for that pane
+4. Per-pane overrides (e.g. `remotea split --color-scheme prod`) — always win for that pane
 
 "File wins at startup, app wins at runtime": if you tweak a value in the Settings
-UI after wmux booted, your tweak sticks until the next reload.
+UI after remotea booted, your tweak sticks until the next reload.
 
 ## CLI helpers
 
 ```bash
-wmux config path      # print the config file path
-wmux config show      # dump the parsed config (useful for debugging syntax)
-wmux config reload    # re-read the file and apply to running surfaces
-wmux reload-config    # alias of `config reload`
-wmux list-themes      # print all valid `default`/`--color-scheme` names
-wmux locales          # list community translations and any load errors
+remotea config path      # print the config file path
+remotea config show      # dump the parsed config (useful for debugging syntax)
+remotea config reload    # re-read the file and apply to running surfaces
+remotea reload-config    # alias of `config reload`
+remotea list-themes      # print all valid `default`/`--color-scheme` names
+remotea locales          # list community translations and any load errors
 ```
 
 ## Notes
@@ -399,7 +423,7 @@ wmux locales          # list community translations and any load errors
   (`font-family` and `fontFamily` both work).
 - `cursor` inside a scheme is the cursor color; use `cursor-style` (under `[terminal]`)
   for the shape.
-- A parse error in one key is reported in `wmux config show` but never
+- A parse error in one key is reported in `remotea config show` but never
   aborts loading — the rest of the file still applies.
-- Per-pane overrides via `wmux split --color-scheme NAME` or
-  `wmux set-color-scheme [id] NAME` always take precedence for that surface.
+- Per-pane overrides via `remotea split --color-scheme NAME` or
+  `remotea set-color-scheme [id] NAME` always take precedence for that surface.

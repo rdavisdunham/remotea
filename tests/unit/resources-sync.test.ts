@@ -60,7 +60,7 @@ describe('resources/shell-integration mirrors src/ (issues #168, #169)', () => {
     // V1 command but `ping` without an `auth <token> ` prefix, and the
     // integration has no channel to learn it was rejected. A future edit that
     // drops it would otherwise only fail as "the files differ".
-    const ps = read(path.join(copy, 'wmux-powershell-integration.ps1'));
+    const ps = read(path.join(copy, 'remotea-powershell-integration.ps1'));
     expect(ps).toMatch(/auth\s+\$/);
   });
 });

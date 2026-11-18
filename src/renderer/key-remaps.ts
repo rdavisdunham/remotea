@@ -1,5 +1,5 @@
 /**
- * key-remaps.ts — the renderer's live view of `~/.wmux/config.toml`'s `[keys]`
+ * key-remaps.ts — the renderer's live view of `~/.remotea/config.toml`'s `[keys]`
  * section (issue #146).
  *
  * Deliberately a module-level list rather than store state: every terminal's

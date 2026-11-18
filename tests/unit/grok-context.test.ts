@@ -48,7 +48,7 @@ describe('grok context', () => {
   const grokHome = () => path.join(tmp, '.grok');
   const writeClaudeBlock = () => {
     fs.mkdirSync(path.join(tmp, '.claude'), { recursive: true });
-    fs.writeFileSync(path.join(tmp, '.claude', 'CLAUDE.md'), '<!-- wmux:start -->\nx\n<!-- wmux:end -->\n');
+    fs.writeFileSync(path.join(tmp, '.claude', 'CLAUDE.md'), '<!-- remotea:start -->\nx\n<!-- remotea:end -->\n');
   };
 
   it('writes nothing on a machine that has never run Grok', () => {
@@ -58,7 +58,7 @@ describe('grok context', () => {
   });
 
   it('hook entries match the Claude ones exactly, plus the Grok-only turn endings', () => {
-    const script = 'C:/wmux/resources/cli/wmux-hook.js';
+    const script = 'C:/wmux/resources/cli/remotea-hook.js';
     const { hooks } = buildGrokHooks(script);
     // Grok dedupes on (event, command, matcher): any drift here runs every hook twice.
     for (const [event, entries] of Object.entries(applyWmuxHooks({}, script).hooks)) {
@@ -86,9 +86,9 @@ describe('grok context', () => {
   it('the shared command builder spells exactly what Claude Code has always been given', () => {
     // Extracted from applyWmuxHooks so Grok's file carries the same bytes. A
     // change here rewrites every ~/.claude/settings.json on the next launch.
-    expect(wmuxEventHookCommand('C:/wmux/resources/cli/wmux-hook.js', 'Stop'))
-      .toBe('node "C:/wmux/resources/cli/wmux-hook.js" --event Stop');
-    const { hooks } = applyWmuxHooks({}, 'C:/w/wmux-hook.js');
+    expect(wmuxEventHookCommand('C:/wmux/resources/cli/remotea-hook.js', 'Stop'))
+      .toBe('node "C:/wmux/resources/cli/remotea-hook.js" --event Stop');
+    const { hooks } = applyWmuxHooks({}, 'C:/w/remotea-hook.js');
     const flags = (event: string) => hooks[event].flatMap((g: any) => g.hooks.map((h: any) => h.async));
     for (const event of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit']) {
       expect(flags(event).every((a: unknown) => a === true)).toBe(true);
@@ -98,32 +98,32 @@ describe('grok context', () => {
     }
   });
 
-  it('owns a hooks file only when every handler in it is a wmux-hook command', () => {
-    const ours = JSON.stringify(buildGrokHooks('C:/Program Files/wmux/resources/cli/wmux-hook.js'));
+  it('owns a hooks file only when every handler in it is a remotea-hook command', () => {
+    const ours = JSON.stringify(buildGrokHooks('C:/Program Files/wmux/resources/cli/remotea-hook.js'));
     expect(isWmuxHooksFile(ours)).toBe(true);
     // Written by an install that has since moved: still ours, so it is refreshed.
-    expect(isWmuxHooksFile(JSON.stringify(buildGrokHooks('D:/old/wmux-hook.js')))).toBe(true);
+    expect(isWmuxHooksFile(JSON.stringify(buildGrokHooks('D:/old/remotea-hook.js')))).toBe(true);
 
-    const wmuxCmd = { type: 'command', command: 'node "C:/x/wmux-hook.js" --event Stop' };
+    const wmuxCmd = { type: 'command', command: 'node "C:/x/remotea-hook.js" --event Stop' };
     const mixed = { hooks: { Stop: [{ hooks: [wmuxCmd, { type: 'command', command: 'bin/notify.sh' }] }] } };
     expect(isWmuxHooksFile(JSON.stringify(mixed))).toBe(false);
     expect(isWmuxHooksFile(JSON.stringify({ hooks: { Stop: [{ hooks: [wmuxCmd] }] }, note: 'mine' }))).toBe(false);
-    expect(isWmuxHooksFile(JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'http', url: 'https://x/wmux-hook.js' }] }] } }))).toBe(false);
-    expect(isWmuxHooksFile(JSON.stringify({ hooks: { Stop: 'node "wmux-hook.js" x' } }))).toBe(false);
+    expect(isWmuxHooksFile(JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'http', url: 'https://x/remotea-hook.js' }] }] } }))).toBe(false);
+    expect(isWmuxHooksFile(JSON.stringify({ hooks: { Stop: 'node "remotea-hook.js" x' } }))).toBe(false);
     expect(isWmuxHooksFile('{"hooks":{}}')).toBe(false);
-    expect(isWmuxHooksFile('// wmux-hook\n{')).toBe(false);
+    expect(isWmuxHooksFile('// remotea-hook\n{')).toBe(false);
     expect(isWmuxHooksFile('[]')).toBe(false);
   });
 
-  it('never overwrites or deletes a hand-written wmux.json that also calls wmux-hook.js', () => {
+  it('never overwrites or deletes a hand-written remotea.json that also calls remotea-hook.js', () => {
     // The obvious name for a file someone writes to wire Grok into wmux by
-    // hand. A substring test for "wmux-hook" called it wmux's and destroyed the
+    // hand. A substring test for "remotea-hook" called it wmux's and destroyed the
     // user's own hook beside it, on the next launch and again on toggle-off.
     fs.mkdirSync(path.dirname(getGrokHooksPath()), { recursive: true });
     const theirs = JSON.stringify({
       hooks: {
         Stop: [{ hooks: [
-          { type: 'command', command: 'node "C:/wmux/resources/cli/wmux-hook.js" --event Stop' },
+          { type: 'command', command: 'node "C:/wmux/resources/cli/remotea-hook.js" --event Stop' },
           { type: 'command', command: 'bin/ring-the-bell.sh' },
         ] }],
       },
@@ -155,7 +155,7 @@ describe('grok context', () => {
     expect(getGrokHome()).toBe(grokHome());
     fs.mkdirSync(grokHome());
     ensureGrokHooks();
-    expect(fs.existsSync(path.join(grokHome(), 'hooks', 'wmux.json'))).toBe(true);
+    expect(fs.existsSync(path.join(grokHome(), 'hooks', 'remotea.json'))).toBe(true);
     expect(fs.existsSync(path.resolve('grok-here'))).toBe(false);
   });
 
@@ -163,7 +163,7 @@ describe('grok context', () => {
     fs.mkdirSync(grokHome());
     ensureGrokHooks();
     ensureGrokContext();
-    const stale = [path.join(grokHome(), 'hooks', 'wmux.json'), path.join(grokHome(), 'rules', 'wmux.md')];
+    const stale = [path.join(grokHome(), 'hooks', 'remotea.json'), path.join(grokHome(), 'rules', 'remotea.md')];
     for (const f of stale) expect(fs.existsSync(f)).toBe(true);
 
     const custom = path.join(tmp, 'elsewhere');
@@ -172,7 +172,7 @@ describe('grok context', () => {
     ensureGrokHooks();
     removeGrokHooks();
     removeGrokContext();
-    expect(fs.existsSync(path.join(custom, 'hooks', 'wmux.json'))).toBe(false);
+    expect(fs.existsSync(path.join(custom, 'hooks', 'remotea.json'))).toBe(false);
     for (const f of stale) expect(fs.existsSync(f)).toBe(false);
   });
 
@@ -181,13 +181,13 @@ describe('grok context', () => {
     fs.mkdirSync(custom);
     process.env.GROK_HOME = custom;
     ensureGrokHooks();
-    expect(fs.existsSync(path.join(custom, 'hooks', 'wmux.json'))).toBe(true);
+    expect(fs.existsSync(path.join(custom, 'hooks', 'remotea.json'))).toBe(true);
   });
 
   it('skips the rules file while Grok reads the CLAUDE.md block, and removes a stale one', () => {
     fs.mkdirSync(grokHome());
     ensureGrokContext(); // no CLAUDE.md block yet: Grok would miss the instructions
-    expect(fs.readFileSync(getGrokRulesPath(), 'utf-8')).toContain('<!-- wmux:start');
+    expect(fs.readFileSync(getGrokRulesPath(), 'utf-8')).toContain('<!-- remotea:start');
 
     writeClaudeBlock();
     ensureGrokContext();

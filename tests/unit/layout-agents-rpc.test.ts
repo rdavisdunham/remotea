@@ -7,7 +7,7 @@ const { getAllWindows, getFocusedWindow } = vi.hoisted(() => ({
 vi.mock('electron', () => ({ BrowserWindow: { getAllWindows, getFocusedWindow } }));
 
 import { handleBridgeV2, validateLayoutAgentsParams } from '../../src/main/v2-bridge';
-import { layoutAgentsParams } from '../../src/cli/wmux';
+import { layoutAgentsParams } from '../../src/cli/remotea';
 
 describe('validateLayoutAgentsParams (R1.5)', () => {
   it('accepts a count from 1 to 16 and leaves the ratio optional', () => {

@@ -33,8 +33,8 @@ const freePort = () => new Promise((r) => {
 const port = await freePort();
 const hookPort = await freePort();
 fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ port, hookPort, bind: ['127.0.0.1'] }));
-const HOOK_JS = path.resolve(here, '..', '..', 'resources', 'cli', 'wmux-hook.js');
-const CLI_JS = path.resolve(here, '..', '..', 'resources', 'cli', 'wmux.js');
+const HOOK_JS = path.resolve(here, '..', '..', 'resources', 'cli', 'remotea-hook.js');
+const CLI_JS = path.resolve(here, '..', '..', 'resources', 'cli', 'remotea.js');
 const FIXTURE_HOME = path.join(root, 'tests', 'fixtures', 'collector', 'home');
 // The collector reads the fixture home, never the real ~/.claude or /mnt/c.
 const env = { ...process.env, REMOTEA_CONFIG_DIR: dir, REMOTEA_COLLECTOR_HOME: FIXTURE_HOME };
@@ -248,7 +248,7 @@ try {
   await A.waitText(S1, 'HOOK_0_DONE');
   const rpc = await A.wait((m) => m.t === 'rpc' && m.id === S1, 5000).catch(() => null);
   ok(rpc?.method === 'hook.event' && rpc.params.event === 'Stop' && rpc.params.surfaceId === S1, 'a hook inside the session reaches the app through the bridge');
-  // The wmux CLI, as the OpenCode plugin runs it (`node $WMUX_CLI report-agent …`).
+  // The wmux CLI, as the OpenCode plugin runs it (`node $REMOTEA_CLI report-agent …`).
   A.input(S1, `'${process.execPath}' '${CLI_JS}' report-agent --run-start; echo CLI_$?_DONE\r`);
   await A.waitText(S1, 'CLI_0_DONE');
   const cliRpc = await A.wait((m) => m.t === 'rpc' && m.id === S1 && m.method === 'pane.report_agent', 5000).catch(() => null);

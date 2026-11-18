@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { applyWmuxHooks } from '../../src/main/claude-context';
 
-const HOOK = '/res/cli/wmux-hook.js';
+const HOOK = '/res/cli/remotea-hook.js';
 
 const wmuxCmds = (entries: any[]): string[] =>
   entries.flatMap((e) => (e.hooks || []).map((h: any) => h.command as string));
@@ -12,7 +12,7 @@ describe('applyWmuxHooks (issue #53)', () => {
 
     // PostToolUse: one entry per tracked tool.
     const postCmds = wmuxCmds(out.hooks.PostToolUse);
-    expect(postCmds.some((c) => c.includes('wmux-hook.js') && c.includes('Bash'))).toBe(true);
+    expect(postCmds.some((c) => c.includes('remotea-hook.js') && c.includes('Bash'))).toBe(true);
     expect(postCmds.some((c) => c.includes('Edit'))).toBe(true);
 
     // Notification + Stop: pass an --event flag.
@@ -72,15 +72,15 @@ describe('applyWmuxHooks (issue #53)', () => {
   });
 
   it('adds a SubagentStop hook entry alongside Notification and Stop', () => {
-    const result = applyWmuxHooks({}, '/abs/wmux-hook.js');
+    const result = applyWmuxHooks({}, '/abs/remotea-hook.js');
     const entries = result.hooks.SubagentStop;
     expect(entries).toHaveLength(1);
     expect(entries[0].hooks[0].command).toContain('--event SubagentStop');
   });
 
   it('replaces a prior wmux SubagentStop entry instead of duplicating it', () => {
-    const once = applyWmuxHooks({}, '/abs/wmux-hook.js');
-    const twice = applyWmuxHooks(once, '/abs/wmux-hook.js');
+    const once = applyWmuxHooks({}, '/abs/remotea-hook.js');
+    const twice = applyWmuxHooks(once, '/abs/remotea-hook.js');
     expect(twice.hooks.SubagentStop).toHaveLength(1);
   });
 
@@ -91,7 +91,7 @@ describe('applyWmuxHooks (issue #53)', () => {
   it('marks the per-tool-call observer hooks async and leaves the lifecycle ones sync', () => {
     const out = applyWmuxHooks({}, HOOK);
     const wmuxHooks = (entries: any[]) =>
-      entries.flatMap((e) => (e.hooks || []).filter((h: any) => h.command.includes('wmux-hook.js')));
+      entries.flatMap((e) => (e.hooks || []).filter((h: any) => h.command.includes('remotea-hook.js')));
 
     for (const event of ['PostToolUse', 'PreToolUse', 'UserPromptSubmit']) {
       const hooks = wmuxHooks(out.hooks[event]);

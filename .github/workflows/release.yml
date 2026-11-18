@@ -68,7 +68,7 @@ jobs:
       - name: Verify Remote Console build output
         shell: bash
         env:
-          WMUX_REQUIRE_BUILD: '1'
+          REMOTEA_REQUIRE_BUILD: '1'
         run: |
           test -f dist/renderer/remote-manifest.json
           test -f dist/renderer/remote/index.html

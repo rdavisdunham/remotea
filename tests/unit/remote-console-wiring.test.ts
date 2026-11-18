@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { formatRemoteStatus } from '../../src/cli/wmux';
+import { formatRemoteStatus } from '../../src/cli/remotea';
 
 // ─── module seams for the behavioural half ─────────────────────────────────
 // ipc-handlers reaches Electron and the app data dir at import time

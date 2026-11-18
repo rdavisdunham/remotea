@@ -219,7 +219,7 @@ describe('NewWorktreeModal', () => {
         branch: 'feat/awesome',
         baseBranch: 'main',
         baseSha: '0123456789abcdef0123456789abcdef01234567',
-        worktreePath: '/repo/root/.wmux/worktrees/feat-awesome',
+        worktreePath: '/repo/root/.remotea/worktrees/feat-awesome',
       },
     });
 
@@ -242,13 +242,13 @@ describe('NewWorktreeModal', () => {
     const workspaces = useStore.getState().workspaces;
     expect(workspaces.length).toBe(1);
     expect(workspaces[0].title).toBe('feat/awesome');
-    expect(workspaces[0].cwd).toBe('/repo/root/.wmux/worktrees/feat-awesome');
+    expect(workspaces[0].cwd).toBe('/repo/root/.remotea/worktrees/feat-awesome');
     expect(workspaces[0].worktree).toEqual({
       repoRoot: '/repo/root',
       branch: 'feat/awesome',
       baseBranch: 'main',
       baseSha: '0123456789abcdef0123456789abcdef01234567',
-      worktreePath: '/repo/root/.wmux/worktrees/feat-awesome',
+      worktreePath: '/repo/root/.remotea/worktrees/feat-awesome',
     });
     expect(useStore.getState().activeWorkspaceId).toBe(workspaces[0].id);
     expect(onClose).toHaveBeenCalledOnce();
@@ -345,7 +345,7 @@ describe('NewWorktreeModal', () => {
         branch: 'feat/enter',
         baseBranch: 'main',
         baseSha: 'abc',
-        worktreePath: '/repo/root/.wmux/worktrees/feat-enter',
+        worktreePath: '/repo/root/.remotea/worktrees/feat-enter',
       },
     });
 

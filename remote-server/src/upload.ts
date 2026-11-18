@@ -5,7 +5,7 @@
  * as the body, authenticated exactly like the WebSocket (server.ts).
  *
  * Each file gets a private directory, /tmp/remotea-drop-<uuid>/<name> (0700 /
- * 0600), the same place wmux's ssh uploads go (/tmp/wmux-drop-…): out of the
+ * 0600), the same place the app's ssh uploads go (/tmp/remotea-ssh-drop-…): out of the
  * way, cleared with /tmp, and a name the user recognises when the path is
  * typed into the pane.
  *

@@ -100,7 +100,7 @@ Settings → Phone access serves a browser console from this desktop. View only 
 
 <a id="cli"></a>
 
-The desktop package exposes remotea and injects working wmux compatibility shims. On a host, remotea administers the server; wmux may reach only a status bridge. Run wmux identify and wmux capabilities before using a command family. A successful ping does not establish browser or workspace control. Desktop --remote addresses a desktop CLI bridge, not a session-server WebSocket.
+The desktop package exposes remotea and injects working remotea compatibility shims. On a host, remotea administers the server; remotea may reach only a status bridge. Run remotea identify and remotea capabilities before using a command family. A successful ping does not establish browser or workspace control. Desktop --remote addresses a desktop CLI bridge, not a session-server WebSocket.
 
 ## Customize and troubleshoot
 

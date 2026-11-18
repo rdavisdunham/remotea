@@ -40,7 +40,7 @@
  * software-rendered one with no visible reason. Five minutes between restarts
  * bounds that damage even if every gate above is somehow fooled.
  *
- * Off switch: `"gpuWatchdog": false` in `wmux-workspace-prefs` (settings.json),
+ * Off switch: `"gpuWatchdog": false` in `remotea-workspace-prefs` (settings.json),
  * read at report time like `confirmAppClose` — no restart needed.
  */
 import { IPC_CHANNELS } from '../shared/types';
@@ -108,7 +108,7 @@ export function sanitizeStallReport(raw: unknown): { missed: number; stalledForM
 
 function watchdogEnabled(): boolean {
   try {
-    const prefs = loadSettings()['wmux-workspace-prefs'] as { gpuWatchdog?: unknown } | undefined;
+    const prefs = loadSettings()['remotea-workspace-prefs'] as { gpuWatchdog?: unknown } | undefined;
     return prefs?.gpuWatchdog !== false;
   } catch {
     return true;

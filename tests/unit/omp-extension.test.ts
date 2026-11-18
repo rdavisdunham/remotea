@@ -3,7 +3,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pluginNeedsUpdate } from '../../src/main/agent-plugin-file';
 import type { SurfaceId } from '../../src/shared/types';
-import factory from '../../resources/omp-extension/wmux.js';
+import factory from '../../resources/omp-extension/remotea.js';
 
 vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }));
 import { getAgentState, reportAgent, reportAgentSession, releaseAgent, resetAgentState } from '../../src/main/agent-state';
@@ -78,11 +78,11 @@ async function start(kind = 'main', id = kind, parentId = 'main', smOverrides: R
 beforeEach(() => {
   resetAgentState();
   clearActivity(surface);
-  Object.assign(process.env, { WMUX: '1', WMUX_SURFACE_ID: surface, WMUX_CLI: 'wmux.js', WMUX_NODE: process.execPath });
+  Object.assign(process.env, { REMOTEA: '1', REMOTEA_SURFACE_ID: surface, REMOTEA_CLI: 'remotea.js', REMOTEA_NODE: process.execPath });
 });
 afterEach(async () => {
   for (const shutdown of shutdowns.splice(0)) await shutdown();
-  for (const key of ['WMUX', 'WMUX_SURFACE_ID', 'WMUX_CLI', 'WMUX_NODE']) {
+  for (const key of ['REMOTEA', 'REMOTEA_SURFACE_ID', 'REMOTEA_CLI', 'REMOTEA_NODE']) {
     if (savedEnv[key] === undefined) delete process.env[key];
     else process.env[key] = savedEnv[key];
   }
@@ -259,8 +259,8 @@ describe('omp declared state', () => {
   });
 
   it('pluginNeedsUpdate recognizes version 4 is newer than deployed version 3', () => {
-    const extSrc = fs.readFileSync(path.join(__dirname, '../../resources/omp-extension/wmux.js'), 'utf-8');
-    const deployedV3 = '// wmux-plugin-version: 3\n// old code';
+    const extSrc = fs.readFileSync(path.join(__dirname, '../../resources/omp-extension/remotea.js'), 'utf-8');
+    const deployedV3 = '// remotea-plugin-version: 3\n// old code';
     expect(pluginNeedsUpdate(extSrc, deployedV3)).toBe(true);
     expect(pluginNeedsUpdate(extSrc, extSrc)).toBe(false);
   });

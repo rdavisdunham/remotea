@@ -375,7 +375,7 @@ Eridani sends:
 
 ## Turn capture
 
-The hook helper (`resources/cli/wmux-hook.js`) forwards these on `Stop`, and
+The hook helper (`resources/cli/remotea-hook.js`) forwards these on `Stop`, and
 only to a remotea server's bridge, never to a local wmux:
 
 - `last_assistant_message` (cut at 16,000 code points, flagged)
@@ -702,7 +702,7 @@ change what it reports.
 | `build_sha` | hello, status file `advertised` | `string`: 40 hex, or `"unknown"` (no build-info.json: an older build, or the sources run directly) |
 | `build_dirty` | hello | `boolean`, absent when unknown |
 | `caps_version` | hello | `number` (2) |
-| `hook_version` | hello | `string \| null`: the first 12 hex of the sha256 of the installed `~/.local/share/remotea/cli/wmux-hook.js`, null when not installed |
+| `hook_version` | hello | `string \| null`: the first 12 hex of the sha256 of the installed `~/.local/share/remotea/cli/remotea-hook.js`, null when not installed |
 | `version` | hello (unchanged) | the package version, `0.1.0`; Eridani keeps showing it, `build_sha` goes beside it |
 
 `remotea status --json` (additive, `version` unchanged):
@@ -1292,7 +1292,7 @@ harness and a working launcher); "loop" is `loop` (turns captured, and
 |---|---|---|---|---|---|---|---|---|
 | claude | yes | yes (Stop `last_assistant_message`) | yes: `ask` (AskUserQuestion) | yes | per target | yes (`claude --resume`) | yes | `capture` |
 | codex | yes | yes (Stop `last_assistant_message`, `turn_id`; rollout fallback) | yes: `approval` (PermissionRequest, allow once / deny); `request_user_input` stays in the terminal | yes | per target | yes (`codex resume`) | yes | `answer` |
-| opencode | yes (wmux plugin) | no | no | no | no | no | no | `capture` |
+| opencode | yes (remotea plugin) | no | no | no | no | no | no | `capture` |
 
 `question` is computed, never assumed (harness-adapters.ts): a kind is
 advertised only when the installed version is in the range its capability
@@ -1342,7 +1342,7 @@ this change. (Claude's own PermissionRequest hook takes the same
 `decision.behavior` output as Codex's; it is the structured path if this is
 taken up, after a capability test like Codex's.)
 
-OpenCode 1.17.20 (`opencode --version`): the wmux plugin is installed and
+OpenCode 1.17.20 (`opencode --version`): the remotea plugin is installed and
 reports status (observe). Its `question.asked` / `permission.asked` events
 reach the plugin, and `opencode --help` lists `--prompt`, `--session`,
 `--continue` and `--model`, but nothing here was run: Eridani cannot spawn

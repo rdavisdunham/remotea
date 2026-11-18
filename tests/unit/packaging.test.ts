@@ -14,7 +14,7 @@ import path from 'path';
  * function falls back to a repo-relative path.
  *
  * That has now shipped twice:
- *   - #81  (fixed 0.29.1) cli/wmux-hook.js — every Claude Code hook silently
+ *   - #81  (fixed 0.29.1) cli/remotea-hook.js — every Claude Code hook silently
  *          failed, so workspaces stayed pinned on "Running" while Claude idled.
  *   - #149 (fixed here)   opencode-plugin/ — the OpenCode integration was
  *          absent from every release zip since it was introduced.
@@ -81,11 +81,11 @@ describe('electron-builder packaging', () => {
   it('ships the CLI entry point outside the asar', () => {
     // Bare `node <path>` cannot read an asar archive, so these two are not just
     // "packaged" but specifically packaged OUTSIDE it (#81).
-    expect(extraResources).toContainEqual({ from: 'dist/cli/wmux.js', to: 'cli/wmux.js' });
+    expect(extraResources).toContainEqual({ from: 'dist/cli/remotea.js', to: 'cli/remotea.js' });
   });
 
   it('ships the Claude Code hook helper outside the asar', () => {
-    expect(extraResources).toContainEqual({ from: 'dist/cli/wmux-hook.js', to: 'cli/wmux-hook.js' });
+    expect(extraResources).toContainEqual({ from: 'dist/cli/remotea-hook.js', to: 'cli/remotea-hook.js' });
   });
 
   it('ships the OpenCode plugin (#149)', () => {
@@ -140,7 +140,7 @@ describe('electron-builder packaging', () => {
     const { builtinModules } = require('module') as typeof import('module');
     const builtins = new Set(builtinModules);
     const lines = fs.readFileSync(path.join(repoRoot, 'src/cli', `${entry}.ts`), 'utf8').split('\n');
-    // Real import statements only — wmux.ts carries plenty of help text that
+    // Real import statements only — remotea.ts carries plenty of help text that
     // contains the word "from" followed by a quote.
     const specs = lines
       .filter((l) => /^import (?!type )/.test(l) || /\brequire\('/.test(l))
@@ -168,7 +168,7 @@ describe('electron-builder packaging', () => {
   it('finds the sibling imports it is meant to be checking', () => {
     // Guards the guard: if the CLI stops sharing modules this goes vacuous, and
     // the next one added would slip through unnoticed.
-    expect(siblingImports('wmux')).toContain('transport-deadline');
-    expect(siblingImports('wmux-hook')).toContain('transport-deadline');
+    expect(siblingImports('remotea')).toContain('transport-deadline');
+    expect(siblingImports('remotea-hook')).toContain('transport-deadline');
   });
 });

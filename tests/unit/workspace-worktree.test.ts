@@ -12,7 +12,7 @@ const sampleWorktree: WorktreeMetadata = {
   branch: 'feat/test-branch',
   baseBranch: 'main',
   baseSha: '0123456789abcdef0123456789abcdef01234567',
-  worktreePath: 'C:\\projects\\wmux\\.wmux\\worktrees\\feat-test-branch',
+  worktreePath: 'C:\\projects\\wmux\\.remotea\\worktrees\\feat-test-branch',
 };
 
 describe('workspace-slice worktree persistence', () => {

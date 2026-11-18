@@ -34,13 +34,13 @@ const FEATURES: Array<{ key: Feature; labelKey: TranslationKey; labelFallback: s
     key: 'instructions',
     labelKey: 'settings.integration.instructions',
     labelFallback: 'Agent instructions',
-    pathHint: '~/.claude/CLAUDE.md · ~/.config/opencode/AGENTS.md · ~/.kiro/steering/wmux.md · ~/.omp/agent/AGENTS.md · ~/.pi/agent/AGENTS.md · ~/.grok/rules/wmux.md · ~/.qwen/QWEN.md',
+    pathHint: '~/.claude/CLAUDE.md · ~/.config/opencode/AGENTS.md · ~/.kiro/steering/remotea.md · ~/.omp/agent/AGENTS.md · ~/.pi/agent/AGENTS.md · ~/.grok/rules/remotea.md · ~/.qwen/QWEN.md',
   },
   {
     key: 'hooks',
     labelKey: 'settings.integration.hooks',
     labelFallback: 'Status hooks',
-    pathHint: '~/.claude/settings.json · ~/.omp/agent/extensions/wmux.js · ~/.pi/agent/extensions/wmux.js · ~/.grok/hooks/wmux.json · ~/.gemini/config/plugins/wmux/ · ~/.qwen/settings.json',
+    pathHint: '~/.claude/settings.json · ~/.omp/agent/extensions/remotea.js · ~/.pi/agent/extensions/remotea.js · ~/.grok/hooks/remotea.json · ~/.gemini/config/plugins/remotea/ · ~/.qwen/settings.json',
   },
   {
     key: 'orchestrator',

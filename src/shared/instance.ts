@@ -5,7 +5,7 @@
  * rather than "wmux") — that keeps the pipe, APPDATA dir and taskbar id apart
  * from a stock wmux install running on the same machine.
  *
- * Set WMUX_INSTANCE=<name> to run a separate, side-by-side instance:
+ * Set REMOTEA_INSTANCE=<name> to run a separate, side-by-side instance:
  * the named pipe and APPDATA directory get a "-<name>" suffix, so a dev build
  * can run alongside an installed production build without colliding on the
  * pipe (Windows pipes are exclusive) or overwriting session.json.
@@ -16,7 +16,7 @@ import path from 'path';
 import os from 'os';
 
 function suffix(): string {
-  const name = process.env.WMUX_INSTANCE?.trim();
+  const name = process.env.REMOTEA_INSTANCE?.trim();
   return name ? `-${name}` : '';
 }
 
@@ -54,7 +54,7 @@ export function getLocalAppDataDir(): string {
  * pin is keyed on that id (see build/installer.nsh). Neither heals when the
  * dev build exits; the association outlives it.
  *
- * That is the one identity WMUX_INSTANCE did not already isolate, which made
+ * That is the one identity REMOTEA_INSTANCE did not already isolate, which made
  * "run the dev build side by side" quietly destructive to a real install.
  */
 export function getAppUserModelId(): string {
@@ -74,12 +74,12 @@ export function getPipeTokenPath(): string {
 
 /**
  * Reads the auth token a CLI/hook client must send. Resolution order:
- *   1. WMUX_PIPE_TOKEN env var (injected by wmux into spawned shells)
+ *   1. REMOTEA_PIPE_TOKEN env var (injected by wmux into spawned shells)
  *   2. the token file in APPDATA (for clients launched outside a wmux shell)
  * Returns '' when none is available.
  */
 export function readPipeToken(): string {
-  const fromEnv = process.env.WMUX_PIPE_TOKEN?.trim();
+  const fromEnv = process.env.REMOTEA_PIPE_TOKEN?.trim();
   if (fromEnv) return fromEnv;
   try {
     return fs.readFileSync(getPipeTokenPath(), 'utf-8').trim();

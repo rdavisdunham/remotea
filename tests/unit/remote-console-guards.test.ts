@@ -112,15 +112,15 @@ describe('remote-console guards: https, cookies, headers', () => {
   });
 
   it('cookie is HttpOnly, SameSite=Strict, 30 days, Secure only when asked', () => {
-    expect(cookieHeader('dev-x.tok', false)).toBe('wmux_rc=dev-x.tok; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000');
+    expect(cookieHeader('dev-x.tok', false)).toBe('remotea_rc=dev-x.tok; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000');
     expect(cookieHeader('v', true).endsWith('; Secure')).toBe(true);
     expect(clearCookieHeader(false)).toContain('Max-Age=0');
   });
 
-  it('readCookie finds wmux_rc among others', () => {
-    expect(readCookie('a=1; wmux_rc=dev-1.abc; b=2')).toBe('dev-1.abc');
+  it('readCookie finds remotea_rc among others', () => {
+    expect(readCookie('a=1; remotea_rc=dev-1.abc; b=2')).toBe('dev-1.abc');
     expect(readCookie('a=1')).toBeNull();
-    expect(readCookie('wmux_rc=')).toBeNull();
+    expect(readCookie('remotea_rc=')).toBeNull();
     expect(readCookie(undefined)).toBeNull();
   });
 

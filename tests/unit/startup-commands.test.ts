@@ -47,7 +47,7 @@ describe('readiness classification', () => {
   });
 
   it('the cmd integration prompt (mark + drive prompt) classifies as a mark, not as text', () => {
-    // What wmux-cmd-integration.cmd's PROMPT draws: A, the prompt, B.
+    // What remotea-cmd-integration.cmd's PROMPT draws: A, the prompt, B.
     expect(classifyStartupChunk(`${ESC}]133;A${ESC}\\C:\\Users\\me>${ESC}]133;B${ESC}\\`)).toBe('prompt-mark');
   });
 

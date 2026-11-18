@@ -32,9 +32,9 @@ export function codexShimDirs(options: {
   }
   if (dirs.length > 0) {
     Object.assign(options.env, {
-      WMUX_CODEX_EXE: options.executable,
-      WMUX_CODEX_RUNTIME: options.runtime,
-      WMUX_CODEX_LAUNCHER: options.launcher,
+      REMOTEA_CODEX_EXE: options.executable,
+      REMOTEA_CODEX_RUNTIME: options.runtime,
+      REMOTEA_CODEX_LAUNCHER: options.launcher,
     });
   }
   return dirs;

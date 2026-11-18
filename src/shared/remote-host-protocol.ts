@@ -423,8 +423,13 @@ export interface DiagEvent {
   data?: Record<string, string | number | boolean | null>;
 }
 
-/** Features a server announces in `welcome`; an app uses a feature only when listed. */
-export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention' | 'tea';
+/**
+ * Features a server announces in `welcome`; an app uses a feature only when listed.
+ * `remoteaNames`: the server uses the remotea names on its machine (env vars,
+ * hook files). A server without it predates the rename: it still connects, but
+ * its agents' status hooks won't match this app until it is upgraded.
+ */
+export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention' | 'tea' | 'remoteaNames';
 
 /**
  * Features an app announces in `hello`. `focus`: it brings a session's tab to

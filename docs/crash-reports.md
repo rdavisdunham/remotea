@@ -1,14 +1,14 @@
-# Reporting a wmux crash
+# Reporting a remotea crash
 
-**Short version: run `wmux crash-report`, paste the output, and do not send a
+**Short version: run `remotea crash-report`, paste the output, and do not send a
 crash dump unless someone asks for one by name.**
 
 ```console
-$ wmux crash-report
+$ remotea crash-report
 ```
 
-It needs no running wmux — which is the point, since you run it after wmux
-died. It reads the Windows Event Log and wmux's own process-lifecycle log, and
+It needs no running remotea — which is the point, since you run it after remotea
+died. It reads the Windows Event Log and remotea's own process-lifecycle log, and
 prints a fingerprint that is enough to tell a known crash from a new one.
 
 ---
@@ -30,10 +30,10 @@ Every one carried live credentials. The worst held eleven, including a
 production API key/secret/passphrase set and a bot token. They found that only
 because they stopped to look.
 
-**wmux's users are the worst possible population for this.** wmux is a terminal
+**remotea's users are the worst possible population for this.** remotea is a terminal
 multiplexer. Its users keep credentials in the environment precisely so the
-shells wmux spawns can see them. That is not a misconfiguration, it is the
-normal setup — so the overlap between "people who hit a crash in wmux" and
+shells remotea spawns can see them. That is not a misconfiguration, it is the
+normal setup — so the overlap between "people who hit a crash in remotea" and
 "people whose environment is full of live keys" is close to total.
 
 ## What to send instead
@@ -48,8 +48,8 @@ one?" is in the Windows Event Log, and none of it is memory:
 | Fault offset | The signature — identical offset means identical crash |
 | Additional parameter | For `0xc0000409`, distinguishes a deliberate `__fastfail` from memory corruption |
 
-`wmux crash-report` collects all four, plus the tail of
-`%APPDATA%\wmux\logs\main.log` (wmux 1.1.1+), which records process lifecycle
+`remotea crash-report` collects all four, plus the tail of
+`%APPDATA%\remotea\logs\main.log` (remotea 1.1.1+), which records process lifecycle
 only: start, teardown, PTY counts. No pane contents, no working directories, no
 command lines, no environment.
 
@@ -75,7 +75,7 @@ contains so you can decide. Before you send one:
 
 2. **Removing the variables is not enough on its own.** A process receives a
    *copy* of the environment block at launch and keeps it for its whole life. A
-   wmux that has been running since yesterday still carries the values you
+   remotea that has been running since yesterday still carries the values you
    deleted this morning. Rotating or moving your secrets only makes future dumps
    clean, and only after every affected process has been **restarted**.
 
@@ -88,7 +88,7 @@ contains so you can decide. Before you send one:
 
 4. **A full dump is worse.** `DumpType = 2` adds the process heap to the
    environment block, so it carries secrets a minidump would have missed — API
-   responses, tokens read from files, anything the app touched. `wmux
+   responses, tokens read from files, anything the app touched. `remotea
    crash-report` tells you if this machine is configured to write one.
 
 5. **Or reproduce under a clean profile** with a stripped environment, and send
@@ -99,12 +99,12 @@ contains so you can decide. Before you send one:
 Only do this if asked, and read the section above first.
 
 ```
-HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\wmux.exe
+HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\remotea.exe
   DumpType = 1   (minidump)
   DumpType = 2   (full dump — environment block AND heap)
 ```
 
-`wmux crash-report` will warn you, on every run, for as long as this is set.
+`remotea crash-report` will warn you, on every run, for as long as this is set.
 
 ---
 

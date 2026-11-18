@@ -1,10 +1,10 @@
 /**
  * The hook bridge: where agents running in remotea sessions report status.
  *
- * wmux's hook helper (`wmux-hook.js`, registered in Claude Code's and Codex's
+ * wmux's hook helper (`remotea-hook.js`, registered in Claude Code's and Codex's
  * hook settings) and its plugins talk to the app over a named pipe — which a
  * process in WSL cannot reach. They already know a second transport, built for
- * devcontainers (`WMUX_REMOTE` + `WMUX_REMOTE_TOKEN`, wmux issue #19): one line
+ * devcontainers (`REMOTEA_REMOTE` + `REMOTEA_REMOTE_TOKEN`, wmux issue #19): one line
  * of JSON-RPC over TCP, `{method, params, id, token}`, answered with one line.
  * This listener speaks that, on loopback, and hands what it accepts to the hub,
  * which relays it to every app showing the session.
@@ -32,7 +32,7 @@ import crypto from 'crypto';
 import net from 'net';
 import { RELAYED_RPC_METHODS } from '../../src/shared/remote-host-protocol';
 
-/** Long enough for a UserPromptSubmit carrying a pasted file (wmux-hook caps the prompt itself). */
+/** Long enough for a UserPromptSubmit carrying a pasted file (remotea-hook caps the prompt itself). */
 const MAX_LINE = 2 * 1024 * 1024;
 /** A client that connects and says nothing is dropped after this. */
 const IDLE_MS = 10_000;
@@ -172,15 +172,15 @@ export class HookBridge {
 /**
  * The environment that points a session's hooks at the bridge. `cli`: where
  * the wmux CLI and a Node to run it are — the OpenCode plugin (and the other
- * wmux plugins) report through `node $WMUX_CLI <command>`.
+ * wmux plugins) report through `node $REMOTEA_CLI <command>`.
  */
 export function hookEnv(secret: string, port: number, sessionId: string, cli?: { cliPath: string; nodePath: string }): Record<string, string> {
   return {
-    // wmux-hook.js and the wmux CLI read these (see the header).
-    WMUX: '1',
-    WMUX_SURFACE_ID: sessionId,
-    WMUX_REMOTE: `127.0.0.1:${port}`,
-    WMUX_REMOTE_TOKEN: hookToken(secret, sessionId),
-    ...(cli ? { WMUX_CLI: cli.cliPath, WMUX_NODE: cli.nodePath } : {}),
+    // remotea-hook.js and the wmux CLI read these (see the header).
+    REMOTEA: '1',
+    REMOTEA_SURFACE_ID: sessionId,
+    REMOTEA_REMOTE: `127.0.0.1:${port}`,
+    REMOTEA_REMOTE_TOKEN: hookToken(secret, sessionId),
+    ...(cli ? { REMOTEA_CLI: cli.cliPath, REMOTEA_NODE: cli.nodePath } : {}),
   };
 }

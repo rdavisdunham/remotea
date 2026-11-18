@@ -12,14 +12,14 @@
  * the common case by reading the pane's run depth instead ("a prompt can only
  * occur inside a live turn, so depth 0 means nudge"). #253 is where that
  * inference breaks: a BACKGROUND subagent keeps firing PreToolUse/PostToolUse
- * on the parent's WMUX_SURFACE_ID after the parent's `Stop` has zeroed the
+ * on the parent's REMOTEA_SURFACE_ID after the parent's `Stop` has zeroed the
  * depth, so by the time it finishes the depth reads 1 again and the idle
  * reminder that follows was read as a permission prompt — "Needs you" plus a
  * bell notification, on a pane with nothing to answer.
  *
  * Claude Code states which one it is in `notification_type`, so that is the
  * primary signal and the depth heuristic is only a fallback for payloads that
- * do not carry it (older Claude Code, or an older wmux-hook.js that does not
+ * do not carry it (older Claude Code, or an older remotea-hook.js that does not
  * forward it).
  *
  * Shared by main (declared agent state) and the renderer (the bell/desktop

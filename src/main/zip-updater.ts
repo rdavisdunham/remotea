@@ -550,7 +550,7 @@ export async function downloadToFile(
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const req = net.request({ method: 'GET', url, redirect: 'follow' });
-    req.setHeader('User-Agent', `wmux/${app.getVersion()}`);
+    req.setHeader('User-Agent', `remotea/${app.getVersion()}`);
     req.setHeader('Accept', 'application/octet-stream');
     req.on('response', (res) => {
       const status = res.statusCode ?? 0;

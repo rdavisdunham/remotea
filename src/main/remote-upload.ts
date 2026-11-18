@@ -81,11 +81,11 @@ export function toolForSession(
 }
 
 export function remoteBatchDirectory(uuid: string = crypto.randomUUID()): string {
-  return `/tmp/wmux-drop-${uuid.toLowerCase()}`;
+  return `/tmp/remotea-ssh-drop-${uuid.toLowerCase()}`;
 }
 
 /**
- * The `/tmp/wmux-drop-<uuid>[.ext]` path one local file uploads to.
+ * The `/tmp/remotea-ssh-drop-<uuid>[.ext]` path one local file uploads to.
  *
  * A fresh uuid per file rather than the basename: names collide across users
  * sharing a host, `screenshot.png` twice in a session would silently overwrite,
@@ -96,11 +96,11 @@ export function remoteBatchDirectory(uuid: string = crypto.randomUUID()): string
 export function remoteDropPath(localPath: string, uuid: string = crypto.randomUUID()): string {
   const ext = path.extname(localPath).trim();
   const suffix = /^\.[A-Za-z0-9]{1,16}$/.test(ext) ? ext.toLowerCase() : '';
-  return `/tmp/wmux-drop-${uuid.toLowerCase()}${suffix}`;
+  return `/tmp/remotea-ssh-drop-${uuid.toLowerCase()}${suffix}`;
 }
 
 export function remotePathInBatch(directory: string, localPath: string, uuid: string = crypto.randomUUID()): string {
-  return `${directory}/${path.posix.basename(remoteDropPath(localPath, uuid)).replace('wmux-drop-', '')}`;
+  return `${directory}/${path.posix.basename(remoteDropPath(localPath, uuid)).replace('remotea-ssh-drop-', '')}`;
 }
 
 /** True when `options` already sets `key`, so we must not add our own default. */
@@ -291,7 +291,7 @@ async function mapWithLimit<T, R>(
 
 /**
  * Upload each local file to a unique name inside one private
- * `/tmp/wmux-drop-<batch-id>/` directory, returning the remote paths in the
+ * `/tmp/remotea-ssh-drop-<batch-id>/` directory, returning the remote paths in the
  * order the local paths were given.
  *
  * All-or-nothing: if any file fails, the ones that succeeded are deleted again

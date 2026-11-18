@@ -9,14 +9,14 @@ import { reportIntegrationFailure } from './integration-failures';
  * already teaching Grok about wmux. This module covers the two places that
  * falls short.
  *
- * ── Hooks: $GROK_HOME/hooks/wmux.json ────────────────────────────────────────
+ * ── Hooks: $GROK_HOME/hooks/remotea.json ────────────────────────────────────────
  *
  * The same entries `applyWmuxHooks` writes for Claude Code, byte for byte, plus
  * the two turn endings only Grok has. `StopCancelled` runs INSTEAD of `Stop`
  * when a turn ends without completing (Ctrl+C, a declined permission, the turn
  * limit) and `StopFailure` instead of it on an API error; without them an
  * interrupted Grok turn left the pane reading `working` until the trust window
- * aged it out. wmux-hook.js reports both as the turn ending.
+ * aged it out. remotea-hook.js reports both as the turn ending.
  *
  * Duplicating the Claude entries is safe because Grok dedupes handlers across
  * sources on (event, command, url, matcher) — so with compat on each hook runs
@@ -24,7 +24,7 @@ import { reportIntegrationFailure } from './integration-failures';
  * the full set. That only holds while the bytes match, which is why the command
  * strings come from claude-context.ts rather than being spelled again here.
  *
- * ── Instructions: $GROK_HOME/rules/wmux.md, only when Grok would miss them ───
+ * ── Instructions: $GROK_HOME/rules/remotea.md, only when Grok would miss them ───
  *
  * Grok loads every `*.md` in its home rules dir, so like Kiro this is a file of
  * wmux's own. But it is written only when Grok will NOT already read the wmux
@@ -38,6 +38,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { readRenderedInstructions } from './agent-instructions';
+import { isLegacyRemoteaBlockFile, isLegacyRemoteaGrokHooksFile } from '../shared/legacy-cleanup';
+import { LEGACY_PLUGIN_FILES } from '../shared/legacy-names';
+import { desktopOwnershipContext } from './ownership-context';
 import {
   applyWmuxHooks,
   getClaudeMdPath,
@@ -45,7 +48,7 @@ import {
   wmuxEventHookCommand,
 } from './claude-context';
 
-const START_MARKER = '<!-- wmux:start';
+const START_MARKER = '<!-- remotea:start';
 
 /** Grok's turn endings that Claude Code has no equivalent for. */
 const GROK_ONLY_EVENTS = ['StopCancelled', 'StopFailure'] as const;
@@ -79,8 +82,28 @@ function grokHomes(): string[] {
   return [...new Set([getGrokHome(), defaultGrokHome()])];
 }
 
-const rulesPathIn = (home: string) => path.join(home, 'rules', 'wmux.md');
-const hooksPathIn = (home: string) => path.join(home, 'hooks', 'wmux.json');
+const rulesPathIn = (home: string) => path.join(home, 'rules', 'remotea.md');
+const hooksPathIn = (home: string) => path.join(home, 'hooks', 'remotea.json');
+
+/**
+ * Delete a file remotea wrote under its old name, only when the path inside it
+ * is this install's (KTD8). A wmux install writes the same file names.
+ */
+function removeProvenOldFile(filePath: string, isProven: (content: string) => boolean): void {
+  try {
+    if (isProven(fs.readFileSync(filePath, 'utf-8'))) fs.unlinkSync(filePath);
+  } catch { /* absent or unreadable: leave it */ }
+}
+
+function removeOldRules(home: string): void {
+  const ctx = desktopOwnershipContext();
+  removeProvenOldFile(path.join(home, 'rules', LEGACY_PLUGIN_FILES.grokRules[0]), (s) => isLegacyRemoteaBlockFile(s, ctx));
+}
+
+function removeOldHooks(home: string): void {
+  const ctx = desktopOwnershipContext();
+  removeProvenOldFile(path.join(home, 'hooks', LEGACY_PLUGIN_FILES.grokHooks[0]), (s) => isLegacyRemoteaGrokHooksFile(s, ctx));
+}
 
 export function getGrokRulesPath(): string {
   return rulesPathIn(getGrokHome());
@@ -136,7 +159,7 @@ export function grokReadsClaudeContext(): boolean {
   return compatOn && readOrEmpty(getClaudeMdPath()).includes(START_MARKER);
 }
 
-/** Pure: the whole hooks file, given the absolute path to wmux-hook.js. */
+/** Pure: the whole hooks file, given the absolute path to remotea-hook.js. */
 export function buildGrokHooks(hookScript: string): { hooks: Record<string, unknown[]> } {
   const hooks: Record<string, unknown[]> = { ...applyWmuxHooks({}, hookScript).hooks };
   for (const event of GROK_ONLY_EVENTS) {
@@ -154,7 +177,7 @@ function writeOwnedFile(filePath: string, content: string, isOurs: (s: string) =
   if (fs.existsSync(filePath)) {
     const current = fs.readFileSync(filePath, 'utf-8');
     if (!isOurs(current)) {
-      console.warn(`[remotea] ${filePath} exists and is not wmux-managed — leaving it alone`);
+      console.warn(`[remotea] ${filePath} exists and is not remotea's — leaving it alone`);
       return;
     }
     if (current === content) return; // already current; don't churn the mtime
@@ -179,14 +202,14 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** `node "<anything>wmux-hook.js" <arg>` — the only command shape wmux registers. */
-const WMUX_HOOK_COMMAND_RE = /^node "[^"]*wmux-hook\.js" \S/;
+/** `node "<anything>remotea-hook.js" <arg>` — the only command shape wmux registers. */
+const REMOTEA_HOOK_COMMAND_RE = /^node "[^"]*remotea-hook\.js" \S/;
 
 function isWmuxHandler(handler: unknown): boolean {
   return isRecord(handler)
     && handler.type === 'command'
     && typeof handler.command === 'string'
-    && WMUX_HOOK_COMMAND_RE.test(handler.command);
+    && REMOTEA_HOOK_COMMAND_RE.test(handler.command);
 }
 
 /** Every handler under one event, or null when it is not a list of matcher groups. */
@@ -203,12 +226,12 @@ function handlersOf(groups: unknown): unknown[] | null {
 /**
  * Pure: is this hooks file ENTIRELY wmux's?
  *
- * JSON has no comment to carry a marker, and "contains the string wmux-hook" is
- * not ownership: `wmux.json` is the obvious name for a file a user writes by
+ * JSON has no comment to carry a marker, and "contains the string remotea-hook" is
+ * not ownership: `remotea.json` is the obvious name for a file a user writes by
  * hand to wire Grok into wmux, and the moment they add one hook of their own to
  * it a substring test has wmux overwrite that hook on the next launch and delete
  * it when the toggle goes off. So the test is structural — nothing but a `hooks`
- * object, and every handler in it a wmux-hook.js command. One foreign handler,
+ * object, and every handler in it a remotea-hook.js command. One foreign handler,
  * one extra top-level key, or a file that does not parse, and it is the user's.
  * It matches the command SHAPE rather than this install's path, so a file
  * written before the install moved is still recognised and refreshed.
@@ -240,6 +263,7 @@ export function ensureGrokContext(): void {
     // Rendered, not read: carries this install's absolute CLI path (#158).
     const rendered = readRenderedInstructions();
     if (rendered === null) return;
+    removeOldRules(getGrokHome());
     writeOwnedFile(getGrokRulesPath(), rendered.trimEnd() + '\n', isOurRules);
   } catch (err) {
     reportIntegrationFailure('Grok', 'write', err);
@@ -259,6 +283,7 @@ export function removeGrokContext(): void {
 export function ensureGrokHooks(): void {
   try {
     const content = JSON.stringify(buildGrokHooks(getHookScriptPath()), null, 2) + '\n';
+    removeOldHooks(getGrokHome());
     writeOwnedFile(getGrokHooksPath(), content, isWmuxHooksFile);
   } catch (err) {
     reportIntegrationFailure('Grok', 'write', err);
