@@ -104,7 +104,7 @@ All rows use appearancePrefs unless another scope is named.
 | Enable transparency | `windowTransparency=false` | Only when capability probe says transparency supported. Entering/leaving clear-alpha mode can require rebuilding/restarting window | UI/General:305–315; `hooks/useWindowTransparency.ts:15–21,37–55` |
 | Style | `windowMaterial='clear'`; Clear, Acrylic, Mica | Only when transparency enabled and capability section visible. Acrylic/Mica disabled without Windows 11 material capability | UI/General:319–343 |
 | Terminal opacity — N% | `terminalBgOpacity=88`; 15–100%, step 1 | Visible whenever transparency preference is on; can be shown while restart pending. Runtime clamps minimum | UI/General:355–369; `store/backdrop.ts:18–23` |
-| Agent office | `hubEnabled=true` | Under “Easter eggs”; titlebar office button and its live shortcut enabled | UI/General:376–392 |
+| Agent office | `hubEnabled=false` | Under “Easter eggs”; off by default since remotea's HUB_DEFAULT_REV 2, which switched every profile off once. On adds the titlebar office button and its live shortcut | UI/General:376–392 |
 
 Language choices: English/en, Français/fr, Español/es, Deutsch/de, Português/pt, Italiano/it, Nederlands/nl, Polski/pl, Türkçe/tr, Русский/ru, Українська/uk, 中文/zh, 繁體中文/zh-TW, 日本語/ja, 한국어/ko, हिन्दी/hi, Svenska/sv, Čeština/cs. User JSON locale registration adds more. English text anchors for General are `src/renderer/i18n/locales/en.ts:36–97,880–884,955–957`.
 

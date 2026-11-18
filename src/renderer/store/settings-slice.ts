@@ -1237,10 +1237,10 @@ export interface AppearancePrefs {
    */
   uiModeDefaultRev: number;
   /**
-   * The agent office. On by default since 2.3.0 — it shipped in 2.2.0 as a
-   * quiet easter egg (no titlebar button, inert shortcut until the toggle was
-   * found) and is now surfaced for everyone. Turning it off restores exactly
-   * that quiet state, so the toggle is still the whole feature flag: titlebar
+   * The agent office. Off by default in remotea (HUB_DEFAULT_REV 2). wmux
+   * shipped it in 2.2.0 as a quiet easter egg (no titlebar button, inert
+   * shortcut until the toggle was found) and turned it on for everyone in
+   * 2.3.0. Off restores exactly that quiet state, so the toggle is still the whole feature flag: titlebar
    * button, Ctrl+Shift+O, command palette entry and cheat-sheet row all read it.
    */
   hubEnabled: boolean;
@@ -1281,8 +1281,11 @@ export const UI_MODE_DEFAULT_REV = 1;
  * `hubEnabled: false` on disk. The egg was only discoverable for one release,
  * so the promotion is accepted as overriding that small set once; anyone who
  * turns it off after the promotion keeps it off.
+ *
+ * 2 — remotea (2026-11-18), the agent office is off for everyone, once, even
+ * for profiles that had it on. Anyone who turns it back on keeps it on.
  */
-export const HUB_DEFAULT_REV = 1;
+export const HUB_DEFAULT_REV = 2;
 
 export const DEFAULT_APPEARANCE_PREFS: AppearancePrefs = {
   // Defaults to 'dark' rather than 'system' — wmux shipped dark-only up to
@@ -1297,7 +1300,7 @@ export const DEFAULT_APPEARANCE_PREFS: AppearancePrefs = {
   inactivePaneDim: DEFAULT_INACTIVE_PANE_DIM_PCT,
   uiMode: 'trace',
   uiModeDefaultRev: UI_MODE_DEFAULT_REV,
-  hubEnabled: true,
+  hubEnabled: false,
   hubDefaultRev: HUB_DEFAULT_REV,
 };
 
