@@ -12,7 +12,7 @@ export const ru: Readonly<Record<string, string>> = {
   'loading': 'Подключение…',
 
   'pair.title': 'Сопрячь это устройство',
-  'pair.body': 'Ваш компьютер предлагает сопрячь этот браузер с удалённой консолью wmux. Продолжайте, только если вы сами только что отсканировали этот код.',
+  'pair.body': 'Ваш компьютер предлагает сопрячь этот браузер с удалённой консолью remotea. Продолжайте, только если вы сами только что отсканировали этот код.',
   'pair.nameLabel': 'Имя устройства',
   'pair.namePlaceholder': 'Имя, заданное на компьютере',
   'pair.confirm': 'Сопрячь',
@@ -69,7 +69,7 @@ export const ru: Readonly<Record<string, string>> = {
   'attach.loading': 'Загрузка экрана…',
   'attach.exited': 'Процесс завершён ({code})',
   'attach.lag': 'Догоняем…',
-  'attach.errNoTerminal': 'Этот терминал не открыт ни в одном окне wmux.',
+  'attach.errNoTerminal': 'Этот терминал не открыт ни в одном окне remotea.',
   'attach.errTimeout': 'Компьютер не ответил вовремя.',
   'attach.errGone': 'Этот терминал закрыт.',
   'attach.closedTerminal': 'Закрытый терминал',

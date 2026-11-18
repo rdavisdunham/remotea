@@ -12,7 +12,7 @@ export const pl: Readonly<Record<string, string>> = {
   'loading': 'Łączenie…',
 
   'pair.title': 'Sparuj to urządzenie',
-  'pair.body': 'Twój komputer proponuje sparowanie tej przeglądarki ze zdalną konsolą wmux. Kontynuuj tylko wtedy, gdy właśnie sam zeskanowałeś ten kod.',
+  'pair.body': 'Twój komputer proponuje sparowanie tej przeglądarki ze zdalną konsolą remotea. Kontynuuj tylko wtedy, gdy właśnie sam zeskanowałeś ten kod.',
   'pair.nameLabel': 'Nazwa urządzenia',
   'pair.namePlaceholder': 'Nazwa ustawiona na komputerze',
   'pair.confirm': 'Sparuj',
@@ -69,7 +69,7 @@ export const pl: Readonly<Record<string, string>> = {
   'attach.loading': 'Wczytywanie ekranu…',
   'attach.exited': 'Proces zakończony ({code})',
   'attach.lag': 'Nadrabianie…',
-  'attach.errNoTerminal': 'Ten terminal nie jest otwarty w żadnym oknie wmux.',
+  'attach.errNoTerminal': 'Ten terminal nie jest otwarty w żadnym oknie remotea.',
   'attach.errTimeout': 'Komputer nie odpowiedział na czas.',
   'attach.errGone': 'Ten terminal został zamknięty.',
   'attach.closedTerminal': 'Zamknięty terminal',

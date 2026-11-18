@@ -12,7 +12,7 @@ export const uk: Readonly<Record<string, string>> = {
   'loading': 'Підключення…',
 
   'pair.title': 'Прив’язати цей пристрій',
-  'pair.body': 'Ваш комп’ютер пропонує прив’язати цей браузер до віддаленої консолі wmux. Продовжуйте, лише якщо ви щойно самі відсканували цей код.',
+  'pair.body': 'Ваш комп’ютер пропонує прив’язати цей браузер до віддаленої консолі remotea. Продовжуйте, лише якщо ви щойно самі відсканували цей код.',
   'pair.nameLabel': 'Назва пристрою',
   'pair.namePlaceholder': 'Назва, задана на комп’ютері',
   'pair.confirm': 'Прив’язати',
@@ -69,7 +69,7 @@ export const uk: Readonly<Record<string, string>> = {
   'attach.loading': 'Завантаження екрана…',
   'attach.exited': 'Процес завершено ({code})',
   'attach.lag': 'Наздоганяємо…',
-  'attach.errNoTerminal': 'Цей термінал не відкрито в жодному вікні wmux.',
+  'attach.errNoTerminal': 'Цей термінал не відкрито в жодному вікні remotea.',
   'attach.errTimeout': 'Комп’ютер не відповів вчасно.',
   'attach.errGone': 'Цей термінал закрито.',
   'attach.closedTerminal': 'Закритий термінал',

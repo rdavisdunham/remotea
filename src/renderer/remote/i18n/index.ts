@@ -5,7 +5,7 @@
  * Zustand store, and importing it would drag the store — and with it the whole
  * desktop renderer — into a page served to a phone. The isolation test pins
  * the boundary. What is shared is the language LIST (the same 18 bundled
- * languages), so a user who reads wmux in Polish on the desktop reads it in
+ * languages), so a user who reads remotea in Polish on the desktop reads it in
  * Polish on the phone.
  *
  * Plurals and relative times come from `Intl.PluralRules` and

@@ -12,7 +12,7 @@ export const it: Readonly<Record<string, string>> = {
   'loading': 'Connessione…',
 
   'pair.title': 'Associa questo dispositivo',
-  'pair.body': 'Il tuo computer ha proposto di associare questo browser alla console remota di wmux. Continua solo se hai appena scansionato tu questo codice.',
+  'pair.body': 'Il tuo computer ha proposto di associare questo browser alla console remota di remotea. Continua solo se hai appena scansionato tu questo codice.',
   'pair.nameLabel': 'Nome del dispositivo',
   'pair.namePlaceholder': 'Il nome scelto sul computer',
   'pair.confirm': 'Associa',
@@ -67,7 +67,7 @@ export const it: Readonly<Record<string, string>> = {
   'attach.loading': 'Caricamento schermata…',
   'attach.exited': 'Processo terminato ({code})',
   'attach.lag': 'Recupero in corso…',
-  'attach.errNoTerminal': 'Questo terminale non è aperto in nessuna finestra di wmux.',
+  'attach.errNoTerminal': 'Questo terminale non è aperto in nessuna finestra di remotea.',
   'attach.errTimeout': 'Il computer non ha risposto in tempo.',
   'attach.errGone': 'Questo terminale è stato chiuso.',
   'attach.closedTerminal': 'Terminale chiuso',

@@ -12,7 +12,7 @@ export const cs: Readonly<Record<string, string>> = {
   'loading': 'Připojování…',
 
   'pair.title': 'Spárovat toto zařízení',
-  'pair.body': 'Váš počítač nabízí spárování tohoto prohlížeče se vzdálenou konzolí wmux. Pokračujte, jen pokud jste tento kód právě sami naskenovali.',
+  'pair.body': 'Váš počítač nabízí spárování tohoto prohlížeče se vzdálenou konzolí remotea. Pokračujte, jen pokud jste tento kód právě sami naskenovali.',
   'pair.nameLabel': 'Název zařízení',
   'pair.namePlaceholder': 'Název zadaný na počítači',
   'pair.confirm': 'Spárovat',
@@ -68,7 +68,7 @@ export const cs: Readonly<Record<string, string>> = {
   'attach.loading': 'Načítání obrazovky…',
   'attach.exited': 'Proces skončil ({code})',
   'attach.lag': 'Dohánění…',
-  'attach.errNoTerminal': 'Tento terminál není otevřen v žádném okně wmux.',
+  'attach.errNoTerminal': 'Tento terminál není otevřen v žádném okně remotea.',
   'attach.errTimeout': 'Počítač neodpověděl včas.',
   'attach.errGone': 'Tento terminál byl zavřen.',
   'attach.closedTerminal': 'Zavřený terminál',

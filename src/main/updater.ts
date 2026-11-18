@@ -383,7 +383,7 @@ async function promptToInstall(version: string): Promise<void> {
     defaultId: 1,
     cancelId: 1,
     title: 'remotea update ready',
-    message: `wmux ${version} has been downloaded.`,
+    message: `remotea ${version} has been downloaded.`,
     detail: 'Review the release notes on GitHub before installing. Install now?' + elevationNote,
   });
   if (response === 0) {
