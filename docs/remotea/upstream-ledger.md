@@ -14,7 +14,7 @@ Every ruling follows one of these rules:
 
 A fix that also touches the browser keeps only its non-browser part. Hunks for languages remotea is removing are dropped; English, Czech, French and Traditional Chinese stay.
 
-Totals: 45 ported, 49 skipped, 81 not applicable.
+Totals: 44 ported, 50 skipped, 81 not applicable.
 
 The **ported as** column fills in as each fix lands.
 
@@ -25,7 +25,7 @@ These rows needed a call the rules don't settle. Say if any should go the other 
 - **1c7ebb0** "complete panel docking and browser control handling" is typed as a fix but changes 26 files and adds panel docking (a docked explorer) and wheel zoom. Ruled ported without its browser parts. Two later fixes, ebab909 and 71d89ba, build on its wheel zoom. Skipping it skips them too.
 - **4a529c7** fixes unreachable overflowing tabs and also adds an immersive mode to the phone console and workspace edge controls. Ruled ported as a whole, without the removed languages.
 - **b283d0b** is a `chore` that deletes a second copy of the agent instructions (`resources/claude-instructions/claude-instructions.md`). remotea has the same copy and a test that keeps it identical to the real file; nothing else reads it. Ruled ported, and the port also drops that test assertion.
-- **Fixes for features remotea doesn't have** are ruled skipped. This rule isn't in the plan: a fix to pi session restore, terminal history or the WSL hooks installer can't apply without the feature it fixes. It decides 12 rows. Flagging one of those features brings its fixes back.
+- **Fixes for features remotea doesn't have** are ruled skipped. This rule isn't in the plan: a fix to pi session restore, terminal history, the WSL hooks installer or pane lock can't apply without the feature it fixes. It decides 13 rows. Flagging one of those features brings its fixes back.
 
 ## Features
 
@@ -61,7 +61,7 @@ Features are skipped unless flagged. To port one, mark it in review; its ruling 
 | `fa97b16` | 2026-11-10 | feat(tabs): resume the just-closed tab's agent session on Ctrl+Shift+T (#447) |  |
 | `73b7980` | 2026-11-13 | feat(diff): wrap long lines toggle in the Diff tab and Git view (#450) |  |
 | `1266792` | 2026-11-15 | feat(panes): show no focused pane in an unfocused window (#459) |  |
-| `427db79` | 2026-11-15 | feat(panes): lock a pane against spawned agents and moved tabs (#454) |  |
+| `427db79` | 2026-11-15 | feat(panes): lock a pane against spawned agents and moved tabs (#454) | Brings fix 62724b0 with it. |
 | `3ee1c06` | 2026-11-17 | feat(sidebar): add set-indicator / clear-indicator for a workspace pill (#461) |  |
 | `ad75bd9` | 2026-11-18 | feat(agent-browser): show and control the agent browser page in wmux (#455) | Browser panel; can't be ported. |
 | `4a529c7` | 2026-10-31 | The phone console's immersive mode and workspace edge controls, inside a fix commit | Ported with that fix unless you say otherwise; see Judgment calls. |
@@ -234,7 +234,7 @@ Oldest first.
 | `e67e7be` | 2026-11-15 | fix | fix(notifications): bring the window forward when a toast is clicked (#457) | ported | Fix. | |
 | `0492b10` | 2026-11-15 | fix | fix(markdown): resolve WSL paths for the Windows host (#456) | ported | Fix. | |
 | `427db79` | 2026-11-15 | feat | feat(panes): lock a pane against spawned agents and moved tabs (#454) | skipped | Feature. Port only if flagged. | |
-| `62724b0` | 2026-11-15 | fix | fix(panes): lock toggle targets its own workspace; keep the lock out of the global context stub | ported | Fix. | |
+| `62724b0` | 2026-11-15 | fix | fix(panes): lock toggle targets its own workspace; keep the lock out of the global context stub | skipped | Follow-up to the pane lock feature (427db79), which remotea doesn't have. Ports with it if that feature is flagged. | |
 | `d68414e` | 2026-11-15 | fix | fix(terminal): read Shift off the modifier flags, not the letter's case (#453) | ported | Fix. | |
 | `5fd35ab` | 2026-11-15 | chore | chore(cli): regenerate resources/cli/wmux.js for the WSL markdown path fix (#456) | not applicable | Regenerated `resources/cli`; remotea regenerates its own and never merges it by hand. | |
 | `fc35f15` | 2026-11-15 | chore | chore(release): bump to 2.62.0 | not applicable | Release version bump. | |
