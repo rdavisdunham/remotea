@@ -29,8 +29,10 @@ describe('remote i18n', () => {
     describe(code, () => {
       const keys = Object.keys(dict);
 
-      it('has exactly the English keys (plural variants folded)', () => {
-        expect(new Set(keys.map(baseOf))).toEqual(enBases);
+      // A language may lack strings; translate() shows those in English. It may
+      // not carry a key English lacks, which would be a typo or a leftover.
+      it('has only English keys (plural variants folded)', () => {
+        for (const k of keys) expect(enBases.has(baseOf(k)), `${code} ${k}`).toBe(true);
         for (const k of keys) {
           if (PLURAL_SUFFIX.test(k)) expect(pluralBases.has(baseOf(k))).toBe(true);
           else expect(Object.hasOwn(en, k)).toBe(true);
@@ -43,6 +45,7 @@ describe('remote i18n', () => {
         const used = new Set<string>();
         for (let n = 0; n <= 200; n++) used.add(rules.select(n));
         for (const base of pluralBases) {
+          if (!keys.some((k) => baseOf(k) === base)) continue; // missing: English answers
           for (const cat of used) expect(keys, `${code} ${base}_${cat}`).toContain(`${base}_${cat}`);
           expect(keys).toContain(`${base}_other`);
         }
@@ -68,6 +71,18 @@ describe('remote i18n', () => {
       }
     });
   }
+
+  it('shows English for a string a language lacks', () => {
+    const fr = REMOTE_LANGUAGES.find((l) => l.code === 'fr')!.dict as Record<string, string>;
+    const key = Object.keys(en).find((k) => !PLURAL_SUFFIX.test(k))! as keyof typeof en;
+    const saved = fr[key];
+    delete fr[key];
+    try {
+      expect(createT('fr').t(key)).toBe(format(en[key], {}));
+    } finally {
+      fr[key] = saved;
+    }
+  });
 
   it('matches navigator languages, folding regions except for Chinese script', () => {
     expect(matchLanguage(['fr-FR', 'en'])).toBe('fr');

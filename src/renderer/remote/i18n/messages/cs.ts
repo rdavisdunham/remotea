@@ -1,4 +1,4 @@
-/** Phone console strings — Czech. Keys mirror en.ts exactly (parity test). */
+/** Phone console strings — Czech. Keys are a subset of en.ts; a missing string shows in English. */
 export const cs: Readonly<Record<string, string>> = {
   'attach.hideControls': 'Skrýt všechny ovládací prvky',
   'attach.showControls': 'Zobrazit ovládací prvky',

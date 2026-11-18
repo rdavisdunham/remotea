@@ -1,4 +1,4 @@
-/** Phone console strings — Ukrainian. Keys mirror en.ts exactly (parity test). */
+/** Phone console strings — Ukrainian. Keys are a subset of en.ts; a missing string shows in English. */
 export const uk: Readonly<Record<string, string>> = {
   'attach.hideControls': 'Приховати всі елементи керування',
   'attach.showControls': 'Показати елементи керування',

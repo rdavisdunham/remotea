@@ -1,4 +1,4 @@
-/** Phone console strings — Korean. Keys mirror en.ts exactly (parity test). */
+/** Phone console strings — Korean. Keys are a subset of en.ts; a missing string shows in English. */
 export const ko: Readonly<Record<string, string>> = {
   'attach.hideControls': '모든 컨트롤 숨기기',
   'attach.showControls': '컨트롤 표시',

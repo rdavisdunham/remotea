@@ -1,4 +1,4 @@
-/** Phone console strings — Russian. Keys mirror en.ts exactly (parity test). */
+/** Phone console strings — Russian. Keys are a subset of en.ts; a missing string shows in English. */
 export const ru: Readonly<Record<string, string>> = {
   'attach.hideControls': 'Скрыть все элементы управления',
   'attach.showControls': 'Показать элементы управления',

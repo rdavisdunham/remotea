@@ -1,4 +1,4 @@
-/** Phone console strings — Turkish. Keys mirror en.ts exactly (parity test). */
+/** Phone console strings — Turkish. Keys are a subset of en.ts; a missing string shows in English. */
 export const tr: Readonly<Record<string, string>> = {
   'attach.hideControls': 'Tüm kontrolleri gizle',
   'attach.showControls': 'Kontrolleri göster',

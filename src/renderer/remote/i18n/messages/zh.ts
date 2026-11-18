@@ -1,4 +1,4 @@
-/** Phone console strings — Simplified Chinese. Keys mirror en.ts exactly (parity test). */
+/** Phone console strings — Simplified Chinese. Keys are a subset of en.ts; a missing string shows in English. */
 export const zh: Readonly<Record<string, string>> = {
   'attach.hideControls': '隐藏所有控件',
   'attach.showControls': '显示控件',

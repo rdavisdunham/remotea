@@ -1,4 +1,4 @@
-/** Phone console strings — Spanish. Keys mirror en.ts exactly (parity test). */
+/** Phone console strings — Spanish. Keys are a subset of en.ts; a missing string shows in English. */
 export const es: Readonly<Record<string, string>> = {
   'attach.hideControls': 'Ocultar todos los controles',
   'attach.showControls': 'Mostrar controles',
