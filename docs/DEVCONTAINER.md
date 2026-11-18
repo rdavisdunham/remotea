@@ -2,7 +2,7 @@
 
 remotea runs on Windows, but a Claude Code session often does not: it runs in a
 Linux devcontainer on top of WSL2 + Docker. Nothing in that container can open
-`\\.\pipe\wmux`, so the `remotea` CLI, the Claude Code hooks and the shell
+`\\.\pipe\remotea`, so the `remotea` CLI, the Claude Code hooks and the shell
 integration all fail silently — panes show no cwd or git branch, the sidebar
 never leaves "Running", and `remotea agent spawn` cannot reach the app at all.
 
@@ -13,15 +13,15 @@ long-running command, and two environment variables.
 ## How it fits together
 
 ```
-  Devcontainer (Linux)                WSL2 distro                     Windows
- ┌──────────────────────┐   TCP    ┌────────────────────┐  interop  ┌─────────┐
- │ claude               │ ───────► │ remotea bridge --wsl  │ ────────► │ remotea    │
- │  remotea CLI            │  :9787   │  listens 0.0.0.0   │           │         │
- │  remotea-hook.js        │          │  npiperelay.exe ×N │ ═════════ │ \\.\pipe│
- │  bash integration    │ ◄─────── │  (warm pool)       │ ◄──────── │  \wmux  │
- └──────────────────────┘          └────────────────────┘           └─────────┘
-   REMOTEA_REMOTE=                      remotea bridge is a byte relay:
-   host.docker.internal:9787         no parsing, no auth of its own
+  Devcontainer (Linux)                  WSL2 distro                        Windows
+ ┌───────────────────────┐   TCP    ┌───────────────────────┐  interop  ┌────────────┐
+ │ claude                │ ───────► │ remotea bridge --wsl  │ ────────► │ remotea    │
+ │  remotea CLI          │  :9787   │  listens 0.0.0.0      │           │            │
+ │  remotea-hook.js      │          │  npiperelay.exe ×N    │ ═════════ │ \\.\pipe   │
+ │  bash integration     │ ◄─────── │  (warm pool)          │ ◄──────── │  \remotea  │
+ └───────────────────────┘          └───────────────────────┘           └────────────┘
+   REMOTEA_REMOTE=                     remotea bridge is a byte relay:
+   host.docker.internal:9787           no parsing, no auth of its own
 ```
 
 Three hops, one protocol. The container speaks the same JSON-RPC (V2) and
@@ -158,14 +158,14 @@ cannot, because the app is not running there. This is the one step the native
 case gets for free.
 
 Mount it read-only from the remotea install directory (`resources/` next to
-`wmux.exe`, or the repo checkout):
+`remotea.exe`, or the repo checkout):
 
 ```jsonc
 "mounts": [
-  "source=${localEnv:REMOTEA_RESOURCES}/cli,target=/opt/wmux/cli,type=bind,readonly"
+  "source=${localEnv:REMOTEA_RESOURCES}/cli,target=/opt/remotea/cli,type=bind,readonly"
 ],
 "containerEnv": {
-  "REMOTEA_CLI": "/opt/wmux/cli/remotea.js"
+  "REMOTEA_CLI": "/opt/remotea/cli/remotea.js"
 }
 ```
 
@@ -173,7 +173,7 @@ Then give the container a `remotea` command and let the shell integration report
 to it, in the image or in `postCreateCommand`:
 
 ```bash
-printf 'remotea() { node "$REMOTEA_CLI" "$@"; }\nexport -f wmux\n' >> ~/.bashrc
+printf 'remotea() { node "$REMOTEA_CLI" "$@"; }\nexport -f remotea\n' >> ~/.bashrc
 ```
 
 Copying instead of mounting works equally well and survives the host path

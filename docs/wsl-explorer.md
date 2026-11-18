@@ -21,7 +21,7 @@ on session restore. Shell startup files may change it afterward.
 Add to `~/.bashrc` inside the distro:
 
 ```bash
-# wmux: let the explorer follow this shell's directory
+# remotea: let the explorer follow this shell's directory
 [ -n "$WSL_DISTRO_NAME" ] && PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }"'printf "\e]7;file://localhost/%s\e\\" "$(wslpath -w "$PWD")"'
 ```
 
@@ -30,7 +30,7 @@ Add to `~/.bashrc` inside the distro:
 Add to `~/.zshrc`:
 
 ```zsh
-# wmux: let the explorer follow this shell's directory
+# remotea: let the explorer follow this shell's directory
 if [[ -n "$WSL_DISTRO_NAME" ]]; then
   _wmux_osc7() { printf '\e]7;file://localhost/%s\e\\' "$(wslpath -w "$PWD")" }
   precmd_functions+=(_wmux_osc7)
@@ -64,7 +64,7 @@ your distro's home to load anything into it. One line in `~/.bashrc` (or `~/.zsh
 inside the distro does it:
 
 ```bash
-# wmux: shell integration (cwd for session restore, git branch, prompt marks)
+# remotea: shell integration (cwd for session restore, git branch, prompt marks)
 [ -n "$REMOTEA_BASH_SCRIPT" ] && . "$REMOTEA_BASH_SCRIPT"
 ```
 

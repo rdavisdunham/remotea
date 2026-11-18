@@ -278,7 +278,7 @@ Run `remotea reload-config` after changing either value.
 ## Pasted images
 
 A pasted image (a screenshot, or anything else copied as an image) is written to
-`%TEMP%\wmux\screenshot-<time>.png` and its path is typed into the pane, or
+`%TEMP%\remotea\screenshot-<time>.png` and its path is typed into the pane, or
 uploaded first in an SSH pane (see above).
 
 ```toml

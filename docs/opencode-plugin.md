@@ -88,7 +88,7 @@ remotea opencode-tui --remove   # remove, only when the file carries our marker
   In a WSL pane that is the distro's home; in a devcontainer, the container's.
   Nothing on the Windows side writes into a WSL home.
 - It is not installed automatically and does not need a remotea restart. Re-run
-  the command after upgrading wmux: it compares the `// remotea-plugin-version:`
+  the command after upgrading remotea: it compares the `// remotea-plugin-version:`
   marker on `tui.js` and rewrites both files when the shipped version differs.
 - **Keep backups outside `plugins/`.** OpenCode loads *every* directory under
   `<config>/plugins/` as a plugin, so a copy such as
@@ -148,7 +148,7 @@ Set `REMOTEA_PLUGIN_DEBUG` before launching OpenCode:
 export REMOTEA_PLUGIN_DEBUG=1
 
 # or point it wherever you are already tailing
-export REMOTEA_PLUGIN_DEBUG=/tmp/wmux-debug.log
+export REMOTEA_PLUGIN_DEBUG=/tmp/remotea-debug.log
 ```
 
 It logs plugin init (resolved JS runtime, surface id, CLI path), every event
