@@ -2,6 +2,7 @@ import { isChatAttentionAction } from '../shared/remote-host-protocol';
 import { readIntegrationStatus } from './integration-status';
 import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents, safeStorage } from 'electron';
 import { isSafeExternalUrl } from './security-policy';
+import { nextZoomFactor } from './zoom-factor';
 import * as path from 'path';
 import { promises as fsp } from 'fs';
 import { IPC_CHANNELS, SurfaceId, WindowId, WorkspaceId, AgentId, type InsertionResult, type ExplorerListError } from '../shared/types';
@@ -21,6 +22,7 @@ import { agentIdentity } from './agent-identity';
 import { setDetection, forgetDetection, activeManifests } from './detection-store';
 import {
   readClipboardSource,
+  materializeClipboard,
   regularFilePaths,
   resolveInsertion,
   SurfaceInsertionQueue,
@@ -613,6 +615,14 @@ const agentBrowserDeps: AgentBrowserDeps = {
 };
 
 export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstance?: CDPProxy): void {
+  // Ctrl+wheel captured by the desktop before terminal scrolling consumes it.
+  ipcMain.on(IPC_CHANNELS.WINDOW_ZOOM, (event, deltaY: unknown) => {
+    if (typeof deltaY !== 'number' || !Number.isFinite(deltaY)) return;
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed() || win.webContents !== event.sender) return;
+    event.sender.setZoomFactor(nextZoomFactor(event.sender.getZoomFactor(), deltaY));
+  });
+
   // Toggle DevTools for the renderer window
   ipcMain.on('toggle-devtools', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -769,6 +779,13 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     // A reflowed desktop terminal invalidates a phone's snapshot (#254); the
     // console debounces and resnapshots. The phone itself never resizes a PTY.
     remoteTaps.noteResize(id);
+  });
+
+  // Clear terminal buffer (#434). Only the window that owns the pane may clear
+  // its ConPTY; any other sender, or a pane with no live PTY, is ignored.
+  ipcMain.on(IPC_CHANNELS.PTY_CLEAR, (event, id: unknown) => {
+    if (!ownsLiveSurface(id, event.sender)) return;
+    ptyManager.clear(id);
   });
 
   ipcMain.on(IPC_CHANNELS.PTY_KILL, (_event, id: SurfaceId, shellSpec?: unknown) => {
@@ -1004,6 +1021,10 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     if (effects.toast) {
       notificationManager.showToast(data.title || 'remotea', data.text, () => {
         if (window && !window.isDestroyed()) {
+          // A minimized or hidden window comes back on a toast click.
+          if (window.isMinimized()) window.restore();
+          if (!window.isVisible()) window.show();
+          window.moveTop();
           window.focus();
           window.webContents.send('notification:focus-surface', data.surfaceId);
         }
@@ -1035,6 +1056,9 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   });
   ipcMain.handle(IPC_CHANNELS.WINDOW_IS_MAXIMIZED, (e) =>
     BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false
+  );
+  ipcMain.handle(IPC_CHANNELS.WINDOW_IS_FOCUSED, (e) =>
+    BrowserWindow.fromWebContents(e.sender)?.isFocused() ?? true
   );
   // Window transparency (Win11 backdrop material). Applied to every window, not
   // just the sender: the pref is global, and a second window left opaque while
@@ -1260,10 +1284,18 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
       if (!ownsLiveSurface(surfaceId, event.sender)) return { text: null };
       // Snapshot before queueing: a slow earlier upload must not make this
       // gesture read whatever happens to be on the clipboard later.
-      const source = readClipboardSource();
+      const snapshot = readClipboardSource({
+        downscaleImages: loadUserConfig().paste?.downscaleImages !== false,
+      });
+      // The image is encoded and written now, not behind an earlier gesture's
+      // upload — but only the queue decides when its path is typed (#381).
+      // The catch only keeps a failed write that a cancelled queue never
+      // awaits from being an unhandled rejection; the task still sees it.
+      const ready = materializeClipboard(snapshot);
+      ready.catch(() => undefined);
       return insertionQueue.enqueue(
         surfaceId,
-        (signal) => resolveFor(surfaceId, source, 'paste', false, signal),
+        async (signal) => resolveFor(surfaceId, await ready, 'paste', false, signal),
       );
     },
   );

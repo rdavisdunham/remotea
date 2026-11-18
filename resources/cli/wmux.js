@@ -13,6 +13,7 @@ exports.subcommandError = subcommandError;
 exports.formatRemoteStatus = formatRemoteStatus;
 exports.parseFlagArgs = parseFlagArgs;
 exports.layoutAgentsParams = layoutAgentsParams;
+exports.resolveMarkdownFilePath = resolveMarkdownFilePath;
 exports.sendKeyParams = sendKeyParams;
 exports.emptyPromptNote = emptyPromptNote;
 exports.promptTruncationNote = promptTruncationNote;
@@ -34,6 +35,7 @@ const stream_1 = require("stream");
 const wsl_network_1 = require("./wsl-network");
 const transport_deadline_1 = require("./transport-deadline");
 const opencode_tui_install_1 = require("./opencode-tui-install");
+const transport_retry_1 = require("./transport-retry");
 /** The two signals wsl-network.ts uses to decide we are inside a WSL distro. */
 function readWslEnvironment() {
     let osRelease = null;
@@ -204,7 +206,15 @@ function connectViaNpiperelay(pipePath, onConnect) {
     }
     // npiperelay names the pipe with forward slashes: \\.\pipe\wmux → //./pipe/wmux
     const child = (0, child_process_1.spawn)(bin, ['-ei', '-s', pipePath.replace(/\\/g, '/')], {
-        stdio: ['pipe', 'pipe', 'inherit'],
+        stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let relayError = '';
+    child.stderr?.on('data', (chunk) => {
+        // npiperelay writes "open //./pipe/wmux: All pipe instances are busy" here
+        // and exits non-zero. Keep it on the error so the caller can tell a busy
+        // pipe (safe to retry for an idempotent request) from a missing one.
+        if (relayError.length < 2_000)
+            relayError += chunk.toString();
     });
     const duplex = new stream_1.Duplex({
         read() { },
@@ -232,8 +242,10 @@ function connectViaNpiperelay(pipePath, onConnect) {
     child.stdout?.on('end', () => duplex.push(null));
     child.on('error', (err) => duplex.destroy(err));
     child.on('exit', (code) => {
-        if (code !== 0 && code !== null)
-            duplex.destroy(new Error(`npiperelay exited with code ${code}`));
+        if (code !== 0 && code !== null) {
+            const detail = relayError.trim().slice(0, 500);
+            duplex.destroy(new Error(detail ? `npiperelay exited with code ${code}: ${detail}` : `npiperelay exited with code ${code}`));
+        }
     });
     // "Ready" here means the relay process exists — NOT that it has attached to the
     // named pipe, which over WSL interop can take seconds longer. onConnect must
@@ -357,6 +369,25 @@ function sendV2(method, params = {}, timeoutMs = transport_deadline_1.DEFAULT_V2
         });
         client.on('error', (err) => { clearTimeout(timer); reject(err); });
     });
+}
+/**
+ * A busy pipe clears in about a second during a restore; this budget keeps a
+ * report from waiting longer than the agent would notice.
+ */
+const REPORT_PATIENCE = { budgetMs: 4_000, firstAttemptMs: 1_500 };
+/** Prompt admission is a log entry, not a turn: don't delay the agent for long. */
+const PROMPT_PATIENCE = { budgetMs: 1_500, firstAttemptMs: 750 };
+/**
+ * `sendV2` for requests that may be asked twice.
+ *
+ * Only reports/releases/prompt admission use this. The request is idempotent at
+ * main's boundary, so a duplicate after a lost reply is harmless; a spawn or a
+ * typed key must never take this path. A successful reply resolves the retry
+ * loop immediately — the next attempt only exists when the previous one never
+ * produced a response.
+ */
+function sendV2Patiently(method, params = {}, patience = REPORT_PATIENCE, timeoutMs = transport_deadline_1.DEFAULT_V2_TIMEOUT_MS) {
+    return (0, transport_retry_1.retryTransient)((attemptMs) => sendV2(method, params, Math.max(1, Math.min(timeoutMs, attemptMs))), patience);
 }
 // Simple flag helpers shared across commands.
 function getFlag(args, name) {
@@ -853,7 +884,7 @@ function printManifestResult(result) {
 async function cmdWorkspace(args) {
     const sub = args[1];
     if (sub === 'list') {
-        print(await sendV2('workspace.list', {}));
+        print(await sendV2('workspace.list_manifests', {}));
         return;
     }
     if (sub === 'save')
@@ -916,6 +947,27 @@ async function workspaceSave(rest) {
     fs_1.default.writeFileSync(file, text, 'utf-8');
     console.log(`Wrote ${file}. Commit it; anyone opening it is shown every command before anything runs.`);
 }
+/**
+ * Relative paths resolve against the caller's cwd, which differs from the main
+ * process's. The Windows host reads the file even when the CLI runs in WSL, so
+ * preserve Windows paths before POSIX resolution can turn them into relative
+ * names, and let wslpath handle both distro files and Windows-mounted drives.
+ * Remote requests retain their existing path semantics.
+ */
+function resolveMarkdownFilePath(filePath, { cwd = process.cwd(), platform = process.platform, env = process.env, remote = !!remoteTarget, } = {}) {
+    const paths = platform === 'win32' ? path_1.default.win32 : path_1.default.posix;
+    if (remote || !(0, transport_deadline_1.isWslHost)(env, platform))
+        return paths.resolve(cwd, filePath);
+    if (/^(?:[a-z]:[\\/]|[\\/]{2})/i.test(filePath))
+        return filePath;
+    const resolved = paths.resolve(cwd, filePath);
+    const converted = (0, child_process_1.spawnSync)('/usr/bin/wslpath', ['-w', resolved], { encoding: 'utf-8', timeout: 5000 });
+    if (converted.error || converted.status !== 0 || !converted.stdout.trim()) {
+        const reason = converted.error?.message || converted.stderr.trim() || 'wslpath returned no path';
+        throw new Error(`Cannot convert WSL Markdown path '${resolved}': ${reason}`);
+    }
+    return converted.stdout.replace(/\r?\n$/, '');
+}
 async function cmdMarkdown(args) {
     const sub = args[1];
     if (sub === 'set') {
@@ -933,8 +985,7 @@ async function cmdMarkdown(args) {
             }));
         }
         else if (fileFlag !== -1) {
-            // Resolve against the terminal's cwd — the main-process cwd differs.
-            const filePath = path_1.default.resolve(process.cwd(), args[fileFlag + 1] || '');
+            const filePath = resolveMarkdownFilePath(args[fileFlag + 1] || '');
             print(await sendV2('markdown.load_file', { surfaceId, filePath }));
         }
         else {
@@ -949,7 +1000,7 @@ async function cmdMarkdown(args) {
     else if (sub) {
         // One-shot: `wmux markdown <file>` — create a markdown surface and load the
         // file into it. Relative paths resolve against the caller's cwd.
-        const filePath = path_1.default.resolve(process.cwd(), sub);
+        const filePath = resolveMarkdownFilePath(sub);
         const created = await sendV2('surface.create', { type: 'markdown' });
         const surfaceId = created?.surfaceId;
         if (!surfaceId) {
@@ -1449,7 +1500,7 @@ function hookParams(args) {
     return params;
 }
 async function cmdHook(args) {
-    await sendV2('hook.event', hookParams(args));
+    await sendV2Patiently('hook.event', hookParams(args), PROMPT_PATIENCE);
 }
 /**
  * `wmux opencode-tui [--remove]` — install the CLI-side (TUI) half (#310).
@@ -1895,7 +1946,7 @@ async function cmdReportAgent(args) {
             process.exit(1);
         }
     }
-    print(await sendV2('pane.report_agent', params));
+    print(await sendV2Patiently('pane.report_agent', params));
 }
 /**
  * `answer-agent` — reply to a blocked pane from outside it (issue #128).
@@ -1930,7 +1981,7 @@ async function cmdReportMetadata(args) {
     const ttl = getFlag(args, '--ttl');
     if (ttl)
         params.ttlMs = Number(ttl);
-    print(await sendV2('pane.report_metadata', params));
+    print(await sendV2Patiently('pane.report_metadata', params));
 }
 /**
  * A subagent of the calling pane — a background task, a worker, a planner —
@@ -1955,7 +2006,7 @@ async function cmdReportSubagent(args) {
     if (detail !== undefined)
         params.detail = detail;
     params.done = args.includes('--done');
-    print(await sendV2('agent.subagent', params));
+    print(await sendV2Patiently('agent.subagent', params));
 }
 // Keys stay inferred (no Record<string, …> annotation) so spreading this into
 // COMMANDS still satisfies the exhaustive Record<CommandName, …> check.
@@ -1965,7 +2016,7 @@ const AGENT_STATE_COMMANDS = {
     'report-subagent': cmdReportSubagent,
     'report-session': async (args) => {
         const surfaceId = reportingSurface(args, 'report-session');
-        print(await sendV2(getFlag(args, '--provider') === 'codex' ? 'pane.report_codex_session' : 'pane.report_agent_session', {
+        print(await sendV2Patiently(getFlag(args, '--provider') === 'codex' ? 'pane.report_codex_session' : 'pane.report_agent_session', {
             surfaceId,
             seq: seqFlag(args),
             sessionId: getFlag(args, '--session') ?? args[1] ?? null,
@@ -1978,14 +2029,14 @@ const AGENT_STATE_COMMANDS = {
         // OpenCode's plugin releases only the session it reported (#290): main
         // refuses it while quitting, and when the pane already holds a newer one.
         if (getFlag(args, '--provider') === 'opencode') {
-            print(await sendV2('pane.release_opencode_session', { surfaceId, sessionId: getFlag(args, '--session') ?? null }));
+            print(await sendV2Patiently('pane.release_opencode_session', { surfaceId, sessionId: getFlag(args, '--session') ?? null }));
             return;
         }
         if (getFlag(args, '--provider') === 'omp') {
-            print(await sendV2('pane.release_omp_session', { surfaceId, sessionId: getFlag(args, '--session') ?? null }));
+            print(await sendV2Patiently('pane.release_omp_session', { surfaceId, sessionId: getFlag(args, '--session') ?? null }));
             return;
         }
-        print(await sendV2('pane.release_agent', { surfaceId, seq: seqFlag(args) }));
+        print(await sendV2Patiently('pane.release_agent', { surfaceId, seq: seqFlag(args) }));
     },
     // No --surface → the whole picture, including a `blocked` list that answers
     // "which pane needs me?" in one call.
@@ -2060,7 +2111,8 @@ exports.COMMAND_SPECS = {
         usage: 'wmux workspace open [path] [--dry-run] [--new] [--json]   (bring up a wmux.workspace.json; asks before running anything)\n'
             + 'wmux workspace validate [path] [--json]\n'
             + 'wmux workspace save [--to <dir|file.json>] [--name N] [--workspace <id>] [--force] [--stdout]\n'
-            + 'wmux workspace list',
+            + 'wmux workspace list   (manifests you allowed to run on this machine; empty until you open one and choose to run it.\n'
+            + '                       Your open workspaces are `wmux list-workspaces`)',
         value: ['--to', '--name', '--workspace'],
         bool: ['--dry-run', '--new', '--json', '--force', '--stdout'],
         passthrough: true,

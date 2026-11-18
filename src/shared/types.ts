@@ -94,6 +94,12 @@ export interface SurfaceRef {
    * all can still say "PowerShell" rather than "Terminal".
    */
   resolvedShell?: string;
+  /**
+   * Effective launch spec captured when the PTY starts, including an inherited
+   * workspace/default spec's arguments. New terminals inherit it rather than
+   * re-reading preferences that may have changed since this terminal started.
+   */
+  launchShell?: string;
   /** Per-surface color scheme override (bundled theme name or user-defined scheme name). */
   colorScheme?: string;
   /** Per-surface working directory override (quick-launch profiles — issue #32). */
@@ -460,14 +466,10 @@ export interface WorkspaceInfo {
    * so an agent running cd .. moves it.
    */
   worktree?: WorktreeMetadata;
-  // The last POSIX/WSL directory known for this workspace, kept apart from
-  // `cwd` because one workspace can hold panes in two filesystems at once.
-  // `cwd` is whichever pane reported last, so a single pwsh/cmd pane rewrites
-  // it to a Win32 path — and a WSL pane with no cwd of its own then falls back
-  // to a path wsl.exe cannot open, so `--cd` degrades to `~` and the pane
-  // silently lands in the WSL home instead of the project. Only POSIX reports
-  // (and a POSIX folder at creation) write here, so the WSL fallback survives
-  // a Win32 pane living in the same workspace.
+  /**
+   * The WSL fallback survives a neighbouring Windows pane's cwd report. May be
+   * POSIX, a drive path or WSL UNC: wsl.exe --cd accepts all three spellings.
+   */
   posixCwd?: string;
   prNumber?: number;
   prStatus?: 'open' | 'merged' | 'closed';
@@ -716,11 +718,13 @@ export interface InsertionResult {
 
 // IPC channel names
 export const IPC_CHANNELS = {
+  WINDOW_ZOOM: 'window:zoom',
   INTEGRATION_STATUS: 'integration:status',
   // PTY
   PTY_CREATE: 'pty:create',
   PTY_WRITE: 'pty:write',
   PTY_RESIZE: 'pty:resize',
+  PTY_CLEAR: 'pty:clear',
   PTY_KILL: 'pty:kill',
   PTY_HAS: 'pty:has',
   PTY_DATA: 'pty:data',
@@ -824,6 +828,14 @@ export const IPC_CHANNELS = {
   WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_MAXIMIZE: 'window:maximize',
   WINDOW_IS_MAXIMIZED: 'window:isMaximized',
+  /** Seed for WINDOW_FOCUS_CHANGED, which only reports changes. */
+  WINDOW_IS_FOCUSED: 'window:isFocused',
+  /**
+   * Main → renderer: the OS window gained or lost focus. From main because the
+   * renderer's own `blur` also fires when focus moves into a browser pane's
+   * `<webview>`, which is still this window.
+   */
+  WINDOW_FOCUS_CHANGED: 'window:focusChanged',
   WINDOW_SET_PROGRESS: 'window:setProgress',
   /** Flash this window's taskbar button — an agent started waiting on the user. */
   WINDOW_FLASH: 'window:flash',

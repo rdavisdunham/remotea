@@ -15,6 +15,7 @@ import { groupSidebarWorkspaces, taskRunHealth } from './eridani-groups';
 import { useRemoteRegistry } from '../../remote-sessions/registry-cache';
 import type { AgentRosterEntry } from '../../store/agent-rollup';
 import { DropEdge, edgeForListPointer, edgeForPointer, reorderByDrop } from './reorder';
+import { keepPaneFocus } from './keep-pane-focus';
 import ErrorBoundary from '../ErrorBoundary';
 import { useStore } from '../../store';
 import { sidebarTextScale } from '../../store/settings-slice';
@@ -364,6 +365,7 @@ export default function Sidebar({
       // The custom property, not a `zoom`: zoom would scale the resizable
       // width and every icon too, while #319 asks for the TEXT only.
       style={{ width: sidebarWidth, '--sidebar-text-scale': textScale } as React.CSSProperties}
+      onMouseDown={keepPaneFocus}
     >
       <ErrorBoundary label="agent-roster" silent>
         <AgentRosterBanner onFocusAgent={onFocusAgent} onOpenNavigator={onOpenAgentNavigator} />

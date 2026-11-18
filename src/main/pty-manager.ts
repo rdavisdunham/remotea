@@ -15,7 +15,7 @@ import { codexShimDirs } from './codex-launcher';
 import { loadSettings } from './settings-store';
 import { getNodeRuntime } from './node-runtime';
 import { system32, opensshPath } from './system32';
-import { bashAlias, gitBashCandidates, isWslBashLauncher, isGitBashLauncher, GIT_BASH_LOGIN_ARGS } from './git-bash';
+import { bashAlias, gitBashCandidates, isWslBashLauncher, isGitBashLauncher, gitBashIntegrationArgs, GIT_BASH_LOGIN_ARGS } from './git-bash';
 import { deliverStartupCommandsWhenReady } from './startup-commands';
 import { browserEnvFor, WSL_ENV_PASSTHROUGH } from './pane-browser-env';
 
@@ -472,8 +472,8 @@ export function resolveShellForCwd(shell: string, cwd: string | undefined): stri
 // inherited split — passes through here too, and gets the same courtesy for
 // free. Expansion happens only for the SPAWN dir; resolveShellForCwd and
 // buildShellArgs above still see the raw string, which is what keeps `~` on a
-// wsl.exe pane meaning "the distro's home" (`--cd ~`) instead of a Win32 path
-// that distro cannot open.
+// wsl.exe pane meaning "the distro's home" (`--cd ~`) rather than expanding it
+// to the Windows user's home.
 export function resolveSpawnCwd(raw: string | undefined): string {
   const cwd = expandPathVars(raw ?? '', process.env);
   const fallback = process.env.USERPROFILE || os.homedir();
@@ -494,10 +494,11 @@ export function resolveSpawnCwd(raw: string | undefined): string {
   return fallback;
 }
 
-// Build the launch args for a shell and mutate `env` with shell-specific vars.
-// Kept out of create() so that hot path stays under the cognitive-complexity
-// budget. `env` is mutated in place (integration script paths, WSLENV, etc.).
-function buildShellArgs(
+/**
+ * WSL needs the reported directory as --cd independently of the Windows-side
+ * spawn cwd; its CLI accepts POSIX, Windows drive and WSL UNC paths.
+ */
+export function buildShellArgs(
   shellType: ReturnType<typeof getShellType>,
   env: { [key: string]: string },
   integrationDir: string,
@@ -525,6 +526,15 @@ function buildShellArgs(
     // this WSL shell inherits them and its CLI can reach wmux over the bridge
     // (issue #19). Harmless when unset — WSLENV skips a variable with no value.
     env.WSLENV = env.WSLENV ? `${env.WSLENV}:${WSL_ENV_PASSTHROUGH}` : WSL_ENV_PASSTHROUGH;
+    // What the bash integration needs inside the distro (#428): the Windows JS
+    // runtime that can reach the pipe, under a name of its own (see
+    // WSL_ENV_PASSTHROUGH), and the script, so the line a user adds to
+    // ~/.bashrc does not depend on where wmux is installed. Nothing loads it
+    // for them: wsl.exe starts the distro's own login shell, and wmux could
+    // only hand that an rc file by replacing the shell or writing to the
+    // distro's home.
+    if (env.WMUX_NODE) env.WMUX_WSL_NODE = env.WMUX_NODE;
+    env.WMUX_BASH_SCRIPT = path.join(integrationDir, 'wmux-bash-integration.sh');
     // A restored WSL/POSIX cwd (issue #60) can't be a Win32 process cwd (error
     // 267). Open it INSIDE the distro via --cd instead; the Win32-side cwd is
     // sanitized to a valid Windows dir by the caller.
@@ -532,10 +542,77 @@ function buildShellArgs(
     // --cd is BEST-EFFORT: WSL applies it before the interactive login shell
     // reads its rc, so a distro whose /etc/profile or ~/.profile cds to $HOME
     // discards it and the pane opens at home. See docs/config.md.
-    const posixCwd = cwd && isPosixPath(cwd) ? cwd : null;
-    return ['--cd', posixCwd ?? '~'];
+    return ['--cd', wslCdArg(cwd)];
   }
   return [];
+}
+
+/**
+ * Git Bash's arguments when it loads wmux's integration (#427, see
+ * `gitBashIntegrationArgs`), or null to leave the shell alone. The script is
+ * checked first, like PowerShell's: bash given an --init-file it cannot read
+ * would skip the user's ~/.bashrc as well.
+ */
+export function gitBashArgs(
+  shell: string,
+  extraArgs: readonly string[],
+  integrationDir: string,
+  env: { [key: string]: string },
+): string[] | null {
+  const script = path.join(integrationDir, 'wmux-bash-integration.sh');
+  const plan = gitBashIntegrationArgs(shell, extraArgs, script);
+  if (!plan || !fs.existsSync(script)) return null;
+  env.WMUX_BASH_INIT = '1';
+  if (plan.login) env.WMUX_BASH_LOGIN = '1';
+  return plan.args;
+}
+
+function nonBlankCommands(commands: readonly unknown[] | undefined): string[] {
+  return (commands ?? []).filter((cmd): cmd is string => typeof cmd === 'string' && cmd.trim().length > 0);
+}
+
+/**
+ * A WSL spec that fell back to another shell, or resolved to something that is
+ * not WSL: its startup commands are not typed (#395). The fallback can change
+ * the shell language, or drop the requested distro's arguments.
+ */
+function lostRequestedWsl(requestedCommand: string, resolved: string | undefined, shellType: string): boolean {
+  return getShellType(requestedCommand) === 'wsl' && (resolved === undefined || shellType !== 'wsl');
+}
+
+const WSL_UNC_RE =/^\\\\(?:wsl\.localhost|wsl\$)\\[^\\]+(\\.*)?$/i;
+
+/**
+ * What `wsl --cd` gets for a saved cwd. wsl.exe EXITS (ERROR_FILE_NOT_FOUND /
+ * ERROR_PATH_NOT_FOUND) on a Windows-spelled directory that does not exist, so
+ * the restored pane never starts, while a missing POSIX path only lands in `/`.
+ * So a WSL UNC path becomes its POSIX spelling (no stat, which could wake the
+ * distro), a drive path is passed only if it still exists, and anything else
+ * opens at the distro home.
+ */
+function wslCdArg(cwd: string | undefined): string {
+  if (!cwd) return '~';
+  if (isPosixPath(cwd)) return cwd;
+  const unc = WSL_UNC_RE.exec(cwd);
+  if (unc) return (unc[1] || '\\').replace(/\\/g, '/');
+  if (/^[a-zA-Z]:[\\/]/.test(cwd)) {
+    try {
+      if (fs.statSync(cwd).isDirectory()) return cwd;
+    } catch {
+      // gone or unreadable: fall through to the distro home
+    }
+  }
+  return '~';
+}
+
+/**
+ * The shell spec a live PTY reports back on reuse: the caller's own spec when
+ * the requested executable is what runs, the substituted shell when it is not,
+ * and nothing when no spec resolved at all (see the note at the call site).
+ */
+function launchShellFor(spec: string, requested: string | undefined, shell: string): string {
+  if (requested === undefined) return '';
+  return requested === shell ? spec : shell;
 }
 
 /**
@@ -566,9 +643,10 @@ interface PtyEntry {
   // reason — a cause of the doubled prompt on startup.
   cols: number;
   rows: number;
-  // Resolved shell + whether startup commands were baked in — returned verbatim
-  // when create() is called again for the same surfaceId (idempotent reuse).
+  // Keep the resolved executable and launch spec with the live PTY, so a
+  // reattachment cannot replace its arguments with changed renderer preferences.
   shell: string;
+  launchShell: string;
   startupConsumed: boolean;
 }
 
@@ -593,6 +671,8 @@ export interface CreateOptions {
 export interface CreateResult {
   id: SurfaceId;
   shell: string;
+  /** User launch spec with its arguments, or the substituted shell on fallback. */
+  launchShell: string;
   /** True when startup commands were given: PtyManager owns their delivery. */
   startupCommandsConsumed: boolean;
   reused: boolean;
@@ -646,6 +726,13 @@ export class PtyManager {
   private static readonly CHUNK_THRESHOLD = 1024;
   private static readonly CHUNK_SIZE = 1024;
 
+  /** The live PTY already registered under this surface id, as a create() answer. */
+  private reuseLive(surfaceId: SurfaceId | undefined): CreateResult | null {
+    const existing = surfaceId ? this.ptys.get(surfaceId) : undefined;
+    if (!surfaceId || !existing?.alive) return null;
+    return { id: surfaceId, shell: existing.shell, launchShell: existing.launchShell, startupCommandsConsumed: existing.startupConsumed, reused: true };
+  }
+
   create(options: CreateOptions): CreateResult {
     const id: SurfaceId = options.surfaceId ?? `surf-${uuidv4()}` as SurfaceId;
 
@@ -655,17 +742,8 @@ export class PtyManager {
     // this guard the second call spawns a SECOND PowerShell process under the
     // same id: both stream to the renderer (doubled prompt + every keystroke
     // echoed twice) and the first leaks as an orphan. Reuse the live PTY instead.
-    if (options.surfaceId) {
-      const existing = this.ptys.get(options.surfaceId);
-      if (existing && existing.alive) {
-        return {
-          id: options.surfaceId,
-          shell: existing.shell,
-          startupCommandsConsumed: existing.startupConsumed,
-          reused: true,
-        };
-      }
-    }
+    const reused = this.reuseLive(options.surfaceId);
+    if (reused) return reused;
 
     // Split "ssh user@host"-style specs into executable + args (issue #78).
     // Extra args only apply when the REQUESTED executable resolved — if we fell
@@ -682,6 +760,11 @@ export class PtyManager {
     // (what we will actually spawn), which is what shellExtraArgs depends on.
     const requested = resolveExistingShellPath(spec.command);
     const shell = resolveShellForCwd(requested ?? resolveShell(spec.command), options.cwd);
+    // Keep arguments only for the requested executable, not a fallback or the
+    // WSL shell substituted for a POSIX directory. Reuse returns this snapshot.
+    // No spec at all stays empty: the resolved path is versioned for a Store
+    // PowerShell (#334), so inheriting it would pin tabs to a folder an update deletes.
+    const launchShell = launchShellFor(options.shell, requested, shell);
     const shellExtraArgs = extraArgsForSpec(spec, requested);
     const shellType = getShellType(shell);
     const integrationDir = getShellIntegrationPath();
@@ -738,7 +821,8 @@ export class PtyManager {
     // shim is a POSIX script and native tools like `gh` cannot run it.
     Object.assign(env, browserEnvFor(shellType));
 
-    const args = [...buildShellArgs(shellType, env, integrationDir, options.cwd), ...shellExtraArgs];
+    const args = gitBashArgs(shell, shellExtraArgs, integrationDir, env)
+      ?? [...buildShellArgs(shellType, env, integrationDir, options.cwd), ...shellExtraArgs];
 
     // Quick-launch startup commands (issue #32). Run them as part of the shell's
     // own initialization — BEFORE the first interactive prompt — instead of
@@ -753,9 +837,8 @@ export class PtyManager {
     // the race: they run during init and the first prompt render — the only one
     // that triggers the leaky query — happens afterward, exactly as it does for a
     // plain terminal that shows no junk.
-    const startupCommands = (options.startupCommands ?? []).filter(
-      (cmd): cmd is string => typeof cmd === 'string' && cmd.trim().length > 0,
-    );
+    const requestedStartupCommands = nonBlankCommands(options.startupCommands);
+    const startupCommands = lostRequestedWsl(spec.command, requested, shellType) ? [] : requestedStartupCommands;
     //
     // Every other shell (cmd, bash, WSL, PowerShell without the integration)
     // has no such seam and gets them TYPED — but by this class, gated on the
@@ -823,6 +906,7 @@ export class PtyManager {
       cols: spawnOptions.cols ?? 80,
       rows: spawnOptions.rows ?? 24,
       shell,
+      launchShell,
       startupConsumed: startupCommandsConsumed,
     };
 
@@ -858,7 +942,7 @@ export class PtyManager {
     // any output can arrive — node-pty delivers data asynchronously.
     if (startupCommandsConsumed && !bakeIntoInit) this.typeStartupCommands(id, entry, startupCommands);
     const fellBack = spec.command !== '' && requested === undefined;
-    return { id, shell, startupCommandsConsumed, reused: false, ...(fellBack ? { shellFallbackFrom: spec.command } : {}) };
+    return { id, shell, launchShell, startupCommandsConsumed, reused: false, ...(fellBack ? { shellFallbackFrom: spec.command } : {}) };
   }
 
   /**
@@ -958,6 +1042,33 @@ export class PtyManager {
       entry.pty.resize(cols, rows);
     } catch {
       // Exited between the liveness check and the call — nothing to resize.
+    }
+  }
+
+  /**
+   * Drop ConPTY's own copy of the screen, to match a renderer-side clear (#434).
+   *
+   * ConPTY renders the console into a buffer of its own and diffs every repaint
+   * against it. Clearing xterm alone leaves that buffer, and the cursor in it,
+   * where they were: the next echoed keystroke comes back as an absolute CUP to
+   * the old bottom row, so the prompt jumps down over the emptied screen. Clearing
+   * ConPTY first re-bases it to the top, which is what VS Code does for its
+   * "Clear" too.
+   *
+   * node-pty's `clear()` is a no-op outside ConPTY, and the method is checked for
+   * rather than assumed so a backend without it (a test double, an older build)
+   * is a no-op here as well.
+   */
+  clear(id: SurfaceId): void {
+    const entry = this.ptys.get(id);
+    // Same liveness rule as resize(): node-pty throws for an exited pty.
+    if (!entry?.alive) return;
+    const ptyProcess = entry.pty as Partial<Pick<pty.IPty, 'clear'>>;
+    if (typeof ptyProcess.clear !== 'function') return;
+    try {
+      ptyProcess.clear();
+    } catch {
+      // Exited between the liveness check and the call — nothing to clear.
     }
   }
 

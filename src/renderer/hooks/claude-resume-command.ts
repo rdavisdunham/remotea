@@ -45,6 +45,21 @@ export function hasResumed(surfaceId: string): boolean {
 }
 
 /**
+ * Surfaces whose next create resumes their agent even with that provider's
+ * restore-on-startup preference off — a tab reopened with Ctrl+Shift+T.
+ *
+ * The preferences gate restart restore, where every pane would start an agent
+ * at once. A reopen is one tab the user explicitly asked back, so its handle
+ * resumes regardless. Spent on first use, like the resume itself, and kept
+ * out of the store so nothing persists it into session.json.
+ */
+const forcedResumeSurfaces = new Set<string>();
+
+export function forceResumeOnSpawn(surfaceId: string): void {
+  forcedResumeSurfaces.add(surfaceId);
+}
+
+/**
  * The resume folded into a surface's commands, or `base` untouched.
  *
  * The once-per-surface guard lives here rather than in each provider branch: a
@@ -102,6 +117,12 @@ export function withClaudeResume(opts: {
   ompEnabled?: boolean;
   shell?: string;
 }): string[] | undefined {
+  if (opts.surfaceId && forcedResumeSurfaces.delete(opts.surfaceId)) {
+    opts = {
+      ...opts, enabled: true, codexEnabled: true, opencodeEnabled: true, agyEnabled: true,
+      qwenEnabled: true, ompEnabled: true,
+    };
+  }
   const { base, surfaceId, claudeSessionId, enabled } = opts;
   if (!surfaceId) return base;
   if (opts.qwenSessionId) return withQwenResume(base, surfaceId, opts);
@@ -119,7 +140,7 @@ export function withClaudeResume(opts: {
     if (claudeSessionId || opts.codexSessionId || opts.ompSessionId || !opts.opencodeEnabled) return base;
     // Mirrors OPENCODE_SESSION_ID_RE in src/main/opencode-resume.ts — re-checked
     // because session.json is a file the user can edit.
-    if (!/^ses_[A-Za-z0-9]{8,120}$/.test(opts.opencodeSessionId)) return base;
+    if (!/^ses_[A-Za-z0-9_]{8,120}$/.test(opts.opencodeSessionId)) return base;
     return applyResume(base, surfaceId, 'opencode', opts.opencodeSessionId);
   }
   if (opts.codexSessionId) {

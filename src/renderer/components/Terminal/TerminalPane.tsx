@@ -47,6 +47,8 @@ export interface TerminalPaneProps {
    * so it refits, repaints and takes focus back the way it does when shown.
    */
   attachGeneration?: number;
+  /** The pane's zoom, applied to the font size (#420). */
+  fontZoom?: number;
 }
 
 export default function TerminalPane({
@@ -68,8 +70,9 @@ export default function TerminalPane({
   onFindBarClose,
   copyModeActive = false,
   attachGeneration,
+  fontZoom,
 }: TerminalPaneProps) {
-  const { terminalRef, searchAddonRef, xtermRef } = useTerminal({ surfaceId, shell, cwd, visible, focused, attachGeneration, colorScheme, startupCommands, env, claudeSessionId, codexSessionId, opencodeSessionId, agySessionId, qwenSessionId, ompSessionId });
+  const { terminalRef, searchAddonRef, xtermRef } = useTerminal({ surfaceId, shell, cwd, visible, focused, attachGeneration, fontZoom, colorScheme, startupCommands, env, claudeSessionId, codexSessionId, opencodeSessionId, agySessionId, qwenSessionId, ompSessionId });
 
   // remotea: which remote host backs this pane, if any (same resolution as the spawn).
   const defaultShell = useStore((s) => s.workspacePrefs.defaultShell);
@@ -114,6 +117,16 @@ export default function TerminalPane({
     document.addEventListener('wmux:focus-terminal', onFocusTerminal);
     return () => document.removeEventListener('wmux:focus-terminal', onFocusTerminal);
   }, [xtermRef]);
+
+  useEffect(() => {
+    const onRefresh = (event: Event) => {
+      const id = (event as CustomEvent<{ surfaceId?: string }>).detail?.surfaceId;
+      if (id !== surfaceId || !activeRef.current) return;
+      try { xtermRef.current?.refresh(0, (xtermRef.current?.rows ?? 1) - 1); } catch { /* disposed */ }
+    };
+    document.addEventListener('wmux:refresh-surface', onRefresh);
+    return () => document.removeEventListener('wmux:refresh-surface', onRefresh);
+  }, [surfaceId, xtermRef]);
 
   const handleSearch = useCallback((query: string) => {
     setLastQuery(query);

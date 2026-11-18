@@ -7,6 +7,9 @@
 // belongs to. Keeping the predicate here rather than in pty-manager.ts lets the
 // renderer apply the same rule the PTY layer does, instead of re-deriving it.
 
+import { remoteDirectoryIssue } from './execution-location';
+import { parseRemoteShellSpec } from './remote-shell-spec';
+
 /**
  * A POSIX/WSL path (e.g. /home/user/project restored from session.json — issue
  * #60). Such a path is NOT a valid working dir for a Win32 process and makes
@@ -57,24 +60,24 @@ export function expandPathVars(p: string, env: Record<string, string | undefined
 }
 
 /**
- * Whether a shell command line opens a POSIX filesystem rather than a Win32 one.
- *
- * Deliberately the same substring test `getShellType` in pty-manager.ts uses, so
- * the renderer's idea of "this pane lives in WSL" cannot drift from the one the
- * spawn path acts on. An 'unknown' spec (a remote command line such as
- * `ssh user@host`, issue #78) is not treated as WSL — wmux does not know where
- * that lands, and guessing POSIX would send it a path it cannot open.
+ * A directory name or remote hostname containing "wsl" must not select the WSL
+ * namespace for a different executable.
  */
 export function isWslShell(shell: string | undefined): boolean {
-  return !!shell && shell.toLowerCase().includes('wsl');
+  const spec = shell?.trim() ?? '';
+  const match = /^(?:"([^"]+)"|'([^']+)'|(\S+))/.exec(spec);
+  // Settings also accepts bare absolute executable paths containing spaces.
+  const barePath = /^(?:[A-Za-z]:[\\/]|[\\/])/.test(spec) && !/\.(?:exe|com|cmd|bat|ps1)\s/i.test(spec);
+  const executable = match?.[1] ?? match?.[2] ?? (barePath ? spec : match?.[3]) ?? '';
+  return /(?:^|[\\/])wsl(?:\.exe)?$/i.test(executable);
 }
 
 /**
  * The workspace-metadata patch for a `report_pwd` from some pane.
  *
  * `cwd` stays last-writer-wins — it is what the sidebar shows, and the most
- * recent prompt is the honest answer there. `posixCwd` is additive and only
- * ever written by a POSIX report, so a pwsh pane reporting C:\Users\<user>
+ * recent prompt is the honest answer there. This helper writes `posixCwd` only
+ * for POSIX `report_pwd` paths, so a pwsh pane reporting C:\Users\<user>
  * cannot erase the WSL fallback its neighbours depend on. Omitting the key
  * (rather than writing undefined) is the whole point: updateWorkspaceMetadata
  * spreads the patch, so a present-but-undefined key would clear it.
@@ -87,24 +90,22 @@ export function cwdReportPatch(pwd: string | undefined): { cwd?: string; posixCw
  * The workspace-level cwd a surface should spawn in when it has none of its own
  * — picked to match the surface's filesystem namespace.
  *
- * A surface only carries its own `cwd` once shell integration has reported a
- * prompt (frozen into the tree by freezeSurfaceCwds at save time). Plain WSL
- * panes never report — wmux exports WMUX_INTEGRATION=1 into the distro but
- * installs no rc hook there — so in practice they live on this fallback for
- * their whole life, which is why handing them the wrong namespace is not a
- * corner case.
+ * WSL has no automatically installed prompt hook. Without an explicit/restored
+ * cwd or a manually configured cwd report, its panes rely on this fallback.
  *
- * For a WSL surface, deliberately returns undefined rather than a Win32 path
- * when no POSIX directory is known: `--cd C:\Users\<user>` is not something
- * wsl.exe can honour, so there is nothing to gain by passing it, and undefined
- * keeps the intent ("we do not know") legible downstream.
+ * With no WSL report, its home is preferable to a neighbouring Windows pane's
+ * directory. Conversely, a POSIX workspace cwd must never make a new Windows
+ * pane switch shells merely because a WSL pane reported last.
  */
 export function workspaceFallbackCwd(
   shell: string | undefined,
   workspace: { cwd?: string; posixCwd?: string } | null | undefined,
 ): string | undefined {
   if (!workspace) return undefined;
-  if (!isWslShell(shell)) return workspace.cwd;
+  // remotea: a remote host takes only a host path (main refuses a desktop one);
+  // a host directory that is missing there starts the session at its home.
+  if (parseRemoteShellSpec(shell)) return workspace.cwd && !remoteDirectoryIssue(workspace.cwd) ? workspace.cwd : undefined;
+  if (!isWslShell(shell)) return workspace.cwd && !isPosixPath(workspace.cwd) ? workspace.cwd : undefined;
   if (workspace.posixCwd) return workspace.posixCwd;
   return workspace.cwd && isPosixPath(workspace.cwd) ? workspace.cwd : undefined;
 }

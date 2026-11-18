@@ -2,7 +2,11 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { PtyManager, parseShellSpec, resolveSpawnCwd, resolveShell, resolveShellForCwd, resolveExistingShellPath, comparePackageVersion, appExecAliasTarget, shellEnv, shellProbe, resetShellPathCache } from '../../src/main/pty-manager';
+import * as nodePty from 'node-pty';
+import { EventEmitter } from 'events';
+import { Terminal } from '@xterm/xterm';
+import { PtyManager, parseShellSpec, resolveSpawnCwd, resolveShell, resolveShellForCwd, resolveExistingShellPath, comparePackageVersion, appExecAliasTarget, shellEnv, shellProbe, resetShellPathCache, buildShellArgs } from '../../src/main/pty-manager';
+import { workspaceFallbackCwd } from '../../src/shared/paths';
 import type { SurfaceId } from '../../src/shared/types';
 
 const TEST_SHELL = 'cmd.exe';
@@ -73,6 +77,81 @@ describe('PtyManager', { timeout: 60_000 }, () => {
       env: TEST_ENV,
     });
     expect(id).toMatch(/^surf-/);
+  });
+
+  it('keeps the launch arguments when reattaching with different preferences', () => {
+    const manager = makeManager();
+    const created = manager.create({
+      shell: 'cmd.exe /q', cwd: process.env.USERPROFILE || 'C:\\', env: TEST_ENV,
+    });
+    expect(created.launchShell).toBe('cmd.exe /q');
+    const reused = manager.create({
+      surfaceId: created.id, shell: 'powershell.exe', cwd: process.env.USERPROFILE || 'C:\\', env: TEST_ENV,
+    });
+    expect(reused.reused).toBe(true);
+    expect(reused.launchShell).toBe('cmd.exe /q');
+  });
+
+  it('inherits the WSL shell chosen for a POSIX cwd', () => {
+    const fakePty = Object.assign(new EventEmitter(), {
+      pid: 0, onData: vi.fn(), onExit: vi.fn(), kill: vi.fn(),
+    });
+    const spawn = vi.spyOn(nodePty, 'spawn').mockReturnValue(fakePty as unknown as nodePty.IPty);
+    const hasWsl = vi.spyOn(shellEnv, 'hasWsl').mockReturnValue(true);
+    try {
+      const manager = makeManager();
+      const created = manager.create({ shell: 'cmd.exe', cwd: '/home/user/project', env: TEST_ENV });
+      expect(created.shell).toBe('wsl.exe');
+      expect(created.launchShell).toBe('wsl.exe');
+      expect(spawn).toHaveBeenCalledWith('wsl.exe', expect.any(Array), expect.any(Object));
+    } finally {
+      spawn.mockRestore();
+      hasWsl.mockRestore();
+    }
+  });
+
+  it('clear() re-bases ConPTY so input typed after a frontend clear echoes on the kept row', async () => {
+    const manager = makeManager();
+    const terminal = new Terminal({ cols: 80, rows: 12, allowProposedApi: true });
+    const { id } = manager.create({
+      shell: TEST_SHELL, cwd: process.env.USERPROFILE || 'C:\\', env: TEST_ENV, cols: 80, rows: 12,
+    });
+    const unsubscribe = manager.onData(id, (data) => terminal.write(data));
+    const viewport = () => Array.from({ length: terminal.rows }, (_, y) =>
+      terminal.buffer.active.getLine(terminal.buffer.active.baseY + y)?.translateToString(true) ?? '');
+    try {
+      await firstData(manager, id);
+      manager.write(id, 'for /L %i in (1,1,30) do @echo FILL%i\r');
+      // The screen is full and the prompt is back on the bottom row.
+      await vi.waitFor(() => {
+        const rows = viewport();
+        expect(rows).toContain('FILL30');
+        expect(rows.at(-1)).toMatch(/>$/);
+      }, { timeout: 10_000 });
+      // Let ConPTY settle before the clear, as a human pressing the key would.
+      await new Promise((r) => setTimeout(r, 300));
+      await new Promise<void>((resolve) => terminal.write('', resolve));
+
+      manager.clear(id);
+      terminal.clear();
+      manager.write(id, 'AFTERCLEAR');
+      await vi.waitFor(() => expect(viewport().join('\n')).toContain('AFTERCLEAR'), { timeout: 10_000 });
+      await new Promise((r) => setTimeout(r, 300));
+      await new Promise<void>((resolve) => terminal.write('', resolve));
+      const rows = viewport();
+      expect(rows.findIndex((row) => row.includes('AFTERCLEAR'))).toBe(0);
+    } finally {
+      unsubscribe();
+      terminal.dispose();
+    }
+  });
+
+  it('clear() is a no-op for an unknown or killed surface', () => {
+    const manager = makeManager();
+    expect(() => manager.clear('surf-missing' as SurfaceId)).not.toThrow();
+    const { id } = manager.create({ shell: TEST_SHELL, cwd: process.env.USERPROFILE || 'C:\\', env: TEST_ENV });
+    manager.kill(id);
+    expect(() => manager.clear(id)).not.toThrow();
   });
 
   it('has() returns true after create and false after kill', () => {
@@ -229,6 +308,8 @@ describe('PtyManager', { timeout: 60_000 }, () => {
       env: TEST_ENV,
     });
     expect(created.shellFallbackFrom).toBe('definitely-not-a-shell-252.exe');
+    // The substituted default is not a spec: a tab inheriting it gets the default too.
+    expect(created.launchShell).toBe('');
     const ok = manager.create({ shell: TEST_SHELL, cwd: process.env.USERPROFILE || 'C:\\', env: TEST_ENV });
     expect(ok.shellFallbackFrom).toBeUndefined();
   });
@@ -610,6 +691,40 @@ describe('comparePackageVersion (WindowsApps package ordering)', () => {
 });
 
 
+describe('WSL launch cwd', () => {
+  it('passes a POSIX path directly to WSL', () => {
+    expect(buildShellArgs('wsl', {}, '', '/home/user/project')).toEqual(['--cd', '/home/user/project']);
+  });
+
+  it('passes a Windows directory that exists', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux wsl-cd '));
+    try {
+      expect(buildShellArgs('wsl', {}, '', dir)).toEqual(['--cd', dir]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // wsl.exe exits on a missing Windows-spelled --cd, so the pane would never start.
+  it('opens a Windows directory that is gone at the distro home', () => {
+    expect(buildShellArgs('wsl', {}, '', 'C:\\wmux-no-such-dir-397\\x')).toEqual(['--cd', '~']);
+  });
+
+  it.each([
+    ['\\\\wsl.localhost\\Ubuntu\\home\\user\\project', '/home/user/project'],
+    ['\\\\wsl$\\Ubuntu-24.04\\srv\\app', '/srv/app'],
+    ['\\\\wsl.localhost\\Ubuntu', '/'],
+  ])('passes a WSL UNC path in its POSIX spelling: %s', (cwd, posix) => {
+    expect(buildShellArgs('wsl', {}, '', cwd)).toEqual(['--cd', posix]);
+  });
+
+  it.each([undefined, '~', '%USERPROFILE%\\projects', 'C:relative', '   '])(
+    'keeps the distro-home fallback for an unreported or non-absolute cwd: %s', (cwd) => {
+      expect(buildShellArgs('wsl', {}, '', cwd)).toEqual(['--cd', '~']);
+    },
+  );
+});
+
 /**
  * CreateProcess fails with error 267 (ERROR_DIRECTORY) when handed a working
  * dir that isn't a real directory, and node-pty surfaces it as an opaque
@@ -711,6 +826,12 @@ describe('resolveShellForCwd (POSIX cwd → WSL shell)', () => {
     expect(resolveShellForCwd('pwsh.exe', POSIX)).toBe('wsl.exe');
     expect(resolveShellForCwd('powershell.exe', POSIX)).toBe('wsl.exe');
     expect(resolveShellForCwd('cmd.exe', POSIX)).toBe('wsl.exe');
+  });
+
+  it('keeps a new Windows pane in PowerShell after a WSL pane reports its cwd', () => {
+    const cwd = workspaceFallbackCwd('pwsh.exe', { cwd: '/home/user/project' });
+    expect(resolveShellForCwd('pwsh.exe', cwd)).toBe('pwsh.exe');
+    expect(shellEnv.hasWsl).not.toHaveBeenCalled();
   });
 
   it('leaves a Win32 cwd alone', () => {

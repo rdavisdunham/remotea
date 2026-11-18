@@ -524,6 +524,11 @@ function readPayloadFields(data, out) {
         if (typeof data.agent_type === 'string' && AGENT_IDENT_RE.test(data.agent_type))
             out.agentType = data.agent_type;
     }
+    // For the desktop's permission-block ledger (#399). Not from a Grok
+    // subagent's own session: it carries no `agent_id`, so its tool calls would
+    // pass for the main thread's.
+    if (!out.subagent && typeof data.tool_use_id === 'string' && TURN_ID_RE.test(data.tool_use_id))
+        out.toolUseId = data.tool_use_id;
     // UserPromptSubmit carries what the user actually typed, and wmux threw it
     // away — which is why the prompt-log features in issue #207 had no source of
     // truth for an agent pane. It cannot be recovered from the screen: an agent
@@ -564,6 +569,7 @@ function readRemoteaFields(data, out) {
         out.phantomSubagent = true;
     if (event === 'Stop' && Array.isArray(data.background_tasks) && data.background_tasks.length > 0)
         out.backgroundTasks = true;
+    // The server has always taken it from every session, subagents included.
     if (typeof data.tool_use_id === 'string' && TURN_ID_RE.test(data.tool_use_id))
         out.toolUseId = data.tool_use_id;
     if (!event && tool === 'AskUserQuestion') {
@@ -627,10 +633,10 @@ function reportedEvent(fired, subagent) {
 }
 /** The `hook.event` params: only the fields that carry something. */
 function hookParams(fields) {
-    const { file, message, sessionId, prompt, notificationType, agentId, agentType, bgTask, bgTaskDetail, bgTasksEnded } = fields;
+    const { file, message, sessionId, prompt, notificationType, agentId, agentType, toolUseId, bgTask, bgTaskDetail, bgTasksEnded } = fields;
     const params = { at: firedAt };
     const optional = {
-        event, tool, file, message, notificationType, prompt, agentId, agentType, surfaceId,
+        event, tool, file, message, notificationType, prompt, agentId, agentType, toolUseId, surfaceId,
         bgTask, bgTaskDetail, bgTasksEnded, freshSession: fields.freshSession ? '1' : '',
         lastAssistantMessage: fields.lastAssistantMessage,
         lastAssistantTruncated: fields.lastAssistantTruncated ? '1' : '',
@@ -638,7 +644,6 @@ function hookParams(fields) {
         transcriptPath: fields.transcriptPath,
         promptId: fields.promptId,
         source: fields.source,
-        toolUseId: fields.toolUseId,
         backgroundTasks: fields.backgroundTasks ? '1' : '',
         permissionMode: fields.permissionMode,
         answerEcho: fields.answerEcho,

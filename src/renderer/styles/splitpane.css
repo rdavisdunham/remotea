@@ -93,6 +93,15 @@ html.wmux-transparent .pane-wrapper:not(.pane-wrapper--focused) {
 html.wmux-transparent .pane-wrapper--focused {
   border-color: var(--wmux-pane-ring, rgba(var(--ui-accent-rgb), 0.3));
 }
+/* A window without OS focus (App.tsx sets the class) keeps its focused pane
+   but stops showing it: the ring and the active-tab accent fall back to what an
+   unfocused pane has, so only the window with the keyboard shows one. */
+html.wmux-window-inactive .pane-wrapper--focused {
+  border-color: var(--ui-border);
+}
+html.wmux-transparent.wmux-window-inactive .pane-wrapper--focused {
+  border-color: var(--wmux-pane-gutter, var(--ui-bg-2));
+}
 html.wmux-transparent .split-divider {
   background: var(--wmux-pane-gutter, var(--ui-bg-2));
 }
@@ -137,6 +146,11 @@ html.wmux-transparent .split-divider--horizontal {
   position: absolute; inset: 0; background: rgba(0, 0, 0, var(--wmux-inactive-pane-dim, 0.2));
   pointer-events: none; z-index: 5; transition: opacity 0.15s ease, background-color 0.2s ease;
 }
+/* In a window without OS focus the focused pane dims like the rest, since the
+   keyboard is in another window. A stylesheet rule rather than an inline
+   style so the window class can override it. */
+.pane-wrapper--focused .pane-wrapper__unfocused-overlay { opacity: 0; }
+html.wmux-window-inactive .pane-wrapper--focused .pane-wrapper__unfocused-overlay { opacity: 1; }
 /* Focus mode (titlebar button): the same overlay, much darker, and the
    unfocused panes' tab bars fade with it. Still pointer-events: none, so a
    click on a dimmed pane focuses it and the spotlight follows. */
@@ -144,6 +158,15 @@ html.wmux-transparent .split-divider--horizontal {
   background: rgba(0, 0, 0, 0.62);
 }
 .surface-tab-bar { transition: opacity 0.2s ease; }
+.workspace-drop-edge { position: absolute; z-index: 50; background: color-mix(in srgb, var(--ui-accent) 18%, transparent); }
+.workspace-drop-edge:hover { background: color-mix(in srgb, var(--ui-accent) 45%, transparent); }
+.workspace-drop-edge span { position: absolute; white-space: nowrap; font-size: 10px; pointer-events: none; color: var(--ui-text); }
+.workspace-drop-edge--left { left: 0; top: 20px; bottom: 20px; width: 18px; }
+.workspace-drop-edge--right { right: 0; top: 20px; bottom: 20px; width: 18px; }
+.workspace-drop-edge--up { left: 0; right: 0; top: 0; height: 18px; }
+.workspace-drop-edge--down { left: 0; right: 0; bottom: 0; height: 18px; }
+.workspace-drop-edge--up span, .workspace-drop-edge--down span { left: 50%; transform: translateX(-50%); }
+.workspace-drop-edge--left span, .workspace-drop-edge--right span { top: 50%; writing-mode: vertical-rl; }
 .wmux-focus-mode .pane-wrapper:not(.pane-wrapper--focused) .surface-tab-bar {
   opacity: 0.4;
 }
@@ -169,9 +192,10 @@ html.wmux-transparent .split-divider--horizontal {
   padding: 0 4px;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none;
+  scrollbar-width: thin;
 }
-.surface-tab-bar__tabs::-webkit-scrollbar { display: none; }
+.surface-tab-bar__tabs::-webkit-scrollbar { height: 4px; }
+.surface-tab-bar__tabs::-webkit-scrollbar-thumb { background: var(--ui-text-muted); border-radius: 2px; }
 /* A tab is a pill inside the bar. The name gets the room: it may shrink to an
    ellipsis only once the tabs no longer fit, and the tab being looked at
    shrinks last. */
@@ -246,6 +270,8 @@ html.wmux-transparent .split-divider--horizontal {
   text-overflow: ellipsis;
   pointer-events: none;
 }
+/* An unfocused window shows no focused pane (#459). */
+html.wmux-window-inactive .pane-wrapper--focused .surface-tab--active { box-shadow: none; }
 .surface-tab__label--ephemeral { font-style: italic; }
 .surface-tab__rename-input {
   background: rgba(var(--ui-overlay-rgb), 0.1);

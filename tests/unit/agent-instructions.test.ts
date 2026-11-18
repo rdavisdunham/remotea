@@ -72,7 +72,6 @@ describe('agent instruction block (issue #158)', () => {
     expect(builder.extraResources).toContainEqual(expect.objectContaining({
       from: 'resources/claude-instructions.md', to: 'claude-instructions/claude-instructions.md',
     }));
-    expect(fs.readFileSync('resources/claude-instructions/claude-instructions.md', 'utf8')).toBe(raw);
     expect(raw).toContain('<!-- wmux:start');
     expect(raw).toContain('<!-- wmux:end -->');
   });

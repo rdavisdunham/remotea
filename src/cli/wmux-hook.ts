@@ -301,7 +301,11 @@ interface HookPayloadFields {
   promptId: string;
   /** SessionStart `source` (startup, resume, clear, compact). */
   source: string;
-  /** The tool call's `tool_use_id` (AskUserQuestion only). */
+  /**
+   * The tool call's `tool_use_id`. Answers AskUserQuestion, and pairs a tool's
+   * start with its end so the desktop can tell that the call a permission
+   * prompt stood for has run (#399).
+   */
   toolUseId: string;
   /** Stop with background work still running (an interim Stop). */
   backgroundTasks: boolean;
@@ -580,6 +584,10 @@ function readPayloadFields(data: Record<string, any>, out: HookPayloadFields): v
     out.agentId = data.agent_id;
     if (typeof data.agent_type === 'string' && AGENT_IDENT_RE.test(data.agent_type)) out.agentType = data.agent_type;
   }
+  // For the desktop's permission-block ledger (#399). Not from a Grok
+  // subagent's own session: it carries no `agent_id`, so its tool calls would
+  // pass for the main thread's.
+  if (!out.subagent && typeof data.tool_use_id === 'string' && TURN_ID_RE.test(data.tool_use_id)) out.toolUseId = data.tool_use_id;
   // UserPromptSubmit carries what the user actually typed, and wmux threw it
   // away — which is why the prompt-log features in issue #207 had no source of
   // truth for an agent pane. It cannot be recovered from the screen: an agent
@@ -615,6 +623,7 @@ function readRemoteaFields(data: Record<string, any>, out: HookPayloadFields): v
   if (event === 'SessionStart' && typeof data.source === 'string' && SOURCES.has(data.source)) out.source = data.source;
   if (event === 'SubagentStop' && !isCodex && data.agent_type === '') out.phantomSubagent = true;
   if (event === 'Stop' && Array.isArray(data.background_tasks) && data.background_tasks.length > 0) out.backgroundTasks = true;
+  // The server has always taken it from every session, subagents included.
   if (typeof data.tool_use_id === 'string' && TURN_ID_RE.test(data.tool_use_id)) out.toolUseId = data.tool_use_id;
   if (!event && tool === 'AskUserQuestion') {
     const res = data.tool_response;
@@ -674,10 +683,10 @@ function reportedEvent(fired: string, subagent: boolean): string | null {
 
 /** The `hook.event` params: only the fields that carry something. */
 function hookParams(fields: HookPayloadFields): Record<string, string | number> {
-  const { file, message, sessionId, prompt, notificationType, agentId, agentType, bgTask, bgTaskDetail, bgTasksEnded } = fields;
+  const { file, message, sessionId, prompt, notificationType, agentId, agentType, toolUseId, bgTask, bgTaskDetail, bgTasksEnded } = fields;
   const params: Record<string, string | number> = { at: firedAt };
   const optional: Record<string, string> = {
-    event, tool, file, message, notificationType, prompt, agentId, agentType, surfaceId,
+    event, tool, file, message, notificationType, prompt, agentId, agentType, toolUseId, surfaceId,
     bgTask, bgTaskDetail, bgTasksEnded, freshSession: fields.freshSession ? '1' : '',
     lastAssistantMessage: fields.lastAssistantMessage,
     lastAssistantTruncated: fields.lastAssistantTruncated ? '1' : '',
@@ -685,7 +694,6 @@ function hookParams(fields: HookPayloadFields): Record<string, string | number> 
     transcriptPath: fields.transcriptPath,
     promptId: fields.promptId,
     source: fields.source,
-    toolUseId: fields.toolUseId,
     backgroundTasks: fields.backgroundTasks ? '1' : '',
     permissionMode: fields.permissionMode,
     answerEcho: fields.answerEcho,

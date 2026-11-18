@@ -81,13 +81,14 @@ import {
   applyExternalActivity, markSubagentStop, markAllAgentsDone, reportSubagent, endDeclaredSubagents,
 } from './claude-observer';
 import { handleAgentStateV2, setAnswerWriter, deliverAnswer } from './agent-state-rpc';
-import { applyHookToAgentState, hookEventName } from './agent-hook-bridge';
+import { applyHookToAgentState, hookEventName, type HookOrigin } from './agent-hook-bridge';
 import { startOrchestrationWatcher } from './orchestration-watcher';
 import { readMarkdownFile } from './markdown-file';
 import { grantFilePath, clearFileGrants } from './file-grants';
 import { directoryFromArgv } from './shell-context-menu';
 import { reportExplorerCwd } from './explorer-roots';
 import { ensurePowerShellShim } from './powershell-shim';
+import { installPageZoom } from './webcontents-zoom';
 import { loadSettings } from './settings-store';
 import { translateKeyName } from './pty-keys';
 import { initRemoteConsole, getRemoteConsole, handleRemoteConsoleV2 } from './remote-console';
@@ -1060,6 +1061,14 @@ function hardenWebContents(): void {
   app.on('web-contents-created', (_event, contents) => {
     const type = contents.getType();
 
+    // Guest pages zoom through Electron's zoom-changed. The desktop already
+    // handles its captured DOM gesture through WINDOW_ZOOM: Electron emits
+    // zoom-changed even when that gesture is prevented, so handling both
+    // would apply two zoom steps to the same wheel input.
+    if (type === 'webview') {
+      installPageZoom(contents);
+    }
+
     // Enforce safe webview preferences regardless of attributes set in the DOM,
     // plus Chrome's autoplay rule (#287). The event fires on the HOST — the
     // wmux window — so it must be registered there; see webview-prefs.ts.
@@ -1374,6 +1383,14 @@ function pushDiffUpdate(file: string): void {
   }
 }
 
+/** The `hook.event` fields that say which thread and which tool call fired it (#399). */
+function hookOrigin(params: any): HookOrigin {
+  return {
+    agentId: typeof params.agentId === 'string' ? params.agentId : null,
+    toolUseId: typeof params.toolUseId === 'string' ? params.toolUseId : null,
+  };
+}
+
 /** One Claude Code hook event, fanned out to every consumer that wants it. */
 function handleHookEvent(params: any): void {
   BrowserWindow.getAllWindows().forEach(w => {
@@ -1397,6 +1414,9 @@ function handleHookEvent(params: any): void {
       Number.isFinite(params.at) ? Number(params.at) : undefined,
       // Tells the idle reminder from a real prompt (issue #253).
       typeof params.notificationType === 'string' ? params.notificationType : null,
+      // Whose tool event this is, so a main-thread call moving past a
+      // permission prompt can retract the block a hook raised (#399).
+      hookOrigin(params),
     );
   }
 
@@ -1530,11 +1550,11 @@ function deliverPaneNotice(surfaceId: string, key: string): void {
     if (win.webContents.isLoading()) {
       win.webContents.once('did-finish-load', () => {
         if (!win.isDestroyed()) {
-          void win.webContents.executeJavaScript(script).catch(() => {});
+          win.webContents.executeJavaScript(script).catch(() => {});
         }
       });
     } else {
-      void win.webContents.executeJavaScript(script).catch(() => {});
+      win.webContents.executeJavaScript(script).catch(() => {});
     }
   };
 
@@ -2001,6 +2021,15 @@ app.whenReady().then(() => {
     // credentials into a web context for nothing. The agent LABEL derived from
     // it does cross, on its own channel; the command line never does.
     if (cmd.command === 'report_command') return;
+    // A notify from a process that outlived its pane (a detached job that
+    // inherited WMUX_SURFACE_ID) names a surface no window owns. Since #392
+    // each window keeps only notifications for surfaces it owns, so that one
+    // would be dropped everywhere; sent surface-less, the active workspace
+    // takes it as before. Only main knows which surfaces still exist.
+    if (cmd.command === 'notify' && cmd.surfaceId && !ptyManager.has(cmd.surfaceId as SurfaceId)) {
+      broadcastMetadataUpdate({ ...cmd, surfaceId: '' });
+      return;
+    }
     broadcastMetadataUpdate(cmd);
   });
 

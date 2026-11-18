@@ -462,6 +462,7 @@ export const en = {
   'surfaceLabel.tab': 'Tab',
   // SplitPane — drag-to-split preview overlay
   'splitPreview.dropHere': 'Drop here',
+  'splitPreview.workspaceEdge': 'Workspace edge',
   // SplitPane — surface tab bar controls & context menu
   'surfaceTab.newTab': 'New terminal tab ({binding})',
   'surfaceTab.newTabType': 'New tab type…',
@@ -670,6 +671,7 @@ export const en = {
   'shortcutAction.markWorkspaceRead': 'Mark workspace read',
   'shortcutAction.toggleShortcutCheatSheet': 'Show keyboard shortcuts',
   'shortcutAction.resetTerminal': 'Reset terminal state',
+  'shortcutAction.clearTerminalBuffer': 'Clear terminal buffer',
   'shortcutAction.toggleExplorer': 'Toggle file explorer',
   // File explorer panel
   'explorer.title': 'Explorer',
@@ -717,6 +719,7 @@ export const en = {
   'shortcutAction.togglePromptOutline': 'Toggle prompt outline',
   'shortcutAction.togglePinnedPrompt': 'Pin or unpin prompt',
   'shortcutAction.followOutput': 'Follow output',
+  'shortcutAction.refreshSurface': 'Refresh focused tab',
   // Settings — Quick-launch profiles panel
   'settings.quickLaunch.title': 'Quick-launch profiles',
   'settings.quickLaunch.hintPart1': 'One-click tab presets shown in the ',
@@ -855,7 +858,7 @@ export const en = {
   "settings.workspacePanel.sessionSnapshotHint": "Keeps the last three changed arrangements under Restore workspace snapshot. Restore rebuilds saved tabs and supported launch details, not process memory. Named snapshots include all workspaces and terminal preferences in this window; restoring applies those preferences.",
   "settings.workspacePanel.restoreCodexSessions": "Resume local Codex conversations when restoring",
   "settings.workspacePanel.restoreOpencodeSessions": "Resume local OpenCode conversations when restoring",
-  'settings.workspacePanel.restoreOpencodeSessionsHint': "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode plugin (Agent integration on). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 is captured only when started with --standalone: its shared background server cannot tell tabs apart.",
+  'settings.workspacePanel.restoreOpencodeSessionsHint': "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode integration (the server plugin, or the TUI plugin installed with `wmux opencode-tui` for OpenCode 2). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 on a remote or shared server is captured by the TUI plugin; re-run `wmux opencode-tui` in that environment after a remotea update.",
   "settings.workspacePanel.restoreQwenSessions": "Resume local Qwen Code conversations when restoring",
   'settings.workspacePanel.restoreQwenSessionsHint': "Re-launches each restored tab that was running Qwen Code with `qwen --resume`, in the directory it was in. Needs the remotea Qwen hooks (Status hooks on) and Qwen Code 0.14 or later. Tabs whose session Qwen no longer has are skipped, and a Qwen you exited cleanly is not resumed.",
   "settings.workspacePanel.restoreAgySessions": "Resume local Antigravity conversations when restoring",

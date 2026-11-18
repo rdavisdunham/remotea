@@ -43,11 +43,14 @@ const hostInfo = decodeHostInfoArg(process.argv);
 contextBridge.exposeInMainWorld('wmux', {
   pty: {
     create: (options: { shell: string; cwd: string; env: Record<string, string>; surfaceId?: string; startupCommands?: string[]; cols?: number; rows?: number }) =>
-      ipcRenderer.invoke(IPC_CHANNELS.PTY_CREATE, options) as Promise<{ id: string; shell: string; startupCommandsConsumed?: boolean; reused: boolean; shellFallbackFrom?: string }>,
+      ipcRenderer.invoke(IPC_CHANNELS.PTY_CREATE, options) as Promise<{ id: string; shell: string; launchShell: string; startupCommandsConsumed?: boolean; reused: boolean; shellFallbackFrom?: string }>,
     write: (id: string, data: string) =>
       ipcRenderer.send(IPC_CHANNELS.PTY_WRITE, id, data),
     resize: (id: string, cols: number, rows: number) =>
       ipcRenderer.send(IPC_CHANNELS.PTY_RESIZE, id, cols, rows),
+    // ConPTY's own screen copy, cleared alongside xterm's (#434).
+    clear: (id: string) =>
+      ipcRenderer.send(IPC_CHANNELS.PTY_CLEAR, id),
     // `shellSpec` lets a remote surface that was never mounted here still be
     // closed on its server (remotea).
     kill: (id: string, shellSpec?: string) =>
@@ -147,6 +150,7 @@ contextBridge.exposeInMainWorld('wmux', {
     openExternal: (url: string) => ipcRenderer.send(IPC_CHANNELS.SYSTEM_OPEN_EXTERNAL, url),
     getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_GET_VERSION),
     toggleDevTools: () => ipcRenderer.send('toggle-devtools'),
+    zoom: (deltaY: number) => ipcRenderer.send(IPC_CHANNELS.WINDOW_ZOOM, deltaY),
     pickFolder: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_PICK_FOLDER),
     // Restart Explorer with its icon cache cleared (issues #137/#226). Main
     // puts up the confirm itself — the dialog names the cost (File Explorer
@@ -581,6 +585,12 @@ contextBridge.exposeInMainWorld('wmux', {
     minimize: () => ipcRenderer.send(IPC_CHANNELS.WINDOW_MINIMIZE),
     maximize: () => ipcRenderer.send(IPC_CHANNELS.WINDOW_MAXIMIZE),
     isMaximized: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_IS_MAXIMIZED),
+    isFocused: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_IS_FOCUSED),
+    onFocusChange: (callback: (focused: boolean) => void) => {
+      const handler = (_event: any, focused: boolean) => callback(focused);
+      ipcRenderer.on(IPC_CHANNELS.WINDOW_FOCUS_CHANGED, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.WINDOW_FOCUS_CHANGED, handler);
+    },
     // Windows taskbar progress (OSC 9;4 aggregate). value 0-1, or -1 to remove.
     setProgress: (value: number, mode?: string) =>
       ipcRenderer.send(IPC_CHANNELS.WINDOW_SET_PROGRESS, value, mode),

@@ -1,9 +1,12 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
 import { setFocusedPaneReader, markRemoteLayoutReady } from './remote-sessions/sync';
 import { remoteSessionsWillPopulate } from './remote-sessions/startup';
 import { startGpuProbe } from './utils/gpu-watchdog';
+import { installWheelZoom, nextPaneZoom, paneIdAt } from './utils/wheel-zoom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
+import type { NotificationSlice } from './store/notification-slice';
+import { fireNotification } from './utils/notifications';
 import { getStoredWorkspaceLabel, useWorkspaceLabels } from './components/SplitPane/use-osc-title';
 import { PaneId, SurfaceId, SurfaceRef, WorkspaceId, WorkspaceInfo, SplitNode } from '../shared/types';
 import { cwdReportPatch } from '../shared/paths';
@@ -12,10 +15,11 @@ import SplitContainer from './components/SplitPane/SplitContainer';
 import { TerminalHost } from './components/Terminal/KeptAliveTerminal';
 import { updateRatio, getAllPaneIds, findLeaf, replaceSoleTerminalSurface, freezeSurfaceCwds, dropEphemeralSurfaces, dropCodeContent, workspaceHasTerminalCwd } from './store/split-utils';
 import { forgetProgressTurn } from './utils/progress-turn';
-import { type ShellState, previousSurfaceShellState, recordSurfaceShellState, treeSurfaceIds, workspaceShellState } from './utils/surface-shell-state';
+import { type ShellState, forgetSurfaceShellState, previousSurfaceShellState, recordSurfaceShellState, treeSurfaceIds, workspaceShellState } from './utils/surface-shell-state';
 import { DEFAULT_DEV_PORTS, mergeDevPorts, matchDevPorts, firstNewDevPort } from './dev-ports';
 import { aggregateProgress } from './store/progress-slice';
 import { isDiffTabDismissed } from './store/surface-slice';
+import { autoOpenDiffPane } from './utils/auto-open-diff';
 import Sidebar from './components/Sidebar/Sidebar';
 import { applyPrCommand } from './pr-metadata';
 import Titlebar from './components/Titlebar/Titlebar';
@@ -66,7 +70,8 @@ import type {
   SurfaceDragPreviewTarget,
 } from './components/SplitPane/drag-preview-types';
 import { buildSurfaceDragPreview } from './components/SplitPane/surface-drag-preview';
-import { forgetSurfaceTitle, surfaceTerminalRegistry } from './hooks/useTerminal';
+import WorkspaceDropZones from './components/SplitPane/WorkspaceDropZones';
+import { forgetClosedTerminal, surfaceTerminalRegistry } from './hooks/useTerminal';
 import { forgetSurface as forgetPromptLog, hookEventSurface, recordAgentPrompt } from './utils/prompt-log';
 import { forgetAlternateScreen, RESET_TERMINAL_LEAVE_ALT_ACTION } from './utils/alt-screen-owner';
 import { SURFACE_CLOSED_EVENT } from './store/pty-teardown';
@@ -121,18 +126,11 @@ function applyUserConfigTerminal(state: ReturnType<typeof useStore.getState>, te
   if (Object.keys(patch).length) state.setTerminalPrefs(patch);
 }
 
-/** Find the bottom-most pane in the split tree (follows last child of vertical splits) */
-function findBottomPane(node: SplitNode): PaneId | null {
-  if (node.type === 'leaf') return node.paneId;
-  if (node.direction === 'vertical') return findBottomPane(node.children[1]);
-  return findBottomPane(node.children[0]);
-}
-
 // ─── Shell-integration / hook metadata handlers (issue #53) ───────────────────
 // Extracted from the metadata + hook listeners so each function stays under the
-// cognitive-complexity budget. `fireNotification` is the single place that both
-// adds the in-app bell entry and raises the OS toast (via the renderer → main
-// NOTIFICATION_FIRE chokepoint).
+// cognitive-complexity budget. `fireNotification` (utils/notifications.ts) is
+// the single place that both adds the in-app bell entry and raises the OS toast
+// (via the renderer → main NOTIFICATION_FIRE chokepoint).
 
 // Effective runtime values — seeded from the built-in defaults, then widened/
 // toggled by ~/.wmux/config.toml at startup and on `wmux reload-config`.
@@ -191,7 +189,7 @@ type StoreAction = (...args: any[]) => void;
 type T = (key: TranslationKey, fallback?: string) => string;
 type MetaDeps = {
   updateWorkspaceMetadata: StoreAction;
-  addNotification: StoreAction;
+  addNotification: NotificationSlice['addNotification'];
   runningStartTimes: React.MutableRefObject<Record<string, number>>;
   t: T;
 };
@@ -247,16 +245,18 @@ async function restoreNamedSession(t: T, setWidth: SetWidth): Promise<boolean> {
   }
 }
 
-function fireNotification(
-  surfaceId: string,
-  workspaceId: WorkspaceId | null,
-  text: string,
-  addNotification: StoreAction,
-): void {
-  if (workspaceId) {
-    addNotification({ surfaceId: (surfaceId || '') as SurfaceId, workspaceId, text });
-  }
-  window.wmux?.notification?.fire({ surfaceId: surfaceId || '', text, title: 'remotea' });
+/** The palette's two Reset terminal state entries (#175, #357). */
+function isPaletteResetAction(action: string): boolean {
+  return action === 'resetTerminal' || action === RESET_TERMINAL_LEAVE_ALT_ACTION;
+}
+
+/** Reset the focused terminal from the palette; nothing when it is not a terminal. */
+function dispatchPaletteReset(action: string, terminalSurfaceId: string | null): void {
+  if (!terminalSurfaceId) return;
+  // The palette's second entry skips the keep-then-press-again step
+  // (#357): choosing it by name already says "leave it anyway".
+  const leaveAlternateScreen = action === RESET_TERMINAL_LEAVE_ALT_ACTION;
+  document.dispatchEvent(new CustomEvent('wmux:reset-terminal', { detail: { surfaceId: terminalSurfaceId, leaveAlternateScreen } }));
 }
 
 /** Resolve the workspace that owns a surface, or undefined. */
@@ -268,11 +268,10 @@ function workspaceForSurface(surfaceId: string): WorkspaceInfo | undefined {
 type HookActivityMap = Record<string, { lastTool: string; toolCount: number; lastSeen: number }>;
 
 /**
- * Stop hook = the turn is over. Zero out lastSeen so the sidebar flips to
- * "Idle" immediately instead of waiting out the ACTIVITY_TTL window, and
- * upsert the entry so turns with zero tool uses (pure text generation) still
- * register as "Claude ran here and finished" — otherwise WorkspaceRow falls
- * back to the shell's perpetual "Running" while the TUI sits idle (issue #81).
+ * Stop hook = the turn is over. Zero out lastSeen so the last tool label (and
+ * the `unknown`-state working fallback) expires immediately instead of waiting
+ * out the activity TTL window. The idle claim itself comes from the agent
+ * roster, not from this entry (issue #81 is answered there now).
  *
  * Keyed by SURFACE, not workspace: two Claude sessions split inside one
  * workspace must not zero each other's freshness. Only surfaceId-less legacy
@@ -297,18 +296,14 @@ function markSessionIdleOnStop(
  */
 function maybeAutoOpenDiffTab(tool: string, ownerWs: WorkspaceInfo): void {
   const state = useStore.getState();
-  if ((tool !== 'Edit' && tool !== 'Write') || !state.workspacePrefs.autoOpenDiffTab) return;
   // A diff tab the user closed stays closed (issue #141). Without this, every
   // Edit/Write put it back minutes later with no user action — and on a large
   // repo its polling is what made typing lag, so "close it" was not a fix.
-  if (isDiffTabDismissed(ownerWs.id)) return;
-  const bottomPaneId = findBottomPane(ownerWs.splitTree);
-  if (!bottomPaneId) return;
-  const bottomLeaf = findLeafFromTree(ownerWs.splitTree, bottomPaneId);
-  // Only add diff tab if bottom pane doesn't already have one
-  if (bottomLeaf && !bottomLeaf.surfaces.some(s => s.type === 'diff')) {
-    state.addSurface(ownerWs.id, bottomPaneId, 'diff', { auto: true });
-  }
+  const paneId = autoOpenDiffPane(tool, ownerWs, {
+    enabled: state.workspacePrefs.autoOpenDiffTab,
+    dismissed: isDiffTabDismissed(ownerWs.id),
+  });
+  if (paneId) state.addSurface(ownerWs.id, paneId, 'diff', { auto: true });
 }
 
 function handlePortsUpdate(cmd: any, updateWorkspaceMetadata: StoreAction): void {
@@ -336,15 +331,15 @@ function handlePortsUpdate(cmd: any, updateWorkspaceMetadata: StoreAction): void
 }
 
 /** `wmux notify <text>` — works even outside a pane (falls back to active workspace). */
-function handleNotifyCommand(cmd: any, addNotification: StoreAction, t: T): void {
+function handleNotifyCommand(cmd: any, addNotification: NotificationSlice['addNotification'], t: T): void {
   const text = (cmd.args || []).join(' ').trim() || t('app.notificationDefault', 'Notification');
   const ws = workspaceForSurface(cmd.surfaceId);
-  const wsId = ws?.id || useStore.getState().activeWorkspaceId;
+  const wsId = cmd.surfaceId ? ws?.id ?? null : useStore.getState().activeWorkspaceId;
   fireNotification(cmd.surfaceId, wsId, text, addNotification);
 }
 
 /** Remote Console bells (#254): main sends the facts, the UI language words them. */
-function handleRemoteNotice(cmd: any, addNotification: StoreAction, t: T): void {
+function handleRemoteNotice(cmd: any, addNotification: NotificationSlice['addNotification'], t: T): void {
   const text = formatRemoteNotice(cmd.args, t);
   if (!text) return;
   fireNotification('', useStore.getState().activeWorkspaceId, text, addNotification);
@@ -481,7 +476,7 @@ function recordPromptSubmission(event: any): void {
 }
 
 /** Agent Notification (needs input) / Stop (turn finished) hook events — Claude Code, Grok, anything on its hooks. */
-function handleAgentLifecycleEvent(event: any, addNotification: StoreAction, t: T): void {
+function handleAgentLifecycleEvent(event: any, addNotification: NotificationSlice['addNotification'], t: T): void {
   const state = useStore.getState();
   const prefs = state.notificationPrefs;
   if (event.event === 'Notification' && prefs.agentInputNotify === false) return;
@@ -500,7 +495,7 @@ function handleAgentLifecycleEvent(event: any, addNotification: StoreAction, t: 
 
   const sid = (event.surfaceId as string) || '';
   const ws = workspaceForSurface(sid);
-  const wsId = ws?.id || state.activeWorkspaceId;
+  const wsId = sid ? ws?.id ?? null : state.activeWorkspaceId;
   const labelled = ws ?? state.workspaces.find(w => w.id === wsId);
   const wsTitle = labelled ? getStoredWorkspaceLabel(labelled) : '';
 
@@ -548,6 +543,18 @@ export function tryReplaceTabSpawn(event: any, ws: WorkspaceInfo, setAgentMeta: 
 }
 
 export default function App() {
+  const [paneZooms, setPaneZooms] = useState<Record<string, number>>({});
+  // Per-pane zoom, like Windows Terminal's per-pane font size (#420): Ctrl+wheel
+  // and the font-size shortcuts change one pane, and a deltaY of 0 resets it.
+  // Not persisted, also like Windows Terminal.
+  const adjustPaneZoom = useCallback((paneId: PaneId, deltaY: number) => {
+    setPaneZooms((previous) => {
+      const next = { ...previous };
+      if (deltaY === 0) delete next[paneId];
+      else next[paneId] = nextPaneZoom(previous[paneId] ?? 1, deltaY);
+      return next;
+    });
+  }, []);
   // Field-scoped store subscription. A bare `useStore()` subscribes App to the
   // WHOLE store, so every set() anywhere — one pane's OSC 9;4 progress, an
   // agent verdict, a settings write — re-rendered App and with it the sidebar
@@ -607,6 +614,17 @@ export default function App() {
   const focusedPaneIdRef = useRef<PaneId | null>(null);
   focusedPaneIdRef.current = focusedPaneId;
   useEffect(() => setFocusedPaneReader(() => focusedPaneIdRef.current), []);
+  useEffect(() => installWheelZoom(
+    document,
+    // The pane under the pointer, as in Windows Terminal; the focused one when
+    // the wheel is over no pane.
+    (deltaY, target) => {
+      const paneId = (paneIdAt(target) as PaneId | null) ?? focusedPaneId;
+      if (paneId) adjustPaneZoom(paneId, deltaY);
+    },
+    (deltaY) => window.wmux?.system?.zoom?.(deltaY),
+  ), [adjustPaneZoom, focusedPaneId]);
+  const [zoomedPaneId, setZoomedPaneId] = useState<PaneId | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Deep links choose a tab and optionally the host whose Dani (host assistant) settings to show.
   const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>(undefined);
@@ -645,6 +663,21 @@ export default function App() {
     document.documentElement.classList.toggle('wmux-focus-mode', focusMode);
     try { localStorage.setItem('wmux-focus-mode', focusMode ? '1' : '0'); } catch { /* storage unavailable: keep the in-memory state */ }
   }, [focusMode]);
+  // A window without OS focus shows no focused pane, so two windows side by
+  // side do not both claim the keyboard. A class for the same reason as focus
+  // mode: no pane re-renders, and which pane is focused does not change.
+  useEffect(() => {
+    const api = window.wmux?.window;
+    if (!api?.onFocusChange) return;
+    const apply = (focused: boolean) =>
+      document.documentElement.classList.toggle('wmux-window-inactive', !focused);
+    const off = api.onFocusChange(apply);
+    api.isFocused?.().then(apply, () => { /* keep the default: active */ });
+    return () => {
+      off?.();
+      document.documentElement.classList.remove('wmux-window-inactive');
+    };
+  }, []);
   // The everyday strength of that same overlay, as a custom property for the
   // same reason: dragging the Settings slider re-renders no pane.
   const inactivePaneDim = useStore((s) => s.appearancePrefs.inactivePaneDim);
@@ -1052,11 +1085,24 @@ export default function App() {
       useStore.getState().clearPromptsForSurface(surfaceId);
       // Both halves, in this order: the module map AND its pending throttle
       // timer first, or a flush already armed re-publishes the title into the
-      // store a moment after the store entry was dropped.
-      forgetSurfaceTitle(surfaceId);
+      // store a moment after the store entry was dropped. forgetClosedTerminal
+      // does the title first, then the rest of the terminal's per-surface maps
+      // (#385) — mouse modes, wheel/touch remainders, output counter, parked
+      // notices, a stale remount snapshot.
+      forgetClosedTerminal(surfaceId);
       useStore.getState().clearOscTitle(surfaceId);
       // Reset terminal state's record of the alternate screen (#357).
       forgetAlternateScreen(surfaceId);
+      // The PTY-exit path clears these too, but a closed pane's exit handler
+      // is unsubscribed before the exit of its PTY comes back (#385).
+      forgetProgressTurn(surfaceId);
+      forgetSurfaceShellState(surfaceId);
+      setClaudeActivity((prev) => {
+        if (!(surfaceId in prev)) return prev;
+        const next = { ...prev };
+        delete next[surfaceId];
+        return next;
+      });
     };
     document.addEventListener(SURFACE_CLOSED_EVENT, handler);
     return () => document.removeEventListener(SURFACE_CLOSED_EVENT, handler);
@@ -1128,11 +1174,13 @@ export default function App() {
     return unsub;
   }, []);
 
-  // NOTE: hookActivity entries are intentionally kept forever (not cleaned up).
-  // Keys are surface ids (per Claude session) or workspace ids (legacy events).
-  // WorkspaceRow uses the lastSeen timestamp + TTL to decide what to display.
-  // Keeping stale entries lets us distinguish "Claude was active but stopped"
-  // (idle) from "a regular shell command is running" (no hookActivity at all).
+  // NOTE: hookActivity entries are not cleaned up, but they no longer decide
+  // whether a pane hosts an agent or whether it is idle: the shared agent
+  // roster owns membership and idle claims. Keys are surface ids (per Claude
+  // session) or workspace ids (legacy events). WorkspaceRow reads an entry only
+  // while its lastSeen is inside the activity TTL, for the tool label and for a
+  // roster member whose state is `unknown`, and sums toolCount for the trace
+  // odometer. A stale entry is therefore inert.
 
   // Listen for Claude Code activity parsed from terminal output
   useEffect(() => {
@@ -1347,37 +1395,44 @@ export default function App() {
     setExplorerOpen(byDefault || !!activeWorkspace?.explorerOpen);
   }, [activeWorkspaceId, activeWorkspace?.explorerOpen, activeWorkspace?.explorerDismissed, explorerOpenByDefault, workspaceHasRoot]);
 
+  // The pane each workspace last had focused (#449). Focus is one value per
+  // window, so a switch always lands on a pane the new workspace doesn't have;
+  // without this the reset below sent every return trip to the first pane.
+  // Recorded only while the pane belongs to the active workspace: on the render
+  // that switches, `focusedPaneId` is still the previous workspace's pane.
+  const lastFocusedPaneRef = useRef(new Map<WorkspaceId, PaneId>());
+  useEffect(() => {
+    if (!activeWorkspace || !focusedPaneId) return;
+    if (findLeaf(activeWorkspace.splitTree, focusedPaneId)) {
+      lastFocusedPaneRef.current.set(activeWorkspace.id, focusedPaneId);
+    }
+  }, [activeWorkspace?.id, activeWorkspace?.splitTree, focusedPaneId]);
+
   useEffect(() => {
     if (!activeWorkspace) return;
     const paneIds = getAllPaneIds(activeWorkspace.splitTree);
     if (paneIds.length > 0 && (focusedPaneId === null || !paneIds.includes(focusedPaneId))) {
-      setFocusedPaneId(paneIds[0]);
+      const remembered = lastFocusedPaneRef.current.get(activeWorkspace.id);
+      setFocusedPaneId(remembered && paneIds.includes(remembered) ? remembered : paneIds[0]);
     }
   }, [activeWorkspace?.id, activeWorkspace?.splitTree]);
 
   /**
-   * Tell every `prompts` PANE which terminal it is listing (issue #207 follow-up).
-   *
-   * A prompts pane is not attached to the terminal it describes — it lives
-   * somewhere else in the split tree — so the focused terminal has to be pushed
-   * to it. Computed here because this is where focus lives; `focusedPaneId` is
-   * component state, not store state.
-   *
-   * The `if` is the whole rule. Focus landing on ANYTHING that is not a terminal
-   * leaves the last value standing, so clicking into the prompts pane itself —
-   * to filter it, to scroll it, to click a row — does not blank the list the
-   * user just reached for. `setPromptSourceSurface` no-ops on an unchanged
-   * value, which matters because this runs on every split-tree edit.
+   * Publish focus before notifications can arrive after a commit. Non-terminal
+   * selections clear notification focus but preserve the prompt pane's source.
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const leaf = activeWorkspace && focusedPaneId
       ? findLeaf(activeWorkspace.splitTree, focusedPaneId)
       : undefined;
     const surface = leaf?.surfaces[leaf.activeSurfaceIndex];
-    if (surface?.type === 'terminal') {
-      useStore.getState().setPromptSourceSurface(surface.id);
-    }
-  }, [activeWorkspace?.splitTree, focusedPaneId]);
+    const terminalId = surface?.type === 'terminal' ? surface.id : null;
+    // Keyboard navigation can select a pane that zoom keeps off-screen.
+    const visible = !zoomedPaneId || zoomedPaneId === focusedPaneId;
+    useStore.getState().setNotificationFocusedSurface(visible ? terminalId : null);
+    if (terminalId) useStore.getState().setPromptSourceSurface(terminalId);
+    return () => useStore.getState().setNotificationFocusedSurface(null);
+  }, [activeWorkspace?.id, activeWorkspace?.splitTree, focusedPaneId, zoomedPaneId]);
 
   const handleRatioChange = useCallback(
     (leftPaneId: PaneId, rightPaneId: PaneId, ratio: number) => {
@@ -1481,12 +1536,11 @@ export default function App() {
     const surface = leaf?.surfaces[leaf.activeSurfaceIndex];
     const terminalSurfaceId = surface?.type === 'terminal' ? surface.id : null;
 
-    if (action === 'resetTerminal' || action === RESET_TERMINAL_LEAVE_ALT_ACTION) {
+    if (isPaletteResetAction(action)) {
+      dispatchPaletteReset(action, terminalSurfaceId);
+    } else if (action === 'clearTerminalBuffer') {
       if (terminalSurfaceId) {
-        // The palette's second entry skips the keep-then-press-again step
-        // (#357): choosing it by name already says "leave it anyway".
-        const leaveAlternateScreen = action === RESET_TERMINAL_LEAVE_ALT_ACTION;
-        document.dispatchEvent(new CustomEvent('wmux:reset-terminal', { detail: { surfaceId: terminalSurfaceId, leaveAlternateScreen } }));
+        document.dispatchEvent(new CustomEvent('wmux:clear-terminal-buffer', { detail: { surfaceId: terminalSurfaceId } }));
       }
     } else if (action === 'togglePromptOutline') {
       togglePromptOutlineFor(
@@ -1595,7 +1649,6 @@ export default function App() {
     setNotifPanelOpen((o) => !o);
   }, []);
 
-  const [zoomedPaneId, setZoomedPaneId] = useState<PaneId | null>(null);
   const [surfaceDrag, setSurfaceDrag] = useState<SurfaceDragPayload | null>(null);
   const [surfaceDragPreview, setSurfaceDragPreview] = useState<SurfaceDragPreview | null>(null);
   const surfaceDragRef = useRef<SurfaceDragPayload | null>(null);
@@ -1711,7 +1764,7 @@ export default function App() {
     if (!paneIds.includes(zoomedPaneId)) setZoomedPaneId(null);
   }, [zoomedPaneId, activeWorkspace]);
 
-  useKeyboardShortcuts(focusedPaneId, setSettingsOpenFromShortcut, () => setBrowserOpen(o => !o), handleToggleNotifPanel, setFocusedPaneId, handleToggleZoom, () => handleToggleExplorer());
+  useKeyboardShortcuts(focusedPaneId, setSettingsOpenFromShortcut, () => setBrowserOpen(o => !o), handleToggleNotifPanel, setFocusedPaneId, handleToggleZoom, () => handleToggleExplorer(), adjustPaneZoom);
 
   // Derive a title for the titlebar: active workspace title or blank
   const titlebarText = (activeWorkspace && workspaceNames.get(activeWorkspace.id)) ?? '';
@@ -1840,6 +1893,7 @@ export default function App() {
                 focusedPaneId={ws.id === activeWorkspaceId ? focusedPaneId : null}
                 onRatioChange={ws.id === activeWorkspaceId ? handleRatioChange : undefined}
                 onPaneFocus={handlePaneFocus}
+                paneZooms={paneZooms}
                 surfaceDrag={ws.id === activeWorkspaceId ? surfaceDrag : null}
                 onSurfaceDragStart={handleSurfaceDragStart}
                 onSurfaceDragEnd={handleSurfaceDragEnd}
@@ -1847,6 +1901,11 @@ export default function App() {
                 onClearSurfaceDragPreview={handleClearSurfaceDragPreview}
                 onSurfaceDragCommit={handleSurfaceDragCommit}
               />
+              {surfaceDrag?.workspaceId === ws.id && ws.id === activeWorkspaceId && (
+                <WorkspaceDropZones workspace={ws} drag={surfaceDrag}
+                  onEnd={handleSurfaceDragEnd} onClearPreview={handleClearSurfaceDragPreview}
+                  onCommit={() => handleSurfaceDragCommit({ clearZoom: true })} />
+              )}
               {surfaceDragPreview?.workspaceId === ws.id && ws.id === activeWorkspaceId && (
                 <SplitPreviewOverlay
                   tree={surfaceDragPreview.previewTree}

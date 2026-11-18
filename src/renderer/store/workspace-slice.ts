@@ -200,9 +200,16 @@ export interface WorkspaceSlice {
 // ─── Slice creator ───────────────────────────────────────────────────────────
 
 type SliceSet = Parameters<StateCreator<WorkspaceSlice>>[0];
+type SliceGet = Parameters<StateCreator<WorkspaceSlice>>[1];
 
 /** Drop one workspace from the list, selecting a neighbour if it was active. Tears nothing down. */
-function removeWorkspaceEntry(set: SliceSet, id: WorkspaceId): void {
+function removeWorkspaceEntry(set: SliceSet, get: SliceGet, id: WorkspaceId): void {
+  // Its notifications can no longer be read by focusing a pane, so they
+  // would sit in the bell for the life of the window (#385). The notification
+  // slice is composed beside this one at runtime; this creator is typed for
+  // its own slice only, as with workspacePrefs below.
+  (get() as unknown as { clearWorkspaceNotifications?: (wsId: WorkspaceId) => void })
+    .clearWorkspaceNotifications?.(id);
   set((state) => {
     const idx = state.workspaces.findIndex((w) => w.id === id);
     if (idx === -1) return state;
@@ -338,7 +345,7 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
     // requestCloseWorkspace / routeRemoteClose and the dialog first.
     if (closing?.remoteGroups) closeRemoteGroups(closing.remoteGroups);
     if (closing) killTreeTerminalPtys(closing.splitTree);
-    removeWorkspaceEntry(set, id);
+    removeWorkspaceEntry(set, get, id);
   },
 
   hideWorkspaceOnDevice(id: WorkspaceId): void {
@@ -354,7 +361,7 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
         killSurfacePty(s);
       }
     });
-    removeWorkspaceEntry(set, id);
+    removeWorkspaceEntry(set, get, id);
   },
 
   routeRemoteClose(workspaceId: WorkspaceId, surfaceIds: readonly string[]): boolean {
@@ -469,7 +476,8 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
       workspaces: state.workspaces.map((w) => {
         if (w.id !== id) return w;
         // A chosen name stops following the window title.
-        const { titleIsDefault: _dropped, ...rest } = w;
+        const rest = { ...w };
+        delete rest.titleIsDefault;
         return { ...rest, title };
       }),
     }));

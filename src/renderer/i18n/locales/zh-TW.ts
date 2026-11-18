@@ -560,7 +560,7 @@ export const zhTW: Translation = {
   'settings.workspacePanel.sessionSnapshot15': '15 分鐘',
   'settings.workspacePanel.sessionSnapshot30': '30 分鐘',
   'settings.workspacePanel.sessionSnapshot60': '60 分鐘',
-  'settings.workspacePanel.restoreOpencodeSessionsHint': '以 `opencode -s` 在每個還原分頁原本的目錄中重新開啟它的 OpenCode 工作階段。需要 remotea 的 OpenCode 外掛（已啟用代理整合）。正常結束的 OpenCode 不會重新開啟。若工作階段已被刪除，OpenCode 會改為建立新的工作階段。OpenCode 2 只有以 --standalone 啟動時才會記錄：它共用的背景伺服器無法分辨分頁。',
+  'settings.workspacePanel.restoreOpencodeSessionsHint': '以 `opencode -s` 在每個還原分頁原本的目錄中重新開啟它的 OpenCode 工作階段。需要 remotea 的 OpenCode 整合（伺服器外掛，或為 OpenCode 2 以 `wmux opencode-tui` 安裝的 TUI 外掛）。正常結束的 OpenCode 不會重新開啟。若工作階段已被刪除，OpenCode 會改為建立新的工作階段。OpenCode 2 在遠端或共用伺服器上由 TUI 外掛記錄；remotea 更新後請在該環境重新執行 `wmux opencode-tui`。',
   'settings.workspacePanel.restoreAgySessionsHint': '以 `agy --conversation` 在每個還原分頁原本的目錄中重新開啟它的 agy 對話。需要 remotea 的 agy 外掛（已啟用狀態掛鉤）與 Node.js。對話會在開始時記錄，或在繼續後的第一則訊息時記錄。結束 agy 回到 shell 提示字元後，不會重新開啟。',
   'settings.workspacePanel.restoreOmpSessions': '還原時繼續 omp 工作階段',
   'settings.workspacePanel.restoreOmpSessionsHint': '以 `omp --resume <path>` 在每個還原分頁原本的目錄中重新開啟它的精確 omp 工作階段。需要啟用 remotea 的 omp 擴充功能（狀態掛鉤已開啟）。正常結束的 omp 不會重新開啟。若工作階段檔案已被刪除，該窗格會安全略過，絕不偷偷建立新工作階段。',

@@ -38,7 +38,7 @@ describe('settings navigation compatibility and discovery', () => {
     expect(count).toBe(88);
   });
   it('finds all shortcuts by shared action ID and human label', () => {
-    expect(Object.keys(SHORTCUT_TABLE)).toHaveLength(61);
+    expect(Object.keys(SHORTCUT_TABLE)).toHaveLength(63);
     for (const [id, entry] of Object.entries(SHORTCUT_TABLE)) {
       expect(searchSettings(id)).toContain('Shortcuts');
       expect(searchSettings(entry.label)).toContain('Shortcuts');

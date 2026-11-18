@@ -404,7 +404,7 @@ export function shouldSnapshot(input: SnapshotDecisionInput): boolean {
  * spent on a `cd` or a tab click, and the state worth recovering was rotated
  * out behind them.
  */
-const TREE_VIEW_STATE = new Set(['cwd', 'currentCwd', 'resolvedShell', 'activeSurfaceIndex']);
+const TREE_VIEW_STATE = new Set(['cwd', 'currentCwd', 'resolvedShell', 'launchShell', 'activeSurfaceIndex']);
 
 /**
  * What "the layout changed" means, as one string.

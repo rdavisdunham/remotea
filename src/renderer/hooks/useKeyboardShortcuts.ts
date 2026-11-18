@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { listenAppActions } from '../utils/app-action';
 import { useStore } from '../store';
 import { ShortcutBinding, ShortcutAction } from '../store/settings-slice';
-import { splitNode, removeLeaf, getAllPaneIds, findLeaf, adjustPaneRatio } from '../store/split-utils';
+import { activeTerminalShell, splitNode, removeLeaf, getAllPaneIds, findLeaf, adjustPaneRatio } from '../store/split-utils';
 import { rollupAgents } from '../store/agent-rollup';
 import { focusAgentTarget } from '../store/focus-agent';
 import { PaneId, SplitNode } from '../../shared/types';
@@ -138,6 +138,8 @@ export function useKeyboardShortcuts(
   onFocusPane?: (paneId: PaneId) => void,
   onToggleZoom?: () => void,
   onToggleExplorer?: () => void,
+  /** Zoom one pane (#420): deltaY < 0 in, > 0 out, 0 resets. */
+  onPaneZoom?: (paneId: PaneId, deltaY: number) => void,
 ): void {
   const {
     shortcuts,
@@ -168,7 +170,15 @@ export function useKeyboardShortcuts(
       const ws = activeWs();
       if (!ws) return;
       const newPaneId = `pane-${uuid()}` as PaneId;
-      updateSplitTree(activeWorkspaceId, splitNode(ws.splitTree, focusedPaneId, newPaneId, type, dir));
+      const newTree = splitNode(ws.splitTree, focusedPaneId, newPaneId, type, dir,
+        activeTerminalShell(findLeaf(ws.splitTree, focusedPaneId)));
+      // splitNode hands back the SAME tree when the target is not in it; focusing
+      // newPaneId then would point focus at a pane that does not exist, and the
+      // fallback effect in App only re-runs on a tree change, so nothing repairs it.
+      if (newTree === ws.splitTree) return;
+      updateSplitTree(activeWorkspaceId, newTree);
+      // The pane the user just asked for is the one they mean to type into.
+      onFocusPane?.(newPaneId);
     };
 
     const doFocus = (dir: 'left' | 'right' | 'up' | 'down') => {
@@ -306,9 +316,10 @@ export function useKeyboardShortcuts(
       return surface?.type === 'terminal' ? surface.id : null;
     };
 
-    const adjustFontSize = (next: (size: number) => number) => {
-      const prefs = useStore.getState().terminalPrefs;
-      useStore.getState().setTerminalPrefs({ fontSize: next(prefs.fontSize) });
+    // The font-size shortcuts zoom the focused pane only, as in Windows
+    // Terminal (#420); the default size for every terminal stays in Settings.
+    const zoomFocusedPane = (deltaY: number) => {
+      if (focusedPaneId) onPaneZoom?.(focusedPaneId, deltaY);
     };
 
     const togglePinWorkspace = () => {
@@ -369,7 +380,12 @@ export function useKeyboardShortcuts(
       focusUp: () => doFocus('up'),
       focusDown: () => doFocus('down'),
       closeSurfaceOrPane: closeFocusedSurfaceOrPane,
-      newSurface: () => { if (activeWorkspaceId && focusedPaneId) addSurface(activeWorkspaceId, focusedPaneId, 'terminal'); },
+      newSurface: () => {
+        if (!activeWorkspaceId || !focusedPaneId) return;
+        const ws = activeWs();
+        const shell = activeTerminalShell(ws && findLeaf(ws.splitTree, focusedPaneId));
+        addSurface(activeWorkspaceId, focusedPaneId, 'terminal', { shell });
+      },
       nextSurface: () => { if (activeWorkspaceId && focusedPaneId) nextSurface(activeWorkspaceId, focusedPaneId); },
       prevSurface: () => { if (activeWorkspaceId && focusedPaneId) prevSurface(activeWorkspaceId, focusedPaneId); },
       jumpToUnread,
@@ -385,6 +401,10 @@ export function useKeyboardShortcuts(
       copy: copySelection,
       paste: pasteIntoFocusedTerminal,
       resetTerminal: resetFocusedTerminal,
+      clearTerminalBuffer: () => {
+        const surfaceId = focusedTerminalSurfaceId();
+        if (surfaceId) fire('wmux:clear-terminal-buffer', { surfaceId });
+      },
       // Issue #207. The bodies live in store/prompt-actions.ts so the command
       // palette runs the same code — see the note there.
       // The pane context is what lets `outlineMode: 'pane'` put the outline in
@@ -396,9 +416,17 @@ export function useKeyboardShortcuts(
       ),
       togglePinnedPrompt: () => togglePinnedPromptFor(focusedTerminalSurfaceId()),
       followOutput: () => followOutputFor(focusedTerminalSurfaceId()),
-      fontSizeIncrease: () => adjustFontSize((s) => Math.min(32, s + 1)),
-      fontSizeDecrease: () => adjustFontSize((s) => Math.max(8, s - 1)),
-      fontSizeReset: () => useStore.getState().setTerminalPrefs({ fontSize: 13 }),
+      refreshSurface: () => {
+        if (!activeWorkspaceId || !focusedPaneId) return;
+        const state = useStore.getState();
+        const ws = state.workspaces.find((w) => w.id === activeWorkspaceId);
+        const leaf = ws && findLeaf(ws.splitTree, focusedPaneId);
+        const surface = leaf?.surfaces[leaf.activeSurfaceIndex];
+        if (surface) fire('wmux:refresh-surface', { surfaceId: surface.id });
+      },
+      fontSizeIncrease: () => zoomFocusedPane(-1),
+      fontSizeDecrease: () => zoomFocusedPane(1),
+      fontSizeReset: () => zoomFocusedPane(0),
       openSettings: () => onOpenSettings?.(true),
       openMarkdownPanel: () => { if (activeWorkspaceId && focusedPaneId) addSurface(activeWorkspaceId, focusedPaneId, 'markdown'); },
       // Focus-or-create: the diff panel is a singleton view of the working tree,
@@ -511,6 +539,7 @@ export function useKeyboardShortcuts(
     onFocusPane,
     onToggleZoom,
     onToggleExplorer,
+    onPaneZoom,
     t,
   ]);
 

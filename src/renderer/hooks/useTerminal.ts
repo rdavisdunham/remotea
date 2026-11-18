@@ -10,7 +10,9 @@ import { ProgressAddon } from '@xterm/addon-progress';
 import { useStore } from '../store';
 import { useT } from '../i18n';
 import type { Translator } from '../i18n/core';
-import { collectActiveTerminalSurfaceIds } from '../store/split-utils';
+import { collectActiveTerminalSurfaceIds, findSurfaceOwner } from '../store/split-utils';
+import { fireNotification } from '../utils/notifications';
+import { paneFontSize } from '../utils/wheel-zoom';
 import { SplitNode, SurfaceId, ThemeConfig, type InsertionResult } from '../../shared/types';
 import { UserColorScheme } from '../store/settings-slice';
 import { normalizeOscTitle, isConsoleDefaultTitle } from '../store/osc-title-slice';
@@ -25,9 +27,11 @@ import {
   isMouseTracking,
   takeMouseModeReplay,
 } from '../utils/mouse-modes';
-import { attachVisibleRenderer, RendererHandle } from '../utils/terminal-renderer';
+import { attachVisibleRenderer, rebuildVisibleRenderer, RendererHandle } from '../utils/terminal-renderer';
+import { WidthChangeRebuild } from '../utils/renderer-rebuild';
 import { terminalNeedsTransparency } from '../utils/terminal-theme';
 import { resetTerminalModes } from '../utils/terminal-reset';
+import { clearTerminalBuffer } from '../utils/terminal-clear';
 import { trackScreenEvents } from '../utils/screen-report';
 import {
   applyManualReset,
@@ -50,11 +54,11 @@ import { trimTrailingWhitespace } from '../utils/copy-text';
 import { bellAction, normalizeBellStyle } from '../utils/terminal-bell';
 import { playBellSound } from '../notification-sound';
 import { normalizeRightClickMode, rightClickAction } from '../utils/terminal-right-click';
-import { handleShiftEnter, isLetterKey, isShiftEnter } from './terminal-keys';
+import { handleShiftEnter, isBareCtrlLetter, isShiftEnter } from './terminal-keys';
 import { applyKeyRemap } from '../key-remaps';
 import { claimsKeyEvent } from '../utils/shortcut-binding';
 import { installXtermCompositionClauses } from '../utils/ime-composition';
-import { isConEmuSubcommand } from './osc9';
+import { isConEmuSubcommand, osc9CwdToOsc7 } from './osc9';
 import { applyOsc7Cwd } from '../utils/osc7-cwd';
 import { forgetSurface as forgetPromptLog, handlePromptMark, refreshHighlights } from '../utils/prompt-log';
 import {
@@ -98,6 +102,8 @@ interface UseTerminalOptions {
    * the DOM blurred its textarea — so this re-runs the show path below.
    */
   attachGeneration?: number;
+  /** The pane's zoom (#420): scales the font, so the terminal refits and reflows. */
+  fontZoom?: number;
   /** Per-surface color scheme override — takes priority over terminalPrefs.theme. */
   colorScheme?: string;
   /** Quick-launch profile commands, run once after the PTY is first created (issue #32). */
@@ -128,6 +134,8 @@ interface UseTerminalResult {
   fit: () => void;
   xtermRef: React.RefObject<Terminal | null>;
   searchAddonRef: React.RefObject<SearchAddon | null>;
+  /** The live PTY's id once attached; null before the first attach. */
+  ptyIdRef: React.RefObject<string | null>;
 }
 
 function treeHasSurface(node: SplitNode, surfaceId: string): boolean {
@@ -193,15 +201,17 @@ function snapshotSurfaceBuffer(
  * `…\ssh.exe`, persisted that way, and a restored ssh workspace then started
  * an ssh with no destination, printed usage and exited. The label only ever
  * needed a name to show, so it gets its own field and the spec stays intact.
+ * Main also returns the original effective launch spec on reattachment, so
+ * inheritance preserves arguments even if workspace/default preferences changed.
  */
-function setResolvedShellForSurface(surfaceId: string | undefined, resolvedShell: string): void {
+function setResolvedShellForSurface(surfaceId: string | undefined, resolvedShell: string, launchShell: string | undefined): void {
   if (!surfaceId || !resolvedShell) return;
   const state = useStore.getState();
   const workspace = state.workspaces.find((ws) => treeHasSurface(ws.splitTree, surfaceId));
   if (!workspace) return;
   const location = findSurfaceLocation(workspace.splitTree, surfaceId);
   if (!location) return;
-  state.updateSurface(workspace.id, location.paneId as any, surfaceId as any, { resolvedShell });
+  state.updateSurface(workspace.id, location.paneId as any, surfaceId as any, { resolvedShell, launchShell });
 }
 
 /**
@@ -266,6 +276,48 @@ function applyInsertion(
   try { term.focus(); } catch { /* no-op */ }
 }
 
+/** Ctrl+click on a file path printed in the terminal; needs a surface to jail against. */
+function registerFileLinks(
+  terminal: Terminal,
+  surfaceId: SurfaceId | undefined,
+  handlers: Parameters<typeof createFileLinkProvider>[2],
+): void {
+  if (!surfaceId) return;
+  terminal.registerLinkProvider(createFileLinkProvider(
+    terminal,
+    (path) => terminalFileLinkExists(surfaceId, path),
+    handlers,
+  ));
+}
+
+/** Buffer switches and resizes for `wmux read-screen --events`; none without a surface. */
+function trackScreenEventsFor(surfaceId: string | undefined, terminal: Terminal) {
+  return surfaceId ? trackScreenEvents(surfaceId, terminal) : undefined;
+}
+
+/** Read layout so a removed animation class takes effect before it is re-added. */
+function forceReflow(host: HTMLElement): number {
+  return host.offsetWidth;
+}
+
+/** The surface's own value, else the user's default, else '' (main decides). */
+function withPreference(own: string | undefined, preferred: string | undefined): string {
+  return own || preferred || '';
+}
+
+/**
+ * The size to spawn a PTY at: the already-measured terminal, or nothing for a
+ * hidden or not-yet-laid-out one (the PTY then starts at its default and is
+ * resized when first shown).
+ */
+function proposeInitialDims(fitAddon: FitAddon): { cols?: number; rows?: number } {
+  try {
+    const dims = fitAddon.proposeDimensions();
+    if (dims && dims.cols > 0 && dims.rows > 0) return { cols: dims.cols, rows: dims.rows };
+  } catch { /* element not measurable yet — fall back to PTY default */ }
+  return {};
+}
+
 /**
  * The visual bell (#335): a class on the xterm container whose ::after overlay
  * fades out. Removing and re-adding the class (with a forced reflow between)
@@ -274,7 +326,7 @@ function applyInsertion(
 function flashBell(host: HTMLElement | null): void {
   if (!host) return;
   host.classList.remove('terminal-pane__container--bell');
-  void host.offsetWidth;
+  forceReflow(host);
   host.classList.add('terminal-pane__container--bell');
   // Matched by name: animationend bubbles, and xterm's own children animate.
   const done = (ev: AnimationEvent) => {
@@ -556,6 +608,51 @@ export function forgetSurfaceTitle(surfaceId: string): void {
 }
 
 /**
+ * Drop every module map entry a CLOSED terminal surface left behind (#385).
+ *
+ * Called from the destructive-close chokepoint (SURFACE_CLOSED_EVENT), never
+ * from unmount: a terminal rebuilt on a live PTY needs all of these back. The
+ * PTY-exit handler cleared the mouse modes and wheel remainder, but a close
+ * unsubscribes that handler when the terminal unmounts, before the exit of the
+ * PTY the close just killed comes back from main — so for a closed pane it
+ * never ran, and every one of these kept an entry per surface ever opened.
+ */
+export function forgetClosedTerminal(surfaceId: string): void {
+  forgetSurfaceTitle(surfaceId);
+  surfaceMouseModes.delete(surfaceId);
+  wheelLineAccum.delete(surfaceId);
+  touchReportCarry.delete(surfaceId);
+  surfaceOutputSeq.delete(surfaceId);
+  pendingPaneNotices.delete(surfaceId);
+  surfaceBufferCache.forget(surfaceId);
+}
+
+/** Which of the per-surface module maps above still hold `surfaceId`. Test seam. */
+export function __terminalStateEntries(surfaceId: string): string[] {
+  const held: Array<[string, { has(id: string): boolean }]> = [
+    ['title', surfaceTitle],
+    ['titleFlush', titleFlushTimers],
+    ['mouseModes', surfaceMouseModes],
+    ['wheel', wheelLineAccum],
+    ['touch', touchReportCarry],
+    ['outputSeq', surfaceOutputSeq],
+    ['notices', pendingPaneNotices],
+  ];
+  return held.filter(([, map]) => map.has(surfaceId)).map(([name]) => name);
+}
+
+/** Test seam: seed the per-surface maps the way a live terminal would. */
+export function __seedTerminalState(surfaceId: string): void {
+  surfaceTitle.set(surfaceId, 'title');
+  mouseModesFor(surfaceId);
+  wheelLineAccum.set(surfaceId, 0.5);
+  touchReportCarry.set(surfaceId, 0.25);
+  surfaceOutputSeq.set(surfaceId, 1);
+  showPaneNotice(surfaceId, 'held back');
+  publishTitle(surfaceId);
+}
+
+/**
  * Wire a terminal up to the prompt log (issue #207): OSC 133 in, scroll out.
  *
  * Module-level, like `recordTitleChanges` above, for the same two reasons — the
@@ -818,7 +915,7 @@ function scheduleDeferredRepaint(terminal: Terminal): ReturnType<typeof setTimeo
       try {
         terminal.scrollToBottom();
         terminal.refresh(0, terminal.rows - 1);
-      } catch {}
+      } catch { /* best effort */ }
     });
   }, 300);
 }
@@ -842,7 +939,7 @@ export async function fetchTheme(name: string): Promise<ThemeConfig> {
   }
 }
 
-export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = true, attachGeneration, colorScheme, startupCommands, env, claudeSessionId, codexSessionId, opencodeSessionId, agySessionId, qwenSessionId, ompSessionId }: UseTerminalOptions = {}): UseTerminalResult {
+export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = true, attachGeneration, fontZoom = 1, colorScheme, startupCommands, env, claudeSessionId, codexSessionId, opencodeSessionId, agySessionId, qwenSessionId, ompSessionId }: UseTerminalOptions = {}): UseTerminalResult {
   const t = useT();
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -900,6 +997,17 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
   // Read by the bell handler (#335), whose closure outlives every render.
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
+  // A settled column change replaces the WebGL renderer, as a hide/show does,
+  // because that is the only thing that repaired #400's stale glyphs. Read
+  // through refs: it fires after the resize that armed it, and only for a
+  // terminal that is still shown and still on WebGL.
+  const widthRebuildRef = useRef<WidthChangeRebuild | null>(null);
+  widthRebuildRef.current ??= new WidthChangeRebuild(() => {
+    const term = xtermRef.current;
+    const handle = rendererRef.current;
+    if (!term || !handle || !visibleRef.current) return;
+    rendererRef.current = rebuildVisibleRenderer(term, handle);
+  });
 
   // Subscribe to relevant settings so changes apply live.
   const prefs = useStore((s) => s.terminalPrefs);
@@ -985,6 +1093,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         // After captureViewportTop: a tail it orphans is where ConPTY's copy of
         // the cursor's line starts (#273, see captureCursorLine).
         const cursorLine = reflows ? captureCursorLine(term) : undefined;
+        const colsBefore = term?.cols;
         try {
           fitAddonRef.current.fit();
         } finally {
@@ -995,6 +1104,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           if (term) {
             restoreCursorLine(term, cursorLine);
             anchorViewportLikeConpty(term, top);
+            if (colsBefore !== undefined) widthRebuildRef.current?.noteFit(colsBefore, term.cols);
           }
         }
       } catch {
@@ -1033,7 +1143,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         selectionForeground: '#fdfff1',
       },
       fontFamily: prefs.fontFamily || "'Cascadia Mono', 'Consolas', monospace",
-      fontSize: prefs.fontSize || 13,
+      fontSize: paneFontSize(prefs.fontSize || 13, fontZoom),
       cursorBlink: prefs.cursorBlink ?? true,
       cursorStyle: prefs.cursorStyle || 'block',
       // A transparent glyph atlas loses subpixel text AA even when the window
@@ -1085,13 +1195,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     terminal.loadAddon(unicode11Addon);
     terminal.loadAddon(imageAddon);
     terminal.loadAddon(serializeAddon);
-    if (linkSurfaceId) {
-      terminal.registerLinkProvider(createFileLinkProvider(
-        terminal,
-        (path) => terminalFileLinkExists(linkSurfaceId, path),
-        links.fileLinkHandlers,
-      ));
-    }
+    registerFileLinks(terminal, linkSurfaceId, links.fileLinkHandlers);
     terminal.unicode.activeVersion = '11';
 
     // OSC 9;4 progress (ConEmu/Windows Terminal convention) → store, keyed by
@@ -1155,7 +1259,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     }
 
     const titleDisposable = recordTitleChanges(terminal, surfaceId);
-    const screenEventsDisposable = surfaceId ? trackScreenEvents(surfaceId, terminal) : undefined;
+    const screenEventsDisposable = trackScreenEventsFor(surfaceId, terminal);
 
     // Restore a buffer snapshot captured before a previous unmount (issue #49).
     // Run by the PTY lookup below, just before it attaches, so the restored
@@ -1567,6 +1671,13 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       cleanupFnsRef.current.push(installXtermCompositionClauses(terminal, compositionHelper, xtermCore.textarea));
     }
 
+    const notify = (text: string, title?: string) => {
+      const id = ptyIdRef.current || '';
+      const state = useStore.getState();
+      const owner = findSurfaceOwner(state.workspaces, id as SurfaceId);
+      fireNotification(id, owner?.workspaceId ?? null, text, state.addNotification, title);
+    };
+
     // Register OSC notification handlers
     // OSC 9: basic notification (iTerm2 style)
     terminal.parser.registerOscHandler(9, (data) => {
@@ -1575,17 +1686,23 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // prompt snippet emit this on EVERY prompt redraw) and "4;<state>;<n>"
       // (progress). Only bare text is an iTerm2 notification (#127).
       //
-      // Return FALSE, not true: xterm runs OSC handlers newest-first and stops
+      // Reuse OSC 7's main-process validation and explorer/store updates. The
+      // path is literal, not URL-encoded; the adapter preserves '%' in names.
+      const cwdReport = osc9CwdToOsc7(data);
+      if (cwdReport !== null) {
+        const surfaceId = ptyIdRef.current as SurfaceId | null;
+        if (surfaceId) void applyOsc7Cwd(surfaceId, cwdReport);
+        return true;
+      }
+
+      // For other numeric subcommands return FALSE: xterm runs newest-first and stops
       // at the first one returning true. ProgressAddon also registers on OSC 9
       // but is loaded earlier (above), so this handler always sees the sequence
       // first — swallowing it with `true` starved the addon and the OSC 9;4
       // progress bar never fired at all (dead since it shipped in 0.23.0).
       // Declining passes the sequence down the chain to the addon.
       if (isConEmuSubcommand(data)) return false;
-      window.wmux.notification.fire({
-        surfaceId: ptyIdRef.current || '',
-        text: data,
-      });
+      notify(data);
       return true;
     });
 
@@ -1597,11 +1714,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         const [k, ...v] = part.split('=');
         if (k && v.length) params[k.trim()] = v.join('=').trim();
       });
-      window.wmux.notification.fire({
-        surfaceId: ptyIdRef.current || '',
-        text: params.body || params.d || data,
-        title: params.title || params.t,
-      });
+      notify(params.body || params.d || data, params.title || params.t);
       return true;
     });
 
@@ -1609,11 +1722,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     terminal.parser.registerOscHandler(777, (data) => {
       const parts = data.split(';');
       if (parts[0] === 'notify' && parts.length >= 3) {
-        window.wmux.notification.fire({
-          surfaceId: ptyIdRef.current || '',
-          text: parts.slice(2).join(';'),
-          title: parts[1],
-        });
+        notify(parts.slice(2).join(';'), parts[1]);
       }
       return true;
     });
@@ -1653,10 +1762,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         const now = Date.now();
         if (now - lastBellAt < 3000) return;
         lastBellAt = now;
-        window.wmux.notification.fire({
-          surfaceId: ptyIdRef.current || '',
-          text: t('terminal.bell', 'Terminal bell'),
-        });
+        notify(t('terminal.bell', 'Terminal bell'));
       }
     });
 
@@ -1687,7 +1793,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
           const text = new TextDecoder('utf-8').decode(bytes);
           if (text) window.wmux?.clipboard?.writeText?.(text);
-        } catch {}
+        } catch { /* best effort */ }
       }
       return true;
     });
@@ -1712,7 +1818,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // pty.write so broadcast-input fans a remapped key out like any other.
       if (!managedInputBlocked(latestRemoteViews(), surfaceId) && applyKeyRemap(event, (data) => terminal.input(data, true))) return false;
 
-      if (event.type === 'keydown' && event.ctrlKey && isLetterKey(event, 'c', 'KeyC')) {
+      if (isBareCtrlLetter(event, 'c', 'KeyC')) {
         // ConPTY pads lines to full width with real spaces — trim them or
         // pasted blocks carry ragged trailing whitespace (issue #102).
         const selection = trimTrailingWhitespace(terminal.getSelection());
@@ -1735,8 +1841,11 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         event.preventDefault();
         return false;
       }
-      // Ctrl+V: main reads the clipboard and tells us what to type.
-      if (event.type === 'keydown' && event.ctrlKey && isLetterKey(event, 'v', 'KeyV')) {
+      // Ctrl+V: main reads the clipboard and tells us what to type. Bare Ctrl
+      // only, read off the modifier flags rather than the letter's case: with
+      // Caps Lock on, a case test let Ctrl+V through to the PTY as a raw ^V
+      // and claimed Ctrl+Shift+V, which the `paste` shortcut pasted again (#453).
+      if (isBareCtrlLetter(event, 'v', 'KeyV')) {
         // Prevent the browser 'paste' event — without this, xterm's built-in
         // paste handler ALSO writes the clipboard content through onData,
         // causing the text to appear twice in the terminal.
@@ -1927,7 +2036,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
 
     // Resolve effective shell: explicit (workspace) > user default preference > main-process fallback.
     // Read prefs at spawn time so changing the default later doesn't re-spawn live PTYs.
-    const effectiveShell = shell || useStore.getState().workspacePrefs.defaultShell || '';
+    const effectiveShell = withPreference(shell, useStore.getState().workspacePrefs.defaultShell);
 
     // Same rule for the directory (issue #205): the surface's own cwd wins —
     // a split inheriting its parent, "Open in wmux", `--cwd`, a restored
@@ -1936,7 +2045,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // spawn time for the same reason as the shell: changing it must not
     // re-spawn the PTYs already running. Left as the user typed it; `~` and
     // `%VAR%` are expanded in the main process by resolveSpawnCwd.
-    const effectiveCwd = cwd || useStore.getState().workspacePrefs.defaultCwd || '';
+    const effectiveCwd = withPreference(cwd, useStore.getState().workspacePrefs.defaultCwd);
 
     // Spawn the PTY at the already-measured terminal size. Otherwise it starts at
     // the 80x24 default and our follow-up resize triggers a window-size-change in
@@ -1945,19 +2054,15 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // the default, then resizes correctly when first shown (that redraw isn't
     // visible). proposeDimensions needs the element laid out, which it is after
     // terminal.open() above.
-    let initialCols: number | undefined;
-    let initialRows: number | undefined;
-    try {
-      const dims = fitAddon.proposeDimensions();
-      if (dims && dims.cols > 0 && dims.rows > 0) {
-        initialCols = dims.cols;
-        initialRows = dims.rows;
-      }
-    } catch { /* element not measurable yet — fall back to PTY default */ }
+    const { cols: initialCols, rows: initialRows } = proposeInitialDims(fitAddon);
 
     // If surfaceId is given AND a PTY already exists for it (agent spawn or re-mount), attach to it
     if (surfaceId && window.wmux.pty.has) {
       window.wmux.pty.has(surfaceId).then((exists: boolean) => {
+        // Torn down while has() was in flight (#385): attaching now would add
+        // PTY listeners after the cleanup that removes them already ran, and
+        // they would hold this disposed terminal for the life of the window.
+        if (disposed) return;
         if (exists) {
           restoreSurfaceState(true);
           attachToPty(surfaceId!);
@@ -1987,7 +2092,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           // remotea: a remote session is filed under this workspace's shared group (created on first use).
           const remoteGroup = remoteSpec ? ensureRemoteGroup(surfaceId, remoteSpec.hostId) : null;
           window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, surfaceId, startupCommands: spawnCommands, cols: initialCols, rows: initialRows, ...(remoteGroup ? { remote: remoteGroup } : {}) })
-            .then((created: { id: string; shell: string; reused: boolean; shellFallbackFrom?: string; snapshot?: TerminalSnapshot; unavailable?: PtyExitInfo; remote?: boolean }) => {
+            .then((created: { id: string; shell: string; launchShell?: string; reused: boolean; shellFallbackFrom?: string; snapshot?: TerminalSnapshot; unavailable?: PtyExitInfo; remote?: boolean }) => {
               // PTY persists (keep-alive); a remount re-attaches via pty.has.
               if (disposed) return;
               if (created.unavailable) {
@@ -1995,7 +2100,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
                 return;
               }
               if (created.remote) pinShellForSurface(surfaceId, effectiveShell);
-              setResolvedShellForSurface(surfaceId, created.shell);
+              setResolvedShellForSurface(surfaceId, created.shell, created.launchShell);
               // `reused`: StrictMode's second mount loses the has() race and
               // lands here on the PTY its first mount just created.
               restoreSurfaceState(created.reused, created.snapshot);
@@ -2008,9 +2113,9 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     } else {
       // No surfaceId hint — always create new PTY
       window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, startupCommands: startupCommandsRef.current, cols: initialCols, rows: initialRows })
-        .then((created: { id: string; shell: string; reused: boolean; shellFallbackFrom?: string }) => {
+        .then((created: { id: string; shell: string; launchShell?: string; reused: boolean; shellFallbackFrom?: string }) => {
           if (disposed) return;
-          setResolvedShellForSurface(surfaceId, created.shell);
+          setResolvedShellForSurface(surfaceId, created.shell, created.launchShell);
           restoreSurfaceState(created.reused);
           noteShellFallback(created);
           attachToPty(created.id);
@@ -2059,7 +2164,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         // pty.resize() call above and redraw themselves. A premature refresh here
         // would paint stale/clipped buffer content before their redraw arrives.
         if (!surfaceId || !isMouseTracking(surfaceMouseModes.get(surfaceId))) {
-          try { terminal.refresh(0, terminal.rows - 1); } catch {}
+          try { terminal.refresh(0, terminal.rows - 1); } catch { /* best effort */ }
         }
       });
     });
@@ -2121,6 +2226,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       }
 
       // Release the GPU renderer (and its WebGL budget slot) before disposing
+      widthRebuildRef.current?.cancel();
       rendererRef.current?.dispose();
       rendererRef.current = null;
 
@@ -2172,6 +2278,20 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     };
     document.addEventListener('wmux:paste-terminal', handler);
     return () => document.removeEventListener('wmux:paste-terminal', handler);
+  }, [surfaceId]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!surfaceId || detail?.surfaceId !== surfaceId) return;
+      const term = xtermRef.current;
+      if (!term || replayHoldRef.current.isHolding) return;
+      // The prompt list stays; its markers and anchor go, a prompt in progress
+      // is re-based, and ConPTY is cleared before xterm (utils/terminal-clear.ts).
+      clearTerminalBuffer(term, surfaceId, ptyIdRef.current, window.wmux?.pty?.clear);
+    };
+    document.addEventListener('wmux:clear-terminal-buffer', handler);
+    return () => document.removeEventListener('wmux:clear-terminal-buffer', handler);
   }, [surfaceId]);
 
   // Manual pane recovery (issue #175). The PTY-exit path above handles the case
@@ -2284,7 +2404,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     });
     // Font + cursor + scrollback can be applied synchronously.
     term.options.fontFamily = prefs.fontFamily || term.options.fontFamily;
-    term.options.fontSize = prefs.fontSize || term.options.fontSize;
+    term.options.fontSize = paneFontSize(prefs.fontSize || 13, fontZoom);
     term.options.cursorStyle = prefs.cursorStyle || term.options.cursorStyle;
     term.options.cursorBlink = prefs.cursorBlink ?? term.options.cursorBlink;
     term.options.scrollback = prefs.scrollbackLines || term.options.scrollback;
@@ -2309,7 +2429,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       cancelled = true;
       if (raf !== null) cancelAnimationFrame(raf);
     };
-  }, [schemeName, userScheme, bgAlpha, prefs.fontFamily, prefs.fontSize, prefs.cursorStyle, prefs.cursorBlink, prefs.scrollbackLines, visible]);
+  }, [schemeName, userScheme, bgAlpha, prefs.fontFamily, prefs.fontSize, fontZoom, prefs.cursorStyle, prefs.cursorBlink, prefs.scrollbackLines, visible]);
 
   // Refit + force-repaint when terminal becomes visible again (tab/workspace switch).
   // A canvas inside a visibility:hidden ancestor skips paint frames; on return we
@@ -2322,7 +2442,11 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // A hidden pane must not keep scrolling (#248): rAF would stall anyway, but
     // it would resume the fling on the way back into view — a pane that moves
     // by itself when the user returns to it.
-    if (!visible) cancelFlingRef.current?.();
+    if (!visible) {
+      cancelFlingRef.current?.();
+      // A hidden terminal has released WebGL; showing it again loads a fresh one.
+      widthRebuildRef.current?.cancel();
+    }
     // Track the nested rAFs so they can be cancelled if the terminal is hidden
     // or unmounted before they fire. Otherwise (notably under StrictMode's
     // double-mount) they run fit()/resize/refresh on a disposed terminal and
@@ -2386,5 +2510,5 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     return () => window.removeEventListener('focus', claim);
   }, [visible, focused, attachGeneration]);
 
-  return { terminalRef, fit, xtermRef, searchAddonRef };
+  return { terminalRef, fit, xtermRef, searchAddonRef, ptyIdRef };
 }

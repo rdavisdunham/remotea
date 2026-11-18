@@ -1,5 +1,7 @@
 import type { Terminal } from '@xterm/xterm';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { patchWebglDefaultBackground } from './webgl-default-bg';
+import { disposeWebglAddon } from './webgl-release';
 
 export type RendererKind = 'dom' | 'webgl';
 
@@ -41,6 +43,7 @@ export function attachVisibleRenderer(terminal: Terminal): RendererHandle {
   try {
     webgl = new WebglAddon();
     terminal.loadAddon(webgl);
+    patchWebglDefaultBackground(webgl);
   } catch (err) {
     console.warn('[remotea] WebGL renderer unavailable, staying on DOM renderer:', err);
     return DOM_RENDERER_HANDLE;
@@ -58,7 +61,7 @@ export function attachVisibleRenderer(terminal: Terminal): RendererHandle {
     kind: 'webgl',
     dispose: () => {
       release();
-      try { webgl.dispose(); } catch { /* already disposed with terminal */ }
+      disposeWebglAddon(webgl);
     },
   };
 
@@ -70,7 +73,7 @@ export function attachVisibleRenderer(terminal: Terminal): RendererHandle {
     // frozen.
     console.warn('[remotea] WebGL context lost, downgrading terminal to DOM renderer');
     release();
-    try { webgl.dispose(); } catch { /* no-op */ }
+    disposeWebglAddon(webgl);
     handle.kind = DOM_RENDERER_HANDLE.kind;
     handle.dispose = DOM_RENDERER_HANDLE.dispose;
     // Disposing the WebGL addon reactivates xterm's DOM renderer, but nothing
@@ -84,4 +87,17 @@ export function attachVisibleRenderer(terminal: Terminal): RendererHandle {
   });
 
   return handle;
+}
+
+/**
+ * Replace a terminal's WebGL renderer with a fresh one, which is what a hide
+ * and show does (#400, see renderer-rebuild.ts). A DOM handle comes back as
+ * is: the DOM renderer rebuilds its rows on every refresh and has no model to
+ * go stale. Released before the new one is attached, so the swap never needs
+ * a second budget slot.
+ */
+export function rebuildVisibleRenderer(terminal: Terminal, handle: RendererHandle): RendererHandle {
+  if (handle.kind !== 'webgl') return handle;
+  handle.dispose();
+  return attachVisibleRenderer(terminal);
 }
