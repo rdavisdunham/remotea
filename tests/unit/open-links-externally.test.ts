@@ -43,3 +43,31 @@ describe('linkOpensExternally', () => {
     expect(linkOpensExternally(true, undefined)).toBe(true);
   });
 });
+
+/**
+ * The in-app browser switch (2026-11-18). Off by default, and while it is off
+ * every link goes to the system browser: there is no panel for Ctrl+click to
+ * invert to.
+ */
+describe('openInWmuxBrowser with the in-app browser off', () => {
+  it('defaults the in-app browser to off', async () => {
+    const { DEFAULT_BROWSER_PREFS } = await import('../../src/renderer/store/settings-slice');
+    expect(DEFAULT_BROWSER_PREFS.inAppBrowser).toBe(false);
+  });
+
+  it('sends plain and Ctrl+clicked links to the system browser', async () => {
+    const opened: string[] = [];
+    (globalThis as { window?: unknown }).window = { wmux: { system: { openExternal: (u: string) => opened.push(u) } } };
+    try {
+      const { useStore } = await import('../../src/renderer/store');
+      const { openInWmuxBrowser } = await import('../../src/renderer/utils/open-in-browser');
+      const prefs = useStore.getState().browserPrefs;
+      useStore.setState({ browserPrefs: { ...prefs, inAppBrowser: false, openLinksExternally: false } });
+      openInWmuxBrowser('https://example.com/a');
+      openInWmuxBrowser('https://example.com/b', { invert: true });
+      expect(opened).toEqual(['https://example.com/a', 'https://example.com/b']);
+    } finally {
+      delete (globalThis as { window?: unknown }).window;
+    }
+  });
+});

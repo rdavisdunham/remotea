@@ -1,5 +1,5 @@
 /**
- * Phone console strings — German. Keys mirror en.ts exactly (parity test).
+ * Phone console strings — German. Keys are a subset of en.ts; a missing string shows in English.
  * Formal `Sie` throughout and "Remote-Konsole" for the feature, as the desktop
  * Settings strings and the refused-address page say it; the Enter key is
  * "Eingabetaste" everywhere.

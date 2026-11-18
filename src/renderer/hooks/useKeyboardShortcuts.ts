@@ -36,6 +36,9 @@ const UNSHIFTED_BY_CODE: Readonly<Record<string, string>> = {
   Minus: '-', Equal: '=', Backslash: '\\',
 };
 
+/** The browser panel's own entry points answer only while it is turned on. */
+const inAppBrowser = (): boolean => useStore.getState().browserPrefs.inAppBrowser;
+
 export function matchesBinding(
   e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'shiftKey' | 'altKey'>,
   binding: ShortcutBinding,
@@ -400,8 +403,8 @@ export function useKeyboardShortcuts(
       renameWorkspace: () => fire('wmux:rename-workspace'),
       splitRight: () => doSplit('terminal', 'horizontal'),
       splitDown: () => doSplit('terminal', 'vertical'),
-      splitBrowserRight: () => doSplit('browser', 'horizontal'),
-      splitBrowserDown: () => doSplit('browser', 'vertical'),
+      splitBrowserRight: () => { if (inAppBrowser()) doSplit('browser', 'horizontal'); },
+      splitBrowserDown: () => { if (inAppBrowser()) doSplit('browser', 'vertical'); },
       toggleZoom: () => onToggleZoom?.(),
       focusLeft: () => doFocus('left'),
       focusRight: () => doFocus('right'),
@@ -423,7 +426,7 @@ export function useKeyboardShortcuts(
       openHub: () => { if (useStore.getState().appearancePrefs.hubEnabled) fire('wmux:open-hub'); },
       showNotifications: () => onToggleNotifications?.(),
       flashFocused: () => { if (focusedPaneId) fire('wmux:trigger-flash', { paneId: focusedPaneId }); },
-      openBrowser: () => onToggleBrowser?.(),
+      openBrowser: () => { if (inAppBrowser()) onToggleBrowser?.(); },
       browserDevTools: () => window.wmux?.system?.toggleDevTools?.(),
       browserConsole: () => window.wmux?.system?.toggleDevTools?.(),
       copy: copySelection,

@@ -109,6 +109,7 @@ export default function SurfaceTabBar({
   const t = useT();
   const splitRightBinding = useStore((s) => s.shortcuts.splitRight);
   const splitDownBinding = useStore((s) => s.shortcuts.splitDown);
+  const inAppBrowser = useStore((s) => s.browserPrefs.inAppBrowser);
   const [draggingSurfaceId, setDraggingSurfaceId] = useState<SurfaceId | null>(null);
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
   const [renamingId, setRenamingId] = useState<SurfaceId | null>(null);
@@ -659,9 +660,11 @@ export default function SurfaceTabBar({
                   <span className="surface-tab-menu__icon">{surfaceIcon('terminal', false)}</span> {t('surfaceLabel.terminal', 'Terminal')}
                 </button>
               )}
-              <button role="menuitem" onClick={() => pickNew('browser')}>
-                <span className="surface-tab-menu__icon">{surfaceIcon('browser', false)}</span> {t('surfaceLabel.browser', 'Browser')}
-              </button>
+              {inAppBrowser && (
+                <button role="menuitem" onClick={() => pickNew('browser')}>
+                  <span className="surface-tab-menu__icon">{surfaceIcon('browser', false)}</span> {t('surfaceLabel.browser', 'Browser')}
+                </button>
+              )}
               <button role="menuitem" onClick={() => pickNew('markdown')}>
                 <span className="surface-tab-menu__icon">{surfaceIcon('markdown', false)}</span> {t('surfaceLabel.markdown', 'Markdown')}
               </button>

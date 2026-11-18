@@ -1,4 +1,4 @@
-/** Phone console strings — Japanese. Keys mirror en.ts exactly (parity test). */
+/** Phone console strings — Japanese. Keys are a subset of en.ts; a missing string shows in English. */
 export const ja: Readonly<Record<string, string>> = {
   'attach.hideControls': 'すべての操作ボタンを隠す',
   'attach.showControls': '操作ボタンを表示',

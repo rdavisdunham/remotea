@@ -19,6 +19,7 @@ const store = create(() => ({
   terminalPrefs: { oscTitleTabs: false },
   sidebarPrefs: { activeTabIndicator: 'leftRail' },
   appearancePrefs: { uiMode: 'classic' },
+  browserPrefs: { inAppBrowser: false },
   shortcuts: {
     newSurface: { key: 't', ctrl: true },
     splitRight: { key: 'd', ctrl: true },
