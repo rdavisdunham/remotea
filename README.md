@@ -51,7 +51,7 @@ SSH-ing into the desktop from a laptop works until the laptop sleeps. Then the s
 | `src/` | The Windows app (Electron + React + xterm.js), built on wmux |
 | `remote-server/` | The WSL session server (Node + node-pty + `@xterm/headless`) |
 | `src/shared/remote-host-protocol.ts` | Wire protocol shared by the app and the server |
-| `docs/remotea/` | Design notes |
+| `docs/remotea/` | Design notes, and the [upstream ledger](docs/remotea/upstream-ledger.md): which wmux changes remotea took after forking |
 | `docs/upstream/` | wmux's original README |
 
 ## Install
