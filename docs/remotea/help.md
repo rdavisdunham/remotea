@@ -82,7 +82,7 @@ The run approval card handles exceptional requests, including explicit permissio
 
 <a id="files"></a>
 
-File and Git operations belong to a location and directory. Host filesystem access does not imply desktop worktree or Git feature parity. Git review is read-only; editing files can detect concurrent changes. The browser runs on this computer: localhost refers here, so use a reachable host URL or a configured tunnel. Browser engine settings affect desktop automation.
+File and Git operations belong to a location and directory. Host filesystem access does not imply desktop worktree or Git feature parity. Git review is read-only; editing files can detect concurrent changes. Links open in your system browser unless Settings → Browser → Use the in-app browser is on; that switch also shows the browser panel's menu entries and shortcuts. The in-app browser runs on this computer: localhost refers here, so use a reachable host URL or a configured tunnel. Browser engine settings affect desktop automation.
 
 ## Leave and return safely
 

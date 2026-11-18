@@ -557,6 +557,9 @@ export const en = {
   "sessionMenu.load": "Restore \"{name}\"",
   "sessionMenu.deleteSession": "Delete snapshot",
   // Settings — Browser panel
+  'settings.browser.inAppBrowser': 'Use the in-app browser',
+  'settings.browser.inAppBrowserHint':
+    'Off: links open in your system browser, and the browser panel stays out of the new-tab menu, the command palette and its shortcuts. On: links open in the browser panel, with the settings below. Browser tabs already in a saved layout open either way.',
   'settings.browser.searchSection': 'Search',
   'settings.browser.defaultSearchEngine': 'Default search engine',
   'settings.browser.startupSection': 'Startup',

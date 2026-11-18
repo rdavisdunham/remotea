@@ -1298,6 +1298,14 @@ export const SETTINGS_SEARCH_TERMS = {
   ],
   "Browser": [
     {
+      "key": "settings.browser.inAppBrowser",
+      "label": "Use the in-app browser"
+    },
+    {
+      "key": "settings.browser.inAppBrowserHint",
+      "label": "Off: links open in your system browser, and the browser panel stays out of the new-tab menu, the command palette and its shortcuts. On: links open in the browser panel, with the settings below. Browser tabs already in a saved layout open either way."
+    },
+    {
       "key": "settings.browser.searchSection",
       "label": "Search"
     },
@@ -2346,6 +2354,7 @@ export const PREFERENCE_FIELDS = {
     "bellNotify"
   ],
   "BrowserPrefs": [
+    "inAppBrowser",
     "searchEngine",
     "devToolsIcon",
     "openOnStartup",

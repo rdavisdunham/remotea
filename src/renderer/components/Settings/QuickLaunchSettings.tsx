@@ -15,6 +15,7 @@ export default function QuickLaunchSettings() {
   const t = useT();
   const profiles = useStore((s) => s.quickLaunchProfiles);
   const setProfiles = useStore((s) => s.setQuickLaunchProfiles);
+  const inAppBrowser = useStore((s) => s.browserPrefs.inAppBrowser);
   const [importNote, setImportNote] = useState<string>('');
 
   const update = (id: string, patch: Partial<QuickLaunchProfile>) => {
@@ -84,7 +85,7 @@ export default function QuickLaunchSettings() {
               value={p.type}
               onChange={(e) => update(p.id, { type: e.target.value as SurfaceType })}
             >
-              {TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              {TYPES.filter((type) => type !== 'browser' || inAppBrowser || p.type === 'browser').map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
             <button className="settings-button settings-button--danger" onClick={() => remove(p.id)}>{t('settings.quickLaunch.remove', 'Remove')}</button>
           </div>

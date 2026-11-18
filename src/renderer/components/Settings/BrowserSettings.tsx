@@ -12,6 +12,27 @@ export default function BrowserSettings() {
 
   return (
     <div className="settings-section">
+      <div className="settings-row">
+        <label className="settings-label" htmlFor="browser-in-app">
+          {t('settings.browser.inAppBrowser', 'Use the in-app browser')}
+        </label>
+        <input
+          id="browser-in-app"
+          type="checkbox"
+          className="settings-toggle"
+          checked={browserPrefs.inAppBrowser}
+          onChange={(e) => setBrowserPrefs({ inAppBrowser: e.target.checked })}
+        />
+      </div>
+      <p className="settings-hint">
+        {t(
+          'settings.browser.inAppBrowserHint',
+          'Off: links open in your system browser, and the browser panel stays out of the new-tab menu, the command palette and its shortcuts. On: links open in the browser panel, with the settings below. Browser tabs already in a saved layout open either way.',
+        )}
+      </p>
+
+      {browserPrefs.inAppBrowser && (<>
+      <div className="settings-divider" />
       <h3 className="settings-section-title">{t('settings.browser.searchSection', 'Search')}</h3>
 
       <div className="settings-row">
@@ -141,6 +162,7 @@ export default function BrowserSettings() {
           <option value="hidden">{t('settings.browser.devToolsIcon.hidden', 'Hidden')}</option>
         </select>
       </div>
+      </>)}
     </div>
   );
 }

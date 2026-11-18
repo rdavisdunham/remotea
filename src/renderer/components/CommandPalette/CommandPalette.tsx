@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../../store';
 import { SurfaceId } from '../../../shared/types';
-import { ShortcutAction, ShortcutBinding } from '../../store/settings-slice';
+import { IN_APP_BROWSER_ACTIONS, ShortcutAction, ShortcutBinding } from '../../store/settings-slice';
 import { actionLabel } from '../Settings/KeyboardSettings';
 import { formatAccelerator } from '../../shortcuts';
 import { useT } from '../../i18n';
@@ -118,9 +118,12 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
     // Category: Actions — all shortcut actions
     const actionEntries = Object.entries(shortcuts) as [ShortcutAction, ShortcutBinding][];
     const hubEnabled = useStore.getState().appearancePrefs.hubEnabled;
+    const inAppBrowser = useStore.getState().browserPrefs.inAppBrowser;
     for (const [action, binding] of actionEntries) {
-      // The agent-office easter egg stays out of the palette until enabled.
+      // The agent-office easter egg stays out of the palette until enabled, and
+      // so do the browser panel's actions while the in-app browser is off.
       if (action === 'commandPalette' || (action === 'openHub' && !hubEnabled)) continue;
+      if (!inAppBrowser && IN_APP_BROWSER_ACTIONS.has(action)) continue;
       items.push({
         id: `action:${action}`,
         label: actionLabel(action, t),

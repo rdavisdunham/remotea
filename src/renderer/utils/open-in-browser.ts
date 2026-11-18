@@ -37,7 +37,8 @@ export function linkOpensExternally(preferExternal: boolean, invert: boolean | u
 export function openInWmuxBrowser(url: string, opts?: { invert?: boolean }): void {
   const state = useStore.getState();
 
-  if (linkOpensExternally(state.browserPrefs.openLinksExternally, opts?.invert)) {
+  // With the in-app browser off there is no panel to invert to.
+  if (!state.browserPrefs.inAppBrowser || linkOpensExternally(state.browserPrefs.openLinksExternally, opts?.invert)) {
     window.wmux?.system?.openExternal?.(url);
     return;
   }

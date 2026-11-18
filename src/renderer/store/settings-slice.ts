@@ -796,6 +796,17 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 // ─── Browser settings ─────────────────────────────────────────────────────────
 
 export interface BrowserPrefs {
+  /**
+   * Use remotea's own browser panel. Off by default (2026-11-18): links open in
+   * the system browser, and the panel's entry points (its split and toggle
+   * shortcuts, the new-tab menu entry, the palette entries, the Quick launch
+   * type, dev-server auto-open and open-on-startup) stay out of the way. Browser
+   * tabs already in a saved layout still load. Agents' `wmux browser` verbs are
+   * not gated by this.
+   *
+   * A new field, so every stored prefs block picks up the default.
+   */
+  inAppBrowser: boolean;
   searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave';
   devToolsIcon: 'default' | 'compact' | 'hidden';
   /** Open the browser panel automatically on startup (issue #22). */
@@ -805,8 +816,8 @@ export interface BrowserPrefs {
    * of the wmux panel (issue #201). Ctrl/Cmd+click inverts whichever way this
    * is set, so the other destination is always one modifier away.
    *
-   * Default false — the panel is what wmux is for, and flipping the default
-   * would change behaviour for everyone on upgrade.
+   * Only consulted while `inAppBrowser` is on; with the panel off every link
+   * goes to the system browser.
    */
   openLinksExternally: boolean;
   /**
@@ -845,7 +856,15 @@ export interface BrowserPrefs {
   autoOpenDevServer: boolean;
 }
 
+/** Actions that open or show the browser panel; inert while `inAppBrowser` is off. */
+export const IN_APP_BROWSER_ACTIONS: ReadonlySet<ShortcutAction> = new Set<ShortcutAction>([
+  'splitBrowserRight',
+  'splitBrowserDown',
+  'openBrowser',
+]);
+
 export const DEFAULT_BROWSER_PREFS: BrowserPrefs = {
+  inAppBrowser: false,
   searchEngine: 'google',
   devToolsIcon: 'default',
   openOnStartup: false,

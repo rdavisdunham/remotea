@@ -319,7 +319,8 @@ function handlePortsUpdate(cmd: any, updateWorkspaceMetadata: StoreAction): void
       // never opens when other recognized ports are already listening (netstat order
       // is arbitrary), and the guard permanently suppresses navigation thereafter.
       const newPort = firstNewDevPort(devPorts, ws?.ports || []);
-      const autoOpenDevPort = useStore.getState().browserPrefs.autoOpenDevServer;
+      const { autoOpenDevServer, inAppBrowser } = useStore.getState().browserPrefs;
+      const autoOpenDevPort = inAppBrowser && autoOpenDevServer;
       if (autoOpenDevPort && currentWs && newPort !== undefined) {
         window.wmux?.browser?.navigate?.(`browser-${currentWs}`, `http://localhost:${newPort}`);
       }
@@ -747,7 +748,10 @@ export default function App() {
   // not a look anyone asked for.
   const customBgOpacity = customBgLayerAlpha(appearancePrefs, transparencyPending);
   // Browser startup is opt-in through Settings.
-  const [browserOpen, setBrowserOpen] = useState(() => useStore.getState().browserPrefs.openOnStartup);
+  const [browserOpen, setBrowserOpen] = useState(() => {
+    const { inAppBrowser, openOnStartup } = useStore.getState().browserPrefs;
+    return inAppBrowser && openOnStartup;
+  });
   // Subscribed rather than read once: the start page (#212) can change under a
   // `wmux reload-config`, and a panel already mounted for a workspace that has
   // been nowhere should pick it up.
