@@ -3,12 +3,12 @@ import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import {
-  applyWmuxHooks,
+  applyRemoteaHooks,
   buildChromeDevtoolsMcpServer,
   CHROME_DEVTOOLS_MCP_PACKAGE,
-  isWmuxAuthoredMcpEntry,
-  removeWmuxHooks,
-  stripWmuxBlock,
+  isRemoteaAuthoredMcpEntry,
+  removeRemoteaHooks,
+  stripRemoteaBlock,
 } from '../../src/main/claude-context';
 import {
   parseConsent,
@@ -23,9 +23,9 @@ const HOOK = '/res/cli/remotea-hook.js';
 // it straight back. These cover the two halves of the fix: an inverse for every
 // write, and a consent record that fails toward asking rather than assuming.
 
-describe('removeWmuxHooks (issue #132)', () => {
-  it('takes back exactly what applyWmuxHooks installed', () => {
-    const restored = removeWmuxHooks(applyWmuxHooks({}, HOOK));
+describe('removeRemoteaHooks (issue #132)', () => {
+  it('takes back exactly what applyRemoteaHooks installed', () => {
+    const restored = removeRemoteaHooks(applyRemoteaHooks({}, HOOK));
     // Not merely "no wmux entries" — an empty `hooks: {}` left behind is still a
     // footprint in a file wmux was asked to stay out of.
     expect(restored.hooks).toBeUndefined();
@@ -33,58 +33,58 @@ describe('removeWmuxHooks (issue #132)', () => {
 
   it('leaves the user\'s own hooks in place', () => {
     const userHook = { matcher: 'Bash', hooks: [{ type: 'command', command: 'my-audit.sh' }] };
-    const withBoth = applyWmuxHooks({ hooks: { PostToolUse: [userHook] } }, HOOK);
-    const restored = removeWmuxHooks(withBoth);
+    const withBoth = applyRemoteaHooks({ hooks: { PostToolUse: [userHook] } }, HOOK);
+    const restored = removeRemoteaHooks(withBoth);
     expect(restored.hooks.PostToolUse).toEqual([userHook]);
   });
 
   it('keeps every other setting untouched', () => {
-    const settings = applyWmuxHooks({ model: 'opus', env: { FOO: '1' } }, HOOK);
-    const restored = removeWmuxHooks(settings);
+    const settings = applyRemoteaHooks({ model: 'opus', env: { FOO: '1' } }, HOOK);
+    const restored = removeRemoteaHooks(settings);
     expect(restored.model).toBe('opus');
     expect(restored.env).toEqual({ FOO: '1' });
   });
 
   it('is a no-op on settings that never had wmux hooks', () => {
     const settings = { hooks: { Stop: [{ hooks: [{ type: 'command', command: 'mine.sh' }] }] } };
-    expect(removeWmuxHooks(settings)).toEqual(settings);
+    expect(removeRemoteaHooks(settings)).toEqual(settings);
   });
 
   it('survives settings with no hooks key at all', () => {
-    expect(removeWmuxHooks({ model: 'opus' })).toEqual({ model: 'opus' });
-    expect(removeWmuxHooks({})).toEqual({});
+    expect(removeRemoteaHooks({ model: 'opus' })).toEqual({ model: 'opus' });
+    expect(removeRemoteaHooks({})).toEqual({});
   });
 
   it('does not mutate the settings it was given', () => {
-    const settings = applyWmuxHooks({}, HOOK);
+    const settings = applyRemoteaHooks({}, HOOK);
     const before = JSON.stringify(settings);
-    removeWmuxHooks(settings);
+    removeRemoteaHooks(settings);
     expect(JSON.stringify(settings)).toBe(before);
   });
 
   it('is idempotent — a second launch after declining rewrites nothing', () => {
-    const once = removeWmuxHooks(applyWmuxHooks({}, HOOK));
-    expect(removeWmuxHooks(once)).toEqual(once);
+    const once = removeRemoteaHooks(applyRemoteaHooks({}, HOOK));
+    expect(removeRemoteaHooks(once)).toEqual(once);
   });
 });
 
-describe('stripWmuxBlock (issue #132)', () => {
+describe('stripRemoteaBlock (issue #132)', () => {
   const BLOCK = '<!-- remotea:start -->\ninstructions here\n<!-- remotea:end -->';
 
   it('reports nothing to do when the document has no wmux block', () => {
     // null, not '' — the caller skips the write entirely rather than rewriting
     // a file it did not change.
-    expect(stripWmuxBlock('# My notes\n')).toBeNull();
+    expect(stripRemoteaBlock('# My notes\n')).toBeNull();
   });
 
   it('empties a document that was nothing but the wmux block', () => {
     // '' is the signal to delete the file: wmux created it, so leaving an empty
     // CLAUDE.md behind is still a file the user never asked for.
-    expect(stripWmuxBlock(BLOCK)).toBe('');
+    expect(stripRemoteaBlock(BLOCK)).toBe('');
   });
 
   it('keeps the user text that surrounded the block', () => {
-    const out = stripWmuxBlock(`# Mine\n\n${BLOCK}\n\n## Also mine\n`);
+    const out = stripRemoteaBlock(`# Mine\n\n${BLOCK}\n\n## Also mine\n`);
     expect(out).toContain('# Mine');
     expect(out).toContain('## Also mine');
     expect(out).not.toContain('wmux:start');
@@ -92,19 +92,19 @@ describe('stripWmuxBlock (issue #132)', () => {
   });
 
   it('does not leave a growing gap where the block was', () => {
-    const out = stripWmuxBlock(`# Mine\n\n${BLOCK}\n\n## Also mine\n`);
+    const out = stripRemoteaBlock(`# Mine\n\n${BLOCK}\n\n## Also mine\n`);
     expect(out).toBe('# Mine\n\n## Also mine\n');
   });
 
   it('removes a block whose end marker was lost to a hand-edit', () => {
     // Matches how ensureClaudeContext repairs the same damage: an unterminated
     // block is taken to run to end-of-file.
-    expect(stripWmuxBlock('# Mine\n\n<!-- remotea:start -->\ndangling\n')).toBe('# Mine\n');
+    expect(stripRemoteaBlock('# Mine\n\n<!-- remotea:start -->\ndangling\n')).toBe('# Mine\n');
   });
 
   it('is idempotent', () => {
-    const once = stripWmuxBlock(`# Mine\n\n${BLOCK}\n`)!;
-    expect(stripWmuxBlock(once)).toBeNull();
+    const once = stripRemoteaBlock(`# Mine\n\n${BLOCK}\n`)!;
+    expect(stripRemoteaBlock(once)).toBeNull();
   });
 });
 
@@ -162,8 +162,8 @@ describe('safe agent integration defaults', () => {
   // (removeChromeDevtoolsConfig), and a plain "is this what I want" inequality
   // would clobber them on every single launch. That is the issue #132 mistake.
   it('recognises its own MCP entry across pins, so @latest can be migrated', () => {
-    expect(isWmuxAuthoredMcpEntry(buildChromeDevtoolsMcpServer())).toBe(true);
-    expect(isWmuxAuthoredMcpEntry({
+    expect(isRemoteaAuthoredMcpEntry(buildChromeDevtoolsMcpServer())).toBe(true);
+    expect(isRemoteaAuthoredMcpEntry({
       command: 'npx',
       args: ['-y', 'chrome-devtools-mcp@latest', '--browserUrl=http://127.0.0.1:9222'],
     })).toBe(true);
@@ -172,19 +172,19 @@ describe('safe agent integration defaults', () => {
   it("leaves an entry it did not write alone", () => {
     // A different port is the clearest "this is mine, not yours" signal: wmux
     // only ever aims at its own proxy.
-    expect(isWmuxAuthoredMcpEntry({
+    expect(isRemoteaAuthoredMcpEntry({
       command: 'npx',
       args: ['-y', 'chrome-devtools-mcp@1.7.0', '--browserUrl=http://127.0.0.1:9333'],
     })).toBe(false);
     // A global install rather than npx.
-    expect(isWmuxAuthoredMcpEntry({
+    expect(isRemoteaAuthoredMcpEntry({
       command: 'chrome-devtools-mcp',
       args: ['--browserUrl=http://127.0.0.1:9222'],
     })).toBe(false);
     // Something else entirely under the same key.
-    expect(isWmuxAuthoredMcpEntry({ command: 'node', args: ['./my-server.js'] })).toBe(false);
+    expect(isRemoteaAuthoredMcpEntry({ command: 'node', args: ['./my-server.js'] })).toBe(false);
     for (const junk of [null, undefined, 'npx', 42, {}, { command: 'npx' }]) {
-      expect(isWmuxAuthoredMcpEntry(junk)).toBe(false);
+      expect(isRemoteaAuthoredMcpEntry(junk)).toBe(false);
     }
   });
 

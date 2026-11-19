@@ -27,15 +27,15 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { HOOK_TIMEOUTS_S, applyWmuxHooks, removeWmuxHooks } from '../../src/shared/claude-hooks';
+import { HOOK_TIMEOUTS_S, applyRemoteaHooks, removeRemoteaHooks } from '../../src/shared/claude-hooks';
 import type { AdapterHooks } from './harness-adapters';
 import { applyQwenHooks, removeQwenHooksFrom } from '../../src/main/qwen-context';
 import { buildGrokHooks } from '../../src/main/grok-context';
 import { ensureAgyPlugin, getAgyPluginDir, removeAgyPlugin } from '../../src/main/agy-context';
-import { isWmuxPluginFile } from '../../src/main/agent-plugin-file';
+import { isRemoteaPluginFile } from '../../src/main/agent-plugin-file';
 import type { HookAgentStatus } from '../../src/shared/remote-host-protocol';
 import { countLegacyHookEntries, isLegacyRemoteaGrokHooksFile, stripLegacyHookEntries } from '../../src/shared/legacy-cleanup';
-import { LEGACY_PLUGIN_FILES } from '../../src/shared/legacy-names';
+import { LEGACY_OPENCODE_PLUGIN_EXPORT, LEGACY_PLUGIN_FILES } from '../../src/shared/legacy-names';
 import type { OwnershipContext } from '../../src/shared/artifact-ownership';
 
 // The helper's file name, not a bare prefix (see claude-hooks.ts).
@@ -215,7 +215,7 @@ function readText(file: string): string | null {
 /** A file wmux installed: the OpenCode plugin by its export, the others by their version marker. */
 function isOurPluginFile(file: string): boolean {
   const text = readText(file);
-  return text !== null && (text.includes('WmuxPlugin') || isWmuxPluginFile(text));
+  return text !== null && (text.includes('RemoteaPlugin') || text.includes(LEGACY_OPENCODE_PLUGIN_EXPORT) || isRemoteaPluginFile(text));
 }
 
 /** Grok's hooks file is wmux's own; ours only while every command in it is the helper. */
@@ -251,7 +251,7 @@ function targets(p: HookPaths): Target[] {
   const res = (...parts: string[]) => path.resolve(p.sourceDir, '..', ...parts);
   const h = (...parts: string[]) => path.join(p.home, ...parts);
   return [
-    { agent: 'claude', dir: h('.claude'), file: h('.claude', 'settings.json'), kind: 'settings', apply: (c, script) => applyWmuxHooks(c, script, { questions: true }), remove: removeWmuxHooks },
+    { agent: 'claude', dir: h('.claude'), file: h('.claude', 'settings.json'), kind: 'settings', apply: (c, script) => applyRemoteaHooks(c, script, { questions: true }), remove: removeRemoteaHooks },
     { agent: 'codex', dir: h('.codex'), file: h('.codex', 'hooks.json'), kind: 'settings', apply: applyCodexHooks, remove: removeCodexHooks },
     { agent: 'opencode', dir: h('.config', 'opencode'), file: h('.config', 'opencode', 'plugin', 'remotea.js'), kind: 'plugin', source: res('opencode-plugin', 'remotea.js') },
     { agent: 'pi', dir: h('.pi'), file: h('.pi', 'agent', 'extensions', 'remotea.js'), kind: 'plugin', source: res('pi-extension', 'remotea.js') },

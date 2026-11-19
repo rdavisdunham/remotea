@@ -78,7 +78,7 @@ describe('createSessionReporter (#310)', () => {
     const sent: string[][] = [];
     const reporter = createSessionReporter({
       surface: overrides.surface ?? SURFACE,
-      callWmux: (argv: string[]) => sent.push(argv),
+      callRemotea: (argv: string[]) => sent.push(argv),
       log: overrides.log,
     });
     return { reporter, sent };
@@ -100,7 +100,7 @@ describe('createSessionReporter (#310)', () => {
     const scheduled: Array<{ fn: () => void; ms: number }> = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: (argv: string[], done: (failure?: unknown) => void) => {
+      callRemotea: (argv: string[], done: (failure?: unknown) => void) => {
         sent.push(argv);
         dones.push(done);
       },
@@ -133,7 +133,7 @@ describe('createSessionReporter (#310)', () => {
     const scheduled: Array<{ fn: () => void; ms: number }> = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: (_argv: string[], done: (failure?: unknown) => void) => dones.push(done),
+      callRemotea: (_argv: string[], done: (failure?: unknown) => void) => dones.push(done),
       schedule: (fn: () => void, ms: number) => {
         scheduled.push({ fn, ms });
         return scheduled.length;
@@ -152,7 +152,7 @@ describe('createSessionReporter (#310)', () => {
     const sent: string[][] = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: (argv: string[], done: (failure?: unknown) => void) => {
+      callRemotea: (argv: string[], done: (failure?: unknown) => void) => {
         sent.push(argv);
         done(null);
       },
@@ -174,7 +174,7 @@ describe('createSessionReporter (#310)', () => {
     const dones: Array<(failure?: unknown) => void> = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: (argv: string[], done: (failure?: unknown) => void) => {
+      callRemotea: (argv: string[], done: (failure?: unknown) => void) => {
         sent.push(argv);
         dones.push(done);
       },
@@ -194,7 +194,7 @@ describe('createSessionReporter (#310)', () => {
     const scheduled: Array<{ fn: () => void; ms: number }> = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: (_argv: string[], done: (failure?: unknown) => void) => dones.push(done),
+      callRemotea: (_argv: string[], done: (failure?: unknown) => void) => dones.push(done),
       schedule: (fn: () => void, ms: number) => {
         scheduled.push({ fn, ms });
         return scheduled.length;
@@ -218,7 +218,7 @@ describe('createSessionReporter (#310)', () => {
     const sent: string[][] = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: (argv: string[], done: (failure?: unknown) => void) => {
+      callRemotea: (argv: string[], done: (failure?: unknown) => void) => {
         sent.push(argv);
         done(null);
       },
@@ -279,8 +279,8 @@ describe('createSessionReporter (#310)', () => {
     const synced: string[][] = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: (argv: string[]) => sent.push(argv),
-      callWmuxSync: (argv: string[]) => synced.push(argv),
+      callRemotea: (argv: string[]) => sent.push(argv),
+      callRemoteaSync: (argv: string[]) => synced.push(argv),
     });
     reporter.observe(route('ses_abc12345'), rootOf);
 
@@ -299,8 +299,8 @@ describe('createSessionReporter (#310)', () => {
     const synced: string[][] = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: () => {},
-      callWmuxSync: (argv: string[]) => synced.push(argv),
+      callRemotea: () => {},
+      callRemoteaSync: (argv: string[]) => synced.push(argv),
     });
     expect(reporter.releaseOnExit()).toBe(false);
     expect(synced).toEqual([]);
@@ -311,8 +311,8 @@ describe('createSessionReporter (#310)', () => {
     const sent: string[][] = [];
     const reporter = createSessionReporter({
       surface: SURFACE,
-      callWmux: (argv: string[]) => sent.push(argv),
-      callWmuxSync: () => {},
+      callRemotea: (argv: string[]) => sent.push(argv),
+      callRemoteaSync: () => {},
     });
     reporter.observe(route('ses_abc12345'), rootOf);
 
@@ -477,7 +477,7 @@ describe('prompt capture (#310 phase 2)', () => {
   it('reports a hosted prompt through the #305 event path, no --surface needed', async () => {
     const { createPromptReporter } = await load();
     const sent: string[][] = [];
-    const reporter = createPromptReporter({ callWmux: (argv: string[]) => sent.push(argv) });
+    const reporter = createPromptReporter({ callRemotea: (argv: string[]) => sent.push(argv) });
     reporter.observe(enqueued(), true);
     expect(sent).toEqual([['hook', '--event', 'UserPromptSubmit', '--prompt', 'fix the flaky test']]);
   });
@@ -485,7 +485,7 @@ describe('prompt capture (#310 phase 2)', () => {
   it('does not attribute a prompt from a session this TUI is not hosting', async () => {
     const { createPromptReporter } = await load();
     const sent: string[][] = [];
-    const reporter = createPromptReporter({ callWmux: (argv: string[]) => sent.push(argv) });
+    const reporter = createPromptReporter({ callRemotea: (argv: string[]) => sent.push(argv) });
     reporter.observe(enqueued(), false);
     expect(sent).toEqual([]);
   });
@@ -493,7 +493,7 @@ describe('prompt capture (#310 phase 2)', () => {
   it('reports one prompt per inbox id, however many replays arrive', async () => {
     const { createPromptReporter } = await load();
     const sent: string[][] = [];
-    const reporter = createPromptReporter({ callWmux: (argv: string[]) => sent.push(argv) });
+    const reporter = createPromptReporter({ callRemotea: (argv: string[]) => sent.push(argv) });
     reporter.observe(enqueued(), true);
     reporter.observe(enqueued(), true);
     expect(sent).toHaveLength(1);
@@ -502,7 +502,7 @@ describe('prompt capture (#310 phase 2)', () => {
   it('caps a pasted prompt at the same 4000 chars the other producers use', async () => {
     const { createPromptReporter } = await load();
     const sent: string[][] = [];
-    const reporter = createPromptReporter({ callWmux: (argv: string[]) => sent.push(argv) });
+    const reporter = createPromptReporter({ callRemotea: (argv: string[]) => sent.push(argv) });
     reporter.observe(enqueued({ item: { type: 'user', payload: { text: 'x'.repeat(5000) }, delivery: 'steer' } }), true);
     expect(sent[0][4].length).toBe(4000);
   });
@@ -539,7 +539,7 @@ describe('blocked state (#310 phase 3a)', () => {
   const reporterFor = async () => {
     const { createBlockedReporter } = await load();
     const sent: string[][] = [];
-    const reporter = createBlockedReporter({ surface: SURFACE, callWmux: (argv: string[]) => sent.push(argv) });
+    const reporter = createBlockedReporter({ surface: SURFACE, callRemotea: (argv: string[]) => sent.push(argv) });
     return { reporter, sent };
   };
   const asked = (over: any = {}) => ({
@@ -664,7 +664,7 @@ describe('working/idle (#310 phase 3b)', () => {
     const sent: string[][] = [];
     const reporter = createActivityReporter({
       surface: SURFACE,
-      callWmux: (argv: string[], done?: () => void) => { sent.push(argv); done?.(); },
+      callRemotea: (argv: string[], done?: () => void) => { sent.push(argv); done?.(); },
     });
     return { reporter, sent };
   };
@@ -752,7 +752,7 @@ describe('working/idle (#310 phase 3b)', () => {
     const pending: Array<() => void> = [];
     const reporter = createActivityReporter({
       surface: SURFACE,
-      callWmux: (argv: string[], done: () => void) => { sent.push(argv); pending.push(done); },
+      callRemotea: (argv: string[], done: () => void) => { sent.push(argv); pending.push(done); },
     });
     reporter.observe('session.execution.started', ev('ses_abc12345'), true);
     reporter.observe('session.execution.succeeded', ev('ses_abc12345'), true);
@@ -767,7 +767,7 @@ describe('working/idle (#310 phase 3b)', () => {
     const pending: Array<() => void> = [];
     const reporter = createActivityReporter({
       surface: SURFACE,
-      callWmux: (argv: string[], done: () => void) => { sent.push(argv); pending.push(done); },
+      callRemotea: (argv: string[], done: () => void) => { sent.push(argv); pending.push(done); },
     });
     reporter.observe('session.execution.started', ev('ses_a1234567'), true);
     reporter.observe('session.execution.succeeded', ev('ses_a1234567'), true);
@@ -779,13 +779,13 @@ describe('working/idle (#310 phase 3b)', () => {
   });
 });
 
-describe('callWmux (#310)', () => {
+describe('callRemotea (#310)', () => {
   const runtimeNode = { file: ':node:', electron: false };
 
   it('runs the shipped CLI on the resolved JS runtime, argv untouched', async () => {
-    const { callWmux } = await load();
+    const { callRemotea } = await load();
     const env = { REMOTEA_CLI: 'C:\\wmux\\resources\\cli\\remotea.js' };
-    callWmux(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, env);
+    callRemotea(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, env);
     expect(calls).toHaveLength(1);
     expect(calls[0].file).toBe(':node:');
     expect(calls[0].argv).toEqual(['C:\\wmux\\resources\\cli\\remotea.js', 'report-session', 'ses_abc12345']);
@@ -793,44 +793,44 @@ describe('callWmux (#310)', () => {
   });
 
   it('marks wmux\'s own Electron binary as Node, or a second wmux window opens', async () => {
-    const { callWmux } = await load();
+    const { callRemotea } = await load();
     const env = { REMOTEA_CLI: 'remotea.js' };
-    callWmux({ file: 'wmux.exe', electron: true }, ['x'], () => {}, env);
+    callRemotea({ file: 'wmux.exe', electron: true }, ['x'], () => {}, env);
     expect(calls[0].opts.env.ELECTRON_RUN_AS_NODE).toBe('1');
   });
 
   it('skips on Windows without REMOTEA_CLI — execFile cannot spawn the .cmd shim', async () => {
-    const { callWmux } = await load();
-    callWmux(runtimeNode, ['x'], () => {}, {}, 'win32');
+    const { callRemotea } = await load();
+    callRemotea(runtimeNode, ['x'], () => {}, {}, 'win32');
     expect(calls).toEqual([]);
   });
 
   it('reports completion on every path, the skip included', async () => {
-    const { callWmux } = await load();
+    const { callRemotea } = await load();
     const done = vi.fn();
-    callWmux(runtimeNode, ['x'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
-    callWmux(runtimeNode, ['x'], () => {}, {}, 'win32', done);
+    callRemotea(runtimeNode, ['x'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
+    callRemotea(runtimeNode, ['x'], () => {}, {}, 'win32', done);
     expect(done).toHaveBeenCalledTimes(2);
   });
 
   it('hands the failure to the caller so a report that never landed can retry', async () => {
-    const { callWmux } = await load();
+    const { callRemotea } = await load();
     const done = vi.fn();
     const failure = new Error('pipe busy');
     execFailure.value = failure;
-    callWmux(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
+    callRemotea(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
     expect(done).toHaveBeenCalledWith(failure);
 
     done.mockClear();
     execFailure.value = null;
-    callWmux(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
+    callRemotea(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux', done);
     expect(done).toHaveBeenCalledWith(null);
   });
 
   it('bounds every call — a hung CLI must not hold the activity reporter in flight forever', async () => {
-    const { callWmux } = await load();
-    callWmux(runtimeNode, ['x'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux');
-    callWmux(runtimeNode, ['x'], () => {}, {}, 'linux');
+    const { callRemotea } = await load();
+    callRemotea(runtimeNode, ['x'], () => {}, { REMOTEA_CLI: 'remotea.js' }, 'linux');
+    callRemotea(runtimeNode, ['x'], () => {}, {}, 'linux');
     for (const call of calls) {
       expect(call.opts.timeout).toBeGreaterThan(0);
       expect(Number.isFinite(call.opts.timeout)).toBe(true);
@@ -838,14 +838,14 @@ describe('callWmux (#310)', () => {
   });
 
   it('falls back to `wmux` on PATH elsewhere', async () => {
-    const { callWmux } = await load();
-    callWmux(runtimeNode, ['x'], () => {}, {}, 'linux');
+    const { callRemotea } = await load();
+    callRemotea(runtimeNode, ['x'], () => {}, {}, 'linux');
     expect(calls[0]).toMatchObject({ file: 'wmux', argv: ['x'] });
   });
 
   it('runs the exit release synchronously and bounded', async () => {
-    const { callWmuxSync } = await load();
-    callWmuxSync(
+    const { callRemoteaSync } = await load();
+    callRemoteaSync(
       runtimeNode,
       ['release-agent', '--session', 'ses_abc12345'],
       () => {},
@@ -859,8 +859,8 @@ describe('callWmux (#310)', () => {
   });
 
   it('skips the synchronous path on Windows without REMOTEA_CLI', async () => {
-    const { callWmuxSync } = await load();
-    expect(callWmuxSync(runtimeNode, ['x'], () => {}, {}, 'win32')).toBe(false);
+    const { callRemoteaSync } = await load();
+    expect(callRemoteaSync(runtimeNode, ['x'], () => {}, {}, 'win32')).toBe(false);
     expect(syncCalls).toEqual([]);
   });
 });

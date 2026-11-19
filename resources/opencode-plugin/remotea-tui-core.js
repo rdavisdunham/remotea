@@ -140,7 +140,7 @@ const CLI_TIMEOUT_MS = 10_000;
  * shell is involved unless the PATH fallback names `wmux`, which on Windows is
  * why the .cmd shim is refused (#154/#187).
  */
-export function callWmux(runtime, argv, log = () => {}, env = process.env, platform = process.platform, done = () => {}) {
+export function callRemotea(runtime, argv, log = () => {}, env = process.env, platform = process.platform, done = () => {}) {
   // `done` fires exactly once, on every path, when this call can no longer
   // reach the pipe — which is what lets a reporter order its own calls. The
   // argument is null on success, and the failure otherwise, so a caller that
@@ -190,14 +190,14 @@ export function callWmux(runtime, argv, log = () => {}, env = process.env, platf
 }
 
 /**
- * Synchronous sibling of `callWmux`, for the process-exit hook.
+ * Synchronous sibling of `callRemotea`, for the process-exit hook.
  *
  * An async spawn dies with the process, so a handle released from `exit` must
  * be sent synchronously. Bounded like the async path: quitting OpenCode is not
  * worth hanging on, and a failed release is better than a stuck process. The
  * server half uses the same shape.
  */
-export function callWmuxSync(runtime, argv, log = () => {}, env = process.env, platform = process.platform) {
+export function callRemoteaSync(runtime, argv, log = () => {}, env = process.env, platform = process.platform) {
   try {
     const cli = env.REMOTEA_CLI;
     let file;
@@ -263,8 +263,8 @@ const SESSION_REPORT_RETRY_MS = [1000, 3000, 10000];
 
 export function createSessionReporter({
   surface,
-  callWmux: send,
-  callWmuxSync: sendSync,
+  callRemotea: send,
+  callRemoteaSync: sendSync,
   log = () => {},
   schedule = (fn, ms) => setTimeout(fn, ms),
   cancel = (timer) => clearTimeout(timer),
@@ -562,7 +562,7 @@ export function routeFromTabs(route, tabs) {
  * resolves it for the prompt log only. `inboxID` dedupes admission; the
  * renderer's identical-text window is the backstop when both halves run.
  */
-export function createPromptReporter({ callWmux: send, log = () => {} }) {
+export function createPromptReporter({ callRemotea: send, log = () => {} }) {
   const seen = new Set();
   return {
     observe(payload, hosted) {
@@ -625,7 +625,7 @@ export function eventSessionID(type, data) {
  * An ask with no id is cleared by any reply of its kind, so it cannot strand
  * the pane. A turn that ends interrupted or failed clears its session's asks.
  */
-export function createBlockedReporter({ surface, callWmux: send, log = () => {} }) {
+export function createBlockedReporter({ surface, callRemotea: send, log = () => {} }) {
   /** `per:<id>` / `frm:<id>` → the session it was asked in (or null). */
   const pending = new Map();
   /** Ids already answered, so a replayed ask cannot raise "Needs you" again. */
@@ -727,7 +727,7 @@ export function createBlockedReporter({ surface, callWmux: send, log = () => {} 
  * the #151 race. The next report waits for the previous call to finish, and
  * whatever changed meanwhile collapses into the latest wanted depth.
  */
-export function createActivityReporter({ surface, callWmux: send, log = () => {} }) {
+export function createActivityReporter({ surface, callRemotea: send, log = () => {} }) {
   const running = new Set();
   let wanted = null;
   let sent = null;

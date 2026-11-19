@@ -160,7 +160,7 @@ describe('browser pane popup bridge (issue #126)', () => {
     const source = popupBridgeSource();
     expect(source.startsWith('(function')).toBe(true);
     expect(source.endsWith('(window)')).toBe(true);
-    expect(source).toContain('__wmuxPopupBridge');
+    expect(source).toContain('__remoteaPopupBridge');
     // Nothing module-scoped: no sibling export, no imports, and none of the
     // TS/bundler helper shims that a downlevelled construct would pull in.
     expect(source).not.toContain('popupBridgeSource');

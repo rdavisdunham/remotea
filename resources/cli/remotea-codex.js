@@ -4,13 +4,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isTransientWmuxError = void 0;
+exports.isTransientRemoteaError = void 0;
 exports.codexLaunchPlan = codexLaunchPlan;
 exports.resumeTarget = resumeTarget;
-exports.wmuxRequestPatiently = wmuxRequestPatiently;
+exports.remoteaRequestPatiently = remoteaRequestPatiently;
 exports.codexCapabilityKey = codexCapabilityKey;
 exports.supportsRemote = supportsRemote;
-exports.runWmuxCodex = runWmuxCodex;
+exports.runRemoteaCodex = runRemoteaCodex;
 /** Launched by remotea's private PATH shims using remotea's resolved Node runtime. */
 const child_process_1 = require("child_process");
 const fs_1 = __importDefault(require("fs"));
@@ -18,7 +18,7 @@ const net_1 = __importDefault(require("net"));
 const os_1 = __importDefault(require("os"));
 const path_1 = __importDefault(require("path"));
 const transport_retry_1 = require("./transport-retry");
-Object.defineProperty(exports, "isTransientWmuxError", { enumerable: true, get: function () { return transport_retry_1.isTransientWmuxError; } });
+Object.defineProperty(exports, "isTransientRemoteaError", { enumerable: true, get: function () { return transport_retry_1.isTransientRemoteaError; } });
 const NON_INTERACTIVE = new Set([
     'agents', 'exec', 'e', 'review', 'login', 'logout', 'mcp', 'plugin', 'app-server',
     'remote-control', 'app', 'completion', 'update', 'doctor', 'sandbox', 'debug',
@@ -133,7 +133,7 @@ function resumeTarget(clientArgs) {
     return undefined;
 }
 /** Authenticated local pipe only; never send environment variables or transcripts. */
-const wmuxRequest = (method, params, timeoutMs) => {
+const remoteaRequest = (method, params, timeoutMs) => {
     return new Promise((resolve, reject) => {
         const pipe = process.env.REMOTEA_PIPE;
         const token = process.env.REMOTEA_PIPE_TOKEN;
@@ -143,7 +143,7 @@ const wmuxRequest = (method, params, timeoutMs) => {
         }
         const socket = net_1.default.connect(pipe);
         let data = '';
-        const timer = setTimeout(() => finish(new transport_retry_1.WmuxBusyError('remotea did not respond')), timeoutMs);
+        const timer = setTimeout(() => finish(new transport_retry_1.RemoteaBusyError('remotea did not respond')), timeoutMs);
         const finish = (error, result) => {
             clearTimeout(timer);
             socket.destroy();
@@ -174,7 +174,7 @@ const wmuxRequest = (method, params, timeoutMs) => {
             }
         });
         socket.on('error', error => finish(error));
-        socket.on('end', () => finish(new transport_retry_1.WmuxBusyError('remotea disconnected')));
+        socket.on('end', () => finish(new transport_retry_1.RemoteaBusyError('remotea disconnected')));
     });
 };
 /**
@@ -183,7 +183,7 @@ const wmuxRequest = (method, params, timeoutMs) => {
  * timed out and started without session capture, so remotea lost track of
  * them — a `/new` or a quit there was never recorded.
  */
-async function wmuxRequestPatiently(method, params, patience, request = wmuxRequest, now = Date.now) {
+async function remoteaRequestPatiently(method, params, patience, request = remoteaRequest, now = Date.now) {
     return (0, transport_retry_1.retryTransient)((timeoutMs) => request(method, params, timeoutMs), patience, now);
 }
 /** Whether to record sessions: decides a restored pane's capture, so it waits for wmux. */
@@ -286,7 +286,7 @@ async function startRelay(options) {
         return null;
     }
 }
-async function runWmuxCodex(args = process.argv.slice(2)) {
+async function runRemoteaCodex(args = process.argv.slice(2)) {
     const executable = process.env.REMOTEA_CODEX_EXE;
     if (!executable || !path_1.default.isAbsolute(executable))
         throw new Error('remotea could not locate the native Codex executable');
@@ -298,7 +298,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
         return runCli(executable, args, env);
     let enabled = false;
     try {
-        enabled = (await wmuxRequestPatiently('pane.codex_restore_config', { surfaceId }, {
+        enabled = (await remoteaRequestPatiently('pane.codex_restore_config', { surfaceId }, {
             ...CONFIG_PATIENCE,
             onWait: () => console.error('[remotea] remotea is busy; waiting for it before starting Codex with session restore...'),
         })).enabled === true;
@@ -306,7 +306,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
     catch (error) {
         // An older/offline remotea leaves the CLI usable. Say so when remotea was there
         // but never answered: that pane is about to run without session capture.
-        if ((0, transport_retry_1.isTransientWmuxError)(error))
+        if ((0, transport_retry_1.isTransientRemoteaError)(error))
             console.error('[remotea] remotea did not answer; starting Codex without session restore.');
     }
     if (!enabled)
@@ -323,7 +323,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
     const report = (method, sessionId) => {
         reports = reports.then(async () => {
             try {
-                await wmuxRequestPatiently(method, { surfaceId, sessionId }, REPORT_PATIENCE);
+                await remoteaRequestPatiently(method, { surfaceId, sessionId }, REPORT_PATIENCE);
             }
             catch { /* A crashed remotea cannot receive a report; Codex still owns its history. */ }
         });
@@ -353,7 +353,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
         // Only an orderly CLI exit forgets the handle. A crash, socket failure or
         // remotea shutdown retains it. Main also guards this RPC while quitting.
         try {
-            await wmuxRequestPatiently('pane.release_codex_session', { surfaceId, sessionId: relay.sessionId }, RELEASE_PATIENCE);
+            await remoteaRequestPatiently('pane.release_codex_session', { surfaceId, sessionId: relay.sessionId }, RELEASE_PATIENCE);
         }
         catch { /* remotea has already closed */ }
         console.log(`To resume later: codex resume ${relay.sessionId}`);
@@ -361,7 +361,7 @@ async function runWmuxCodex(args = process.argv.slice(2)) {
     return exitCode;
 }
 if (require.main === module) {
-    runWmuxCodex().then(code => { process.exitCode = code; }).catch(error => {
+    runRemoteaCodex().then(code => { process.exitCode = code; }).catch(error => {
         console.error('[remotea] Could not launch Codex:', error.message);
         process.exitCode = 1;
     });

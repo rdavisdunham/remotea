@@ -114,7 +114,7 @@ function observerLines(surfaceId: string, activity: ObserverActivity | undefined
   }));
 }
 
-function wmuxLine(surfaceId: string, paneId: PaneId, meta: AgentMeta | undefined): WorkspaceAgent | null {
+function remoteaLine(surfaceId: string, paneId: PaneId, meta: AgentMeta | undefined): WorkspaceAgent | null {
   if (!meta) return null;
   const done = meta.status === 'exited';
   return { key: `remotea:${surfaceId}`, name: meta.label, detail: done ? '✓' : '', done, paneId };
@@ -167,8 +167,8 @@ export function agentsForWorkspace(
   const merged: WorkspaceAgent[] = [];
   for (const { surfaceId, paneId } of pairs) {
     merged.push(...observerLines(surfaceId, claudeActivity[surfaceId], now, t));
-    const wmux = wmuxLine(surfaceId, paneId, agentMeta.get(surfaceId));
-    if (wmux) merged.push(wmux);
+    const remotea = remoteaLine(surfaceId, paneId, agentMeta.get(surfaceId));
+    if (remotea) merged.push(remotea);
   }
 
   // Stable partition: running agents first, done ones after.

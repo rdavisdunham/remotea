@@ -34,7 +34,7 @@ const load = () => import(/* @vite-ignore */ PLUGIN);
  * calls every export of a plugin file as a plugin factory. Reaching them
  * through the one real export is what keeps that surface at exactly one.
  */
-const internals = async () => (await load()).WmuxPlugin.__wmuxInternals;
+const internals = async () => (await load()).RemoteaPlugin.__remoteaInternals;
 
 /** Every wmux CLI invocation the plugin made, as flat argv (minus the script). */
 const verbs = () => calls.map((c) => {
@@ -54,8 +54,8 @@ async function pluginWith(env: Record<string, string> = {}) {
     REMOTEA_NODE: process.execPath,
     ...env,
   });
-  const { WmuxPlugin } = await load();
-  return WmuxPlugin();
+  const { RemoteaPlugin } = await load();
+  return RemoteaPlugin();
 }
 
 beforeEach(() => {
@@ -88,27 +88,29 @@ describe('the plugin file itself', () => {
     // v7 → v8 is #304: without the bump no installed copy gains the prompt hook.
     // v9 → v10 retries a lost session report, keeps a shared server's signals
     // out of the starter pane, and stops a reload from releasing the handle.
-    expect(src).toMatch(/remotea-plugin-version:\s*10/);
+    // v10 → v11 renames the plugin's code symbols (WmuxPlugin → RemoteaPlugin);
+    // the host still recognises an installed v10 by LEGACY_OPENCODE_PLUGIN_EXPORT.
+    expect(src).toMatch(/remotea-plugin-version:\s*11/);
   });
 
-  it('exports WmuxPlugin and the default definition, NOTHING else (#191, #271)', async () => {
+  it('exports RemoteaPlugin and the default definition, NOTHING else (#191, #271)', async () => {
     // OpenCode v1's legacy loader calls every export as a plugin factory, then
     // invokes a `config` hook on the result. v3/v4 also exported four helpers,
     // so it called `summarize(ctx)`, got a string back, and crashed OpenCode at
     // startup on `null.config`. Helpers now hang off
-    // WmuxPlugin.__wmuxInternals, which the loader never looks at.
+    // RemoteaPlugin.__remoteaInternals, which the loader never looks at.
     const mod = await load();
-    expect(Object.keys(mod).sort()).toEqual(['WmuxPlugin', 'default']);
+    expect(Object.keys(mod).sort()).toEqual(['RemoteaPlugin', 'default']);
   });
 
   it('has the default definition BOTH OpenCode generations accept (#271)', async () => {
     // v2 rejects the file unless `default` is `{ id, effect | setup }`; v1
     // (>= 1.3.4) sees the `id`, calls `default.server` and stops calling every
-    // export — which is what keeps WmuxPlugin from being invoked twice.
-    const { default: def, WmuxPlugin } = await load();
+    // export — which is what keeps RemoteaPlugin from being invoked twice.
+    const { default: def, RemoteaPlugin } = await load();
     expect(def.id).toBe('wmux');
     expect(typeof def.setup).toBe('function');
-    expect(def.server).toBe(WmuxPlugin);
+    expect(def.server).toBe(RemoteaPlugin);
     expect('effect' in def).toBe(false); // v2 would take the Effect branch instead
   });
 
@@ -187,8 +189,8 @@ describe('spawning', () => {
 
   it('no-ops entirely outside wmux', async () => {
     delete process.env.REMOTEA;
-    const { WmuxPlugin } = await load();
-    expect(await WmuxPlugin()).toEqual({});
+    const { RemoteaPlugin } = await load();
+    expect(await RemoteaPlugin()).toEqual({});
   });
 });
 
@@ -365,8 +367,8 @@ describe('debug logging (#190)', () => {
 
   it('says so when it loaded but did nothing — the commonest silent failure', async () => {
     process.env.REMOTEA_PLUGIN_DEBUG = logPath();
-    const { WmuxPlugin } = await load();
-    expect(await WmuxPlugin()).toEqual({});
+    const { RemoteaPlugin } = await load();
+    expect(await RemoteaPlugin()).toEqual({});
     expect(readLog()).toContain('init: inactive');
   });
 
@@ -793,7 +795,7 @@ describe('session handle for restore (#290)', () => {
     });
   });
 
-  /** Let wmuxAsync's promise callbacks run after the mocked execFile resolves. */
+  /** Let remoteaAsync's promise callbacks run after the mocked execFile resolves. */
   const flush = async () => {
     for (let i = 0; i < 10; i++) await Promise.resolve();
   };
@@ -919,7 +921,7 @@ describe('session handle for restore (#290)', () => {
       await hooks.event({ event: { type: 'session.idle', properties: { sessionID: PARENT } } });
       await flush();
       calls.length = 0;
-      hooks.__wmuxShutdown();
+      hooks.__remoteaShutdown();
       // A dispose may be a reload: nothing may be released immediately.
       expect(reports()).toEqual([]);
       await vi.advanceTimersByTimeAsync(1400);
@@ -936,7 +938,7 @@ describe('session handle for restore (#290)', () => {
       await hooks.event({ event: { type: 'session.idle', properties: { sessionID: PARENT } } });
       await flush();
       calls.length = 0;
-      hooks.__wmuxShutdown();
+      hooks.__remoteaShutdown();
       // The replacement instance starts before the delayed release fires.
       await pluginWith();
       await vi.advanceTimersByTimeAsync(2000);
@@ -951,7 +953,7 @@ describe('session handle for restore (#290)', () => {
       await hooks.event({ event: { type: 'session.idle', properties: { sessionID: PARENT } } });
       await flush();
       calls.length = 0;
-      hooks.__wmuxShutdown();
+      hooks.__remoteaShutdown();
       expect(reports()).toEqual([]);
       fireExit();
       expect(reports()).toEqual([['release-agent', '--provider', 'opencode', '--session', PARENT, '--surface', SURFACE]]);

@@ -7,7 +7,7 @@ import { applyConsent } from '../../src/main/agent-integration';
 import { clearIntegrationFailures, integrationFailures, reportIntegrationFailure } from '../../src/main/integration-failures';
 import { ensureKiroContext } from '../../src/main/kiro-context';
 import { readRenderedInstructions } from '../../src/main/agent-instructions';
-import { applyWmuxHooks, getHookScriptPath } from '../../src/main/claude-context';
+import { applyRemoteaHooks, getHookScriptPath } from '../../src/main/claude-context';
 
 let home: string;
 const envKeys = ['HOME', 'USERPROFILE', 'PI_CODING_AGENT_DIR', 'PI_CONFIG_DIR', 'QWEN_HOME', 'GROK_HOME'] as const;
@@ -80,7 +80,7 @@ describe('read-only desktop integration observations', () => {
   });
 
   it('detects partial hooks and invalid JSON while preserving user credentials', () => {
-    const configured = applyWmuxHooks({ secret: 'PRIVATE_CREDENTIAL' }, getHookScriptPath());
+    const configured = applyRemoteaHooks({ secret: 'PRIVATE_CREDENTIAL' }, getHookScriptPath());
     write('.claude/settings.json', JSON.stringify(configured));
     expect(observation('Claude Code', 'hooks').state).toBe('present');
     delete configured.hooks.Stop;

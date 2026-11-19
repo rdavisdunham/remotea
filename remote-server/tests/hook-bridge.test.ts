@@ -344,7 +344,7 @@ describe('hooks install', () => {
     const rows = installHooks(paths);
     const plugin = path.join(home, '.config', 'opencode', 'plugin', 'remotea.js');
     expect(rows.find((r) => r.agent === 'opencode')).toMatchObject({ present: true, entries: 1 });
-    expect(fs.readFileSync(plugin, 'utf8')).toContain('WmuxPlugin');
+    expect(fs.readFileSync(plugin, 'utf8')).toContain('RemoteaPlugin');
     expect(fs.existsSync(path.join(paths.cliDir, 'remotea.js'))).toBe(true);
     expect(fs.existsSync(path.join(paths.cliDir, 'wsl-network.js'))).toBe(true);
     removeHooks(paths);

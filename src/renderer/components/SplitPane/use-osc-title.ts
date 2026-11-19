@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { WorkspaceId, WorkspaceInfo } from '../../../shared/types';
-import { useStore, type WmuxStore } from '../../store';
+import { useStore, type RemoteaStore } from '../../store';
 import { getWorkspaceLabel, hasAgentLookup } from '../Sidebar/workspace-label';
 
 /**
@@ -23,7 +23,7 @@ export function useOscTitleLookup(): (surfaceId: string) => string | undefined {
 
 type LabelledWorkspace = Pick<WorkspaceInfo, 'title' | 'titleIsDefault' | 'splitTree'>;
 /** The store fields a workspace's label is derived from. */
-type LabelState = Pick<WmuxStore, 'terminalPrefs' | 'oscTitles' | 'agentIdentities' | 'agentStates'>;
+type LabelState = Pick<RemoteaStore, 'terminalPrefs' | 'oscTitles' | 'agentIdentities' | 'agentStates'>;
 
 /**
  * The one rule for what a workspace is CALLED, wherever the UI names it: the

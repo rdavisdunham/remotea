@@ -71,7 +71,7 @@
  */
 
 /** Marks a prototype we have already wrapped, so repeated installs are free. */
-const GUARDED = Symbol.for('wmux.ptyExitCallbackGuarded');
+const GUARDED = Symbol.for('remotea.ptyExitCallbackGuarded');
 
 type ExitCallbackHost = {
   _$onProcessExit?: (exitCode: number) => void;

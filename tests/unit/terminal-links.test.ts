@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { openInWmuxBrowser } = vi.hoisted(() => ({
-  openInWmuxBrowser: vi.fn(),
+const { openInRemoteaBrowser } = vi.hoisted(() => ({
+  openInRemoteaBrowser: vi.fn(),
 }));
 
 vi.mock('../../src/renderer/utils/open-in-browser', () => ({
-  openInWmuxBrowser,
+  openInRemoteaBrowser,
 }));
 
 import {
@@ -27,17 +27,17 @@ function mouseEvent(modifiers: Partial<Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 
 
 describe('terminal link handling', () => {
   beforeEach(() => {
-    openInWmuxBrowser.mockReset();
+    openInRemoteaBrowser.mockReset();
   });
 
   // This module reports only WHETHER to invert. Since issue #201 the meaning
-  // of that lives in openInWmuxBrowser, because it depends on
+  // of that lives in openInRemoteaBrowser, because it depends on
   // browserPrefs.openLinksExternally — so an unmodified click is `invert:
   // false`, not "open in the panel".
   it('reports an unmodified HTTP(S) click as no inversion', () => {
     activateTerminalLink(mouseEvent(), 'https://example.com/path');
 
-    expect(openInWmuxBrowser).toHaveBeenCalledWith('https://example.com/path', {
+    expect(openInRemoteaBrowser).toHaveBeenCalledWith('https://example.com/path', {
       invert: false,
     });
   });
@@ -48,7 +48,7 @@ describe('terminal link handling', () => {
   ])('reports a modified click as an inversion: %o', modifiers => {
     activateTerminalLink(mouseEvent(modifiers), 'https://example.com');
 
-    expect(openInWmuxBrowser).toHaveBeenCalledWith('https://example.com', {
+    expect(openInRemoteaBrowser).toHaveBeenCalledWith('https://example.com', {
       invert: true,
     });
   });
@@ -61,7 +61,7 @@ describe('terminal link handling', () => {
   ])('rejects unsafe or invalid targets: %s', uri => {
     activateTerminalLink(mouseEvent(), uri);
 
-    expect(openInWmuxBrowser).not.toHaveBeenCalled();
+    expect(openInRemoteaBrowser).not.toHaveBeenCalled();
   });
 });
 
@@ -69,14 +69,14 @@ describe('terminal link handling', () => {
 // too meant two browsers for one click.
 describe('a pane whose app has captured the mouse (#280)', () => {
   beforeEach(() => {
-    openInWmuxBrowser.mockReset();
+    openInRemoteaBrowser.mockReset();
   });
 
   const TRACKING: MouseTrackingMode[] = ['x10', 'vt200', 'drag', 'any'];
 
   it.each(TRACKING)('a plain click is the app\'s (%s): wmux opens nothing', mode => {
     activateTerminalLink(mouseEvent(), 'https://example.com', mode);
-    expect(openInWmuxBrowser).not.toHaveBeenCalled();
+    expect(openInRemoteaBrowser).not.toHaveBeenCalled();
   });
 
   it.each(TRACKING)('Ctrl+click reaches wmux and opens the DEFAULT destination (%s)', mode => {
@@ -84,12 +84,12 @@ describe('a pane whose app has captured the mouse (#280)', () => {
     // reach wmux at all, so inverting would make the default destination —
     // the panel, out of the box — unreachable from every such pane.
     activateTerminalLink(mouseEvent({ ctrlKey: true }), 'https://example.com', mode);
-    expect(openInWmuxBrowser).toHaveBeenCalledWith('https://example.com', { invert: false });
+    expect(openInRemoteaBrowser).toHaveBeenCalledWith('https://example.com', { invert: false });
   });
 
   it('Cmd counts as the modifier too', () => {
     activateTerminalLink(mouseEvent({ metaKey: true }), 'https://example.com', 'any');
-    expect(openInWmuxBrowser).toHaveBeenCalledWith('https://example.com', { invert: false });
+    expect(openInRemoteaBrowser).toHaveBeenCalledWith('https://example.com', { invert: false });
   });
 
   it('the full decision table', () => {
@@ -102,7 +102,7 @@ describe('a pane whose app has captured the mouse (#280)', () => {
 
 describe('createTerminalLinkActivation', () => {
   beforeEach(() => {
-    openInWmuxBrowser.mockReset();
+    openInRemoteaBrowser.mockReset();
   });
 
   it('the OSC 8 handler and the WebLinksAddon callback are the same function', () => {
@@ -117,15 +117,15 @@ describe('createTerminalLinkActivation', () => {
     const links = createTerminalLinkActivation(() => mode);
 
     links.activate(mouseEvent(), 'https://a.example');
-    expect(openInWmuxBrowser).toHaveBeenCalledTimes(1);
+    expect(openInRemoteaBrowser).toHaveBeenCalledTimes(1);
 
     mode = 'any';
     links.activate(mouseEvent(), 'https://b.example');
-    expect(openInWmuxBrowser).toHaveBeenCalledTimes(1);
+    expect(openInRemoteaBrowser).toHaveBeenCalledTimes(1);
 
     mode = 'none';
     links.activate(mouseEvent(), 'https://c.example');
-    expect(openInWmuxBrowser).toHaveBeenCalledTimes(2);
+    expect(openInRemoteaBrowser).toHaveBeenCalledTimes(2);
   });
 
   it('the OSC 8 handler and the WebLinksAddon options share one hover state', () => {
@@ -140,7 +140,7 @@ describe('createTerminalLinkActivation', () => {
 // the URL a second time, in the system browser, beside the wmux panel.
 describe('a Ctrl+click wmux takes is not reported to the app (#353)', () => {
   beforeEach(() => {
-    openInWmuxBrowser.mockReset();
+    openInRemoteaBrowser.mockReset();
   });
 
   const URL_A = 'https://example.com/a';
@@ -172,11 +172,11 @@ describe('a Ctrl+click wmux takes is not reported to the app (#353)', () => {
     const links = hoveredLinks('vt200');
 
     expect(links.claimMouseDown(mouseEvent({ ctrlKey: true }))).toBe(true);
-    expect(openInWmuxBrowser).not.toHaveBeenCalled();
+    expect(openInRemoteaBrowser).not.toHaveBeenCalled();
 
     expect(links.claimMouseUp(mouseEvent({ ctrlKey: true }))).toBe(true);
-    expect(openInWmuxBrowser).toHaveBeenCalledTimes(1);
-    expect(openInWmuxBrowser).toHaveBeenCalledWith(URL_A, { invert: false });
+    expect(openInRemoteaBrowser).toHaveBeenCalledTimes(1);
+    expect(openInRemoteaBrowser).toHaveBeenCalledWith(URL_A, { invert: false });
   });
 
   it('claims a release only after a claimed press', () => {
@@ -186,7 +186,7 @@ describe('a Ctrl+click wmux takes is not reported to the app (#353)', () => {
     links.claimMouseDown(mouseEvent({ ctrlKey: true }));
     links.claimMouseUp(mouseEvent({ ctrlKey: true }));
     expect(links.claimMouseUp(mouseEvent({ ctrlKey: true }))).toBe(false);
-    expect(openInWmuxBrowser).toHaveBeenCalledTimes(1);
+    expect(openInRemoteaBrowser).toHaveBeenCalledTimes(1);
   });
 
   it('opens nothing when the pointer left the link before the release', () => {
@@ -196,7 +196,7 @@ describe('a Ctrl+click wmux takes is not reported to the app (#353)', () => {
 
     // Still claimed: the app never saw the press, so it must not see a lone release.
     expect(links.claimMouseUp(mouseEvent({ ctrlKey: true }))).toBe(true);
-    expect(openInWmuxBrowser).not.toHaveBeenCalled();
+    expect(openInRemoteaBrowser).not.toHaveBeenCalled();
   });
 
   it('leaves a plain click, and any click with tracking off, to xterm', () => {

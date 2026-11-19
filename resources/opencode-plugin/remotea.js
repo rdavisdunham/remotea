@@ -1,4 +1,4 @@
-// remotea-plugin-version: 10
+// remotea-plugin-version: 11
 // wmux OpenCode plugin — bridges OpenCode hooks/events to the wmux sidebar.
 // Auto-installed by wmux to ~/.config/opencode/plugin/remotea.js.
 // No-ops entirely outside wmux (REMOTEA !== '1').
@@ -24,7 +24,7 @@ const JS_RUNTIME_RE = /^(node|bun)(\.exe)?$/i;
  * only link in this chain that cannot come up empty. The rest is for a plugin
  * installed by an older wmux that does not declare it yet.
  *
- * Not exported — see the WmuxPlugin.__wmuxInternals note at the end of the file.
+ * Not exported — see the RemoteaPlugin.__remoteaInternals note at the end of the file.
  */
 function resolveNodeRuntime(
   env = process.env,
@@ -91,7 +91,7 @@ function firstExisting(dirs, names, exists) {
  * `1`/`true` picks the default location; anything else is taken as a path, so a
  * user can drop the log somewhere they are already tailing.
  *
- * Not exported — see the WmuxPlugin.__wmuxInternals note at the end of the file.
+ * Not exported — see the RemoteaPlugin.__remoteaInternals note at the end of the file.
  */
 function resolveDebugLog(value, tmpdir = os.tmpdir) {
   const v = typeof value === "string" ? value.trim() : "";
@@ -232,7 +232,7 @@ function resetPendingReleases() {
   pendingReleases.clear();
 }
 
-export const WmuxPlugin = async (options = {}) => {
+export const RemoteaPlugin = async (options = {}) => {
   // Resolved before the REMOTEA gate so "the plugin loaded but did nothing" is
   // itself a visible log line — otherwise the commonest failure is silence.
   const log = makeLogger(resolveDebugLog(process.env.REMOTEA_PLUGIN_DEBUG));
@@ -297,7 +297,7 @@ export const WmuxPlugin = async (options = {}) => {
    * timeout matters: a CLI that never returns must not leave an in-flight
    * report forever.
    */
-  function wmuxAsync(args) {
+  function remoteaAsync(args) {
     return new Promise((resolve) => {
       try {
         const command = cliCommand(args);
@@ -336,8 +336,8 @@ export const WmuxPlugin = async (options = {}) => {
    * still observed so a failed call is logged rather than becoming an
    * unhandled rejection.
    */
-  function wmux(args) {
-    void wmuxAsync(args);
+  function remotea(args) {
+    void remoteaAsync(args);
   }
 
   // message.part.updated fires per streaming delta (many per second). Throttle
@@ -371,14 +371,14 @@ export const WmuxPlugin = async (options = {}) => {
   const clearBlocked = () => {
     if (!blocked) return;
     blocked = false;
-    wmux(["report-agent", "--surface", surface, "--unblocked", "--seq", String(nextSeq())]);
+    remotea(["report-agent", "--surface", surface, "--unblocked", "--seq", String(nextSeq())]);
   };
   /** Tell wmux the pane is alive. Says nothing about whether it is blocked. */
   const ping = () => {
     const now = Date.now();
     if (now - lastActivePing < 1000) return;
     lastActivePing = now;
-    wmux(["agent-activity", "--surface", surface, "--active"]);
+    remotea(["agent-activity", "--surface", surface, "--active"]);
   };
   const pingActive = () => {
     clearBlocked();
@@ -413,7 +413,7 @@ export const WmuxPlugin = async (options = {}) => {
   const releaseSession = (id, sync) => {
     const args = ["release-agent", "--provider", "opencode", "--session", id, "--surface", surface];
     if (!sync) {
-      wmux(args);
+      remotea(args);
       return;
     }
     // Synchronous on exit: an async spawn would die with the process. Bounded,
@@ -447,7 +447,7 @@ export const WmuxPlugin = async (options = {}) => {
   const sendReport = (id) => {
     lastSentAt = Date.now();
     pendingSession = id;
-    void wmuxAsync([
+    void remoteaAsync([
       "report-session",
       id,
       "--provider",
@@ -600,7 +600,7 @@ export const WmuxPlugin = async (options = {}) => {
       if (seenPrompts.size > 100) seenPrompts.delete(seenPrompts.values().next().value);
     }
     log("prompt", { chars: clean.length });
-    wmux(["hook", "--event", "UserPromptSubmit", "--prompt", clean.slice(0, MAX_PROMPT)]);
+    remotea(["hook", "--event", "UserPromptSubmit", "--prompt", clean.slice(0, MAX_PROMPT)]);
   };
 
   const activeTool = (input) => {
@@ -609,13 +609,13 @@ export const WmuxPlugin = async (options = {}) => {
     const tool = String((input && input.tool) || "");
     const args = ["agent-activity", "--surface", surface, "--active"];
     if (tool) args.push("--tool", tool);
-    wmux(args);
+    remotea(args);
   };
 
   const hooks = {
     "tool.execute.after": async (input) => {
       const tool = String((input && input.tool) || "");
-      if (tool) wmux(["hook", "--event", "PostToolUse", "--tool", tool]);
+      if (tool) remotea(["hook", "--event", "PostToolUse", "--tool", tool]);
       activeTool(input);
     },
     "tool.execute.before": async (input) => {
@@ -639,10 +639,10 @@ export const WmuxPlugin = async (options = {}) => {
         // NOT an unblock: a pane waiting on a permission prompt is idle by
         // definition, and clearing here would erase "Needs you" the moment it
         // appeared.
-        wmux(["agent-activity", "--surface", surface, "--done"]);
+        remotea(["agent-activity", "--surface", surface, "--done"]);
       } else if (type === "session.error") {
         clearBlocked();
-        wmux(["agent-activity", "--surface", surface, "--done"]);
+        remotea(["agent-activity", "--surface", surface, "--done"]);
       } else if (type === "message.part.updated") {
         // Activity ping ONLY — never an unblock (#189).
         //
@@ -662,13 +662,13 @@ export const WmuxPlugin = async (options = {}) => {
         // Issue #188: the sidebar's whole point is telling a user with ten
         // panes open which one is waiting for them.
         blocked = true;
-        wmux(["report-agent", "--surface", surface, "--blocked", askReason(event), "--seq", String(nextSeq())]);
+        remotea(["report-agent", "--surface", surface, "--blocked", askReason(event), "--seq", String(nextSeq())]);
       } else if (REPLY_EVENTS.has(type)) {
         clearBlocked();
         pingActive();
       } else if (type === "file.edited") {
         // Feeds the diff view the same way Claude Code's PostToolUse hook does.
-        wmux(["hook", "--event", "PostToolUse", "--tool", "Edit"]);
+        remotea(["hook", "--event", "PostToolUse", "--tool", "Edit"]);
         pingActive();
       }
     },
@@ -684,12 +684,12 @@ export const WmuxPlugin = async (options = {}) => {
   };
   // For v2's dispose (setupV2). Non-enumerable, so a loader walking the hooks
   // object never mistakes it for a hook.
-  Object.defineProperty(hooks, "__wmuxShutdown", { value: releaseOnDispose });
+  Object.defineProperty(hooks, "__remoteaShutdown", { value: releaseOnDispose });
   return hooks;
 };
 
 /**
- * OpenCode v2 event → the v1 shape `WmuxPlugin`'s `event` hook reads, or null
+ * OpenCode v2 event → the v1 shape `RemoteaPlugin`'s `event` hook reads, or null
  * for an event it has no use for (#271).
  *
  * v2 renamed most session events and moved the payload from `properties` to
@@ -744,7 +744,7 @@ function fromV2Event(event) {
 
 /**
  * OpenCode v2's `setup(ctx)`, adapting its hook and event API onto the very
- * same handlers `WmuxPlugin` returns for v1 (#271).
+ * same handlers `RemoteaPlugin` returns for v1 (#271).
  *
  * Every registration is guarded: a v2 build that renames one domain loses that
  * signal, never the plugin, and never OpenCode's startup.
@@ -755,8 +755,8 @@ async function setupV2(ctx) {
   // screen. The server half cannot tell a background session from the viewed
   // one, so it must not write the restore handle. It keeps activity, blocked
   // state and prompts for private servers; a shared server returned {} above.
-  const hooks = await WmuxPlugin({ sessionHandles: false });
-  if (!hooks.event) return; // outside wmux — WmuxPlugin already logged why
+  const hooks = await RemoteaPlugin({ sessionHandles: false });
+  if (!hooks.event) return; // outside wmux — RemoteaPlugin already logged why
 
   const registrations = [];
   const register = async (domain, name, callback) => {
@@ -801,7 +801,7 @@ async function setupV2(ctx) {
     controller.abort();
     await task;
     // v2 disposes plugins on shutdown, where `exit` may never run for them.
-    if (typeof hooks.__wmuxShutdown === "function") hooks.__wmuxShutdown();
+    if (typeof hooks.__remoteaShutdown === "function") hooks.__remoteaShutdown();
     for (const r of registrations) {
       try {
         if (r && typeof r.dispose === "function") await r.dispose();
@@ -816,13 +816,13 @@ async function setupV2(ctx) {
  * v2 requires `export default { id, effect | setup }` and rejects the file
  * outright without it. v1 (since 1.3.4) reads the same default export: an `id`
  * there switches it from "call every export" to "call `default.server`", so
- * the named `WmuxPlugin` export is never invoked twice. v2's schema ignores
+ * the named `RemoteaPlugin` export is never invoked twice. v2's schema ignores
  * `server`; v1 ignores `setup`.
  *
  * OpenCode 1.3.3 and older call every export as a factory, this object
  * included — they cannot load a v2-compatible file at all.
  */
-export default { id: "wmux", server: WmuxPlugin, setup: setupV2 };
+export default { id: "wmux", server: RemoteaPlugin, setup: setupV2 };
 
 /**
  * The helpers above, reachable by wmux's own test suite (issue #191).
@@ -836,7 +836,7 @@ export default { id: "wmux", server: WmuxPlugin, setup: setupV2 };
  * crashed just the same, but the REMOTEA gate meant nobody testing wmux ever saw
  * the export loop as the cause.
  *
- * `WmuxPlugin` and the default definition must stay the only exports in this
+ * `RemoteaPlugin` and the default definition must stay the only exports in this
  * file. A test asserts it.
  */
-WmuxPlugin.__wmuxInternals = { resolveNodeRuntime, resolveDebugLog, summarize, askReason, fromV2Event, v2SessionSource, sessionFacts, resetPendingReleases };
+RemoteaPlugin.__remoteaInternals = { resolveNodeRuntime, resolveDebugLog, summarize, askReason, fromV2Event, v2SessionSource, sessionFacts, resetPendingReleases };

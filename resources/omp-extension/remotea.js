@@ -1,4 +1,4 @@
-// remotea-plugin-version: 4
+// remotea-plugin-version: 5
 // Omp factories are rebound per session, but share this module in one process.
 // Track session ancestry too: running agents need not have an async job record.
 import { execFile } from 'node:child_process';
@@ -15,7 +15,7 @@ function descendsFrom(sessions, agent, parentId) {
   return false;
 }
 
-export default function wmuxExtension(omp) {
+export default function remoteaExtension(omp) {
   const surface = process.env.REMOTEA_SURFACE_ID;
   const cli = process.env.REMOTEA_CLI;
   const runtime = process.env.REMOTEA_NODE;

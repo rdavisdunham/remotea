@@ -6,7 +6,7 @@ import path from 'path';
 import { WebSocket } from 'ws';
 import { CodexSessionTracker } from '../../src/cli/codex-session-tracker';
 import {
-  codexLaunchPlan, resumeTarget, supportsRemote, wmuxRequestPatiently, isTransientWmuxError,
+  codexLaunchPlan, resumeTarget, supportsRemote, remoteaRequestPatiently, isTransientRemoteaError,
 } from '../../src/cli/remotea-codex';
 import { createCodexRelay, MAX_BACKENDS, type CodexRelay } from '../../src/cli/codex-relay';
 
@@ -151,7 +151,7 @@ describe('Codex launch compatibility', () => {
 // 2 s answer from wmux and one 5 s `codex --help`; under that burst about half
 // timed out and ran without session capture.
 describe('launcher patience during a restore burst', () => {
-  const busy = () => Object.assign(new Error('wmux did not respond'), { name: 'WmuxBusyError' });
+  const busy = () => Object.assign(new Error('wmux did not respond'), { name: 'RemoteaBusyError' });
   // The real busy error is a private class; reproduce it through the request itself.
   function flaky(failures: number, error: () => Error = () => { const e = new Error('x') as NodeJS.ErrnoException; e.code = 'EBUSY'; return e; }) {
     const timeouts: number[] = [];
@@ -167,7 +167,7 @@ describe('launcher patience during a restore burst', () => {
   it('asks a busy wmux again, with longer attempts, and says so once', async () => {
     const { request, timeouts } = flaky(2);
     const onWait = vi.fn();
-    const result = await wmuxRequestPatiently('pane.codex_restore_config', {}, { budgetMs: 60_000, firstAttemptMs: 3_000, onWait }, request);
+    const result = await remoteaRequestPatiently('pane.codex_restore_config', {}, { budgetMs: 60_000, firstAttemptMs: 3_000, onWait }, request);
     expect(result).toEqual({ enabled: true });
     expect(timeouts).toEqual([3_000, 6_000, 12_000]);
     expect(onWait).toHaveBeenCalledTimes(1);
@@ -177,7 +177,7 @@ describe('launcher patience during a restore burst', () => {
     let clock = 0;
     const { request, calls } = flaky(Infinity);
     const now = () => (clock += 4_000);
-    await expect(wmuxRequestPatiently('m', {}, { budgetMs: 20_000, firstAttemptMs: 3_000 }, request, now)).rejects.toThrow();
+    await expect(remoteaRequestPatiently('m', {}, { budgetMs: 20_000, firstAttemptMs: 3_000 }, request, now)).rejects.toThrow();
     expect(calls()).toBeLessThan(6);
   });
 
@@ -187,16 +187,16 @@ describe('launcher patience during a restore burst', () => {
     ['outside wmux', () => new Error('Outside wmux')],
   ])('answers at once for %s', async (_label, error) => {
     const { request, calls } = flaky(Infinity, error);
-    await expect(wmuxRequestPatiently('m', {}, { budgetMs: 60_000, firstAttemptMs: 3_000 }, request)).rejects.toThrow();
+    await expect(remoteaRequestPatiently('m', {}, { budgetMs: 60_000, firstAttemptMs: 3_000 }, request)).rejects.toThrow();
     expect(calls()).toBe(1);
   });
 
   it('treats a dropped or busy pipe as transient', () => {
     for (const code of ['EBUSY', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT']) {
-      expect(isTransientWmuxError(Object.assign(new Error(code), { code }))).toBe(true);
+      expect(isTransientRemoteaError(Object.assign(new Error(code), { code }))).toBe(true);
     }
-    expect(isTransientWmuxError(busy())).toBe(false); // only the launcher's own class, not a lookalike
-    expect(isTransientWmuxError(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
+    expect(isTransientRemoteaError(busy())).toBe(false); // only the launcher's own class, not a lookalike
+    expect(isTransientRemoteaError(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
   });
 
   it('probes `codex --help` once per executable, and remembers only a yes', async () => {

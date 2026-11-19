@@ -21,7 +21,7 @@ import { agentBrowserPath, runAgentBrowser, unwrapAgentData, type RunResult } fr
 import { DashboardDaemon } from './agent-browser-daemon';
 import {
   DASHBOARD_PORT,
-  isWmuxSessionName,
+  isRemoteaSessionName,
   SessionRegistry,
   surfaceIdFromSessionName,
   type AgentSession,
@@ -503,7 +503,7 @@ export async function teardownAgentBrowser(
  *
  * Everything returned here is UNTRUSTED input — a machine-global namespace any
  * tool can write into — so this deliberately does no filtering of its own.
- * Deciding what is wmux's to close is `isWmuxSessionName`'s single job.
+ * Deciding what is wmux's to close is `isRemoteaSessionName`'s single job.
  */
 export function parseSessionList(res: Pick<RunResult, 'data' | 'stdout'>): string[] {
   const payload = unwrapAgentData(res as RunResult) as { sessions?: unknown } | null;
@@ -555,7 +555,7 @@ export async function reconcileOrphanSessions(
     // THE security boundary. A session without the wmux prefix belongs to a
     // human or another tool and is never wmux's to close, whatever else is
     // true about it.
-    if (!isWmuxSessionName(name)) continue;
+    if (!isRemoteaSessionName(name)) continue;
     const surfaceId = surfaceIdFromSessionName(name);
     if (surfaceId && deps.hasSession(surfaceId)) continue; // this run's, not a leftover
     if (await closeSessionByName(name, deps)) closed.push(name);

@@ -40,9 +40,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type * as Electron from 'electron';
-import { injectWmuxBlock, readRenderedInstructions } from './agent-instructions';
-import { stripWmuxBlock, stripLegacyBlocks } from './claude-context';
-import { isWmuxPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
+import { injectRemoteaBlock, readRenderedInstructions } from './agent-instructions';
+import { stripRemoteaBlock, stripLegacyBlocks } from './claude-context';
+import { isRemoteaPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
 
 /**
  * The omp agent directory — `~/.omp/agent` unless the env overrides omp itself
@@ -89,13 +89,13 @@ export function getOmpAgentsMdPath(agentDir = getOmpAgentDir()): string {
 export function ensureOmpContext(): void {
   try {
     // Rendered, not read: carries this install's absolute CLI path (#158).
-    const wmuxBlock = readRenderedInstructions();
-    if (wmuxBlock === null) return;
+    const remoteaBlock = readRenderedInstructions();
+    if (remoteaBlock === null) return;
 
     const agentsPath = getOmpAgentsMdPath();
     fs.mkdirSync(path.dirname(agentsPath), { recursive: true });
     const existing = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, 'utf-8') : '';
-    const next = injectWmuxBlock(existing, wmuxBlock, stripLegacyBlocks);
+    const next = injectRemoteaBlock(existing, remoteaBlock, stripLegacyBlocks);
     // Don't churn the mtime when nothing changed — omp watches these files.
     if (next === existing) return;
     fs.writeFileSync(agentsPath, next, 'utf-8');
@@ -122,7 +122,7 @@ export function removeOmpContext(): void {
     const existing = fs.readFileSync(agentsPath, 'utf-8');
     // null means there is no wmux block in there at all — a file the user
     // created themselves under this name, which is not ours to touch.
-    const next = stripWmuxBlock(existing);
+    const next = stripRemoteaBlock(existing);
     if (next === null || next === existing) return;
     if (next.trim() === '') fs.unlinkSync(agentsPath);
     else fs.writeFileSync(agentsPath, next, 'utf-8');
@@ -154,7 +154,7 @@ export function ensureOmpExtension(): void {
     const src = fs.readFileSync(source, 'utf-8');
     const dest = getOmpExtensionPath();
     const target = fs.existsSync(dest) ? fs.readFileSync(dest, 'utf-8') : null;
-    if (target !== null && !isWmuxPluginFile(target)) {
+    if (target !== null && !isRemoteaPluginFile(target)) {
       console.warn('[remotea] Refusing to overwrite the user-owned omp extension:', dest);
       return;
     }
@@ -171,7 +171,7 @@ export function ensureOmpExtension(): void {
 export function removeOmpExtension(): void {
   try {
     const dest = getOmpExtensionPath();
-    if (!fs.existsSync(dest) || !isWmuxPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
+    if (!fs.existsSync(dest) || !isRemoteaPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
     fs.unlinkSync(dest);
   } catch (err) {
     reportIntegrationFailure('omp', 'remove', err);

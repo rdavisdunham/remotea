@@ -1,4 +1,4 @@
-// remotea-plugin-version: 2
+// remotea-plugin-version: 3
 // wmux pi extension — bridges pi's lifecycle events to the wmux sidebar (#231).
 // Auto-installed by wmux to ~/.pi/agent/extensions/remotea.js.
 // No-ops entirely outside wmux (REMOTEA !== '1').
@@ -202,7 +202,7 @@ function metadataArgs(ctx) {
   return args;
 }
 
-export default function wmuxExtension(pi) {
+export default function remoteaExtension(pi) {
   const surface = process.env.REMOTEA_SURFACE_ID;
   // Outside wmux this file is inert. pi loads global extensions for every
   // session on the machine, including ones started from a plain terminal.
@@ -224,7 +224,7 @@ export default function wmuxExtension(pi) {
    * leaving the pane declared "working" with nothing alive to correct it.
    * Bounded, because a wedged wmux must not be able to hang pi's exit.
    */
-  function wmux(args, { wait = false } = {}) {
+  function remotea(args, { wait = false } = {}) {
     const cli = process.env.REMOTEA_CLI;
     const done = wait ? deferred() : null;
     try {
@@ -275,7 +275,7 @@ export default function wmuxExtension(pi) {
     return done.promise;
   }
 
-  const report = (...args) => wmux(["report-agent", "--surface", surface, ...args]);
+  const report = (...args) => remotea(["report-agent", "--surface", surface, ...args]);
 
   let lastActivityPing = 0;
 
@@ -299,7 +299,7 @@ export default function wmuxExtension(pi) {
 
   const sendMetadata = (ctx) => {
     const args = metadataArgs(ctx);
-    if (args) wmux(["report-metadata", "--surface", surface, ...args]);
+    if (args) remotea(["report-metadata", "--surface", surface, ...args]);
   };
 
   // ── Run state ──────────────────────────────────────────────────────────────
@@ -337,7 +337,7 @@ export default function wmuxExtension(pi) {
     const tool = typeof event?.toolName === "string" ? event.toolName : "";
     const args = ["agent-activity", "--surface", surface, "--active"];
     if (tool) args.push("--tool", tool);
-    wmux(args);
+    remotea(args);
   });
 
   pi.on("tool_execution_end", async (event) => {
@@ -345,7 +345,7 @@ export default function wmuxExtension(pi) {
     if (!tool || READ_ONLY_TOOLS.has(tool)) return;
     // Feeds the explorer's diff rollup the same way Claude Code's PostToolUse
     // hook does. Coalesced downstream per cwd (#141).
-    wmux(["hook", "--event", "PostToolUse", "--tool", tool]);
+    remotea(["hook", "--event", "PostToolUse", "--tool", tool]);
   });
 
   pi.on("turn_end", async (_event, ctx) => {
@@ -370,7 +370,7 @@ export default function wmuxExtension(pi) {
     // release-agent, not `--run-depth 0`: the pane stops having a declared
     // agent at all, so the sidebar falls back to the shell's own state rather
     // than showing a pi that is gone as "idle" forever.
-    await wmux(["release-agent", "--surface", surface], { wait: true });
+    await remotea(["release-agent", "--surface", surface], { wait: true });
   });
 }
 
@@ -384,7 +384,7 @@ export default function wmuxExtension(pi) {
  * it (#191), and "harmless in this host" is not a property worth relying on
  * twice.
  */
-wmuxExtension.__wmuxInternals = {
+remoteaExtension.__remoteaInternals = {
   resolveNodeRuntime,
   promptReason,
   modelLabel,

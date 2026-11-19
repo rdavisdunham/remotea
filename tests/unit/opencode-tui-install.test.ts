@@ -4,7 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import {
   installOpencodeTui,
-  isWmuxTuiFile,
+  isRemoteaTuiFile,
   opencodeConfigDir,
   opencodePluginSourceDir,
   removeOpencodeTui,
@@ -70,8 +70,8 @@ describe('markers (#310)', () => {
   });
 
   it('recognises only marker-bearing files as ours', () => {
-    expect(isWmuxTuiFile('// remotea-plugin-version: 1\nx')).toBe(true);
-    expect(isWmuxTuiFile('export default { id: "mine" }')).toBe(false);
+    expect(isRemoteaTuiFile('// remotea-plugin-version: 1\nx')).toBe(true);
+    expect(isRemoteaTuiFile('export default { id: "mine" }')).toBe(false);
   });
 });
 
@@ -165,7 +165,9 @@ describe('the shipped entry file (#310)', () => {
     // v5 → v6 retries a session report that never landed and reasserts the
     // handle when the pane starts a turn, so a transient CLI failure no longer
     // leaves the sidebar without that pane's session until the next switch.
-    expect(src).toMatch(/remotea-plugin-version:\s*6/);
+    // v6 → v7 renames the plugin's code symbols from wmux to remotea; the bump
+    // makes installed copies pick the rename up.
+    expect(src).toMatch(/remotea-plugin-version:\s*7/);
   });
 
   it('is a v2 CLI plugin definition and the only export', () => {
@@ -187,7 +189,7 @@ describe('the shipped entry file (#310)', () => {
 
   it('releases only on a real exit — a plugin reload must keep the handle', () => {
     expect(src).toContain('releaseOnExit');
-    expect(src).toContain('callWmuxSync');
+    expect(src).toContain('callRemoteaSync');
     expect(src).toContain('process.once("exit"');
     expect(src).not.toContain('reporter.dispose()');
   });

@@ -17,7 +17,7 @@ import { reportIntegrationFailure } from './integration-failures';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { isWmuxPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
+import { isRemoteaPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
 
 const HOOK_SCRIPT = 'remotea-agy-hook.cjs';
 
@@ -77,7 +77,7 @@ function isDirectory(p: string): boolean {
  */
 function ownsPluginDir(dir: string): boolean {
   const script = readOrNull(path.join(dir, HOOK_SCRIPT));
-  if (script !== null) return isWmuxPluginFile(script);
+  if (script !== null) return isRemoteaPluginFile(script);
   try { return fs.readdirSync(dir).length === 0; } catch { return true; }
 }
 
@@ -122,7 +122,7 @@ export function removeAgyPlugin(home = os.homedir()): void {
   try {
     const dir = getAgyPluginDir(home);
     const script = readOrNull(path.join(dir, HOOK_SCRIPT));
-    if (script === null || !isWmuxPluginFile(script)) return;
+    if (script === null || !isRemoteaPluginFile(script)) return;
     // The two JSON files go only when they are still exactly what wmux wrote.
     for (const [name, ours] of [['plugin.json', buildAgyPluginManifest()], ['hooks.json', buildAgyHooks()]] as const) {
       const file = path.join(dir, name);

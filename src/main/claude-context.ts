@@ -128,8 +128,8 @@ export function ensureClaudeContext(): void {
     // Rendered rather than read: the block carries this install's absolute CLI
     // path, so a session that wmux did not spawn (and therefore has no `wmux`
     // on PATH) can still tell "not running" from "not reachable" — issue #158.
-    const wmuxBlock = readRenderedInstructions();
-    if (wmuxBlock === null) return;
+    const remoteaBlock = readRenderedInstructions();
+    if (remoteaBlock === null) return;
     const claudeMdPath = getClaudeMdPath();
     const claudeDir = path.dirname(claudeMdPath);
 
@@ -140,7 +140,7 @@ export function ensureClaudeContext(): void {
 
     if (!fs.existsSync(claudeMdPath)) {
       // No CLAUDE.md yet — create with just the wmux block
-      fs.writeFileSync(claudeMdPath, wmuxBlock, 'utf-8');
+      fs.writeFileSync(claudeMdPath, remoteaBlock, 'utf-8');
       console.log('[remotea] Created ~/.claude/CLAUDE.md with remotea context');
       return;
     }
@@ -155,10 +155,10 @@ export function ensureClaudeContext(): void {
     if (startIdx === -1) {
       // No wmux block — append it
       if (existing.trim() === '') {
-        fs.writeFileSync(claudeMdPath, wmuxBlock, 'utf-8');
+        fs.writeFileSync(claudeMdPath, remoteaBlock, 'utf-8');
       } else {
         const separator = existing.endsWith('\n') ? '\n' : '\n\n';
-        fs.writeFileSync(claudeMdPath, existing + separator + wmuxBlock, 'utf-8');
+        fs.writeFileSync(claudeMdPath, existing + separator + remoteaBlock, 'utf-8');
       }
       console.log('[remotea] Appended remotea context to ~/.claude/CLAUDE.md');
       return;
@@ -167,21 +167,21 @@ export function ensureClaudeContext(): void {
     if (endIdx === -1) {
       // Broken markers — replace from start marker to end of file
       const before = existing.substring(0, startIdx);
-      fs.writeFileSync(claudeMdPath, before + wmuxBlock, 'utf-8');
+      fs.writeFileSync(claudeMdPath, before + remoteaBlock, 'utf-8');
       console.log('[remotea] Fixed and updated remotea context in ~/.claude/CLAUDE.md');
       return;
     }
 
     // Both markers found — replace the block
     const currentBlock = existing.substring(startIdx, endIdx + END_MARKER.length);
-    if (currentBlock.trim() === wmuxBlock.trim() && existing === raw) {
+    if (currentBlock.trim() === remoteaBlock.trim() && existing === raw) {
       // Already up to date, and nothing stale left beside it
       return;
     }
 
     const before = existing.substring(0, startIdx);
     const after = existing.substring(endIdx + END_MARKER.length);
-    fs.writeFileSync(claudeMdPath, before + wmuxBlock + after, 'utf-8');
+    fs.writeFileSync(claudeMdPath, before + remoteaBlock + after, 'utf-8');
     console.log('[remotea] Updated remotea context in ~/.claude/CLAUDE.md');
   } catch (err) {
     reportIntegrationFailure('Claude Code', 'write', err);
@@ -201,7 +201,7 @@ export function ensureClaudeContext(): void {
  * same damage. The blank lines that joined the block to its surroundings are
  * collapsed so removal doesn't leave a growing gap behind.
  */
-export function stripWmuxBlock(content: string): string | null {
+export function stripRemoteaBlock(content: string): string | null {
   const startIdx = content.indexOf(START_MARKER);
   if (startIdx === -1) return null;
   const endIdx = content.indexOf(END_MARKER, startIdx);
@@ -223,7 +223,7 @@ export function removeClaudeContext(): void {
   try {
     const claudeMdPath = getClaudeMdPath();
     if (!fs.existsSync(claudeMdPath)) return;
-    const stripped = stripWmuxBlock(fs.readFileSync(claudeMdPath, 'utf-8'));
+    const stripped = stripRemoteaBlock(fs.readFileSync(claudeMdPath, 'utf-8'));
     if (stripped === null) return; // no wmux block — nothing of ours to take back
     if (stripped === '') fs.unlinkSync(claudeMdPath);
     else fs.writeFileSync(claudeMdPath, stripped, 'utf-8');
@@ -252,8 +252,8 @@ function getCliAbsolutePath(): string {
 
 // The hook-entry builders are pure and shared with the remotea server (which
 // installs the same hooks inside WSL): see src/shared/claude-hooks.ts.
-export { applyWmuxHooks, removeWmuxHooks, wmuxEventHookCommand, REMOTEA_HOOK_EVENTS } from '../shared/claude-hooks';
-import { applyWmuxHooks, removeWmuxHooks, REMOTEA_HOOK_EVENTS } from '../shared/claude-hooks';
+export { applyRemoteaHooks, removeRemoteaHooks, remoteaEventHookCommand, REMOTEA_HOOK_EVENTS } from '../shared/claude-hooks';
+import { applyRemoteaHooks, removeRemoteaHooks, REMOTEA_HOOK_EVENTS } from '../shared/claude-hooks';
 import { stripLegacyBlocks as stripOldRemoteaBlocks, stripLegacyHookEntries } from '../shared/legacy-cleanup';
 import { desktopOwnershipContext } from './ownership-context';
 
@@ -301,7 +301,7 @@ export function ensureClaudeHooks(): void {
     try { settings = JSON.parse(raw); } catch { return; }
 
     // Old-named entries go only when their path is this install's (KTD8).
-    const updated = applyWmuxHooks(stripLegacyHookEntries(settings, desktopOwnershipContext()), getHookScriptPath());
+    const updated = applyRemoteaHooks(stripLegacyHookEntries(settings, desktopOwnershipContext()), getHookScriptPath());
     fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf-8');
     console.log(`[remotea] Configured ${REMOTEA_HOOK_EVENTS.join('/')} hooks in ~/.claude/settings.json`);
   } catch (err) {
@@ -319,7 +319,7 @@ export function removeClaudeHooks(): void {
     let settings: any;
     try { settings = JSON.parse(raw); } catch { return; }
 
-    const updated = removeWmuxHooks(settings);
+    const updated = removeRemoteaHooks(settings);
     // Compare before writing: on every launch after a decline this function runs
     // again, and rewriting an unchanged file would keep bumping its mtime for no
     // reason (and race anyone else editing it).
@@ -384,7 +384,7 @@ export function buildChromeDevtoolsMcpServer(): { command: string; args: string[
  * else — a different port, a global install, extra flags someone added — is
  * treated as the user's and left untouched.
  */
-export function isWmuxAuthoredMcpEntry(entry: unknown): boolean {
+export function isRemoteaAuthoredMcpEntry(entry: unknown): boolean {
   if (!entry || typeof entry !== 'object') return false;
   const e = entry as { command?: unknown; args?: unknown };
   if (e.command !== 'npx') return false;
@@ -421,7 +421,7 @@ export function applyChromeDevtoolsMcp(config: unknown): { next: any; changed: b
   const next = config as Record<string, any>;
   const existing = mcpServersOf(next)?.['chrome-devtools'];
   // Somebody else's entry stands; wmux does not get to retune it.
-  if (existing && !isWmuxAuthoredMcpEntry(existing)) return { next, changed: false };
+  if (existing && !isRemoteaAuthoredMcpEntry(existing)) return { next, changed: false };
   const desired = buildChromeDevtoolsMcpServer();
   if (existing && JSON.stringify(existing) === JSON.stringify(desired)) return { next, changed: false };
   if (!mcpServersOf(next)) next.mcpServers = {};
@@ -434,7 +434,7 @@ export function applyChromeDevtoolsMcp(config: unknown): { next: any; changed: b
  * the only one in there — an empty key left behind is still a footprint in a
  * file wmux was asked to stay out of.
  *
- * Matches on {@link isWmuxAuthoredMcpEntry}, not on the port alone: a user who
+ * Matches on {@link isRemoteaAuthoredMcpEntry}, not on the port alone: a user who
  * has since pointed `chrome-devtools` at their own Chrome keeps it.
  *
  * This is also the migration for #237's first blocker. Older releases wrote the
@@ -448,7 +448,7 @@ export function stripChromeDevtoolsMcp(config: unknown): { next: any; changed: b
   const next = config as Record<string, any>;
   const servers = mcpServersOf(config);
   if (!servers || !('chrome-devtools' in servers)) return { next, changed: false };
-  if (!isWmuxAuthoredMcpEntry(servers['chrome-devtools'])) return { next, changed: false };
+  if (!isRemoteaAuthoredMcpEntry(servers['chrome-devtools'])) return { next, changed: false };
   delete servers['chrome-devtools'];
   if (Object.keys(servers).length === 0) delete next.mcpServers;
   return { next, changed: true };

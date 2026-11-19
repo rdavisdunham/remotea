@@ -34,7 +34,7 @@ export function linkOpensExternally(preferExternal: boolean, invert: boolean | u
  * - Anything that makes the panel impossible (no workspace, no pane) falls back
  *   to the system browser rather than dropping the click.
  */
-export function openInWmuxBrowser(url: string, opts?: { invert?: boolean }): void {
+export function openInRemoteaBrowser(url: string, opts?: { invert?: boolean }): void {
   const state = useStore.getState();
 
   // With the in-app browser off there is no panel to invert to.

@@ -10,11 +10,11 @@ import {
   getGrokHome,
   getGrokHooksPath,
   getGrokRulesPath,
-  isWmuxHooksFile,
+  isRemoteaHooksFile,
   removeGrokContext,
   removeGrokHooks,
 } from '../../src/main/grok-context';
-import { applyWmuxHooks, wmuxEventHookCommand } from '../../src/main/claude-context';
+import { applyRemoteaHooks, remoteaEventHookCommand } from '../../src/main/claude-context';
 
 /**
  * Grok Build reads Claude Code's files by default, so what this suite pins is
@@ -61,7 +61,7 @@ describe('grok context', () => {
     const script = 'C:/wmux/resources/cli/remotea-hook.js';
     const { hooks } = buildGrokHooks(script);
     // Grok dedupes on (event, command, matcher): any drift here runs every hook twice.
-    for (const [event, entries] of Object.entries(applyWmuxHooks({}, script).hooks)) {
+    for (const [event, entries] of Object.entries(applyRemoteaHooks({}, script).hooks)) {
       expect(hooks[event]).toEqual(entries);
     }
     expect(JSON.stringify(hooks.StopCancelled)).toContain(`"node \\"${script}\\" --event StopCancelled"`);
@@ -84,11 +84,11 @@ describe('grok context', () => {
   });
 
   it('the shared command builder spells exactly what Claude Code has always been given', () => {
-    // Extracted from applyWmuxHooks so Grok's file carries the same bytes. A
+    // Extracted from applyRemoteaHooks so Grok's file carries the same bytes. A
     // change here rewrites every ~/.claude/settings.json on the next launch.
-    expect(wmuxEventHookCommand('C:/wmux/resources/cli/remotea-hook.js', 'Stop'))
+    expect(remoteaEventHookCommand('C:/wmux/resources/cli/remotea-hook.js', 'Stop'))
       .toBe('node "C:/wmux/resources/cli/remotea-hook.js" --event Stop');
-    const { hooks } = applyWmuxHooks({}, 'C:/w/remotea-hook.js');
+    const { hooks } = applyRemoteaHooks({}, 'C:/w/remotea-hook.js');
     const flags = (event: string) => hooks[event].flatMap((g: any) => g.hooks.map((h: any) => h.async));
     for (const event of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit']) {
       expect(flags(event).every((a: unknown) => a === true)).toBe(true);
@@ -100,19 +100,19 @@ describe('grok context', () => {
 
   it('owns a hooks file only when every handler in it is a remotea-hook command', () => {
     const ours = JSON.stringify(buildGrokHooks('C:/Program Files/wmux/resources/cli/remotea-hook.js'));
-    expect(isWmuxHooksFile(ours)).toBe(true);
+    expect(isRemoteaHooksFile(ours)).toBe(true);
     // Written by an install that has since moved: still ours, so it is refreshed.
-    expect(isWmuxHooksFile(JSON.stringify(buildGrokHooks('D:/old/remotea-hook.js')))).toBe(true);
+    expect(isRemoteaHooksFile(JSON.stringify(buildGrokHooks('D:/old/remotea-hook.js')))).toBe(true);
 
-    const wmuxCmd = { type: 'command', command: 'node "C:/x/remotea-hook.js" --event Stop' };
-    const mixed = { hooks: { Stop: [{ hooks: [wmuxCmd, { type: 'command', command: 'bin/notify.sh' }] }] } };
-    expect(isWmuxHooksFile(JSON.stringify(mixed))).toBe(false);
-    expect(isWmuxHooksFile(JSON.stringify({ hooks: { Stop: [{ hooks: [wmuxCmd] }] }, note: 'mine' }))).toBe(false);
-    expect(isWmuxHooksFile(JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'http', url: 'https://x/remotea-hook.js' }] }] } }))).toBe(false);
-    expect(isWmuxHooksFile(JSON.stringify({ hooks: { Stop: 'node "remotea-hook.js" x' } }))).toBe(false);
-    expect(isWmuxHooksFile('{"hooks":{}}')).toBe(false);
-    expect(isWmuxHooksFile('// remotea-hook\n{')).toBe(false);
-    expect(isWmuxHooksFile('[]')).toBe(false);
+    const remoteaCmd = { type: 'command', command: 'node "C:/x/remotea-hook.js" --event Stop' };
+    const mixed = { hooks: { Stop: [{ hooks: [remoteaCmd, { type: 'command', command: 'bin/notify.sh' }] }] } };
+    expect(isRemoteaHooksFile(JSON.stringify(mixed))).toBe(false);
+    expect(isRemoteaHooksFile(JSON.stringify({ hooks: { Stop: [{ hooks: [remoteaCmd] }] }, note: 'mine' }))).toBe(false);
+    expect(isRemoteaHooksFile(JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'http', url: 'https://x/remotea-hook.js' }] }] } }))).toBe(false);
+    expect(isRemoteaHooksFile(JSON.stringify({ hooks: { Stop: 'node "remotea-hook.js" x' } }))).toBe(false);
+    expect(isRemoteaHooksFile('{"hooks":{}}')).toBe(false);
+    expect(isRemoteaHooksFile('// remotea-hook\n{')).toBe(false);
+    expect(isRemoteaHooksFile('[]')).toBe(false);
   });
 
   it('never overwrites or deletes a hand-written remotea.json that also calls remotea-hook.js', () => {

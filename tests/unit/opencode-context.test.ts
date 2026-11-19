@@ -1,23 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { injectWmuxBlock } from '../../src/main/opencode-context';
+import { injectRemoteaBlock } from '../../src/main/opencode-context';
 import { pluginNeedsUpdate } from '../../src/main/opencode-context';
 
 const START = '<!-- remotea:start';
 const END = '<!-- remotea:end -->';
 const BLOCK = `${START} v1 -->\nUse the wmux CLI.\n${END}`;
 
-describe('injectWmuxBlock', () => {
+describe('injectRemoteaBlock', () => {
   it('returns the block alone when existing is empty', () => {
-    expect(injectWmuxBlock('', BLOCK)).toBe(BLOCK);
+    expect(injectRemoteaBlock('', BLOCK)).toBe(BLOCK);
   });
   it('appends the block when no markers present', () => {
-    const out = injectWmuxBlock('# My rules\n', BLOCK);
+    const out = injectRemoteaBlock('# My rules\n', BLOCK);
     expect(out.startsWith('# My rules')).toBe(true);
     expect(out.includes(BLOCK)).toBe(true);
   });
   it('replaces an existing block, preserving surrounding content', () => {
     const old = `top\n${START} v0 -->\nOLD\n${END}\nbottom`;
-    const out = injectWmuxBlock(old, BLOCK);
+    const out = injectRemoteaBlock(old, BLOCK);
     expect(out.includes('OLD')).toBe(false);
     expect(out.includes('top')).toBe(true);
     expect(out.includes('bottom')).toBe(true);
@@ -26,14 +26,14 @@ describe('injectWmuxBlock', () => {
   it('is idempotent when the block source ends with a newline', () => {
     // Regression: a trailing newline on the source must not accumulate across runs.
     const blockNl = `${BLOCK}\n`;
-    const first = injectWmuxBlock('', blockNl);
-    const second = injectWmuxBlock(first, blockNl);
+    const first = injectRemoteaBlock('', blockNl);
+    const second = injectRemoteaBlock(first, blockNl);
     expect(second).toBe(first);
   });
   it('is idempotent when appended after user content', () => {
     const blockNl = `${BLOCK}\n`;
-    const first = injectWmuxBlock('# My rules\n', blockNl);
-    const second = injectWmuxBlock(first, blockNl);
+    const first = injectRemoteaBlock('# My rules\n', blockNl);
+    const second = injectRemoteaBlock(first, blockNl);
     expect(second).toBe(first);
   });
 });

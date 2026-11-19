@@ -49,9 +49,9 @@ import { reportIntegrationFailure } from './integration-failures';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { injectWmuxBlock, readRenderedInstructions } from './agent-instructions';
-import { stripWmuxBlock, stripLegacyBlocks } from './claude-context';
-import { isWmuxPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
+import { injectRemoteaBlock, readRenderedInstructions } from './agent-instructions';
+import { stripRemoteaBlock, stripLegacyBlocks } from './claude-context';
+import { isRemoteaPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
 
 /**
  * The context-file names pi looks for, in pi's own priority order.
@@ -115,13 +115,13 @@ export function getPiContextFilePath(agentDir = getPiAgentDir()): string {
 export function ensurePiContext(): void {
   try {
     // Rendered, not read: carries this install's absolute CLI path (#158).
-    const wmuxBlock = readRenderedInstructions();
-    if (wmuxBlock === null) return;
+    const remoteaBlock = readRenderedInstructions();
+    if (remoteaBlock === null) return;
 
     const contextPath = getPiContextFilePath();
     fs.mkdirSync(path.dirname(contextPath), { recursive: true });
     const existing = fs.existsSync(contextPath) ? fs.readFileSync(contextPath, 'utf-8') : '';
-    const next = injectWmuxBlock(existing, wmuxBlock, stripLegacyBlocks);
+    const next = injectRemoteaBlock(existing, remoteaBlock, stripLegacyBlocks);
     // Don't churn the mtime when nothing changed — pi reloads these on /reload.
     if (next === existing) return;
     fs.writeFileSync(contextPath, next, 'utf-8');
@@ -150,7 +150,7 @@ export function removePiContext(): void {
       const existing = fs.readFileSync(contextPath, 'utf-8');
       // null means there is no wmux block in there at all — a file the user
       // wrote themselves, which is not ours to touch.
-      const next = stripWmuxBlock(existing);
+      const next = stripRemoteaBlock(existing);
       if (next === null || next === existing) continue;
       if (next.trim() === '') fs.unlinkSync(contextPath);
       else fs.writeFileSync(contextPath, next, 'utf-8');
@@ -219,7 +219,7 @@ export function removePiExtension(): void {
   try {
     const dest = getPiExtensionPath();
     if (!fs.existsSync(dest)) return;
-    if (!isWmuxPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
+    if (!isRemoteaPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
     fs.unlinkSync(dest);
     console.log('[remotea] Removed the remotea pi extension from', dest);
   } catch (err) {

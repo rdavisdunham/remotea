@@ -14,7 +14,7 @@ import { approvalItems, buildDecision } from '../src/questions-codex';
 import { answerableKinds, parseVersion, versionInRange } from '../src/harness-adapters';
 import { CODEX_TIMEOUTS_S, adapterHooks, applyCodexHooks } from '../src/hooks-install';
 import { HookBridge, hookEnv } from '../src/hook-bridge';
-import { applyWmuxHooks } from '../../src/shared/claude-hooks';
+import { applyRemoteaHooks } from '../../src/shared/claude-hooks';
 import type { SessionRecord } from '../../src/shared/remote-host-protocol';
 import type { AnswerCommand } from '../../src/shared/eridani-link-protocol';
 import { ManualTimers } from './helpers';
@@ -73,7 +73,7 @@ describe('harness-adapters: what is advertised', () => {
     expect(adapterHooks({ home })).toEqual({ claudeAsk: false, codexApproval: false });
     fs.mkdirSync(path.join(home, '.claude'));
     fs.mkdirSync(path.join(home, '.codex'));
-    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify(applyWmuxHooks({}, '/h/remotea-hook.js', { questions: true })));
+    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify(applyRemoteaHooks({}, '/h/remotea-hook.js', { questions: true })));
     const old = applyCodexHooks({}, '/h/remotea-hook.js');
     old.hooks.PermissionRequest[0].hooks[0].timeout = 10; // what installs before this change wrote
     fs.writeFileSync(path.join(home, '.codex', 'hooks.json'), JSON.stringify(old));
@@ -81,7 +81,7 @@ describe('harness-adapters: what is advertised', () => {
     fs.writeFileSync(path.join(home, '.codex', 'hooks.json'), JSON.stringify(applyCodexHooks({}, '/h/remotea-hook.js')));
     expect(adapterHooks({ home })).toEqual({ claudeAsk: true, codexApproval: true });
     // Claude settings without the question entry (the app's own install): not wired.
-    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify(applyWmuxHooks({}, '/h/remotea-hook.js')));
+    fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify(applyRemoteaHooks({}, '/h/remotea-hook.js')));
     expect(adapterHooks({ home }).claudeAsk).toBe(false);
   });
 

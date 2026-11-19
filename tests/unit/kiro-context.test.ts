@@ -6,7 +6,7 @@ import {
   ensureKiroContext,
   removeKiroContext,
   getKiroSteeringPath,
-  isWmuxManaged,
+  isRemoteaManaged,
 } from '../../src/main/kiro-context';
 import { CLI_BIN_PLACEHOLDER, renderInstructions } from '../../src/main/agent-instructions';
 
@@ -71,7 +71,7 @@ describe('#148 Kiro steering', () => {
       fs.readFileSync(path.join(__dirname, '../../resources/claude-instructions.md'), 'utf-8'),
     );
     expect(written.trimEnd()).toBe(source.trimEnd());
-    expect(isWmuxManaged(written)).toBe(true);
+    expect(isRemoteaManaged(written)).toBe(true);
   });
 
   it('leaves no unsubstituted placeholder in the steering file (issue #158)', () => {
@@ -126,11 +126,11 @@ describe('#148 Kiro steering', () => {
   });
 });
 
-describe('isWmuxManaged', () => {
+describe('isRemoteaManaged', () => {
   it('recognises the remotea marker', () => {
-    expect(isWmuxManaged('<!-- remotea:start v1 -->\nx')).toBe(true);
+    expect(isRemoteaManaged('<!-- remotea:start v1 -->\nx')).toBe(true);
   });
   it('treats an unmarked file as the user\'s', () => {
-    expect(isWmuxManaged('# my notes')).toBe(false);
+    expect(isRemoteaManaged('# my notes')).toBe(false);
   });
 });

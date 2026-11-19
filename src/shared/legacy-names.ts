@@ -41,6 +41,12 @@ export const LEGACY_CLI_BIN_PLACEHOLDER = '{{WMUX_CLI_BIN}}';
 /** Header line the old plugin files carried. */
 export const LEGACY_PLUGIN_VERSION_TAG = 'wmux-plugin-version';
 
+/**
+ * Export name of the OpenCode plugin before the code-symbol rename. A plugin
+ * file installed before then (version marker 10 or lower) still carries it.
+ */
+export const LEGACY_OPENCODE_PLUGIN_EXPORT = 'WmuxPlugin';
+
 /** Right-click verb under `HKCU\Software\Classes\{Directory,…}\shell\`. */
 export const LEGACY_REGISTRY_VERB = 'wmux';
 

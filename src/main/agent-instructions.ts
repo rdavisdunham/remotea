@@ -70,8 +70,8 @@ const END_MARKER = '<!-- remotea:end -->';
  * Lives here rather than being duplicated per agent because it was duplicated
  * per agent, and the copies had already diverged on precisely that line.
  */
-export function injectWmuxBlock(rawExisting: string, wmuxBlock: string, stripLegacy: (s: string) => string): string {
-  const block = wmuxBlock.trimEnd();
+export function injectRemoteaBlock(rawExisting: string, remoteaBlock: string, stripLegacy: (s: string) => string): string {
+  const block = remoteaBlock.trimEnd();
   // Marker-less copies from older versions are ours and stale; splicing keys off
   // the markers, so without this they would sit beside the managed block forever.
   // Old-named blocks go only when their path is this install's (KTD8).

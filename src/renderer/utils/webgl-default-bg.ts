@@ -40,7 +40,7 @@ type UpdateRectangle = (
 
 interface RectangleRendererLike { _updateRectangle?: UpdateRectangle }
 
-const PATCHED = Symbol.for('wmux.webglDefaultBg');
+const PATCHED = Symbol.for('remotea.webglDefaultBg');
 
 /** Patch the prototype behind `rectangleRenderer`. Idempotent; false when the shape is not the expected one. */
 export function patchRectangleRenderer(rectangleRenderer: RectangleRendererLike | undefined): boolean {

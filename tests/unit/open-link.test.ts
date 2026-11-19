@@ -1,23 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { openInWmuxBrowser } = vi.hoisted(() => ({ openInWmuxBrowser: vi.fn() }));
-vi.mock('../../src/renderer/utils/open-in-browser', () => ({ openInWmuxBrowser }));
+const { openInRemoteaBrowser } = vi.hoisted(() => ({ openInRemoteaBrowser: vi.fn() }));
+vi.mock('../../src/renderer/utils/open-in-browser', () => ({ openInRemoteaBrowser }));
 
 import { isHttpUrl, openLinkFromBridge } from '../../src/renderer/utils/open-link';
 
 describe('openLinkFromBridge', () => {
-  beforeEach(() => openInWmuxBrowser.mockReset());
+  beforeEach(() => openInRemoteaBrowser.mockReset());
 
   it('dispatches an http(s) URL and reports success', () => {
     expect(openLinkFromBridge('https://example.com/a?b=c')).toBe(true);
-    expect(openInWmuxBrowser).toHaveBeenCalledWith('https://example.com/a?b=c');
+    expect(openInRemoteaBrowser).toHaveBeenCalledWith('https://example.com/a?b=c');
   });
 
   it.each(['javascript:alert(1)', 'file:///etc/passwd', 'not a url', '', 42, null])(
     'refuses %p without dispatching',
     value => {
       expect(openLinkFromBridge(value)).toBe(false);
-      expect(openInWmuxBrowser).not.toHaveBeenCalled();
+      expect(openInRemoteaBrowser).not.toHaveBeenCalled();
     },
   );
 });

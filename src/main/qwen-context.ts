@@ -35,7 +35,7 @@ import { reportIntegrationFailure } from './integration-failures';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { injectWmuxBlock, readRenderedInstructions } from './agent-instructions';
+import { injectRemoteaBlock, readRenderedInstructions } from './agent-instructions';
 import { isLegacyRemoteaQwenStub, stripLegacyHookEntries } from '../shared/legacy-cleanup';
 import { LEGACY_PLUGIN_FILES } from '../shared/legacy-names';
 import type { OwnershipContext } from '../shared/artifact-ownership';
@@ -45,7 +45,7 @@ import {
   getHookScriptPath,
   stripChromeDevtoolsMcp,
   stripLegacyBlocks,
-  stripWmuxBlock,
+  stripRemoteaBlock,
 } from './claude-context';
 
 function defaultQwenHome(): string {
@@ -85,11 +85,11 @@ export function ensureQwenContext(): void {
   try {
     if (!isDirectory(getQwenHome())) return;
     // Rendered, not read: carries this install's absolute CLI path (#158).
-    const wmuxBlock = readRenderedInstructions();
-    if (wmuxBlock === null) return;
+    const remoteaBlock = readRenderedInstructions();
+    if (remoteaBlock === null) return;
     const contextPath = getQwenContextPath();
     const existing = fs.existsSync(contextPath) ? fs.readFileSync(contextPath, 'utf-8') : '';
-    const next = injectWmuxBlock(existing, wmuxBlock, stripLegacyBlocks);
+    const next = injectRemoteaBlock(existing, remoteaBlock, stripLegacyBlocks);
     if (next === existing) return; // already current; don't churn the mtime
     fs.writeFileSync(contextPath, next, 'utf-8');
     console.log('[remotea] Updated remotea context in', contextPath);
@@ -106,7 +106,7 @@ export function removeQwenContext(): void {
       const contextPath = contextPathIn(home);
       if (!fs.existsSync(contextPath)) continue;
       const existing = fs.readFileSync(contextPath, 'utf-8');
-      const next = stripWmuxBlock(existing);
+      const next = stripRemoteaBlock(existing);
       if (next === null || next === existing) continue;
       if (next.trim() === '') fs.unlinkSync(contextPath);
       else fs.writeFileSync(contextPath, next, 'utf-8');
@@ -230,13 +230,13 @@ function removeOldQwenStub(home: string, ctx: OwnershipContext): void {
   }
 }
 
-function isWmuxQwenEntry(entry: unknown): boolean {
+function isRemoteaQwenEntry(entry: unknown): boolean {
   const hooks = (entry as { hooks?: unknown })?.hooks;
   return Array.isArray(hooks) && hooks.some((h: any) => typeof h?.command === 'string' && REMOTEA_QWEN_COMMAND_RE.test(h.command));
 }
 
-const stripWmuxEntries = (entries: unknown): unknown[] =>
-  (Array.isArray(entries) ? entries : []).filter(e => !isWmuxQwenEntry(e));
+const stripRemoteaEntries = (entries: unknown): unknown[] =>
+  (Array.isArray(entries) ? entries : []).filter(e => !isRemoteaQwenEntry(e));
 
 function isRecord(v: unknown): v is Record<string, any> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -251,7 +251,7 @@ export function applyQwenHooks(settings: unknown, hookScript: string): Record<st
   const hooks: Record<string, any> = { ...(isRecord(next.hooks) ? next.hooks : {}) };
 
   hooks.PostToolUse = [
-    ...stripWmuxEntries(hooks.PostToolUse),
+    ...stripRemoteaEntries(hooks.PostToolUse),
     ...QWEN_TRACKED_TOOLS.map(tool => ({
       matcher: tool,
       hooks: [{ type: 'command', command: qwenToolHookCommand(hookScript, tool), async: true }],
@@ -259,7 +259,7 @@ export function applyQwenHooks(settings: unknown, hookScript: string): Record<st
   ];
   for (const { event, async } of QWEN_EVENT_HOOKS) {
     const handler = { type: 'command', command: qwenEventHookCommand(hookScript, event), ...(async ? { async: true } : {}) };
-    hooks[event] = [...stripWmuxEntries(hooks[event]), { hooks: [handler] }];
+    hooks[event] = [...stripRemoteaEntries(hooks[event]), { hooks: [handler] }];
   }
   next.hooks = hooks;
   return next;
@@ -276,7 +276,7 @@ export function removeQwenHooksFrom(settings: unknown): Record<string, any> {
   const hooks: Record<string, any> = { ...next.hooks };
   for (const event of QWEN_HOOK_EVENTS) {
     if (!(event in hooks)) continue;
-    const kept = stripWmuxEntries(hooks[event]);
+    const kept = stripRemoteaEntries(hooks[event]);
     if (kept.length > 0) hooks[event] = kept;
     else delete hooks[event];
   }

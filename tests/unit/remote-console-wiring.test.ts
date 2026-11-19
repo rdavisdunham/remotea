@@ -23,7 +23,7 @@ vi.mock('electron', () => ({
   // A sender is "one of wmux's windows" when the fake says so.
   BrowserWindow: {
     getAllWindows: () => [],
-    fromWebContents: (wc: any) => (wc?.isWmuxWindow ? {} : null),
+    fromWebContents: (wc: any) => (wc?.isRemoteaWindow ? {} : null),
     getFocusedWindow: () => null,
   },
   clipboard: { readText: () => '', writeText: () => {} },
@@ -231,8 +231,8 @@ describe('bindings made BEFORE the console listens reach it (#254)', () => {
 });
 
 describe('Settings → Remote IPC gates (#254)', () => {
-  const win = { sender: { isWmuxWindow: true } };
-  const guest = { sender: { isWmuxWindow: false } };
+  const win = { sender: { isRemoteaWindow: true } };
+  const guest = { sender: { isRemoteaWindow: false } };
   let rt: any;
 
   beforeEach(() => {

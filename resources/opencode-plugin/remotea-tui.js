@@ -1,11 +1,11 @@
-// remotea-plugin-version: 6
+// remotea-plugin-version: 7
 // wmux OpenCode CLI-side (TUI) plugin — the half that runs in the TUI process,
 // so a pane is attributable even when the server is remote or shared (#310).
 // Installed by `wmux opencode-tui` to <config>/plugins/remotea-cli/tui.js.
 // No-ops entirely outside wmux (REMOTEA !== '1').
 import { Plugin } from "@opencode/plugin/tui";
 import { createEffect, createRoot } from "solid-js";
-import { callWmux, callWmuxSync, createActivityReporter, createBlockedReporter, createPromptReporter, createSessionReporter, createSessionSeeder, eventSessionID, isHostedSession, makeLogger, resolveDebugLog, resolveNodeRuntime, routeFromTabs, tabSessionIds } from "./core.js";
+import { callRemotea, callRemoteaSync, createActivityReporter, createBlockedReporter, createPromptReporter, createSessionReporter, createSessionSeeder, eventSessionID, isHostedSession, makeLogger, resolveDebugLog, resolveNodeRuntime, routeFromTabs, tabSessionIds } from "./core.js";
 
 export default Plugin.define({
   id: "remotea.cli",
@@ -27,12 +27,12 @@ export default Plugin.define({
       pid: process.pid,
     });
 
-    const send = (argv, done) => callWmux(runtime, argv, log, process.env, process.platform, done);
-    const sendSync = (argv) => callWmuxSync(runtime, argv, log, process.env, process.platform);
-    const reporter = createSessionReporter({ surface, callWmux: send, callWmuxSync: sendSync, log });
-    const prompts = createPromptReporter({ callWmux: send, log });
-    const blockedState = createBlockedReporter({ surface, callWmux: send, log });
-    const activity = createActivityReporter({ surface, callWmux: send, log });
+    const send = (argv, done) => callRemotea(runtime, argv, log, process.env, process.platform, done);
+    const sendSync = (argv) => callRemoteaSync(runtime, argv, log, process.env, process.platform);
+    const reporter = createSessionReporter({ surface, callRemotea: send, callRemoteaSync: sendSync, log });
+    const prompts = createPromptReporter({ callRemotea: send, log });
+    const blockedState = createBlockedReporter({ surface, callRemotea: send, log });
+    const activity = createActivityReporter({ surface, callRemotea: send, log });
     let currentSession = null;
 
     /** The root a session belongs to — a viewed subagent is not the pane's run. */

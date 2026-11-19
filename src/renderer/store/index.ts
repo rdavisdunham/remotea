@@ -9,9 +9,9 @@ import { AgentStateSlice, createAgentStateSlice } from './agent-state-slice';
 import { PromptSlice, createPromptSlice } from './prompt-slice';
 import { OscTitleSlice, createOscTitleSlice } from './osc-title-slice';
 
-export type WmuxStore = WorkspaceSlice & SettingsSlice & NotificationSlice & SurfaceSlice & AgentSlice & ProgressSlice & AgentStateSlice & PromptSlice & OscTitleSlice;
+export type RemoteaStore = WorkspaceSlice & SettingsSlice & NotificationSlice & SurfaceSlice & AgentSlice & ProgressSlice & AgentStateSlice & PromptSlice & OscTitleSlice;
 
-export const useStore = create<WmuxStore>()((...args) => ({
+export const useStore = create<RemoteaStore>()((...args) => ({
   ...createWorkspaceSlice(...args),
   ...createSettingsSlice(...args),
   ...createNotificationSlice(...args),

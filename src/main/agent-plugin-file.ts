@@ -43,6 +43,6 @@ export function pluginNeedsUpdate(src: string, target: string | null): boolean {
 }
 
 /** Is this file one wmux installed? The guard on every uninstall path. */
-export function isWmuxPluginFile(contents: string): boolean {
+export function isRemoteaPluginFile(contents: string): boolean {
   return PLUGIN_VERSION_RE.test(contents);
 }

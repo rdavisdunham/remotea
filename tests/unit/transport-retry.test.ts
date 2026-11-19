@@ -1,31 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isTransientWmuxError, retryTransient } from '../../src/cli/transport-retry';
+import { isTransientRemoteaError, retryTransient } from '../../src/cli/transport-retry';
 
 /**
  * A busy wmux named pipe answers `All pipe instances are busy` (native) or
  * makes npiperelay exit before it attaches (WSL). Session/status reports are
  * idempotent, so the CLI may ask again instead of losing the handle.
  */
-describe('isTransientWmuxError', () => {
+describe('isTransientRemoteaError', () => {
   it('recognises the native pipe-busy codes', () => {
     for (const code of ['EBUSY', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT']) {
-      expect(isTransientWmuxError(Object.assign(new Error('x'), { code }))).toBe(true);
+      expect(isTransientRemoteaError(Object.assign(new Error('x'), { code }))).toBe(true);
     }
   });
 
   it('recognises the npiperelay busy message', () => {
-    expect(isTransientWmuxError(
+    expect(isTransientRemoteaError(
       new Error('npiperelay exited with code 1: open //./pipe/wmux: All pipe instances are busy'),
     )).toBe(true);
-    expect(isTransientWmuxError(
+    expect(isTransientRemoteaError(
       new Error('pane.report_agent_session timed out after 1500ms — wmux accepted the request but sent no reply.'),
     )).toBe(true);
   });
 
   it('does not retry a missing wmux or a protocol answer', () => {
-    expect(isTransientWmuxError(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
-    expect(isTransientWmuxError(new Error('Unknown method'))).toBe(false);
-    expect(isTransientWmuxError(null)).toBe(false);
+    expect(isTransientRemoteaError(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
+    expect(isTransientRemoteaError(new Error('Unknown method'))).toBe(false);
+    expect(isTransientRemoteaError(null)).toBe(false);
   });
 });
 
