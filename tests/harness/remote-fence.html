@@ -23,7 +23,7 @@
   candidates, a fence with nothing queued ahead of it, and a fence behind
   several small writes.
 
-  Result, 2026-09-29, remotea 2.14.0 browser panel (Chromium), read back through
+  Result, 2026-09-29, upstream 2.14.0 browser panel (Chromium), read back through
   `remotea browser get-text`: 8/8 PASS — byFence {"empty":true,"osc6973":true}.
   Every case held A (a 20 000-line chunk serialized to 76 657 chars at
   scrollback 1000; 50 small writes all present) and none of B, and the OSC

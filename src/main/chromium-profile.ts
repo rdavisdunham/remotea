@@ -1,9 +1,9 @@
 // Where Electron's own profile lives — Chromium's data and the single-instance
 // lock — and the one-time move that put it there (#282).
 //
-// Until 2.22.0 Electron's userData was `%APPDATA%\remotea`: the default for a
-// productName of "remotea", and therefore ALSO the default of openwong2kim/wmux,
-// a different Electron app with remotea's old name. Electron keys its single-
+// Until 2.22.0 Electron's userData was `%APPDATA%\wmux`: the default for a
+// productName of "wmux", and therefore ALSO the default of openwong2kim/wmux,
+// a different Electron app with the same name. Electron keys its single-
 // instance lock on the userData directory, so with both installed whichever
 // started first owned the lock and the other quit on launch — handing its
 // command line to the WRONG app as a `second-instance`. They also shared one

@@ -1,9 +1,9 @@
 /**
- * remotea instance identity (inherited from remotea).
+ * remotea instance identity (inherited from the upstream app).
  *
- * remotea is built on remotea, so its base name differs from remotea's ("remotea"
- * rather than "remotea") — that keeps the pipe, APPDATA dir and taskbar id apart
- * from a stock wmux install running on the same machine.
+ * remotea's base name, "remotea", differs from the upstream app's, which keeps
+ * the pipe, APPDATA dir and taskbar id apart from a stock wmux install running
+ * on the same machine.
  *
  * Set REMOTEA_INSTANCE=<name> to run a separate, side-by-side instance:
  * the named pipe and APPDATA directory get a "-<name>" suffix, so a dev build

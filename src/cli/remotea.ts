@@ -1778,7 +1778,7 @@ function readWerConfig(): WerDumpConfig {
  * The app name is matched on the property rather than anywhere in the rendered
  * text. Substring-matching the message attributes any crash whose *path*
  * happens to contain the string — on the machine this was written, a sibling
- * project at `...\neremotea\smux.exe` was being reported as a remotea crash, with a
+ * project at `...\newmux\smux.exe` was being reported as a wmux crash, with a
  * fault offset identical to the one #150 is about. A crash report that
  * confidently hands the maintainer another program's crash is worse than none.
  */

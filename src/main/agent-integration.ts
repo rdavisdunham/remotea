@@ -234,7 +234,7 @@ export function applyConsent(consent: IntegrationConsent): void {
  *
  * remotea does not ask at launch. Agents on a remote host are set up by that
  * host's server, which the app offers once it is connected (RemoteHooksPrompt).
- * This local integration, inherited from remotea, edits files in the home
+ * This local integration, inherited from the upstream app, edits files in the home
  * directory of the computer the app runs on, so it stays off until someone
  * turns it on in Settings → Agent integration. `unset` writes nothing and
  * removes nothing.

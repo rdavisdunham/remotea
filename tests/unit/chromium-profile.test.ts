@@ -10,8 +10,8 @@ import {
 } from '../../src/main/chromium-profile';
 
 /**
- * #282: Electron's userData was %APPDATA%\remotea — also the default of
- * openwong2kim/wmux, a different app with remotea's old name. Electron keys its
+ * #282: Electron's userData was %APPDATA%\wmux — also the default of
+ * openwong2kim/wmux, a different app with the same name. Electron keys its
  * single-instance lock on userData, so the two could not run at once, and they
  * shared one Chromium profile. The profile now lives in a subdirectory, carried
  * over once by COPY.

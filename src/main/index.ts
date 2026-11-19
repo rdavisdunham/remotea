@@ -998,8 +998,8 @@ stripMotw();
 // Holding the lock makes the second launch hand off to the running instance,
 // which just focuses its window.
 //
-// Electron keys that lock on userData, which was `%APPDATA%\remotea` — also the
-// default of openwong2kim/wmux, a different app with remotea's old name, so the two
+// Electron keys that lock on userData, which was `%APPDATA%\wmux` — also the
+// default of openwong2kim/wmux, a different app with the same name, so the two
 // could not run at once (#282). Electron's profile now lives in its own
 // subdirectory of this instance's data dir (REMOTEA_INSTANCE included, so dev and
 // prod still coexist), carried over once; see chromium-profile.ts. Must run

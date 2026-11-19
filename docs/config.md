@@ -9,7 +9,7 @@ Edit it, then run `remotea reload-config` (or restart remotea) to pick up change
 
 Builds from before the rename kept this file in `~/.wmux`, saved settings under
 `wmux-*` keys, and read project files named `.wmux.json` and
-`remotea.workspace.json`. remotea no longer reads any of those. Until you move
+`wmux.workspace.json`. remotea no longer reads any of those. Until you move
 them, the app shows a notice when it starts.
 
 - On the computer running the app: quit remotea (from the tray too) and run

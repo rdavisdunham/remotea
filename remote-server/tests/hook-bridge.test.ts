@@ -16,6 +16,7 @@ import { Registry } from '../src/registry';
 import { DiagLog } from '../src/diag-log';
 import { FakeConn, fakeSpawner, ManualTimers, waitFor } from './helpers';
 import { parseClientMsg } from '../../src/shared/remote-host-protocol';
+import { LEGACY_OPENCODE_PLUGIN_EXPORT } from '../../src/shared/legacy-names';
 
 const SECRET = 'test-secret';
 const SURF = 'surf-hook-1';
@@ -362,12 +363,13 @@ describe('hooks install', () => {
     fs.mkdirSync(path.dirname(plugin), { recursive: true });
     // The old export alone, and the old export under the last pre-rename version marker.
     for (const old of [
-      'export const RemoteaPlugin = async () => ({});\n',
-      '// remotea-plugin-version: 10\nexport const RemoteaPlugin = async () => ({});\n',
+      `export const ${LEGACY_OPENCODE_PLUGIN_EXPORT} = async () => ({});\n`,
+      `// remotea-plugin-version: 10\nexport const ${LEGACY_OPENCODE_PLUGIN_EXPORT} = async () => ({});\n`,
     ]) {
       fs.writeFileSync(plugin, old);
       installHooks(paths);
       expect(fs.readFileSync(plugin, 'utf8')).toContain('RemoteaPlugin');
+      expect(fs.readFileSync(plugin, 'utf8')).not.toContain(LEGACY_OPENCODE_PLUGIN_EXPORT);
       fs.writeFileSync(plugin, old);
       removeHooks(paths);
       expect(fs.existsSync(plugin)).toBe(false);

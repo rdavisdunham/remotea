@@ -19,8 +19,8 @@
  *
  * The third step is the one that got reported. The repo page puts an "Issues"
  * tab one click away, so a single click rewrote the stored value to
- * `.../remotea/issues` — and remotea then opened its own issue tracker on every launch
- * and every workspace switch. #232: "remotea regularly opens its GitHub Issues page
+ * `.../wmux/issues` — and the app then opened wmux's issue tracker on every launch
+ * and every workspace switch. #232: "wmux regularly opens its GitHub Issues page
  * in an internal browser tab… at seemingly random times."
  *
  * ── Why the cleanup is read-time, and only for the PANEL ─────────────────────

@@ -14,7 +14,7 @@ import { buildWorkspaceTree, splitNode, findLeaf } from '../../src/renderer/stor
 import type { PaneId, SplitNode } from '../../src/shared/types';
 
 /**
- * Issue #232: "remotea regularly opens its GitHub Issues page in an internal
+ * Issue #232: "wmux regularly opens its GitHub Issues page in an internal
  * browser tab… at seemingly random times."
  *
  * The chain, confirmed against a real install's session.json before any of this

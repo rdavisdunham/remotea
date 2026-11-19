@@ -125,6 +125,12 @@ describe('#231 pi extension: activation', () => {
     await pi.fire('agent_start');
     expect(calls[0].opts.env.ELECTRON_RUN_AS_NODE).toBe('1');
   });
+
+  it.skipIf(process.platform === 'win32')('falls back to `remotea` on PATH when REMOTEA_CLI is unset', async () => {
+    const pi = await extensionWith({ REMOTEA_CLI: undefined });
+    await pi.fire('agent_start');
+    expect(calls[0].file).toBe('remotea');
+  });
 });
 
 describe('#231 pi extension: run state', () => {

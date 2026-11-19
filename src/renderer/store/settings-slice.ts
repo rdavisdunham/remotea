@@ -355,7 +355,7 @@ export interface ShortcutDefaultsState {
 /**
  * 0 — every release through 2.13.x. No promotion has ever run.
  * 1 — #249: nextSurface/prevSurface Ctrl+Shift+] / [ → Ctrl+Tab / Ctrl+Shift+Tab.
- * 2 — refreshSurface bare F5 (as ported from remotea) → Ctrl+Shift+F5.
+ * 2 — refreshSurface bare F5 (as ported from upstream) → Ctrl+Shift+F5.
  */
 export const SHORTCUT_DEFAULT_REV = 2;
 
@@ -393,7 +393,7 @@ interface ShortcutPromotion {
   apply: (shortcuts: Record<ShortcutAction, ShortcutBinding>) => void;
 }
 
-/** refreshSurface's bare F5 from the remotea port, which the rev-2 promotion replaces. */
+/** refreshSurface's bare F5 from the upstream port, which the rev-2 promotion replaces. */
 export const BARE_F5_REFRESH: Readonly<Partial<Record<ShortcutAction, ShortcutBinding>>> = {
   refreshSurface: { key: 'F5' },
 };
@@ -1237,7 +1237,7 @@ export interface AppearancePrefs {
    */
   uiModeDefaultRev: number;
   /**
-   * The agent office. Off by default in remotea (HUB_DEFAULT_REV 2). remotea
+   * The agent office. Off by default in remotea (HUB_DEFAULT_REV 2). Upstream
    * shipped it in 2.2.0 as a quiet easter egg (no titlebar button, inert
    * shortcut until the toggle was found) and turned it on for everyone in
    * 2.3.0. Off restores exactly that quiet state, so the toggle is still the whole feature flag: titlebar
@@ -1288,7 +1288,7 @@ export const UI_MODE_DEFAULT_REV = 1;
 export const HUB_DEFAULT_REV = 2;
 
 export const DEFAULT_APPEARANCE_PREFS: AppearancePrefs = {
-  // Defaults to 'dark' rather than 'system' — remotea shipped dark-only up to
+  // Defaults to 'dark' rather than 'system' — upstream shipped dark-only up to
   // 0.14.0, so existing users' chrome must not change color on first launch
   // after upgrading. New users can switch to 'system'/'light' in Settings.
   uiTheme: 'dark',

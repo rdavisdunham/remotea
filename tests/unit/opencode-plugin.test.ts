@@ -189,6 +189,12 @@ describe('spawning', () => {
     expect(calls[0].opts.env).toBeUndefined();
   });
 
+  it.skipIf(process.platform === 'win32')('falls back to `remotea` on PATH when REMOTEA_CLI is unset', async () => {
+    const p = await pluginWith({ REMOTEA_CLI: '' });
+    await p.event({ event: { type: 'message.part.updated' } });
+    expect(calls[0].file).toBe('remotea');
+  });
+
   it('no-ops entirely outside remotea', async () => {
     delete process.env.REMOTEA;
     const { RemoteaPlugin } = await load();
