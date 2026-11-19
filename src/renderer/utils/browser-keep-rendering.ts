@@ -13,7 +13,7 @@
  */
 import { useEffect, useState } from 'react';
 
-export const KEEP_RENDERING_EVENT = 'wmux:browser-keep-rendering';
+export const KEEP_RENDERING_EVENT = 'remotea:browser-keep-rendering';
 
 /** surface id → epoch ms at which its lease ends. */
 const leases = new Map<string, number>();

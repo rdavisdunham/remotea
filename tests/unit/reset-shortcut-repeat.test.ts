@@ -35,7 +35,7 @@ function pressReset(repeat: boolean): KeyboardEvent {
 
 beforeEach(() => {
   resets = [];
-  document.addEventListener('wmux:reset-terminal', onReset);
+  document.addEventListener('remotea:reset-terminal', onReset);
   useStore.setState({ language: 'en', workspaces: [], activeWorkspaceId: null });
   const leaf = createLeaf();
   useStore.getState().createWorkspace({ title: 'ws', shell: 'pwsh', splitTree: leaf });
@@ -48,7 +48,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
-  document.removeEventListener('wmux:reset-terminal', onReset);
+  document.removeEventListener('remotea:reset-terminal', onReset);
 });
 
 describe('Reset terminal state shortcut and key auto-repeat (issue #357)', () => {

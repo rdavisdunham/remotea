@@ -172,8 +172,8 @@ export default function WorkspaceRow({
   // Listen for rename shortcut event (only the active workspace responds)
   useEffect(() => {
     if (!isActive) return;
-    document.addEventListener('wmux:rename-workspace', startRename);
-    return () => document.removeEventListener('wmux:rename-workspace', startRename);
+    document.addEventListener('remotea:rename-workspace', startRename);
+    return () => document.removeEventListener('remotea:rename-workspace', startRename);
   }, [isActive, workspaceLabel]);
 
   // Emit the workspace colour as a CUSTOM PROPERTY, not as a background.

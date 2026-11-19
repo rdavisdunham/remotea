@@ -40,7 +40,7 @@ function ShortcutProbe() {
 
 function clear(id = surfaceId) {
   act(() => {
-    document.dispatchEvent(new CustomEvent('wmux:clear-terminal-buffer', { detail: { surfaceId: id } }));
+    document.dispatchEvent(new CustomEvent('remotea:clear-terminal-buffer', { detail: { surfaceId: id } }));
   });
 }
 

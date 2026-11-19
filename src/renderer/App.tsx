@@ -256,7 +256,7 @@ function dispatchPaletteReset(action: string, terminalSurfaceId: string | null):
   // The palette's second entry skips the keep-then-press-again step
   // (#357): choosing it by name already says "leave it anyway".
   const leaveAlternateScreen = action === RESET_TERMINAL_LEAVE_ALT_ACTION;
-  document.dispatchEvent(new CustomEvent('wmux:reset-terminal', { detail: { surfaceId: terminalSurfaceId, leaveAlternateScreen } }));
+  document.dispatchEvent(new CustomEvent('remotea:reset-terminal', { detail: { surfaceId: terminalSurfaceId, leaveAlternateScreen } }));
 }
 
 /** Resolve the workspace that owns a surface, or undefined. */
@@ -693,7 +693,7 @@ export default function App() {
   // toggle and translations in 18 languages and nothing read it, so this is
   // what that switch has been promising all along.
   useBlockedAlert(useStore((s) => s.notificationPrefs.taskbarFlash && s.notificationPrefs.agentInputNotify));
-  // Shortcut cheat-sheet overlay (issue #64, toggled by F1 via wmux:toggle-cheatsheet).
+  // Shortcut cheat-sheet overlay (issue #64, toggled by F1 via remotea:toggle-cheatsheet).
   const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
   // Closing the overlay must hand focus back to the terminal it was opened
   // from. The sheet focuses its own filter box on mount, so without this the
@@ -724,8 +724,8 @@ export default function App() {
       if (cheatSheetOpen) closeCheatSheet();
       else setCheatSheetOpen(true);
     };
-    document.addEventListener('wmux:toggle-cheatsheet', toggle);
-    return () => document.removeEventListener('wmux:toggle-cheatsheet', toggle);
+    document.addEventListener('remotea:toggle-cheatsheet', toggle);
+    return () => document.removeEventListener('remotea:toggle-cheatsheet', toggle);
   }, [cheatSheetOpen, closeCheatSheet]);
   // Broadcast-input mode banner (issue #64): mirror the runtime store flag.
   const broadcastInputActive = useStore((s) => s.broadcastInputActive);
@@ -1567,7 +1567,7 @@ export default function App() {
       dispatchPaletteReset(action, terminalSurfaceId);
     } else if (action === 'clearTerminalBuffer') {
       if (terminalSurfaceId) {
-        document.dispatchEvent(new CustomEvent('wmux:clear-terminal-buffer', { detail: { surfaceId: terminalSurfaceId } }));
+        document.dispatchEvent(new CustomEvent('remotea:clear-terminal-buffer', { detail: { surfaceId: terminalSurfaceId } }));
       }
     } else if (action === 'togglePromptOutline') {
       togglePromptOutlineFor(
@@ -1659,8 +1659,8 @@ export default function App() {
   // reset-terminal use.
   useEffect(() => {
     const open = () => setAgentNavigatorOpen(true);
-    document.addEventListener('wmux:open-agent-navigator', open);
-    return () => document.removeEventListener('wmux:open-agent-navigator', open);
+    document.addEventListener('remotea:open-agent-navigator', open);
+    return () => document.removeEventListener('remotea:open-agent-navigator', open);
   }, []);
 
   // Agent office hub. The CustomEvent relay serves the keyboard shortcut
@@ -1668,8 +1668,8 @@ export default function App() {
   // button sets the state directly via its prop.
   useEffect(() => {
     const open = () => setHubOpen(true);
-    document.addEventListener('wmux:open-hub', open);
-    return () => document.removeEventListener('wmux:open-hub', open);
+    document.addEventListener('remotea:open-hub', open);
+    return () => document.removeEventListener('remotea:open-hub', open);
   }, []);
 
   const handleToggleNotifPanel = useCallback(() => {

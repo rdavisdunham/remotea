@@ -166,7 +166,7 @@ export function forgetAlternateScreen(surfaceId: string): void {
  * The non-modal notice a kept reset shows: `until` is when it and the force
  * window end, `null` hides it.
  */
-export const RESET_NOTICE_EVENT = 'wmux:reset-kept-alternate-screen';
+export const RESET_NOTICE_EVENT = 'remotea:reset-kept-alternate-screen';
 
 export interface ResetNoticeDetail {
   surfaceId: string;
@@ -195,7 +195,7 @@ export interface ManualResetOptions {
 }
 
 /**
- * The `wmux:reset-terminal` handler's work for one surface: decide about the
+ * The `remotea:reset-terminal` handler's work for one surface: decide about the
  * alternate screen, reset, arm or disarm the force window, and show or hide
  * the notice. Returns what it did, for the tests.
  */

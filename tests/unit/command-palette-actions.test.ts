@@ -153,7 +153,7 @@ describe('command palette executable choices', () => {
       }] as never,
     });
     const focused = vi.fn();
-    document.addEventListener('wmux:focus-surface', focused);
+    document.addEventListener('remotea:focus-surface', focused);
     try {
       const { onClose } = await renderPalette();
       search('billing');
@@ -166,7 +166,7 @@ describe('command palette executable choices', () => {
       expect((focused.mock.calls[0][0] as CustomEvent).detail).toEqual({ workspaceId: 'ws-fixture', surfaceId: 'surf-fixture' });
       expect(onClose).toHaveBeenCalledOnce();
     } finally {
-      document.removeEventListener('wmux:focus-surface', focused);
+      document.removeEventListener('remotea:focus-surface', focused);
     }
   });
 });

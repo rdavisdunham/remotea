@@ -97,11 +97,11 @@ export default function TerminalPane({
     };
     const onNext = () => cycle(true);
     const onPrev = () => cycle(false);
-    document.addEventListener('wmux:find-next', onNext);
-    document.addEventListener('wmux:find-prev', onPrev);
+    document.addEventListener('remotea:find-next', onNext);
+    document.addEventListener('remotea:find-prev', onPrev);
     return () => {
-      document.removeEventListener('wmux:find-next', onNext);
-      document.removeEventListener('wmux:find-prev', onPrev);
+      document.removeEventListener('remotea:find-next', onNext);
+      document.removeEventListener('remotea:find-prev', onPrev);
     };
   }, [searchAddonRef]);
 
@@ -114,8 +114,8 @@ export default function TerminalPane({
       if (!activeRef.current) return;
       try { xtermRef.current?.focus(); } catch { /* no-op */ }
     };
-    document.addEventListener('wmux:focus-terminal', onFocusTerminal);
-    return () => document.removeEventListener('wmux:focus-terminal', onFocusTerminal);
+    document.addEventListener('remotea:focus-terminal', onFocusTerminal);
+    return () => document.removeEventListener('remotea:focus-terminal', onFocusTerminal);
   }, [xtermRef]);
 
   useEffect(() => {
@@ -124,8 +124,8 @@ export default function TerminalPane({
       if (id !== surfaceId || !activeRef.current) return;
       try { xtermRef.current?.refresh(0, (xtermRef.current?.rows ?? 1) - 1); } catch { /* disposed */ }
     };
-    document.addEventListener('wmux:refresh-surface', onRefresh);
-    return () => document.removeEventListener('wmux:refresh-surface', onRefresh);
+    document.addEventListener('remotea:refresh-surface', onRefresh);
+    return () => document.removeEventListener('remotea:refresh-surface', onRefresh);
   }, [surfaceId, xtermRef]);
 
   const handleSearch = useCallback((query: string) => {

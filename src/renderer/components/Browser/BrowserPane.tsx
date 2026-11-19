@@ -440,8 +440,8 @@ export default function BrowserPane({
       const id = (event as CustomEvent<{ surfaceId?: string }>).detail?.surfaceId;
       if (id === surfaceId) reload();
     };
-    document.addEventListener('wmux:refresh-surface', onRefresh);
-    return () => document.removeEventListener('wmux:refresh-surface', onRefresh);
+    document.addEventListener('remotea:refresh-surface', onRefresh);
+    return () => document.removeEventListener('remotea:refresh-surface', onRefresh);
   }, [reload, surfaceId]);
   const stop = useCallback(() => webviewRef.current?.stop(), []);
   const openDevTools = useCallback(() => {
@@ -739,8 +739,8 @@ export default function BrowserPane({
       const targetId = detail?.surfaceId;
       if (detail?.url && (!targetId || targetId === surfaceId)) navigate(detail.url);
     };
-    window.addEventListener('wmux:browser-navigate', handler);
-    return () => window.removeEventListener('wmux:browser-navigate', handler);
+    window.addEventListener('remotea:browser-navigate', handler);
+    return () => window.removeEventListener('remotea:browser-navigate', handler);
   }, [navigate, surfaceId]);
 
   const isAgent = engine === 'agent';

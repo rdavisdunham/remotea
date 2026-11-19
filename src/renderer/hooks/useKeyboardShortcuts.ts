@@ -313,7 +313,7 @@ export function useKeyboardShortcuts(
       // clipboard here: navigator.clipboard.readText() garbles non-UTF-8 Windows
       // formats and a raw pty.write strips bracketed-paste markers.
       if (activeSurf?.type === 'terminal') {
-        document.dispatchEvent(new CustomEvent('wmux:paste-terminal', { detail: { surfaceId: activeSurf.id } }));
+        document.dispatchEvent(new CustomEvent('remotea:paste-terminal', { detail: { surfaceId: activeSurf.id } }));
       }
     };
 
@@ -326,7 +326,7 @@ export function useKeyboardShortcuts(
       const leaf = ws ? findLeaf(ws.splitTree, focusedPaneId) : undefined;
       const activeSurf = leaf?.surfaces[leaf.activeSurfaceIndex];
       if (activeSurf?.type === 'terminal') {
-        document.dispatchEvent(new CustomEvent('wmux:reset-terminal', { detail: { surfaceId: activeSurf.id } }));
+        document.dispatchEvent(new CustomEvent('remotea:reset-terminal', { detail: { surfaceId: activeSurf.id } }));
       }
     };
 
@@ -399,8 +399,8 @@ export function useKeyboardShortcuts(
       toggleSidebar: () => toggleSidebar(),
       nextWorkspace: () => cycleWorkspace(1),
       prevWorkspace: () => cycleWorkspace(-1),
-      renameSurface: () => fire('wmux:rename-surface'),
-      renameWorkspace: () => fire('wmux:rename-workspace'),
+      renameSurface: () => fire('remotea:rename-surface'),
+      renameWorkspace: () => fire('remotea:rename-workspace'),
       splitRight: () => doSplit('terminal', 'horizontal'),
       splitDown: () => doSplit('terminal', 'vertical'),
       splitBrowserRight: () => { if (inAppBrowser()) doSplit('browser', 'horizontal'); },
@@ -421,11 +421,11 @@ export function useKeyboardShortcuts(
       prevSurface: () => { if (activeWorkspaceId && focusedPaneId) prevSurface(activeWorkspaceId, focusedPaneId); },
       jumpToUnread,
       jumpToBlocked,
-      openAgentNavigator: () => fire('wmux:open-agent-navigator'),
+      openAgentNavigator: () => fire('remotea:open-agent-navigator'),
       // Easter egg: inert until enabled in Settings → General.
-      openHub: () => { if (useStore.getState().appearancePrefs.hubEnabled) fire('wmux:open-hub'); },
+      openHub: () => { if (useStore.getState().appearancePrefs.hubEnabled) fire('remotea:open-hub'); },
       showNotifications: () => onToggleNotifications?.(),
-      flashFocused: () => { if (focusedPaneId) fire('wmux:trigger-flash', { paneId: focusedPaneId }); },
+      flashFocused: () => { if (focusedPaneId) fire('remotea:trigger-flash', { paneId: focusedPaneId }); },
       openBrowser: () => { if (inAppBrowser()) onToggleBrowser?.(); },
       browserDevTools: () => window.remotea?.system?.toggleDevTools?.(),
       browserConsole: () => window.remotea?.system?.toggleDevTools?.(),
@@ -434,7 +434,7 @@ export function useKeyboardShortcuts(
       resetTerminal: resetFocusedTerminal,
       clearTerminalBuffer: () => {
         const surfaceId = focusedTerminalSurfaceId();
-        if (surfaceId) fire('wmux:clear-terminal-buffer', { surfaceId });
+        if (surfaceId) fire('remotea:clear-terminal-buffer', { surfaceId });
       },
       // Issue #207. The bodies live in store/prompt-actions.ts so the command
       // palette runs the same code — see the note there.
@@ -453,7 +453,7 @@ export function useKeyboardShortcuts(
         const ws = state.workspaces.find((w) => w.id === activeWorkspaceId);
         const leaf = ws && findLeaf(ws.splitTree, focusedPaneId);
         const surface = leaf?.surfaces[leaf.activeSurfaceIndex];
-        if (surface) fire('wmux:refresh-surface', { surfaceId: surface.id });
+        if (surface) fire('remotea:refresh-surface', { surfaceId: surface.id });
       },
       fontSizeIncrease: () => zoomFocusedPane(-1),
       fontSizeDecrease: () => zoomFocusedPane(1),
@@ -481,8 +481,8 @@ export function useKeyboardShortcuts(
       commandPalette: () => {},
       // ── issue #64 additions ──────────────────────────────────────────────
       reopenClosedSurface: () => { if (activeWorkspaceId && focusedPaneId) useStore.getState().reopenClosedSurface(activeWorkspaceId, focusedPaneId); },
-      findNext: () => fire('wmux:find-next'),
-      findPrevious: () => fire('wmux:find-prev'),
+      findNext: () => fire('remotea:find-next'),
+      findPrevious: () => fire('remotea:find-prev'),
       resizePaneLeft: () => doResize('horizontal', -0.05),
       resizePaneRight: () => doResize('horizontal', 0.05),
       resizePaneUp: () => doResize('vertical', -0.05),
@@ -490,7 +490,7 @@ export function useKeyboardShortcuts(
       broadcastInput: () => useStore.getState().toggleBroadcastInput(),
       togglePinWorkspace,
       markWorkspaceRead,
-      toggleShortcutCheatSheet: () => fire('wmux:toggle-cheatsheet'),
+      toggleShortcutCheatSheet: () => fire('remotea:toggle-cheatsheet'),
       // ── issue #116 ───────────────────────────────────────────────────────
       // View mode lives on the SurfaceRef, so this flips store state directly
       // rather than going through a CustomEvent. A no-op unless the focused

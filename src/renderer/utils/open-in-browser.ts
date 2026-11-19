@@ -61,7 +61,7 @@ export function openInWmuxBrowser(url: string, opts?: { invert?: boolean }): voi
 
   if (browserSurface) {
     // Browser exists — just navigate
-    window.dispatchEvent(new CustomEvent('wmux:browser-navigate', { detail: { url, surfaceId: browserSurface.id } }));
+    window.dispatchEvent(new CustomEvent('remotea:browser-navigate', { detail: { url, surfaceId: browserSurface.id } }));
     return;
   }
 
@@ -77,7 +77,7 @@ export function openInWmuxBrowser(url: string, opts?: { invert?: boolean }): voi
   const split = splitNode(ws.splitTree, targetPaneId, newPaneId, 'browser', 'horizontal');
   // Mount the pane ON the target, rather than racing a navigate event at it.
   //
-  // This used to split first and then dispatch `wmux:browser-navigate` after a
+  // This used to split first and then dispatch `remotea:browser-navigate` after a
   // 600 ms timer, on the reasoning that React render (~16 ms) plus webview init
   // (~200-500 ms) would be done by then. A timer tuned to an observation is not
   // a guarantee: on a loaded machine, or when the listener had not attached yet,

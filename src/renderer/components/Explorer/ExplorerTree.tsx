@@ -161,7 +161,7 @@ export function ExplorerTree({
       }
       case 'focus-terminal': {
         e.preventDefault();
-        document.dispatchEvent(new CustomEvent('wmux:focus-terminal'));
+        document.dispatchEvent(new CustomEvent('remotea:focus-terminal'));
         break;
       }
       case 'none':

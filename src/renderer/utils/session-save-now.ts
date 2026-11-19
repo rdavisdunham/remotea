@@ -5,7 +5,7 @@
  * "it survives a restart". A DOM event rather than a store field: it is a
  * one-shot request with no state, and App.tsx already owns the payload.
  */
-export const SESSION_SAVE_NOW_EVENT = 'wmux:session-save-now';
+export const SESSION_SAVE_NOW_EVENT = 'remotea:session-save-now';
 
 export function requestSessionSaveNow(): void {
   window.dispatchEvent(new Event(SESSION_SAVE_NOW_EVENT));

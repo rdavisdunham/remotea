@@ -19,7 +19,7 @@ import { recordSurfaceShellState, resetSurfaceShellStates } from '../../src/rend
  * Issue #357, end to end through a real xterm: the record of who is on the
  * alternate screen comes from the pane's own output — DECSET 47/1047/1049 seen
  * by a CSI hook, OSC 133;A seen by the prompt log's existing parse — and the
- * `wmux:reset-terminal` handler's decision is `applyManualReset`.
+ * `remotea:reset-terminal` handler's decision is `applyManualReset`.
  */
 const ESC = '\x1b';
 const SURFACE = 'surf-357';

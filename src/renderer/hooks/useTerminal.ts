@@ -247,7 +247,7 @@ function remoteGoneLine(info: PtyExitInfo): string {
  *
  * Module scope, not the terminal-setup closure, because BOTH paste bindings
  * need it: Ctrl+V is intercepted by xterm, while the configurable
- * `paste` shortcut (Ctrl+Shift+V by default) arrives as a `wmux:paste-terminal`
+ * `paste` shortcut (Ctrl+Shift+V by default) arrives as a `remotea:paste-terminal`
  * event on a different effect. They used to disagree — Ctrl+Shift+V read only
  * text, so a screenshot or a copied file did nothing at all.
  *
@@ -791,7 +791,7 @@ function pointerCell(
 // else would silently inherit touch semantics. The producer and the consumer
 // are forty lines apart in this file, so this is a local protocol and not a
 // module.
-const TOUCH_WHEEL = Symbol('wmux:touch-wheel');
+const TOUCH_WHEEL = Symbol('remotea:touch-wheel');
 type TouchWheelSource = Exclude<WheelSource, 'wheel'>;
 function markTouchWheel(ev: WheelEvent, source: TouchWheelSource): WheelEvent {
   (ev as unknown as Record<symbol, TouchWheelSource>)[TOUCH_WHEEL] = source;
@@ -1961,7 +1961,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         surfaceMouseModes.delete(id);
         // The wheel accumulator is keyed the same way and has the same
         // unbounded-growth problem, so it is dropped on the same path rather
-        // than only on `wmux:reset-terminal` — a surface that dies without
+        // than only on `remotea:reset-terminal` — a surface that dies without
         // ever being reset would otherwise leave its remainder behind for the
         // life of the process. Dropping it is also correct on its own terms:
         // a fraction of a line owed to a scroll gesture aimed at a dead
@@ -2276,8 +2276,8 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       if (!xtermRef.current || !ptyIdRef.current || managedInputBlocked(latestRemoteViews(), surfaceId)) return;
       finishInsertion(window.remotea.remote.resolvePaste(surfaceId ?? ''));
     };
-    document.addEventListener('wmux:paste-terminal', handler);
-    return () => document.removeEventListener('wmux:paste-terminal', handler);
+    document.addEventListener('remotea:paste-terminal', handler);
+    return () => document.removeEventListener('remotea:paste-terminal', handler);
   }, [surfaceId]);
 
   useEffect(() => {
@@ -2290,8 +2290,8 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // is re-based, and ConPTY is cleared before xterm (utils/terminal-clear.ts).
       clearTerminalBuffer(term, surfaceId, ptyIdRef.current, window.remotea?.pty?.clear);
     };
-    document.addEventListener('wmux:clear-terminal-buffer', handler);
-    return () => document.removeEventListener('wmux:clear-terminal-buffer', handler);
+    document.addEventListener('remotea:clear-terminal-buffer', handler);
+    return () => document.removeEventListener('remotea:clear-terminal-buffer', handler);
   }, [surfaceId]);
 
   // Manual pane recovery (issue #175). The PTY-exit path above handles the case
@@ -2328,8 +2328,8 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       surfaceMouseModes.delete(surfaceId);
       wheelLineAccum.delete(surfaceId);
     };
-    document.addEventListener('wmux:reset-terminal', handler);
-    return () => document.removeEventListener('wmux:reset-terminal', handler);
+    document.addEventListener('remotea:reset-terminal', handler);
+    return () => document.removeEventListener('remotea:reset-terminal', handler);
   }, [surfaceId]);
 
   // `[wmux] …` notices from a workspace manifest (#284): a pane held back by

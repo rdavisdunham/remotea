@@ -32,7 +32,7 @@ import { isRemoteShellSpec, parseRemoteShellSpec } from '../../shared/remote-she
  * split-tree restructure must keep everything, which is why the React teardown
  * path deliberately does not do this.
  */
-export const SURFACE_CLOSED_EVENT = 'wmux:surface-closed';
+export const SURFACE_CLOSED_EVENT = 'remotea:surface-closed';
 
 /** Kill the PTY backing a single terminal surface. Idempotent — the main-process
  *  `PtyManager.kill` no-ops on an unknown/already-dead id, so double-calls (e.g.

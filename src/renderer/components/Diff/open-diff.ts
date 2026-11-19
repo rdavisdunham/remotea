@@ -70,7 +70,7 @@ export function findDiffSurface(
 
 // ─── File selection hand-off ─────────────────────────────────────────────────
 
-export const DIFF_SELECT_EVENT = 'wmux:diff-select';
+export const DIFF_SELECT_EVENT = 'remotea:diff-select';
 
 const pendingSelection = new Map<string, string>();
 

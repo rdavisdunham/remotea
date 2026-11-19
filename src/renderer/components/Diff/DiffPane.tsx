@@ -222,8 +222,8 @@ export default function DiffPane({ surfaceId, cwd, baseRef }: DiffPaneProps) {
       const id = (event as CustomEvent<{ surfaceId?: string }>).detail?.surfaceId;
       if (id === surfaceId) void handleRefresh();
     };
-    document.addEventListener('wmux:refresh-surface', onRefresh);
-    return () => document.removeEventListener('wmux:refresh-surface', onRefresh);
+    document.addEventListener('remotea:refresh-surface', onRefresh);
+    return () => document.removeEventListener('remotea:refresh-surface', onRefresh);
   }, [handleRefresh, surfaceId]);
 
   // Status badge color

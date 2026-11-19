@@ -221,7 +221,7 @@ contextBridge.exposeInMainWorld('remotea', {
   browser: {
     navigate: (surfaceId: string, url: string) => {
       // Dispatch a custom event that BrowserPane listens for
-      window.dispatchEvent(new CustomEvent('wmux:browser-navigate', { detail: { url, surfaceId: surfaceId || undefined } }));
+      window.dispatchEvent(new CustomEvent('remotea:browser-navigate', { detail: { url, surfaceId: surfaceId || undefined } }));
     },
     /** The webview's back/forward stack, to persist it (#315). Null for a guest this window does not host. */
     getHistory: (webContentsId: number): Promise<BrowserHistory | null> =>
