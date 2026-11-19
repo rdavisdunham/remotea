@@ -115,7 +115,7 @@ export default function WorkspaceSettings() {
   const pickDefaultCwd = () => {
     if (decodeLaunch(workspacePrefs.defaultShell).location.kind === 'remote') return;
     void (async () => {
-      const res = await window.wmux?.system?.pickFolder?.();
+      const res = await window.remotea?.system?.pickFolder?.();
       if (!res || res.canceled || !res.path) return;
       setWorkspacePrefs({ defaultCwd: res.path });
     })();

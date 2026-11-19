@@ -19,7 +19,7 @@ export default function RemoteSizeBadge({ surfaceId }: { surfaceId: string }) {
           .replace('{cols}', String(view.cols))
           .replace('{rows}', String(view.rows))}
       </span>
-      <button className="remote-size-badge__fit" onClick={() => window.wmux.pty.focus(surfaceId)}>
+      <button className="remote-size-badge__fit" onClick={() => window.remotea.pty.focus(surfaceId)}>
         {t('remoteView.fitHere', 'Fit here')}
       </button>
     </div>

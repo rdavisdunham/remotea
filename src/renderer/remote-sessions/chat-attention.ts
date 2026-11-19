@@ -82,7 +82,7 @@ export async function actOnChat(surfaceId: string, action: ChatAttentionAction):
   const host = useRemoteRegistry.getState().views?.find(v => v.sessions.some(s => s.id === surfaceId));
   if (host) {
     if (!host.connected) return { ok: false, error: 'Reconnect to this server to change attention or reminders.' };
-    const result = await window.wmux.remoteSessions.chatAttention(host.hostId, surfaceId, action);
+    const result = await window.remotea.remoteSessions.chatAttention(host.hostId, surfaceId, action);
     return result.uncertain ? { ok: false, error: 'The server has not confirmed this change. Check the status before retrying.' } : result;
   }
   const old = useLocalChatAttention.getState().entries[surfaceId];

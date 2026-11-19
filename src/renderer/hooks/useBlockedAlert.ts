@@ -24,7 +24,7 @@ export function useBlockedAlert(enabled: boolean): void {
     if (!enabled) {
       // Turning the pref off mid-flash must stop the flash, not just stop
       // future ones — the taskbar would otherwise blink until the user clicks.
-      if (previous.current.size > 0) window.wmux?.window?.flash?.(false);
+      if (previous.current.size > 0) window.remotea?.window?.flash?.(false);
       previous.current = new Set();
       return;
     }
@@ -34,7 +34,7 @@ export function useBlockedAlert(enabled: boolean): void {
     const transition = blockedAlertTransition(previous.current, next);
     previous.current = next;
 
-    if (transition === 'flash') window.wmux?.window?.flash?.(true);
-    else if (transition === 'clear') window.wmux?.window?.flash?.(false);
+    if (transition === 'flash') window.remotea?.window?.flash?.(true);
+    else if (transition === 'clear') window.remotea?.window?.flash?.(false);
   }, [enabled, workspaces, agentStates, agentDetections]);
 }

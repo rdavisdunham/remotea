@@ -298,8 +298,8 @@ async function readForType(
   opts: { surfaceId?: SurfaceId; relPath?: string },
 ): Promise<{ content: string; filePath: string; mtimeMs?: number } | { failure: PreviewOpenFailure }> {
   const read = targetType === 'code'
-    ? await window.wmux.code.readFile(opts.surfaceId!, opts.relPath!)
-    : await window.wmux.explorer.readMarkdown(opts.surfaceId!, opts.relPath!);
+    ? await window.remotea.code.readFile(opts.surfaceId!, opts.relPath!)
+    : await window.remotea.explorer.readMarkdown(opts.surfaceId!, opts.relPath!);
   if (!read) return { failure: 'read_failed' };
   if ('error' in read) {
     return {

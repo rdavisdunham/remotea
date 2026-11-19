@@ -24,10 +24,10 @@ export function useProjectProfiles(workspace: WorkspaceInfo | undefined): QuickL
   const key = source ? JSON.stringify([workspace?.id, source]) : '';
   const [result, setResult] = useState<{ key: string; profiles: QuickLaunchProfile[] }>({ key: '', profiles: [] });
   useEffect(() => {
-    if (!key || !window.wmux?.config?.getProjectProfiles) return;
+    if (!key || !window.remotea?.config?.getProjectProfiles) return;
     let cancelled = false;
     const request = JSON.parse(key)[1] as NonNullable<ReturnType<typeof desktopProjectProfileSource>>;
-    window.wmux.config.getProjectProfiles(request.cwd, { surfaceId: request.surfaceId, shell: request.shell }).then(
+    window.remotea.config.getProjectProfiles(request.cwd, { surfaceId: request.surfaceId, shell: request.shell }).then(
       (profiles: QuickLaunchProfile[]) => { if (!cancelled) setResult({ key, profiles: Array.isArray(profiles) ? profiles : [] }); },
       () => { if (!cancelled) setResult({ key, profiles: [] }); },
     );

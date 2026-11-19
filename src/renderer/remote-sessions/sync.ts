@@ -36,7 +36,7 @@ type Bridge = {
 };
 
 function bridge(): Bridge | null {
-  return (globalThis as { window?: { wmux?: { remoteSessions?: Bridge } } }).window?.wmux?.remoteSessions ?? null;
+  return (globalThis as { window?: { remotea?: { remoteSessions?: Bridge } } }).window?.remotea?.remoteSessions ?? null;
 }
 
 let ready = false;

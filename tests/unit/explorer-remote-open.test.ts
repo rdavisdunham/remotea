@@ -12,11 +12,11 @@ vi.mock('../../src/renderer/components/Explorer/use-explorer-diff', () => ({ use
 
 describe('remote explorer file activation', () => {
   it('opens remote code through the terminal-bound reader while refusing full desktop diff', async () => {
-    const original = window.wmux;
+    const original = window.remotea;
     const readCode = vi.fn().mockResolvedValue({ filePath: '/host/repo/app.ts', content: 'const remote = true;', mtimeMs: 4 });
     const desktopRead = vi.fn();
     const desktopDiff = vi.fn();
-    window.wmux = { explorer: { listDir: vi.fn().mockResolvedValue({ root: '/host/repo', relPath: '', entries: [{ name: 'app.ts', kind: 'file', size: 20, mtimeMs: 4, viewable: true }], truncated: false }) }, code: { readFile: readCode }, markdown: { readFile: desktopRead }, diff: { getFiles: desktopDiff } } as unknown as typeof window.wmux;
+    window.remotea = { explorer: { listDir: vi.fn().mockResolvedValue({ root: '/host/repo', relPath: '', entries: [{ name: 'app.ts', kind: 'file', size: 20, mtimeMs: 4, viewable: true }], truncated: false }) }, code: { readFile: readCode }, markdown: { readFile: desktopRead }, diff: { getFiles: desktopDiff } } as unknown as typeof window.remotea;
     const ws = 'ws-host-test' as WorkspaceId;
     const pane = 'pane-host-test' as PaneId;
     const terminal = 'surf-host-test' as SurfaceId;
@@ -40,7 +40,7 @@ describe('remote explorer file activation', () => {
     } finally {
       act(() => root.unmount());
       container.remove();
-      window.wmux = original;
+      window.remotea = original;
       useStore.setState({ workspaces: [], activeWorkspaceId: null });
     }
   });

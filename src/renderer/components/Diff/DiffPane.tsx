@@ -75,7 +75,7 @@ export default function DiffPane({ surfaceId, cwd, baseRef }: DiffPaneProps) {
 
   const loadFiles = useCallback(async () => {
     try {
-      const result = await window.wmux?.diff?.getFiles(cwd || '', baseRef);
+      const result = await window.remotea?.diff?.getFiles(cwd || '', baseRef);
       if (result?.files) {
         const newFiles = result.files as ChangedFile[];
         const newKey = newFiles.map(f => `${f.path}|${f.status}|${f.additions}|${f.deletions}`).join('\n');
@@ -98,7 +98,7 @@ export default function DiffPane({ surfaceId, cwd, baseRef }: DiffPaneProps) {
 
   const loadDiff = useCallback(async (file: string) => {
     try {
-      const result = await window.wmux?.diff?.getFileDiff(cwd || '', file, baseRef);
+      const result = await window.remotea?.diff?.getFileDiff(cwd || '', file, baseRef);
       if (result?.diff !== undefined) {
         if (result.diff !== lastDiffRawRef.current) {
           lastDiffRawRef.current = result.diff;
@@ -189,14 +189,14 @@ export default function DiffPane({ surfaceId, cwd, baseRef }: DiffPaneProps) {
 
   // Listen for immediate updates from Claude Code hooks (faster than polling)
   useEffect(() => {
-    if (!window.wmux?.diff?.onUpdate) return;
+    if (!window.remotea?.diff?.onUpdate) return;
     let debounce: ReturnType<typeof setTimeout>;
     const refresh = () => {
       lastFilesKeyRef.current = '';
       lastDiffRawRef.current = '';
       void runPass();
     };
-    const unsub = window.wmux.diff.onUpdate((data: { file?: string }) => {
+    const unsub = window.remotea.diff.onUpdate((data: { file?: string }) => {
       clearTimeout(debounce);
       debounce = setTimeout(() => {
         if (data?.file) setSelectedFile(data.file);

@@ -4,7 +4,7 @@ export function requestTea(
   hostId: string,
   command: TeaCommand,
 ): Promise<TeaReply> {
-  const api = window.wmux?.remoteHosts?.tea;
+  const api = window.remotea?.remoteHosts?.tea;
   if (!api)
     return Promise.resolve({
       ok: false,

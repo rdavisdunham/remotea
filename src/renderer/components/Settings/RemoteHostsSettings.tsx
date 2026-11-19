@@ -25,13 +25,13 @@ type Bridge = {
   dismissOutboxFailures?(hostId: string): void;
 };
 
-const bridge = (): Bridge | null => (window as unknown as { wmux?: { remoteHosts?: Bridge } }).wmux?.remoteHosts ?? null;
+const bridge = (): Bridge | null => (window as unknown as { remotea?: { remoteHosts?: Bridge } }).remotea?.remoteHosts ?? null;
 
 /** The registry views, refreshed while Settings is open (for each host's per-tab health). */
 function useRegistryViews(): RemoteRegistryView[] {
   const [views, setViews] = useState<RemoteRegistryView[]>([]);
   useEffect(() => {
-    const api = (window as unknown as { wmux?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).wmux?.remoteSessions;
+    const api = (window as unknown as { remotea?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).remotea?.remoteSessions;
     if (!api) return;
     let live = true;
     const load = () => void api.views().then((v) => { if (live) setViews(v); }, () => {});
@@ -175,7 +175,7 @@ function HiddenSessions() {
   const t = useT();
   const [views, setViews] = useState<RemoteRegistryView[]>([]);
   const load = async () => {
-    const api = (window as unknown as { wmux?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).wmux?.remoteSessions;
+    const api = (window as unknown as { remotea?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).remotea?.remoteSessions;
     if (api) setViews(await api.views());
   };
   useEffect(() => {

@@ -22,7 +22,7 @@ import type { DetectedSsh } from '../../src/main/ssh-argv';
  * shell a path it cannot open.
  *
  * `uploadFiles` is stubbed; everything else is the real decision code. Since
- * this moved into main it needs no `window.wmux` shims at all.
+ * this moved into main it needs no `window.remotea` shims at all.
  */
 
 const session = (over: Partial<DetectedSsh> = {}): DetectedSsh => ({

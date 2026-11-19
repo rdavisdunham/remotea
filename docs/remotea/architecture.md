@@ -10,7 +10,7 @@ The session server has its own notes in `docs/remotea/plan.md`, and the phone co
 src/
   main/           Electron main process
   renderer/       React UI (Vite)
-  preload/        contextBridge (window.wmux)
+  preload/        contextBridge (window.remotea)
   cli/            CLI → named pipe (\\.\pipe\wmux)
   shared/         Shared types (IPC channels, branded IDs)
   shell-integration/  Shell hooks (bash/zsh/PowerShell/cmd)
@@ -146,7 +146,7 @@ docs/             Planning docs
 - `prompt-actions.ts` — The three prompt commands as functions of a surface id, because there are two callers (the shortcut table and the command palette) and they were about to disagree. The palette hands every action it does not recognise to a `console.log`, so an action wired only into the keyboard table appears in the palette, is selectable, and silently does nothing
 - `split-utils.ts` — Immutable split tree helpers, plus `buildWorkspaceTree(panes, layout)` (#212): what a NEW workspace opens as. That shape used to be hard-coded in two places that disagreed — the sidebar `+` built a three-pane T, `remotea new-workspace` built one leaf — because `resolveDefaultSplitTree` took the fallback as a PARAMETER each caller filled in differently. It is now a setting with one resolution (a saved default layout first, then the configured count/arrangement), and `buildDefaultSplitTree()` is `buildWorkspaceTree(3, 'grid')` — byte-for-byte the shipped T, which is what lets it replace the old construction rather than sit beside it. `MAX_WORKSPACE_PANES` is a guard, not a limit: the value arrives from a hand-edited TOML file and over the pipe, and every pane it makes is a PTY
 
-### Preload API (`window.wmux`)
+### Preload API (`window.remotea`)
 
 ```
 pty:      create, write, resize, kill, has, onData, onExit

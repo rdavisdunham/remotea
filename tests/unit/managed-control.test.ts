@@ -54,7 +54,7 @@ function press(target: EventTarget = terminalTarget(), options: KeyboardEventIni
 beforeEach(() => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   focus.mockClear(); takeover.mockReset(); takeover.mockResolvedValue({ ok: true });
-  window.wmux = { remoteSessions: { takeover } };
+  window.remotea = { remoteSessions: { takeover } };
   state.setState({ shortcuts: {} }); setLatestRemoteViews(registry()); setKeyRemaps([]);
 });
 afterEach(() => {

@@ -39,7 +39,7 @@ export default function SaveLayoutDialog() {
     if (!valid) return;
     if (!confirmLayoutSave(name)) {
       // The captured workspace closed while the dialog was up.
-      window.wmux?.notification?.fire({
+      window.remotea?.notification?.fire({
         surfaceId: '',
         text: t('palette.saveCurrentLayoutFailed', 'No active workspace to save as a layout.'),
         title: 'remotea',

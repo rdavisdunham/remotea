@@ -38,7 +38,7 @@ beforeEach(async () => {
   vi.useFakeTimers();
   groupUpsert.mockClear();
   sessionUpdate.mockClear();
-  (window as unknown as { wmux: unknown }).wmux = { remoteSessions: {
+  (window as unknown as { remotea: unknown }).remotea = { remoteSessions: {
     onRegistry: (callback: typeof push) => { push = callback; return () => {}; },
     report: vi.fn(), groupUpsert, sessionUpdate,
   } };
@@ -54,7 +54,7 @@ beforeEach(async () => {
 afterEach(() => {
   vi.clearAllTimers();
   vi.useRealTimers();
-  delete (window as unknown as { wmux?: unknown }).wmux;
+  delete (window as unknown as { remotea?: unknown }).remotea;
 });
 
 describe('shared workspace and terminal names through renderer sync', () => {

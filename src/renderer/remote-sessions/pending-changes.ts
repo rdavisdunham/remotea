@@ -128,7 +128,7 @@ type ForgetBridge = { forgetOutboxIntent?(hostId: string, iid: string): Promise<
 
 /** Forget one change (main drops it from the outbox and pushes a fresh status). */
 export async function forgetPendingChange(hostId: string, iid: string): Promise<boolean> {
-  const b = (globalThis as { window?: { wmux?: { remoteHosts?: ForgetBridge } } }).window?.wmux?.remoteHosts;
+  const b = (globalThis as { window?: { remotea?: { remoteHosts?: ForgetBridge } } }).window?.remotea?.remoteHosts;
   if (!b?.forgetOutboxIntent) return false;
   try {
     return await b.forgetOutboxIntent(hostId, iid);

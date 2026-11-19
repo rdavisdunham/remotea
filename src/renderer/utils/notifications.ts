@@ -15,5 +15,5 @@ export function fireNotification(
     const notification = addNotification({ surfaceId: (surfaceId || '') as SurfaceId, workspaceId, text });
     if (notification.read) return;
   }
-  window.wmux?.notification?.fire({ surfaceId: surfaceId || '', text, title });
+  window.remotea?.notification?.fire({ surfaceId: surfaceId || '', text, title });
 }

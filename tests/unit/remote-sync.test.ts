@@ -122,7 +122,7 @@ describe('store: remote surfaces', () => {
 
   it('dropSurfacesLocal collapses emptied panes and workspaces without killing anything', () => {
     const killed: string[] = [];
-    (globalThis as { window?: unknown }).window = { wmux: { pty: { kill: (id: string) => killed.push(id) } } };
+    (globalThis as { window?: unknown }).window = { remotea: { pty: { kill: (id: string) => killed.push(id) } } };
     const st = useStore.getState();
     const ws1 = st.createWorkspace({ title: 'A', splitTree: { type: 'branch', direction: 'horizontal', ratio: 0.5, children: [leaf('pane-1', ['surf-1', 'surf-2']), leaf('pane-2', ['surf-3'])] } });
     const ws2 = st.createWorkspace({ title: 'B', splitTree: leaf('pane-3', ['surf-4']) });

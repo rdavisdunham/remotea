@@ -446,7 +446,7 @@ export default function PaneWrapper({
 
   // Fetch available shells once on mount for the shell picker dropdown
   useEffect(() => {
-    window.wmux?.system?.getShells?.()
+    window.remotea?.system?.getShells?.()
       .then((shells: ShellInfo[]) => setAvailableShells(Array.isArray(shells) ? shells : []))
       .catch(() => {});
   }, []);

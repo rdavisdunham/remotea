@@ -49,7 +49,7 @@ afterEach(() => {
   host?.remove();
   root = null;
   host = null;
-  delete (window as { wmux?: unknown }).wmux;
+  delete (window as { remotea?: unknown }).remotea;
 });
 
 describe('refused origins: only a proxy of the user\'s own is offered (#254)', () => {
@@ -244,7 +244,7 @@ function mountSettings(s: RemoteConsoleStatus) {
     dismissRejectedOrigin: vi.fn(async () => undefined),
     pairStart: vi.fn(), pairCancel: vi.fn(), onRendererRequest: vi.fn(), replyRenderer: vi.fn(),
   };
-  (window as unknown as { wmux: unknown }).wmux = { remoteConsole: bridge };
+  (window as unknown as { remotea: unknown }).remotea = { remoteConsole: bridge };
   return bridge;
 }
 

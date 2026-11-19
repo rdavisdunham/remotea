@@ -1271,9 +1271,9 @@ async function runSmokeMode(opts: SmokeOptions): Promise<void> {
     probeRenderer: async () => {
       if (loadFailure) throw new Error(loadFailure);
       const r = await wc.executeJavaScript(
-        `({ bridge: typeof window.wmux === 'object' && typeof window.wmux?.pty?.create === 'function',
+        `({ bridge: typeof window.remotea === 'object' && typeof window.remotea?.pty?.create === 'function',
             readScreen: typeof window.__wmux_readScreen === 'function',
-            sandboxed: window.wmux?.system?.sandboxed === true,
+            sandboxed: window.remotea?.system?.sandboxed === true,
             activeSurfaceId: window.__wmux_getActiveSurfaceId?.() ?? null })`,
       );
       return { bridge: !!r?.bridge, readScreen: !!r?.readScreen, sandboxed: r?.sandboxed === true, activeSurfaceId: typeof r?.activeSurfaceId === 'string' ? r.activeSurfaceId : null };

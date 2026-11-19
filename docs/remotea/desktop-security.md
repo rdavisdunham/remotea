@@ -6,7 +6,7 @@ What the Electron app's windows, preload and sessions are allowed to do, what ea
 
 | Contents | Loads | Preload | Who can reach it |
 |---|---|---|---|
-| App window (`WindowManager.createWindow`) | `dist/renderer/index.html` over `file://` (dev: `http://localhost:5199`) | `dist/preload/index.js`, which exposes `window.wmux` | Our own UI. It also renders untrusted text: markdown from agents and files (through DOMPurify), release notes, OSC 8 links, and terminal output. |
+| App window (`WindowManager.createWindow`) | `dist/renderer/index.html` over `file://` (dev: `http://localhost:5199`) | `dist/preload/index.js`, which exposes `window.remotea` | Our own UI. It also renders untrusted text: markdown from agents and files (through DOMPurify), release notes, OSC 8 links, and terminal output. |
 | Browser panel `<webview>` | Any URL the user or an agent opens | None (removed in `will-attach-webview`) | Arbitrary web content |
 | Popup from the panel (`window.open` with features, used for sign-in) | The provider's pages | None | Arbitrary web content |
 
@@ -15,7 +15,7 @@ What the Electron app's windows, preload and sessions are allowed to do, what ea
 | Setting | Before | Now | Status | Why |
 |---|---|---|---|---|
 | `nodeIntegration` | `false` | `false` | unchanged | The renderer never needs Node. |
-| `contextIsolation` | `true` | `true` | unchanged | `window.wmux` is reached only through `contextBridge`. |
+| `contextIsolation` | `true` | `true` | unchanged | `window.remotea` is reached only through `contextBridge`. |
 | `sandbox` | `false` | `true` | done in this PR | The preload needed Node for two values only, `os.homedir()` and `os.release()`. Main now passes them as one `additionalArguments` entry (`--remotea-host-info=`, see `src/shared/host-info.ts`), and the preload reads it from `process.argv`. A sandboxed preload cannot `require` a relative path, so `npm run build:main` now bundles the preload into one file (`scripts/bundle-preload.mjs`). The build fails if the bundle requires anything except `electron`. |
 | `nodeIntegrationInSubFrames` | default (`false`) | `false` | done in this PR (made explicit) | |
 | `nodeIntegrationInWorker` | default (`false`) | `false` | done in this PR (made explicit) | |
@@ -82,9 +82,9 @@ The phone Remote Console page (`src/renderer/remote/index.html`) is served by ma
 
 ## Preload surface
 
-`window.wmux` is a fixed set of named functions. None of them takes a channel name from the renderer, and none exposes `ipcRenderer` itself. Every `ipcRenderer.*` call names its channel statically, either from `IPC_CHANNELS` or from 16 string literals listed in `tests/unit/desktop-security.test.ts`. The test fails on a channel chosen at run time, an unlisted literal, a stale list entry, or a Node import in the preload. Clipboard reads go through main (`clipboard:read-text`), so the renderer never needs `clipboard-read`.
+`window.remotea` is a fixed set of named functions. None of them takes a channel name from the renderer, and none exposes `ipcRenderer` itself. Every `ipcRenderer.*` call names its channel statically, either from `IPC_CHANNELS` or from 16 string literals listed in `tests/unit/desktop-security.test.ts`. The test fails on a channel chosen at run time, an unlisted literal, a stale list entry, or a Node import in the preload. Clipboard reads go through main (`clipboard:read-text`), so the renderer never needs `clipboard-read`.
 
-`window.wmux.system.sandboxed` is new in this PR. It reports `process.sandboxed`, and the `--smoke` self-test fails if it is false.
+`window.remotea.system.sandboxed` is new in this PR. It reports `process.sandboxed`, and the `--smoke` self-test fails if it is false.
 
 ## CDP proxy token (design note)
 

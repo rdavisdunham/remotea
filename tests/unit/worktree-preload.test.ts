@@ -27,7 +27,7 @@ let bridge: any;
 
 beforeAll(async () => {
   await import('../../src/preload/index');
-  bridge = electron.exposeInMainWorld.mock.calls.find(([name]) => name === 'wmux')?.[1];
+  bridge = electron.exposeInMainWorld.mock.calls.find(([name]) => name === 'remotea')?.[1];
 });
 
 beforeEach(() => {
@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 describe('worktree preload bridge', () => {
-  it('exposes worktree namespace on window.wmux', () => {
+  it('exposes worktree namespace on window.remotea', () => {
     expect(bridge).toBeDefined();
     expect(bridge.worktree).toBeDefined();
   });

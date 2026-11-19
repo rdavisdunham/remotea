@@ -37,7 +37,7 @@ describe('replaceAllWorkspaces reaps the surfaces it drops (#361)', () => {
   beforeEach(() => {
     kill = vi.fn();
     closed = [];
-    (globalThis as any).window = { wmux: { pty: { kill } } };
+    (globalThis as any).window = { remotea: { pty: { kill } } };
     listener = (e) => closed.push((e as CustomEvent<{ surfaceId: string }>).detail.surfaceId);
     document.addEventListener(SURFACE_CLOSED_EVENT, listener);
   });

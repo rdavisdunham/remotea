@@ -53,7 +53,7 @@ export default function ChangelogSettings() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const load = useCallback((refresh: boolean) => {
-    const api = (window as any).wmux?.changelog;
+    const api = (window as any).remotea?.changelog;
     if (!api?.get) { setLoading(false); return; }
     setLoading(true);
     api.get({ refresh })

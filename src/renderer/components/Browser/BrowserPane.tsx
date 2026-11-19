@@ -387,7 +387,7 @@ export default function BrowserPane({
     // The page is about to change; a poll that lands before Chrome commits
     // would report where we came FROM and snap the bar back to it.
     suppressPollUntilRef.current = Date.now() + AGENT_URL_POLL_SUPPRESS_MS;
-    const api = window.wmux?.agentBrowser;
+    const api = window.remotea?.agentBrowser;
     try {
       const res = await api?.open?.(surfaceId, url);
       if (res?.ok) return;
@@ -447,7 +447,7 @@ export default function BrowserPane({
   const openDevTools = useCallback(() => {
     if (engineRef.current === 'agent') return;
     const wcId = webviewRef.current?.getWebContentsId?.();
-    if (typeof wcId === 'number') window.wmux?.browser?.focusDevTools?.(wcId);
+    if (typeof wcId === 'number') window.remotea?.browser?.focusDevTools?.(wcId);
   }, []);
 
   useEffect(() => {
@@ -461,7 +461,7 @@ export default function BrowserPane({
       let id: number | undefined;
       try { id = wv.getWebContentsId?.(); } catch { return; } // not attached yet
       if (typeof id !== 'number') return;
-      window.wmux?.browser?.getHistory?.(id).then((history: BrowserHistory | null) => {
+      window.remotea?.browser?.getHistory?.(id).then((history: BrowserHistory | null) => {
         if (!history || !mountedRef.current || engineRef.current === 'agent') return;
         if (sameBrowserHistory(history, lastHistoryRef.current)) return;
         lastHistoryRef.current = history;
@@ -529,9 +529,9 @@ export default function BrowserPane({
   const claimCdp = useCallback(() => {
     if (engineRef.current === 'agent') return;
     const wcId = webviewRef.current?.getWebContentsId?.();
-    if (wcId && window.wmux?.cdp?.attach) {
+    if (wcId && window.remotea?.cdp?.attach) {
       wcIdRef.current = wcId;
-      window.wmux.cdp.attach(wcId, surfaceId, workspaceId ?? null);
+      window.remotea.cdp.attach(wcId, surfaceId, workspaceId ?? null);
     }
   }, [surfaceId, workspaceId]);
   // `target="_blank"` links and `window.open()` used to be silently dropped by
@@ -580,7 +580,7 @@ export default function BrowserPane({
     // the pane (issue #155). Attach only re-runs on dom-ready, and a dead
     // renderer does not reload itself, so nothing re-attached either.
     const onGone = () => {
-      if (wcIdRef.current !== null) window.wmux?.cdp?.detach?.(wcIdRef.current);
+      if (wcIdRef.current !== null) window.remotea?.cdp?.detach?.(wcIdRef.current);
       wcIdRef.current = null;
       const now = Date.now();
       if (now - lastRecoveryRef.current < RECOVERY_COOLDOWN_MS) return;
@@ -602,7 +602,7 @@ export default function BrowserPane({
       wv.removeEventListener('destroyed', onGone);
       // Only detach if this pane still owns the connection — closing a split-tree
       // browser pane must not kill another open pane's CDP (issue #27).
-      if (wcIdRef.current !== null) window.wmux?.cdp?.detach?.(wcIdRef.current);
+      if (wcIdRef.current !== null) window.remotea?.cdp?.detach?.(wcIdRef.current);
     };
   }, [claimCdp, installPopupBridge]);
 
@@ -611,7 +611,7 @@ export default function BrowserPane({
   const enterAgentMode = useCallback(async (url: string) => {
     const seq = ++switchSeqRef.current;
     const stale = () => !mountedRef.current || switchSeqRef.current !== seq;
-    const api = window.wmux?.agentBrowser;
+    const api = window.remotea?.agentBrowser;
     setAgentStatus('starting');
     setAgentUrl(url);
     if (!api) { setAgentStatus('setup'); return; }
@@ -654,7 +654,7 @@ export default function BrowserPane({
 
     let result: { url?: string } | null;
     try {
-      result = (await window.wmux?.agentBrowser?.disable(surfaceId)) ?? null;
+      result = (await window.remotea?.agentBrowser?.disable(surfaceId)) ?? null;
     } catch {
       result = null;
     }
@@ -704,7 +704,7 @@ export default function BrowserPane({
       if (!decide) return;
       pollInFlightRef.current = true;
       try {
-        const res = await window.wmux?.agentBrowser?.currentUrl?.(surfaceId);
+        const res = await window.remotea?.agentBrowser?.currentUrl?.(surfaceId);
         // A URL we could not read leaves the bar showing its last value. That
         // is the honest degradation: the alternative is blanking the bar every
         // time one invocation fails.
@@ -728,7 +728,7 @@ export default function BrowserPane({
   // enabled is a no-op rather than something to guard against.
   useEffect(() => () => {
     if (engineRef.current === 'agent') {
-      window.wmux?.agentBrowser?.disable(surfaceId)?.catch?.(() => {});
+      window.remotea?.agentBrowser?.disable(surfaceId)?.catch?.(() => {});
     }
   }, [surfaceId]);
 

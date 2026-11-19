@@ -18,7 +18,7 @@ describe('DiffPane worktree baseRef', () => {
     mockGetFiles = vi.fn().mockResolvedValue({ files: [] });
     mockGetFileDiff = vi.fn().mockResolvedValue({ diff: '' });
 
-    (window as any).wmux = {
+    (window as any).remotea = {
       diff: {
         getFiles: mockGetFiles,
         getFileDiff: mockGetFileDiff,
@@ -36,10 +36,10 @@ describe('DiffPane worktree baseRef', () => {
     act(() => root?.unmount());
     container?.remove();
     document.body.innerHTML = '';
-    delete (window as any).wmux;
+    delete (window as any).remotea;
   });
 
-  it('passes baseRef to window.wmux.diff.getFiles when provided', async () => {
+  it('passes baseRef to window.remotea.diff.getFiles when provided', async () => {
     await act(async () => {
       root!.render(
         React.createElement(DiffPane, {

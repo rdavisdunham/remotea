@@ -36,7 +36,7 @@ export default function RemoteCloseDialog() {
     if (!open) return;
     setViews(latestRemoteViews());
     let alive = true;
-    const bridge = (window as { wmux?: { remoteSessions?: { views?: () => Promise<RemoteRegistryView[]> } } }).wmux?.remoteSessions;
+    const bridge = (window as { remotea?: { remoteSessions?: { views?: () => Promise<RemoteRegistryView[]> } } }).remotea?.remoteSessions;
     bridge?.views?.().then((v) => { if (alive) setViews(v); }).catch(() => {});
     return () => { alive = false; };
   }, [open, head]);

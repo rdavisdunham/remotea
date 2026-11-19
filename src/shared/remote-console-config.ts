@@ -267,7 +267,7 @@ export interface RemoteDesktopNotice {
   scope: RemoteScope;
 }
 
-// ── Preload bridge (`window.wmux.remoteConsole`) ────────────────────────
+// ── Preload bridge (`window.remotea.remoteConsole`) ────────────────────────
 
 export type RemoteBridgeError = { error: string };
 

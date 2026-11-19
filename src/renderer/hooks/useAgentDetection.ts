@@ -156,7 +156,7 @@ function scanSurface(
   const verdictMoved = previous?.state !== result.state
     || previous?.agent !== result.agent
     || previous?.ruleId !== result.ruleId;
-  if (verdictMoved) window.wmux?.agentDetection?.report?.(surfaceId, result);
+  if (verdictMoved) window.remotea?.agentDetection?.report?.(surfaceId, result);
 }
 
 export function useAgentDetection(enabled: boolean): void {
@@ -178,7 +178,7 @@ export function useAgentDetection(enabled: boolean): void {
     // from the bundled set rather than from nothing means a slow config read
     // costs a beat of stale rules, not a blind first tick.
     void (async () => {
-      const loaded = await window.wmux?.agentDetection?.manifests?.();
+      const loaded = await window.remotea?.agentDetection?.manifests?.();
       if (!cancelled && Array.isArray(loaded?.manifests) && loaded.manifests.length > 0) {
         manifests.current = loaded.manifests as Manifest[];
       }

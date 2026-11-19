@@ -89,7 +89,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
   const [themes, setThemes] = useState<string[]>([]);
   useEffect(() => {
     let live = true;
-    void window.wmux?.config?.getThemeList?.().then((names: unknown) => {
+    void window.remotea?.config?.getThemeList?.().then((names: unknown) => {
       if (live && Array.isArray(names)) setThemes(names.filter((name): name is string => typeof name === 'string'));
     }, () => {});
     return () => { live = false; };
@@ -168,7 +168,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
         onClose();
         void (async () => {
           try {
-            const res = await (window as any).wmux?.markdown?.openFile?.();
+            const res = await (window as any).remotea?.markdown?.openFile?.();
             if (!res || res.canceled || res.error || !res.content) return;
             const created = (window as any).__wmux_createSurface?.({ type: 'markdown' });
             const surfaceId = created?.surfaceId as string | undefined;
@@ -196,7 +196,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
       category: t('palette.category.commands'),
       action: () => {
         onClose();
-        (window as any).wmux?.workspaceFile?.open?.()?.catch?.(() => {});
+        (window as any).remotea?.workspaceFile?.open?.()?.catch?.(() => {});
       },
     });
 
@@ -224,7 +224,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
         // false means no active workspace to capture — an edge case, but a
         // silent no-op here would look identical to "worked" from the palette.
         if (!opened) {
-          (window as any).wmux?.notification?.fire({
+          (window as any).remotea?.notification?.fire({
             surfaceId: '',
             text: t('palette.saveCurrentLayoutFailed', 'No active workspace to save as a layout.'),
             title: 'remotea',

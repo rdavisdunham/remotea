@@ -313,7 +313,7 @@ describe('surface-slice', () => {
         path.join(__dirname, '..', '..', 'src', 'renderer', 'hooks', 'useTerminal.ts'),
         'utf8',
       );
-      const exitHandler = hook.slice(hook.indexOf('window.wmux.pty.onExit('));
+      const exitHandler = hook.slice(hook.indexOf('window.remotea.pty.onExit('));
       expect(exitHandler).toMatch(/clearPrForSurface\(id/);
     });
   });

@@ -41,7 +41,7 @@ export function notifyChatReminders(views: RemoteRegistryView[]): void {
   notify ??= createChatReminderNotifier({
     read: () => localStorage.getItem(KEY),
     write: value => localStorage.setItem(KEY, value),
-    fire: data => { if (!window.wmux?.notification?.fire) throw new Error('Notification bridge unavailable'); window.wmux.notification.fire(data); },
+    fire: data => { if (!window.remotea?.notification?.fire) throw new Error('Notification bridge unavailable'); window.remotea.notification.fire(data); },
   });
   notify(views);
 }

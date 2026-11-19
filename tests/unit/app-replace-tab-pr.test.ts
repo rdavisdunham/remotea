@@ -18,7 +18,7 @@ describe('tryReplaceTabSpawn PR badge teardown', () => {
 
   beforeEach(() => {
     kill = vi.fn();
-    (globalThis as any).window = { wmux: { pty: { kill } } };
+    (globalThis as any).window = { remotea: { pty: { kill } } };
     useStore.setState({ workspaces: [], activeWorkspaceId: null, agentMeta: new Map() } as any);
   });
 

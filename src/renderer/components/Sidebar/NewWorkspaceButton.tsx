@@ -107,7 +107,7 @@ export default function NewWorkspaceButton({
     );
     // Same as the palette command: a silent no-op would look like it worked.
     if (!opened) {
-      (window as any).wmux?.notification?.fire({
+      (window as any).remotea?.notification?.fire({
         surfaceId: '',
         text: t('palette.saveCurrentLayoutFailed', 'No active workspace to save as a layout.'),
         title: 'remotea',

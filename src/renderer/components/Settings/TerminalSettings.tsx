@@ -39,10 +39,10 @@ export default function TerminalSettings() {
   // Load the list of bundled themes from the main process on mount so the
   // dropdown reflects actual files in resources/themes/ rather than a stub.
   useEffect(() => {
-    (window as any).wmux?.config?.getThemeList?.().then((list: string[]) => {
+    (window as any).remotea?.config?.getThemeList?.().then((list: string[]) => {
       if (Array.isArray(list) && list.length > 0) setThemes(list);
     });
-    (window as any).wmux?.system?.getFonts?.().then((list: string[]) => {
+    (window as any).remotea?.system?.getFonts?.().then((list: string[]) => {
       if (Array.isArray(list)) setSystemFonts(list);
     }).catch(() => { /* picker simply stays hidden */ });
   }, []);
@@ -135,7 +135,7 @@ export default function TerminalSettings() {
   };
 
   const doImport = async (source: 'wt' | 'ghostty') => {
-    const config = (window as any).wmux?.config;
+    const config = (window as any).remotea?.config;
     const theme: ThemeConfig | null = source === 'ghostty'
       ? await config?.importGhostty?.()
       : await config?.importWindowsTerminal?.();

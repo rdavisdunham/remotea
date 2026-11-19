@@ -70,7 +70,7 @@ describe('useTerminal wiring', () => {
     // mount effect, and every call of the restore sits in a callback of the
     // async PTY lookup (has()/create() .then), which cannot run before that
     // synchronous effect body has returned.
-    const lookup = USE_TERMINAL.indexOf('if (surfaceId && window.wmux.pty.has)');
+    const lookup = USE_TERMINAL.indexOf('if (surfaceId && window.remotea.pty.has)');
     expect(lookup).toBeGreaterThan(fit);
     const calls = [...USE_TERMINAL.matchAll(/restoreSurfaceState\(/g)]
       .map((m) => m.index ?? -1)

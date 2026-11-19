@@ -107,7 +107,7 @@ export function playBellSound(): void {
 export function initNotificationSound(): void {
   const prefs = useStore.getState().notificationPrefs;
   if (prefs.customSoundExtension) {
-    const request = window.wmux?.notification?.getCustomSoundDataUrl?.(prefs.customSoundExtension);
+    const request = window.remotea?.notification?.getCustomSoundDataUrl?.(prefs.customSoundExtension);
     if (request) {
       const revision = customSoundRevision;
       void request.then((url: string | null) => {
@@ -117,5 +117,5 @@ export function initNotificationSound(): void {
       });
     }
   }
-  window.wmux?.notification?.onPlaySound?.(playNotificationSound);
+  window.remotea?.notification?.onPlaySound?.(playNotificationSound);
 }

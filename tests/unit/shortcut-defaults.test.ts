@@ -24,7 +24,7 @@ async function loadWith(stored: Record<string, unknown> = {}) {
   const writes: Record<string, unknown> = {};
   vi.resetModules();
   vi.stubGlobal('window', {
-    wmux: {
+    remotea: {
       settings: {
         getAllSync: () => stored,
         set: (key: string, value: unknown) => { writes[key] = value; },

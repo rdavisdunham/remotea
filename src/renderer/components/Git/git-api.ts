@@ -1,5 +1,5 @@
 /**
- * The Git view's one door to main (#362): `window.wmux.git.view`, plus a hook
+ * The Git view's one door to main (#362): `window.remotea.git.view`, plus a hook
  * that runs a request and keeps its answer.
  *
  * The hook keys the request by its JSON, so a parent re-rendering with an
@@ -15,7 +15,7 @@ export class GitViewError extends Error {
 }
 
 export async function gitView<T>(request: GitViewRequest): Promise<T> {
-  const res = await window.wmux?.git?.view(request) as GitViewResult<T> | undefined;
+  const res = await window.remotea?.git?.view(request) as GitViewResult<T> | undefined;
   if (!res) throw new GitViewError('Git view unavailable', 'failed');
   if (!res.ok) throw new GitViewError(res.error, res.code);
   return res.data;

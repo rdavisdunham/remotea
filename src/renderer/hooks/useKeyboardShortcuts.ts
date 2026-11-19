@@ -373,7 +373,7 @@ export function useKeyboardShortcuts(
 
     const openFolderAsWorkspace = () => {
       void (async () => {
-        const res = await window.wmux?.system?.pickFolder?.();
+        const res = await window.remotea?.system?.pickFolder?.();
         if (!res || res.canceled || !res.path) return;
         const segments = String(res.path).split(/[\\/]/).filter(Boolean);
         selectWorkspace(createWorkspace({ cwd: res.path, title: segments[segments.length - 1] || res.path }));
@@ -388,7 +388,7 @@ export function useKeyboardShortcuts(
     //    PaneWrapper level and short-circuited before this lookup. ─────────────
     const handlers: Partial<Record<ShortcutAction, () => void>> = {
       newWorkspace: () => selectWorkspace(createWorkspace(undefined, t)),
-      newWindow: () => window.wmux?.window?.create?.(),
+      newWindow: () => window.remotea?.window?.create?.(),
       // Routed through the close guard (issue #90): prompts when the opt-in
       // confirmWorkspaceClose pref is on, closes immediately otherwise.
       // remotea: a workspace with remote sessions always gets the remote close
@@ -427,8 +427,8 @@ export function useKeyboardShortcuts(
       showNotifications: () => onToggleNotifications?.(),
       flashFocused: () => { if (focusedPaneId) fire('wmux:trigger-flash', { paneId: focusedPaneId }); },
       openBrowser: () => { if (inAppBrowser()) onToggleBrowser?.(); },
-      browserDevTools: () => window.wmux?.system?.toggleDevTools?.(),
-      browserConsole: () => window.wmux?.system?.toggleDevTools?.(),
+      browserDevTools: () => window.remotea?.system?.toggleDevTools?.(),
+      browserConsole: () => window.remotea?.system?.toggleDevTools?.(),
       copy: copySelection,
       paste: pasteIntoFocusedTerminal,
       resetTerminal: resetFocusedTerminal,
@@ -584,7 +584,7 @@ export function useKeyboardShortcuts(
     }
 
     document.addEventListener('keydown', handleKeyDown);
-    const offGuestKey: (() => void) | undefined = window.wmux?.browser?.onGuestKey?.(handleGuestKey);
+    const offGuestKey: (() => void) | undefined = window.remotea?.browser?.onGuestKey?.(handleGuestKey);
     return () => {
       stopActions();
       document.removeEventListener('keydown', handleKeyDown);

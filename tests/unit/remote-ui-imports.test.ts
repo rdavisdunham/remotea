@@ -4,7 +4,7 @@
  * The page is served to a phone over the network, so what it bundles is what
  * it exposes. It may import React, @xterm/xterm, src/shared, the two pure
  * touch recognisers and its own folder — and nothing else: no desktop store
- * (which would drag the whole renderer and its `window.wmux` calls in), no
+ * (which would drag the whole renderer and its `window.remotea` calls in), no
  * desktop i18n (whose `useT` reads that store), no hooks/, no components/.
  * Checked on source text, so a violation fails here before a bundler
  * silently makes it work.

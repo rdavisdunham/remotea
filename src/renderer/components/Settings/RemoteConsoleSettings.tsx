@@ -17,8 +17,8 @@ import '../../styles/remote-settings.css';
  * deliberately no pipe method for any of it (spec I2) — an agent in a pane holds
  * the pipe token, and "pair a device" must stay a human click.
  *
- * Everything here goes through `window.wmux.remoteConsole` and nothing else.
- * `window.wmux` is typed `any`, so the bridge is cast to its contract once, in
+ * Everything here goes through `window.remotea.remoteConsole` and nothing else.
+ * `window.remotea` is typed `any`, so the bridge is cast to its contract once, in
  * `remoteBridge()`, and every answer is checked for `{error}` before use: the
  * runtime is loaded lazily in main and may be absent from a build, and a
  * Settings tab that throws takes the whole settings window with it. An absent

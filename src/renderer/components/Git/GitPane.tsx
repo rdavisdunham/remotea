@@ -44,7 +44,7 @@ function usePollTick(surfaceId: string): [number, () => void] {
   useEffect(() => {
     const timer = setInterval(() => { if (isSurfaceVisible(surfaceId)) bump(); }, POLL_MS);
     let debounce: ReturnType<typeof setTimeout> | undefined;
-    const unsub = window.wmux?.diff?.onUpdate?.(() => {
+    const unsub = window.remotea?.diff?.onUpdate?.(() => {
       clearTimeout(debounce);
       debounce = setTimeout(bump, 300);
     });

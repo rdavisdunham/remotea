@@ -13,7 +13,7 @@ import { isWslShell } from '../../shared/paths';
 export async function applyOsc7Cwd(surfaceId: SurfaceId, data: string): Promise<void> {
   let cwd: string | null;
   try {
-    cwd = await window.wmux.explorer.reportOsc7(surfaceId, data);
+    cwd = await window.remotea.explorer.reportOsc7(surfaceId, data);
   } catch {
     return;
   }

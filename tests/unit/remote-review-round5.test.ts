@@ -72,7 +72,7 @@ function mountSettings(s: RemoteConsoleStatus) {
     dismissRejectedOrigin: vi.fn(async () => undefined),
     pairStart: vi.fn(), pairCancel: vi.fn(), onRendererRequest: vi.fn(), replyRenderer: vi.fn(),
   };
-  (window as unknown as { wmux: unknown }).wmux = { remoteConsole: bridge };
+  (window as unknown as { remotea: unknown }).remotea = { remoteConsole: bridge };
   return bridge;
 }
 

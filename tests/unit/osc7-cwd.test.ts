@@ -33,7 +33,7 @@ beforeEach(() => {
     workspaces: [workspace], workspacePrefs: { defaultShell }, updateSurface, updateWorkspaceMetadata,
   }));
   reportOsc7.mockResolvedValue(cwd);
-  vi.stubGlobal('window', { wmux: { explorer: { reportOsc7 } } });
+  vi.stubGlobal('window', { remotea: { explorer: { reportOsc7 } } });
 });
 
 afterEach(() => vi.unstubAllGlobals());

@@ -41,7 +41,7 @@ const remoteConsole: RemoteConsoleBridge = {
 // Main hands the two host facts in through process.argv; see shared/host-info.
 const hostInfo = decodeHostInfoArg(process.argv);
 
-contextBridge.exposeInMainWorld('wmux', {
+contextBridge.exposeInMainWorld('remotea', {
   pty: {
     create: (options: { shell: string; cwd: string; env: Record<string, string>; surfaceId?: string; startupCommands?: string[]; cols?: number; rows?: number }) =>
       ipcRenderer.invoke(IPC_CHANNELS.PTY_CREATE, options) as Promise<{ id: string; shell: string; launchShell: string; startupCommandsConsumed?: boolean; reused: boolean; shellFallbackFrom?: string }>,

@@ -65,7 +65,7 @@ export default function GeneralSettings() {
   const refreshIconCache = async () => {
     setIconCacheBusy(true);
     try {
-      const result = await window.wmux?.system?.refreshIconCache?.();
+      const result = await window.remotea?.system?.refreshIconCache?.();
       if (result?.ran) await new Promise((r) => setTimeout(r, 3000));
     } finally {
       setIconCacheBusy(false);
@@ -74,7 +74,7 @@ export default function GeneralSettings() {
 
   useEffect(() => {
     let cancelled = false;
-    window.wmux?.system?.getContextMenu?.()
+    window.remotea?.system?.getContextMenu?.()
       .then((on: boolean) => { if (!cancelled) setContextMenu(!!on); })
       .catch(() => { /* registry unreadable — leave the toggle showing off */ });
     return () => { cancelled = true; };
@@ -84,7 +84,7 @@ export default function GeneralSettings() {
     setContextMenuBusy(true);
     setContextMenuError(false);
     try {
-      const res = await window.wmux?.system?.setContextMenu?.(
+      const res = await window.remotea?.system?.setContextMenu?.(
         next,
         t('settings.general.contextMenuLabel'),
       );

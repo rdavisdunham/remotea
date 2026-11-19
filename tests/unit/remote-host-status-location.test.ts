@@ -11,7 +11,7 @@ afterEach(() => {
 describe('location configuration certainty', () => {
   it('distinguishes an unavailable host list from a confirmed removed host', async () => {
     const list = vi.fn().mockRejectedValueOnce(new Error('bridge unavailable')).mockResolvedValueOnce([]);
-    Object.defineProperty(globalThis, 'window', { configurable: true, value: { wmux: { remoteHosts: { list } } } });
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { remotea: { remoteHosts: { list } } } });
     await refreshRemoteHosts();
     expect(useRemoteHosts.getState()).toMatchObject({ loaded: true, loadError: true });
     await refreshRemoteHosts();

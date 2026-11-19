@@ -163,7 +163,7 @@ describe('separation: Eridani tabs stay outside manual workspaces', () => {
 
     it('separates tabs repeatedly while preserving their processes, identities, and manual tabs', () => {
       const killed: string[] = [];
-      (window as unknown as { wmux?: unknown }).wmux = { pty: { kill: (id: string) => killed.push(id) } };
+      (window as unknown as { remotea?: unknown }).remotea = { pty: { kill: (id: string) => killed.push(id) } };
       const st = useStore.getState();
       const eriWs = st.createWorkspace({ title: 'Eridani', splitTree: lf('pane-e', ['surf-a1', 'surf-b', 'surf-a2']), remoteGroups: { desk: ERI_GROUP } });
       const workWs = st.createWorkspace({ title: 'Work', splitTree: lf('pane-w', ['surf-manual']), remoteGroups: { desk: 'grp-work' } });
@@ -191,7 +191,7 @@ describe('separation: Eridani tabs stay outside manual workspaces', () => {
       expect(ids(after.workspaces.find((w) => w.id === workWs)!.splitTree)).toEqual(['surf-manual']);
       expect(ids(after.workspaces.find((w) => w.id === fix.id)!.splitTree)).toEqual(['surf-a1', 'surf-a2']);
       expect(killed).toEqual([]);
-      delete (window as unknown as { wmux?: unknown }).wmux;
+      delete (window as unknown as { remotea?: unknown }).remotea;
     });
 
     it('a tab whose shell came from its workspace keeps it when moved', () => {
@@ -252,7 +252,7 @@ it('separates existing and new runs through registry sync when repository headin
     workspacePrefs: { ...useStore.getState().workspacePrefs, groupEridaniRuns: false } });
   let registryPush!: (payload: unknown) => void;
   const close = () => { throw new Error('Presentation changes must preserve host sessions'); };
-  (window as unknown as { wmux: unknown }).wmux = { remoteSessions: {
+  (window as unknown as { remotea: unknown }).remotea = { remoteSessions: {
     onRegistry: (callback: typeof registryPush) => { registryPush = callback; return () => {}; },
     report: () => {}, groupUpsert: () => {}, close, groupClose: close, hide: close,
   } };
@@ -270,5 +270,5 @@ it('separates existing and new runs through registry sync when repository headin
   if (manual.splitTree.type !== 'leaf') throw new Error('Expected one manual pane');
   expect(manual.splitTree.surfaces).toHaveLength(1);
   expect(after.workspaces.filter(workspace => workspace.eridaniTask).map(workspace => workspace.title)).toEqual(['Existing task', 'New task']);
-  delete (window as unknown as { wmux?: unknown }).wmux;
+  delete (window as unknown as { remotea?: unknown }).remotea;
 });

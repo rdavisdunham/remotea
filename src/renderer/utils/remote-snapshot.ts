@@ -130,7 +130,7 @@ export function handleRemoteRequest(
 
 function bridge(): RemoteConsoleBridge | undefined {
   if (typeof window === 'undefined') return undefined;
-  return window.wmux?.remoteConsole as RemoteConsoleBridge | undefined;
+  return window.remotea?.remoteConsole as RemoteConsoleBridge | undefined;
 }
 
 /** The live registries useTerminal keeps; read per request, never cached. */

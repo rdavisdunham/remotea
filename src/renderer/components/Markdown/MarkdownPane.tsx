@@ -404,7 +404,7 @@ export default function MarkdownPane({
   const html = useMemo(() => renderMarkdown(content ?? ''), [content]);
 
   const displayPath = useMemo(
-    () => (filePath ? toDisplayPath(filePath, { cwd, homeDir: window.wmux?.system?.homeDir }) : ''),
+    () => (filePath ? toDisplayPath(filePath, { cwd, homeDir: window.remotea?.system?.homeDir }) : ''),
     [filePath, cwd],
   );
 
@@ -424,12 +424,12 @@ export default function MarkdownPane({
 
   // ─── Clipboard ──────────────────────────────────────────────────────────────
 
-  // window.wmux.clipboard over navigator.clipboard: no user-gesture requirement
+  // window.remotea.clipboard over navigator.clipboard: no user-gesture requirement
   // and correct handling of Windows clipboard payloads (see useTerminal.ts).
   const writeClipboard = useCallback(async (text: string, kind: 'doc' | 'path') => {
     if (!text) return;
     try {
-      await window.wmux?.clipboard?.writeText?.(text);
+      await window.remotea?.clipboard?.writeText?.(text);
       setCopied(kind);
     } catch {
       setError(t('markdown.error.copy', 'Could not write to the clipboard'));
@@ -507,7 +507,7 @@ export default function MarkdownPane({
   // ─── File actions ───────────────────────────────────────────────────────────
 
   const loadFromDisk = useCallback(async (path: string) => {
-    const res = await window.wmux?.markdown?.readFile?.(path);
+    const res = await window.remotea?.markdown?.readFile?.(path);
     if (!res || res.error || typeof res.content !== 'string') {
       setError(markdownErrorMessage(res, t, 'markdown.error.read', 'Could not read the file'));
       return;
@@ -533,12 +533,12 @@ export default function MarkdownPane({
   // Both shell actions are rejected by the main process when the path falls
   // outside the extension whitelist, so surface that rather than dropping it.
   const revealFile = useCallback(async (path: string) => {
-    const res = await window.wmux?.markdown?.reveal?.(path);
+    const res = await window.remotea?.markdown?.reveal?.(path);
     if (res?.error) setError(markdownErrorMessage(res, t, 'markdown.error.action', 'The action failed'));
   }, [t]);
 
   const openFileInApp = useCallback(async (path: string) => {
-    const res = await window.wmux?.markdown?.openInApp?.(path);
+    const res = await window.remotea?.markdown?.openInApp?.(path);
     if (res?.error) setError(markdownErrorMessage(res, t, 'markdown.error.action', 'The action failed'));
   }, [t]);
 
@@ -546,7 +546,7 @@ export default function MarkdownPane({
 
   const saveAs = useCallback(async () => {
     const suggested = filePath ? basenameOf(filePath) : 'untitled.md';
-    const res = await window.wmux?.markdown?.saveAs?.(content, suggested, cwd);
+    const res = await window.remotea?.markdown?.saveAs?.(content, suggested, cwd);
     if (!res || res.canceled) return;
     if (res.error || !res.filePath) {
       setError(markdownErrorMessage(res, t, 'markdown.error.save', 'Could not save the file'));
@@ -563,7 +563,7 @@ export default function MarkdownPane({
    */
   const saveInPlace = useCallback(async (force = false) => {
     if (!filePath) { await saveAs(); return; }
-    const res = await window.wmux?.markdown?.saveFile?.(
+    const res = await window.remotea?.markdown?.saveFile?.(
       filePath,
       content,
       force ? undefined : fileMtime,
@@ -589,7 +589,7 @@ export default function MarkdownPane({
   useEffect(() => {
     if (!filePath || fileMtime === undefined) return;
     const check = async () => {
-      const res = await window.wmux?.markdown?.statFile?.(filePath);
+      const res = await window.remotea?.markdown?.statFile?.(filePath);
       if (res && !res.error && res.mtimeMs !== fileMtime) setConflict(true);
     };
     void check();
@@ -619,7 +619,7 @@ export default function MarkdownPane({
     // preventDefaults both dragover and drop (issue #33).
     event.preventDefault();
     event.stopPropagation();
-    const path = window.wmux?.shell?.getPathForFile?.(files[0]);
+    const path = window.remotea?.shell?.getPathForFile?.(files[0]);
     if (path) void loadFromDisk(path);
   }, [loadFromDisk]);
 

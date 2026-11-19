@@ -283,7 +283,7 @@ export default function WorkspaceRow({
   const answerSession = async (surfaceId: string, choiceId: string, paneId: PaneId) => {
     setAnswering(surfaceId);
     try {
-      const res = await window.wmux?.agentState?.answer?.(surfaceId, choiceId);
+      const res = await window.remotea?.agentState?.answer?.(surfaceId, choiceId);
       if (res?.ok) return;
     } catch {
       // The terminal provides the recovery path for an unconfirmed answer.
@@ -383,7 +383,7 @@ export default function WorkspaceRow({
 
   // ── Context line: "branch* · ~/path/to/dir · :3000" (see ./context-line) ──
   const contextLine = useMemo(
-    () => buildContextLine(workspace, details, window.wmux?.system?.homeDir),
+    () => buildContextLine(workspace, details, window.remotea?.system?.homeDir),
     [workspace.gitBranch, workspace.gitDirty, workspace.cwd, workspace.ports, details],
   );
 

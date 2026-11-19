@@ -19,7 +19,7 @@ type Bridge = {
 };
 
 function bridge(): Bridge | null {
-  return (window as unknown as { wmux?: { remoteHosts?: Bridge } }).wmux?.remoteHosts ?? null;
+  return (window as unknown as { remotea?: { remoteHosts?: Bridge } }).remotea?.remoteHosts ?? null;
 }
 
 function listLabels(names: string[], and: string): string {

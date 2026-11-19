@@ -60,7 +60,7 @@ interface SurfaceTabBarProps {
 
 /** remotea: open an Eridani run's page in the system browser (main allows only http/https). */
 function openEridani(link: EridaniTabLink): void {
-  window.wmux?.system?.openExternal?.(link.url);
+  window.remotea?.system?.openExternal?.(link.url);
 }
 
 function surfaceIcon(type: string, isAgent: boolean): string {
@@ -759,7 +759,7 @@ export default function SurfaceTabBar({
               tabIndex={0}
               title={ctxFilePath}
               onClick={() => {
-                window.wmux?.clipboard?.writeText?.(ctxFilePath)?.catch(() => { /* ignore, as in CodePane */ });
+                window.remotea?.clipboard?.writeText?.(ctxFilePath)?.catch(() => { /* ignore, as in CodePane */ });
                 setCtxMenu(null);
               }}
               onKeyDown={(e) => {
@@ -796,7 +796,7 @@ export default function SurfaceTabBar({
                 role="menuitem"
                 title={ctxEridani.url}
                 onClick={() => {
-                  window.wmux?.clipboard?.writeText?.(ctxEridani.url)?.catch(() => { /* ignore, as for Copy full path */ });
+                  window.remotea?.clipboard?.writeText?.(ctxEridani.url)?.catch(() => { /* ignore, as for Copy full path */ });
                   setCtxMenu(null);
                 }}
               >

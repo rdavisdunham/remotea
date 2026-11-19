@@ -73,7 +73,7 @@ export default function HostActivityDialog({ onClose, onSettings }: {
   }, [onClose]);
 
   useEffect(() => {
-    const bridge = window.wmux?.remoteConsole as RemoteConsoleBridge | undefined;
+    const bridge = window.remotea?.remoteConsole as RemoteConsoleBridge | undefined;
     let live = true;
     const accept = (value: unknown) => {
       if (live && value && typeof value === 'object' && 'config' in value && 'running' in value) {
@@ -90,7 +90,7 @@ export default function HostActivityDialog({ onClose, onSettings }: {
     const key = hostId + ':' + sessionId;
     setHandoff(current => ({ ...current, [key]: { busy: true } }));
     try {
-      const result = await window.wmux.remoteSessions.takeover(hostId, sessionId);
+      const result = await window.remotea.remoteSessions.takeover(hostId, sessionId);
       setHandoff(current => ({ ...current, [key]: { busy: false, error: result.ok ? undefined : result.error || t('activity.takeoverFailed') } }));
     } catch {
       setHandoff(current => ({ ...current, [key]: { busy: false, error: t('activity.takeoverFailed') } }));
@@ -152,7 +152,7 @@ export default function HostActivityDialog({ onClose, onSettings }: {
                   <p>{t('activity.eridaniHint')}</p>
                   {linked.map(({ session, link }) => <div key={session.id} className="host-activity__actions">
                     <span>{session.eridani?.target} · {link.taskTitle || link.taskId || t('activity.standalone')} · {link.runId.slice(0, 8)}</span>
-                    <button onClick={() => void window.wmux?.system?.openExternal?.(link.url)}>{t('activity.openRun')}</button>
+                    <button onClick={() => void window.remotea?.system?.openExternal?.(link.url)}>{t('activity.openRun')}</button>
                     {session.eridani?.execution === 'managed' && <>
                       <span>{t(session.eridani.controller === 'terminal' ? 'activity.terminalControl' : 'activity.managedControl')}</span>
                       {session.eridani.controller !== 'terminal' && <button

@@ -228,7 +228,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
     setLoading(true);
     try {
       const result: ExplorerListResult =
-        await window.wmux.explorer.listDir(surfaceId, relPath, { showHidden });
+        await window.remotea.explorer.listDir(surfaceId, relPath, { showHidden });
       // Clear loading for THIS call unconditionally, even if stale. A stale
       // reply that skipped this would strand the spinner/empty-state forever
       // if the newer fetch then bailed at the guard above (no surfaceId/root)
@@ -423,7 +423,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
     // Optional all the way down, so this can legitimately be `undefined` rather
     // than a promise — hence `?.catch` and not `.catch`. A clipboard write that
     // fails is not worth surfacing: the user sees nothing pasted and retries.
-    window.wmux?.clipboard?.writeText?.(absolutePathOf(relPath))?.catch(() => { /* ignore */ });
+    window.remotea?.clipboard?.writeText?.(absolutePathOf(relPath))?.catch(() => { /* ignore */ });
   }, [absolutePathOf]);
 
   // Reveal / open-in-app go through the EXPLORER's own jailed channels, not
@@ -440,7 +440,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
     if (!surfaceId) { setOpenError('no_root'); return; }
     setOpenError(null);
     // No `void` — the second `.then` argument below is the rejection handler.
-    window.wmux.explorer[action](surfaceId, relPath).then(
+    window.remotea.explorer[action](surfaceId, relPath).then(
       (res: { code?: ExplorerErrorCode } | null) => {
         if (res && 'error' in res) setOpenError(res.code ?? 'read_failed');
       },

@@ -22,7 +22,7 @@ let bridge: any;
 
 beforeAll(async () => {
   await import('../../src/preload/index');
-  bridge = electron.exposeInMainWorld.mock.calls.find(([name]) => name === 'wmux')?.[1];
+  bridge = electron.exposeInMainWorld.mock.calls.find(([name]) => name === 'remotea')?.[1];
 });
 
 beforeEach(() => {

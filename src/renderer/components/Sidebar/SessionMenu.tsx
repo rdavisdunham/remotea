@@ -31,7 +31,7 @@ export default function SessionMenu({ mode = 'load', onSelect, onClose }: Sessio
   const isSave = mode === 'save';
 
   useEffect(() => {
-    window.wmux?.session?.list().then(setSessions);
+    window.remotea?.session?.list().then(setSessions);
   }, []);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function SessionMenu({ mode = 'load', onSelect, onClose }: Sessio
 
   const handleDelete = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    await window.wmux?.session?.delete(name);
+    await window.remotea?.session?.delete(name);
     setSessions(prev => prev.filter(s => s.name !== name));
   };
 
