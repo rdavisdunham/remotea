@@ -181,7 +181,7 @@ export const en = {
   "tutorial.return.title": "Leave and return",
   "tutorial.return.body": "Hide on this device removes a host view without ending its session; End session on this host affects other attached devices. Workspace snapshots save all workspaces, tabs and terminal preferences in this window, not process memory. Restore, reconnect and resume a provider conversation are different operations.",
 
-  "settings.help.credits": "Credits \u2014 built on remotea and inspired by herdr",
+  "settings.help.credits": "Credits \u2014 built on wmux and inspired by herdr",
   "settings.help.tasks": "Help by task",
   "settings.help.search": "Search help",
   "settings.help.noResults": "No matching help topics.",

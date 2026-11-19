@@ -20,7 +20,7 @@ function host() {
   dirs.push(home);
   const paths = { home, cliDir: path.join(home, '.local', 'share', 'remotea', 'cli'), sourceDir: SOURCE };
   fs.mkdirSync(paths.cliDir, { recursive: true });
-  for (const f of ['wmux-hook.js', 'wmux.js', 'remotea-hook.js']) fs.writeFileSync(path.join(paths.cliDir, f), '// helper');
+  for (const f of ['wmux-hook.js', 'wmux.js', 'wmux-codex.js', 'remotea-hook.js']) fs.writeFileSync(path.join(paths.cliDir, f), '// helper');
   fs.mkdirSync(path.join(home, '.claude'));
   const wmux = path.join(home, 'src', 'wmux');
   fs.mkdirSync(path.join(wmux, 'resources', 'cli'), { recursive: true });
@@ -44,6 +44,7 @@ describe('runHostMove', () => {
     ]);
     expect(fs.existsSync(path.join(paths.cliDir, 'wmux-hook.js'))).toBe(false);
     expect(fs.existsSync(path.join(paths.cliDir, 'wmux.js'))).toBe(false);
+    expect(fs.existsSync(path.join(paths.cliDir, 'wmux-codex.js'))).toBe(false);
     expect(fs.existsSync(path.join(paths.cliDir, 'remotea-hook.js'))).toBe(true);
     expect(formatHostMoveResult(r)).toContain(REOPEN_LINE);
     expect(fs.existsSync(hostMoveMarker(paths))).toBe(true);

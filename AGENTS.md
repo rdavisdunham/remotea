@@ -8,6 +8,7 @@ remotea started as a fork of [wmux](https://github.com/amirlehmam/wmux) (MIT, by
 
 - **Taking a wmux fix:** cherry-pick it on its own with `git cherry-pick -x`, and add a row to `docs/remotea/upstream-ledger.md` with the ruling and the remotea commit. Rename any wmux name it brings in to the remotea name already used for that thing.
 - **Names:** everything remotea writes on a machine or hands another program is named remotea: the `remotea` command, `REMOTEA_*` variables, hook and plugin files, managed-block markers. Old names live only in `src/shared/legacy-names.ts`, read by the move command, the old-state notice and the path-proven cleanup of old hook entries (`src/shared/legacy-cleanup.ts`). Add no new wmux names anywhere else. Text people see says remotea.
+- **Name guard:** a test fails when "wmux" (any case, in a file name or a line) appears outside `tests/name-guard-allowlist.json`. When the old name is right (upstream credit, a separate wmux install, a name the move command migrates), add an entry with its reason; otherwise say remotea.
 - **Identity:** the pipe, the APPDATA folder and the AppUserModelId use the base name `remotea` (`src/shared/instance.ts`), so remotea runs beside a stock wmux install.
 
 ## Where things are
