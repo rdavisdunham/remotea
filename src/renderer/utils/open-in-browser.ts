@@ -10,7 +10,7 @@ function getAllSurfaces(node: SplitNode): SurfaceRef[] {
 }
 
 /**
- * Decide where a clicked link goes: the wmux panel, or the system browser.
+ * Decide where a clicked link goes: the remotea panel, or the system browser.
  *
  * The destination is `browserPrefs.openLinksExternally`, and Ctrl/Cmd INVERTS
  * it rather than forcing one side (issue #201). Inverting is what makes the
@@ -27,7 +27,7 @@ export function linkOpensExternally(preferExternal: boolean, invert: boolean | u
 }
 
 /**
- * Open a URL in the wmux browser panel, or the system browser.
+ * Open a URL in the remotea browser panel, or the system browser.
  * - Destination follows `browserPrefs.openLinksExternally`; Ctrl/Cmd inverts it.
  * - For the panel: finds or creates a browser surface in the active workspace,
  *   then navigates to the URL.
@@ -83,7 +83,7 @@ export function openInRemoteaBrowser(url: string, opts?: { invert?: boolean }): 
   // a guarantee: on a loaded machine, or when the listener had not attached yet,
   // the navigate landed on nothing and the pane was left showing BrowserPane's
   // default page — which is how a browser tab the user never asked for appeared
-  // on wmux's own GitHub repo (#232). Handing the surface its url up front
+  // on remotea's own GitHub repo (#232). Handing the surface its url up front
   // removes the window entirely; there is nothing left to be late for.
   state.updateSplitTree(wsId, withLeafSurfaceUrl(split, newPaneId, url));
 }

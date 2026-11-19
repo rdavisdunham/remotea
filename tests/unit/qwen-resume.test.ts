@@ -43,7 +43,7 @@ describe('qwen resume, main side', () => {
 
   describe('pruning', () => {
     let tmp: string;
-    beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-qwen-rt-')); });
+    beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-qwen-rt-')); });
     afterEach(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
     it('lists transcripts under projects/*/chats and prunes the rest', () => {

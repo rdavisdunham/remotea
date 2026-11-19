@@ -16,7 +16,7 @@ import { SplitNode, SurfaceId, PaneId } from '../../src/shared/types';
 
 // Issue #272: a background subagent kept working after its parent's turn ended,
 // and the pane read "Idle". Declared subagents (hook agent_id, or
-// `wmux report-subagent`) own their own lifecycle.
+// `remotea report-subagent`) own their own lifecycle.
 const surf = 'surf-sub-1' as SurfaceId;
 
 function tree(): SplitNode {

@@ -40,17 +40,17 @@ describe('expandPathVars', () => {
   });
 
   it('expands %VAR% anywhere in the path', () => {
-    expect(expandPathVars('%DEV%\\wmux', env)).toBe('D:\\code\\wmux');
+    expect(expandPathVars('%DEV%\\remotea', env)).toBe('D:\\code\\remotea');
     expect(expandPathVars('%USERPROFILE%\\OneDrive', env)).toBe(`${HOME}\\OneDrive`);
   });
 
   // The important one: collapsing an unset %VAR% to nothing turns
-  // `%PROJECTS%\wmux` into `\wmux`, which is a REAL directory (the drive root's
+  // `%PROJECTS%\remotea` into `\remotea`, which is a REAL directory (the drive root's
   // child) — the pane would open somewhere plausible-looking and wrong. Left
   // literal, it fails the stat below and gets the honest %USERPROFILE% fallback
   // plus a console warning naming the path.
   it('leaves an unset %VAR% literal rather than collapsing it', () => {
-    expect(expandPathVars('%PROJECTS%\\wmux', env)).toBe('%PROJECTS%\\wmux');
+    expect(expandPathVars('%PROJECTS%\\remotea', env)).toBe('%PROJECTS%\\remotea');
   });
 
   it('treats a var set to the empty string as set', () => {
@@ -80,13 +80,13 @@ describe('resolveSpawnCwd with a user-typed starting path', () => {
     expect(resolveSpawnCwd('%REMOTEA_NO_SUCH_VAR%\\projects')).toBe(process.env.USERPROFILE || os.homedir());
   });
 
-  // Was `toBeUndefined()` — node-pty's default, which is "inherit wmux.exe's own
+  // Was `toBeUndefined()` — node-pty's default, which is "inherit remotea.exe's own
   // working directory". #205 knew that meant C:\Windows\system32 for a
   // Start-menu launch and kept it as the status quo; #214 is what it cost, when
   // a crash relaunch put every restored pane there and Claude Code filed its
   // transcripts under system32. A directory nobody chose is not a better answer
   // than the home directory every other branch here already falls back to.
-  it('falls back to the home directory for no cwd at all, never wmux\'s own', () => {
+  it('falls back to the home directory for no cwd at all, never remotea\'s own', () => {
     const home = process.env.USERPROFILE || os.homedir();
     expect(resolveSpawnCwd('')).toBe(home);
     expect(resolveSpawnCwd(undefined)).toBe(home);
@@ -96,7 +96,7 @@ describe('resolveSpawnCwd with a user-typed starting path', () => {
 });
 
 describe('workspacePrefs.defaultCwd', () => {
-  // Empty means "wherever wmux itself was launched from" — the behaviour every
+  // Empty means "wherever remotea itself was launched from" — the behaviour every
   // install had before this pref existed. Shipping any other default would move
   // every existing user's panes on upgrade.
   it('defaults to empty, i.e. unchanged behaviour', () => {

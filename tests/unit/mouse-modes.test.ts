@@ -25,7 +25,7 @@ const fold = (...chunks: string[]) => {
  * coordinate ENCODING, so the replacement terminal reported clicks in the legacy
  * encoding while the application was still decoding SGR.
  *
- * wmux's own wheel handler emits SGR itself and so kept working, which is why
+ * remotea's own wheel handler emits SGR itself and so kept working, which is why
  * the bug presented as "the wheel still works but clicking doesn't".
  */
 describe('mouse mode tracking (issue #164)', () => {

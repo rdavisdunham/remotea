@@ -53,7 +53,7 @@ export type OpenResult =
   | { ok: true; cancelled: true }
   | { ok: true; workspaceId: string; ranCommands: boolean; warnings: string[] };
 
-/** Workspaces opened from a manifest in this run of wmux, by manifest path. */
+/** Workspaces opened from a manifest in this run of remotea, by manifest path. */
 const openedWorkspaces = new Map<string, string>();
 
 /**

@@ -3,7 +3,7 @@ import path from 'path';
 import { getAppDataDir } from '../shared/instance';
 
 // User settings (issue #19). Previously these lived only in renderer
-// localStorage, which is scoped to the page origin. Because wmux ships as a
+// localStorage, which is scoped to the page origin. Because remotea ships as a
 // portable zip that users extract to a *new folder per version*, the
 // production `file://` origin changes between versions and Chromium buckets
 // localStorage by that path — so font/theme/shortcut customizations appeared

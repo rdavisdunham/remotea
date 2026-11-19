@@ -21,10 +21,10 @@
  *
  * Neither directory is read by a released install. `electron-builder.json` maps
  * `src/shell-integration` and `dist/cli/*.js` into the package, and
- * `getShellIntegrationPath()` falls back to `src/` in dev — so a packaged wmux
+ * `getShellIntegrationPath()` falls back to `src/` in dev — so a packaged remotea
  * has always run fresh sources. What reads the copies is dev-mode Claude hook
  * registration (`claude-context.ts`, for `resources/cli/remotea-hook.js`) and
- * anything consuming wmux out of a repo checkout, which is how the drift
+ * anything consuming remotea out of a repo checkout, which is how the drift
  * surfaced in the first place.
  */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';

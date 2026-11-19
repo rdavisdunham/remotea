@@ -8,11 +8,11 @@ function makeStore() {
 }
 
 const sampleWorktree: WorktreeMetadata = {
-  repoRoot: 'C:\\projects\\wmux',
+  repoRoot: 'C:\\projects\\remotea',
   branch: 'feat/test-branch',
   baseBranch: 'main',
   baseSha: '0123456789abcdef0123456789abcdef01234567',
-  worktreePath: 'C:\\projects\\wmux\\.remotea\\worktrees\\feat-test-branch',
+  worktreePath: 'C:\\projects\\remotea\\.remotea\\worktrees\\feat-test-branch',
 };
 
 describe('workspace-slice worktree persistence', () => {

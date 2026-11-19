@@ -4,7 +4,7 @@ import { openInRemoteaBrowser } from './open-in-browser';
  * The one protocol gate for a URL arriving from outside the renderer.
  *
  * Both a terminal's OSC 8/WebLinks link and an app's own browser-open request
- * (`wmux open` -> `link.open`) end up here, so `javascript:`, `file:` and
+ * (`remotea open` -> `link.open`) end up here, so `javascript:`, `file:` and
  * malformed values are refused in one place rather than two.
  */
 export function isHttpUrl(value: unknown): value is string {
@@ -18,9 +18,9 @@ export function isHttpUrl(value: unknown): value is string {
 }
 
 /**
- * `link.open` from main, i.e. a URL an agent or CLI asked wmux to open.
+ * `link.open` from main, i.e. a URL an agent or CLI asked remotea to open.
  *
- * It deliberately goes through `openInRemoteaBrowser` and NOT `wmux browser open`:
+ * It deliberately goes through `openInRemoteaBrowser` and NOT `remotea browser open`:
  * this is a human-facing link click, so it follows `openLinksExternally` and
  * lands in the workspace's panel, not the caller's agent-bound browser (#62).
  */

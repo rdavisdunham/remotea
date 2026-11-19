@@ -152,7 +152,7 @@ export function useExplorerDiff(
   }, [enabled, surfaceId, fetchStats]);
 
   // Attribution, plus the freshness signal that actually matters. Both come off
-  // the hook stream wmux already receives — nothing extra is installed or sent,
+  // the hook stream remotea already receives — nothing extra is installed or sent,
   // and with no hooks there are simply no dots and the poll still works.
   useEffect(() => {
     if (!enabled || !absRoot) return;

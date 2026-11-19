@@ -22,10 +22,10 @@ const fixture = (name: string) => path.join(FIXTURES, `${name}.txt`);
 beforeEach(() => resetDetectionStore());
 
 /**
- * The offline half of `wmux detect explain`, and the reason it exists: it
+ * The offline half of `remotea detect explain`, and the reason it exists: it
  * replays a captured screen through the same engine with no running detection
  * and without the agent installed. That is how a rule regression gets debugged
- * from a `wmux read-screen` capture — and how the bundled Codex and OpenCode
+ * from a `remotea read-screen` capture — and how the bundled Codex and OpenCode
  * manifests were authored, on a machine where neither could reach a live turn.
  */
 describe('explainFile', () => {

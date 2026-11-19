@@ -14,7 +14,7 @@ describe('diff-provider with worktree baseRef', () => {
 
   beforeEach(async () => {
     resetDiffCaches();
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-diff-test-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-diff-test-'));
 
     const git = async (args: string[]) => {
       await execFileAsync('git', args, { cwd: tempDir });

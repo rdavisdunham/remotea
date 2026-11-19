@@ -1,5 +1,5 @@
 /**
- * shell-context-menu.ts — "Open in wmux" in the Windows Explorer context menu.
+ * shell-context-menu.ts — "Open in remotea" in the Windows Explorer context menu.
  *
  * Registers the classic shell verbs under HKCU\Software\Classes. Three roots are
  * needed because Explorer treats them as different objects:
@@ -10,14 +10,14 @@
  * WHERE THIS SHOWS UP: on Windows 11 these land in the legacy menu, under
  * "Show more options" (Shift+F10). The modern top-level menu only accepts an
  * IExplorerCommand shell extension shipped in an MSIX package, and MSIX refuses
- * to install unless signed by a cert the machine trusts — wmux's signing is
+ * to install unless signed by a cert the machine trusts — remotea's signing is
  * self-signed and SignPath currently 400s, so that route is closed. This is the
  * same placement "Open with Code" gets, for the same reason.
  *
  * HKCU, never HKLM: no elevation prompt, per-user, and uninstall can't strand
  * a machine-wide key pointing at a deleted exe.
  *
- * Registry writes go through reg.exe rather than a native module: wmux ships as
+ * Registry writes go through reg.exe rather than a native module: remotea ships as
  * a portable zip whose path routinely contains spaces and OneDrive segments, and
  * adding a node-gyp dependency for four keys would break the very packaging
  * story that already forbids electron-builder here.
@@ -46,7 +46,7 @@ export function verbKeyFor(root: string): string {
  * this feature exists to serve.
  *
  * Quoted because a Windows path routinely contains spaces; this project lives
- * in "OneDrive - Pulsa\Bureau\wmux".
+ * in "OneDrive - Pulsa\Bureau\remotea".
  */
 export function commandFor(exePath: string): string {
   return `"${exePath}" "%V"`;
@@ -84,7 +84,7 @@ export function isContextMenuInstalled(): boolean {
 /**
  * Register the verb for all three roots.
  *
- * @param exePath absolute path to wmux.exe
+ * @param exePath absolute path to remotea.exe
  * @param label   menu text, localized by the caller
  */
 export function installContextMenu(exePath: string, label = 'Open in remotea'): void {
@@ -138,7 +138,7 @@ export function uninstallContextMenu(): void {
 /**
  * Pull a directory to open out of a process argv.
  *
- * Explorer invokes us as `wmux.exe "C:\some\folder"`, but argv also carries the
+ * Explorer invokes us as `remotea.exe "C:\some\folder"`, but argv also carries the
  * exe itself, Electron/Chromium switches, and in dev the script path. Anything
  * that is not an existing directory is ignored rather than guessed at, so a
  * stray `--flag` can never be mistaken for a workspace path.

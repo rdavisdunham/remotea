@@ -303,7 +303,7 @@ export function initPipeBridge(): void {
     const surfaceId = newLeaf?.surfaces?.[0]?.id || null;
 
     // Patch the freshly-created surface before React gets a chance to mount it:
-    // `colorScheme` so `wmux split --color-scheme prod` takes effect
+    // `colorScheme` so `remotea split --color-scheme prod` takes effect
     // immediately, and `startupCommands` because useTerminal reads them once,
     // at pty.create time — a patch that landed after mount would never run.
     // Both store writes happen in this same synchronous tick as
@@ -455,7 +455,7 @@ export function initPipeBridge(): void {
 
   /**
    * Update an existing surface's color scheme. Lets users switch a running
-   * pane to "prod" mid-session via `wmux surface set-color-scheme <id> prod`.
+   * pane to "prod" mid-session via `remotea surface set-color-scheme <id> prod`.
    */
   w.__remotea_setSurfaceColorScheme = (surfaceId: string, colorScheme: string | null) => {
     const store = useStore.getState();
@@ -589,7 +589,7 @@ export function initPipeBridge(): void {
   };
 
   /**
-   * A URL an agent or CLI asked wmux to open (`link.open` -> `wmux open`).
+   * A URL an agent or CLI asked remotea to open (`link.open` -> `remotea open`).
    *
    * Goes through the same destination rule as a terminal link click, so
    * `browserPrefs.openLinksExternally` still owns panel-vs-system.
@@ -618,9 +618,9 @@ export function initPipeBridge(): void {
   };
 
   /**
-   * A visible `[wmux] …` line in a terminal — a manifest pane waiting on a
+   * A visible `[remotea] …` line in a terminal — a manifest pane waiting on a
    * dependency, or one whose wait timed out. Written to xterm, never to the
-   * PTY: it is wmux talking, not input. False when this window has no such
+   * PTY: it is remotea talking, not input. False when this window has no such
    * terminal, so main can ask every window.
    */
   w.__remotea_paneNotice = (surfaceId: string, text: string) => {
@@ -639,7 +639,7 @@ export function initPipeBridge(): void {
     return w.__remotea_paneNotice(surfaceId, bridgeT(key as TranslationKey));
   };
 
-  /** The caller's workspace as `wmux workspace save` writes it; null if not here. */
+  /** The caller's workspace as `remotea workspace save` writes it; null if not here. */
   w.__remotea_describeWorkspace = (params: { caller?: string; workspaceId?: string }) => {
     const store = useStore.getState();
     const located = params?.caller ? w.__remotea_locateSurface(params.caller) : null;
@@ -679,7 +679,7 @@ export function initPipeBridge(): void {
   };
 
   /**
-   * The prompt log a surface has recorded (issue #207) — backs `wmux prompts`.
+   * The prompt log a surface has recorded (issue #207) — backs `remotea prompts`.
    *
    * This is the only way an agent can ask what its own pane was asked to do.
    * `__remotea_readScreen` cannot answer it: an agent TUI repaints over its own

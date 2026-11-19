@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { emptyPromptNote, promptTruncationNote } from '../../src/cli/remotea';
 
 /**
- * `wmux prompts` printing nothing is an answer, and it used to be the same
+ * `remotea prompts` printing nothing is an answer, and it used to be the same
  * answer to different questions (issue #207).
  *
  * A caller that sees "No prompts recorded" has no way to tell a pane that has
@@ -13,7 +13,7 @@ import { emptyPromptNote, promptTruncationNote } from '../../src/cli/remotea';
  * helpers at all — the server rejects it and `main` prints `Error: ...` and
  * exits non-zero, which is what every other command does with a bad id.
  */
-describe('wmux prompts — empty and truncated output (issue #207)', () => {
+describe('remotea prompts — empty and truncated output (issue #207)', () => {
   it('distinguishes a disabled log from a pane with nothing recorded', () => {
     const nothingYet = emptyPromptNote(true, ' for surf-1');
     const switchedOff = emptyPromptNote(false, ' for surf-1');

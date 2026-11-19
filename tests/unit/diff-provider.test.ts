@@ -5,7 +5,7 @@ import os from 'os';
 import { getChangedFiles, getFileDiff, resetSnapshot } from '../../src/main/diff-provider';
 
 // Non-git directory so getChangedFiles falls through to the snapshot system.
-const TEST_DIR = path.join(os.tmpdir(), 'wmux-test-diff-' + process.pid);
+const TEST_DIR = path.join(os.tmpdir(), 'remotea-test-diff-' + process.pid);
 
 function write(rel: string, content: string) {
   const abs = path.join(TEST_DIR, rel);

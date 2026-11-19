@@ -112,7 +112,7 @@ describe('remotea-hook.js through the bridge', () => {
     expect(relayed[0]).toMatchObject({ method: 'hook.event', params: { event: 'Stop' } });
   });
 
-  it('Antigravity: wmux\'s agy hook reports the conversation over the bridge', async () => {
+  it('Antigravity: remotea\'s agy hook reports the conversation over the bridge', async () => {
     const { relayed, env } = await bridge();
     const conv = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
     expect(await runHook(['SessionStart'], env, { conversationId: conv }, AGY_HOOK)).toBe(0);
@@ -338,7 +338,7 @@ describe('hooks install', () => {
     expect(fs.statSync(path.join(home, '.codex', 'hooks.json.remotea-backup')).mode & 0o777).toBe(0o600);
   });
 
-  it('OpenCode: installs wmux\'s plugin and the CLI it runs; leaves someone else\'s plugin of that name alone', () => {
+  it('OpenCode: installs remotea\'s plugin and the CLI it runs; leaves someone else\'s plugin of that name alone', () => {
     const { home, paths } = tempHome();
     fs.mkdirSync(path.join(home, '.config', 'opencode'), { recursive: true });
     const rows = installHooks(paths);
@@ -362,8 +362,8 @@ describe('hooks install', () => {
     fs.mkdirSync(path.dirname(plugin), { recursive: true });
     // The old export alone, and the old export under the last pre-rename version marker.
     for (const old of [
-      'export const WmuxPlugin = async () => ({});\n',
-      '// remotea-plugin-version: 10\nexport const WmuxPlugin = async () => ({});\n',
+      'export const RemoteaPlugin = async () => ({});\n',
+      '// remotea-plugin-version: 10\nexport const RemoteaPlugin = async () => ({});\n',
     ]) {
       fs.writeFileSync(plugin, old);
       installHooks(paths);
@@ -374,7 +374,7 @@ describe('hooks install', () => {
     }
   });
 
-  it('pi, omp, Grok, Qwen and agy: each gets wmux\'s own file or entries, and loses only those', () => {
+  it('pi, omp, Grok, Qwen and agy: each gets remotea\'s own file or entries, and loses only those', () => {
     const { home, paths } = tempHome();
     const h = (...p: string[]) => path.join(home, ...p);
     for (const d of [['.pi', 'agent'], ['.omp', 'agent'], ['.grok'], ['.qwen'], ['.gemini', 'antigravity-cli']]) fs.mkdirSync(h(...d), { recursive: true });

@@ -10,7 +10,7 @@ import { WorkspaceId } from '../../src/shared/types';
 // A workspace can hold a pwsh pane and a WSL pane side by side, and both report
 // their directory over the same `report_pwd`. `workspace.cwd` was a single
 // last-writer-wins field, so the pwsh pane's C:\Users\<user> overwrote the
-// POSIX path — and since a plain WSL pane never reports its own cwd (wmux sets
+// POSIX path — and since a plain WSL pane never reports its own cwd (remotea sets
 // REMOTEA_INTEGRATION=1 in the distro but installs no rc hook there), the next WSL
 // pane fell back to that Win32 path, failed isPosixPath, and got `--cd ~`.
 // Users saw every new WSL pane open in /home/<user> instead of the project.
@@ -42,7 +42,7 @@ describe('isPosixPath', () => {
 });
 
 describe('isWslShell', () => {
-  it('recognises the shell spec wmux spawns WSL panes with', () => {
+  it('recognises the shell spec remotea spawns WSL panes with', () => {
     expect(isWslShell('wsl.exe')).toBe(true);
     expect(isWslShell('C:\\Windows\\System32\\wsl.exe -d Ubuntu')).toBe(true);
   });
@@ -62,7 +62,7 @@ describe('isWslShell', () => {
   });
 
   it('does not guess POSIX for a remote command line (issue #78)', () => {
-    // wmux has no idea where `ssh user@host` lands; handing it a POSIX path
+    // remotea has no idea where `ssh user@host` lands; handing it a POSIX path
     // would be a guess, and a wrong one whenever the far end is Windows.
     expect(isWslShell('ssh user@host')).toBe(false);
   });

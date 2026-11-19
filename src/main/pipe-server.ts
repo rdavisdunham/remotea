@@ -20,7 +20,7 @@ export interface V2Request {
 // telemetry-style writes like hook.event and agent.activity, which can spoof
 // agent status / notifications / diff refreshes (issue #72) — requires a valid
 // per-instance token. The legitimate telemetry clients (Claude Code hooks,
-// agents, shell integration) all run inside wmux-spawned shells and carry
+// agents, shell integration) all run inside remotea-spawned shells and carry
 // REMOTEA_PIPE_TOKEN, so nothing tokenless has a reason to write state. Keeping
 // an allowlist (rather than a blocklist) means any new privileged method is
 // locked down by default.
@@ -71,7 +71,7 @@ export class PipeServer extends EventEmitter {
     this.server = net.createServer((socket) => {
       let buffer = '';
       // Requests read off this connection that have not been answered yet.
-      // Every wmux client is one request per connection, so this is 1 for the
+      // Every remotea client is one request per connection, so this is 1 for the
       // whole life of the connection and the reply that brings it to 0 is the
       // one that closes the socket — but the framing loop below can pull two
       // lines out of one chunk, and closing on the first reply would eat the
@@ -86,7 +86,7 @@ export class PipeServer extends EventEmitter {
       // clients used to finish with `socket.end()` (a half-close) against a
       // server that never closed its side, and on a Windows named pipe libuv
       // answers a half-close by arming a 50 ms `eof_timeout` (libuv
-      // src/win/pipe.c) before it will report EOF: `wmux ping` measured 96 ms
+      // src/win/pipe.c) before it will report EOF: `remotea ping` measured 96 ms
       // against a pipe that answers in 1 ms, a Claude Code hook process 95 ms.
       // Replying with `socket.end()` does NOT help — then both sides arm the
       // timer (measured 93 ms, unchanged). The server has to write the reply
@@ -155,8 +155,8 @@ export class PipeServer extends EventEmitter {
   }
 
   private handleV1(rawLine: string, reply: (text: string) => void): void {
-    // V1 lines from wmux-spawned clients carry an "auth <token> " prefix
-    // (REMOTEA_PIPE_TOKEN is injected into every wmux shell). All V1 commands
+    // V1 lines from remotea-spawned clients carry an "auth <token> " prefix
+    // (REMOTEA_PIPE_TOKEN is injected into every remotea shell). All V1 commands
     // mutate UI state (notify, report_pwd, report_pr, shell state, …), so —
     // like privileged V2 methods — they require the per-instance token; an
     // unauthenticated local process must not be able to spoof them (issue

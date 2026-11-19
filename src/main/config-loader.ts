@@ -308,7 +308,7 @@ export function loadProjectProfiles(cwd: string): QuickLaunchProfile[] {
 /**
  * WT's dynamic PowerShell Core profile ("PowerShell" / "PowerShell 7 Preview")
  * ships without a `commandline` — WT itself resolves it at launch. Without an
- * explicit mapping, the imported wmux profile ends up shell-less and silently
+ * explicit mapping, the imported remotea profile ends up shell-less and silently
  * launches the default pwsh instead of the chosen (preview) build. Map it to
  * the App Execution Alias; at spawn time resolveShell verifies it and falls
  * back to the default if the aliases are absent.

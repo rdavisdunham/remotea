@@ -54,7 +54,7 @@ export interface AgentStateSlice {
    * agent DECLARED (invariant 5 of the detection design).
    *
    * They are never merged here. A consumer merges them at render time, so an
-   * operator running `wmux agent-state` can still tell a reported block from a
+   * operator running `remotea agent-state` can still tell a reported block from a
    * seen one — and so a detected state can never be mistaken for a claim the
    * agent made.
    */

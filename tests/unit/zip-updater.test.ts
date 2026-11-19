@@ -14,7 +14,7 @@ vi.mock('child_process', async (importOriginal) => {
 vi.mock('electron', () => ({
   app: {
     getVersion: () => '1.0.0',
-    getPath: (name: string) => (name === 'exe' ? 'C:\\wmux\\wmux.exe' : ''),
+    getPath: (name: string) => (name === 'exe' ? 'C:\\remotea\\remotea.exe' : ''),
     isPackaged: true,
     quit: vi.fn(),
   },
@@ -37,22 +37,23 @@ import {
   buildHelperArgs,
 } from '../../src/main/zip-updater';
 import { app } from 'electron';
+import { LEGACY_APP_EXE } from '../../src/shared/legacy-names';
 
 function tempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-zip-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-zip-'));
 }
 
 describe('isPortableZipInstall', () => {
-  it('is true for a folder that has wmux.exe and no NSIS uninstaller', () => {
+  it('is true for a folder that has the pre-rename exe and no NSIS uninstaller', () => {
     const root = tempDir();
-    fs.writeFileSync(path.join(root, 'wmux.exe'), '');
+    fs.writeFileSync(path.join(root, LEGACY_APP_EXE), '');
     expect(isPortableZipInstall(root)).toBe(true);
   });
 
   it('is false when the NSIS uninstaller sits next to the exe', () => {
     const root = tempDir();
-    fs.writeFileSync(path.join(root, 'wmux.exe'), '');
-    fs.writeFileSync(path.join(root, 'Uninstall wmux.exe'), '');
+    fs.writeFileSync(path.join(root, LEGACY_APP_EXE), '');
+    fs.writeFileSync(path.join(root, `Uninstall ${LEGACY_APP_EXE}`), '');
     expect(isPortableZipInstall(root)).toBe(false);
   });
 
@@ -71,7 +72,7 @@ describe('isPortableZipInstall', () => {
 
   it('is false for an empty path, a missing path, or a file', () => {
     expect(isPortableZipInstall('')).toBe(false);
-    expect(isPortableZipInstall(path.join(os.tmpdir(), 'wmux-does-not-exist-' + process.pid))).toBe(false);
+    expect(isPortableZipInstall(path.join(os.tmpdir(), 'remotea-does-not-exist-' + process.pid))).toBe(false);
     const root = tempDir();
     const file = path.join(root, 'not-a-dir');
     fs.writeFileSync(file, '');
@@ -88,11 +89,11 @@ describe('pickZipAsset', () => {
 
   it('prefers the win-x64 zip', () => {
     const picked = pickZipAsset([
-      asset('wmux-1.6.0-linux-x64.zip'),
-      asset('wmux-1.6.0-win-x64.zip'),
-      asset('wmux-1.6.0-setup.exe'),
+      asset('remotea-1.6.0-linux-x64.zip'),
+      asset('remotea-1.6.0-win-x64.zip'),
+      asset('remotea-1.6.0-setup.exe'),
     ]);
-    expect(picked?.name).toBe('wmux-1.6.0-win-x64.zip');
+    expect(picked?.name).toBe('remotea-1.6.0-win-x64.zip');
   });
 
   it('ignores a zip with no Windows marker (source archives)', () => {
@@ -106,18 +107,18 @@ describe('pickZipAsset', () => {
 });
 
 describe('findPayloadRoot', () => {
-  it('uses the extract dir when the exe is at the zip root (an install still named wmux.exe)', () => {
+  it('uses the extract dir when the exe is at the zip root (an install still on the pre-rename exe)', () => {
     const root = tempDir();
-    fs.writeFileSync(path.join(root, 'wmux.exe'), '');
-    expect(findPayloadRoot(root, 'wmux.exe')).toBe(root);
+    fs.writeFileSync(path.join(root, LEGACY_APP_EXE), '');
+    expect(findPayloadRoot(root, LEGACY_APP_EXE)).toBe(root);
   });
 
   it('walks one directory down when the zip wrapped a folder', () => {
     const root = tempDir();
-    const inner = path.join(root, 'wmux-1.6.0-win-x64');
+    const inner = path.join(root, 'remotea-1.6.0-win-x64');
     fs.mkdirSync(inner);
-    fs.writeFileSync(path.join(inner, 'wmux.exe'), '');
-    expect(findPayloadRoot(root, 'wmux.exe')).toBe(inner);
+    fs.writeFileSync(path.join(inner, 'remotea.exe'), '');
+    expect(findPayloadRoot(root, 'remotea.exe')).toBe(inner);
   });
 
   it('throws when the zip is not a payload', () => {
@@ -136,11 +137,11 @@ describe('findPayloadRoot', () => {
     expect(findPayloadRoot(root)).toBe(root);
   });
 
-  it('wants the exe this install runs: an old wmux zip is refused for a remotea install', () => {
+  it('wants the exe this install runs: a pre-rename zip is refused for a remotea install', () => {
     const root = tempDir();
-    fs.writeFileSync(path.join(root, 'wmux.exe'), '');
+    fs.writeFileSync(path.join(root, LEGACY_APP_EXE), '');
     expect(() => findPayloadRoot(root, APP_EXE)).toThrow(/does not contain remotea\.exe/);
-    expect(findPayloadRoot(root, 'wmux.exe')).toBe(root);
+    expect(findPayloadRoot(root, LEGACY_APP_EXE)).toBe(root);
   });
 
   it('APP_EXE is the exe electron-builder packages (productName, or executableName when set)', () => {
@@ -168,8 +169,8 @@ describe('buildApplyUpdateCmd', () => {
     expect(cmd).not.toMatch(/Unblock-File/i);
   });
 
-  // wmux has already quit by the time the helper runs, so a robocopy failure
-  // that exits without relaunching leaves the user with no wmux at all. The
+  // remotea has already quit by the time the helper runs, so a robocopy failure
+  // that exits without relaunching leaves the user with no remotea at all. The
   // failure branch has to fall through to the same relaunch as the happy path.
   it('still relaunches when robocopy fails', () => {
     const lines = cmd.split('\r\n');
@@ -186,7 +187,7 @@ describe('buildApplyUpdateCmd', () => {
 
   // The jump used to be `goto relaunch` with :relaunch on the very next line,
   // so the failure read as handled while doing nothing: the console said
-  // "Installing" then "Starting wmux...", and the cleanup below deleted the
+  // "Installing" then "Starting remotea...", and the cleanup below deleted the
   // ~150 MB payload needed to retry.
   it('says a failed copy out loud and keeps the payload', () => {
     const lines = cmd.split('\r\n');
@@ -217,7 +218,7 @@ describe('buildApplyUpdateCmd', () => {
   });
 
   // Third inherited-variable exposure in the same script, and the one that is
-  // not a variable wmux named: with command extensions, cmd resolves
+  // not a variable remotea named: with command extensions, cmd resolves
   // %ERRORLEVEL% to the dynamic exit status only while no variable of that name
   // exists. An inherited ERRORLEVEL=0 sends a failed robocopy down the success
   // path, where the cleanup deletes the payload needed to retry.
@@ -226,7 +227,7 @@ describe('buildApplyUpdateCmd', () => {
     expect(cmd).not.toContain('%ERRORLEVEL%');
   });
 
-  // The helper inherits wmux's environment, and `setlocal` copies it rather
+  // The helper inherits remotea's environment, and `setlocal` copies it rather
   // than emptying it, so a SKIPCOPY or KEEPSRC already living out there would
   // decide a branch this script never set: an inherited KEEPSRC silently keeps
   // every payload, an inherited SKIPCOPY skips every copy — an update that
@@ -242,11 +243,11 @@ describe('buildApplyUpdateCmd', () => {
     }
   });
 
-  // Same invariant, one line earlier, and it was the line breaking it. wmux
+  // Same invariant, one line earlier, and it was the line breaking it. remotea
   // checks the payload with existsSync and only then spawns this helper and
   // quits, so the helper's own check runs on the far side of app.quit(): an
   // antivirus or a temp cleaner removing the payload inside that window hit
-  // `exit /b 1` here, after wmux was already gone. Going to :relaunch gets the
+  // `exit /b 1` here, after remotea was already gone. Going to :relaunch gets the
   // user their old install back instead of nothing.
   it('relaunches instead of exiting when the payload is gone', () => {
     const lines = cmd.split('\r\n');
@@ -271,7 +272,7 @@ describe('buildApplyUpdateCmd', () => {
   });
 
   // The wait is cheap and it is the only thing stopping `start "" "%EXE%"`
-  // from racing a wmux that has not finished quitting, so the degraded path
+  // from racing a remotea that has not finished quitting, so the degraded path
   // skips the copy and nothing else.
   it('still waits for the old process before a degraded relaunch', () => {
     const lines = cmd.split('\r\n');
@@ -325,7 +326,7 @@ describe('buildApplyUpdateCmd', () => {
   it('pauses the wait loop with waitfor, not timeout or ping', () => {
     expect(cmd).not.toMatch(/timeout\.exe/i);
     expect(cmd).not.toMatch(/ping(\.exe)?\s+-n/i);
-    expect(cmd).toContain('"%SYS%\\waitfor.exe" /t 1 wmuxUpdateWait >nul 2>nul');
+    expect(cmd).toContain('"%SYS%\\waitfor.exe" /t 1 remoteaUpdateWait >nul 2>nul');
     // The pause runs before the liveness probe, so its own exit code can never
     // stand in for tasklist's.
     expect(cmd.indexOf('waitfor.exe')).toBeLessThan(cmd.indexOf('tasklist.exe'));
@@ -333,7 +334,7 @@ describe('buildApplyUpdateCmd', () => {
 
   // Issue #300: `tasklist | findstr` waits for EOF on a pipe, and on the
   // reporter's machine something outlived tasklist holding its write end —
-  // findstr sat on one PID for minutes after wmux had gone, three releases in a
+  // findstr sat on one PID for minutes after remotea had gone, three releases in a
   // row. The probe now reads a file, and the wait has an upper bound.
   it('probes liveness through a file, never a pipe, and bounds the wait', () => {
     const lines = cmd.split('\r\n');
@@ -368,7 +369,7 @@ describe('buildApplyUpdateCmd', () => {
     const helper = path.join(root, 'helper.cmd');
     fs.writeFileSync(helper, buildApplyUpdateCmd());
     const { spawn } = await vi.importActual<typeof import('child_process')>('child_process');
-    // Stands in for the old wmux: alive for ~2 s, then gone.
+    // Stands in for the old remotea: alive for ~2 s, then gone.
     const old = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 2000)'], { stdio: 'ignore', windowsHide: true });
     const oldPid = old.pid!;
     const relaunch = path.join(dst, 'remotea.exe');
@@ -382,7 +383,7 @@ describe('buildApplyUpdateCmd', () => {
     expect(code).toBe(0);
     expect(Date.now() - started).toBeGreaterThanOrEqual(1500);
     expect(fs.readFileSync(path.join(dst, 'remotea.exe')).equals(fs.readFileSync(rundll32))).toBe(true);
-    expect(fs.existsSync(path.join(root, `wmux-update-wait-${oldPid}.txt`))).toBe(false);
+    expect(fs.existsSync(path.join(root, `remotea-update-wait-${oldPid}.txt`))).toBe(false);
   }, 60_000);
 
   it('does not embed caller paths — those arrive as arguments', () => {
@@ -404,28 +405,28 @@ describe('update leftover names (#3)', () => {
 
   it('rejects near misses', () => {
     for (const name of [
-      'wmux-apply-update-12.cmd.txt',
-      'wmux-apply-update-.cmd',
-      'wmux-apply-update-12.CMD',
-      'WMUX-apply-update-12.cmd',
-      'wmux-update-2.12.0.zip',
-      'wmux-update-2.12.0-',
-      'wmux-update-2.12.0-12.zip.part',
-      'wmux-update-2.12.0-12-old',
-      'wmux-update-2 12 0-12',
-      'xwmux-update-2.12.0-12',
-      'wmux-zip-abc',
+      'remotea-apply-update-12.cmd.txt',
+      'remotea-apply-update-.cmd',
+      'remotea-apply-update-12.CMD',
+      'REMOTEA-apply-update-12.cmd',
+      'remotea-update-2.12.0.zip',
+      'remotea-update-2.12.0-',
+      'remotea-update-2.12.0-12.zip.part',
+      'remotea-update-2.12.0-12-old',
+      'remotea-update-2 12 0-12',
+      'xremotea-update-2.12.0-12',
+      'remotea-zip-abc',
     ]) {
       expect(classifyUpdateLeftover(name), name).toBeNull();
     }
   });
 
   it('rejects a PID that is not a real one', () => {
-    expect(classifyUpdateLeftover('wmux-apply-update-0.cmd')).toBeNull();
-    expect(classifyUpdateLeftover('wmux-apply-update-4294967296.cmd')).toBeNull();
-    expect(classifyUpdateLeftover('wmux-apply-update-12345678901234567890.cmd')).toBeNull();
-    expect(classifyUpdateLeftover('wmux-apply-update-0123.cmd')).toBeNull();
-    expect(classifyUpdateLeftover('wmux-apply-update-4294967295.cmd')).toEqual({ kind: 'helper', pid: 4294967295 });
+    expect(classifyUpdateLeftover('remotea-apply-update-0.cmd')).toBeNull();
+    expect(classifyUpdateLeftover('remotea-apply-update-4294967296.cmd')).toBeNull();
+    expect(classifyUpdateLeftover('remotea-apply-update-12345678901234567890.cmd')).toBeNull();
+    expect(classifyUpdateLeftover('remotea-apply-update-0123.cmd')).toBeNull();
+    expect(classifyUpdateLeftover('remotea-apply-update-4294967295.cmd')).toEqual({ kind: 'helper', pid: 4294967295 });
   });
 });
 
@@ -466,7 +467,7 @@ describe('sweepUpdateLeftovers (#3)', () => {
   function folder(dir: string, name: string, ageMs: number): string {
     const p = path.join(dir, name);
     fs.mkdirSync(p);
-    fs.writeFileSync(path.join(p, 'wmux.exe'), '');
+    fs.writeFileSync(path.join(p, 'remotea.exe'), '');
     age(p, ageMs);
     return p;
   }
@@ -630,8 +631,8 @@ describe('sweepUpdateLeftovers (#3)', () => {
   });
 });
 
-// A quit whose helper never runs leaves the user with no wmux and nothing to
-// restart it (#3). Every failure wmux can still see must reject BEFORE quit.
+// A quit whose helper never runs leaves the user with no remotea and nothing to
+// restart it (#3). Every failure remotea can still see must reject BEFORE quit.
 describe('applyStagedPortableUpdate', () => {
   const savedTemp = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
   let payload: string;
@@ -642,7 +643,7 @@ describe('applyStagedPortableUpdate', () => {
   }
 
   function staged() {
-    return { version: '9.9.9', extractDir: payload, installDir: 'C:\\wmux', exePath: 'C:\\wmux\\wmux.exe' };
+    return { version: '9.9.9', extractDir: payload, installDir: 'C:\\remotea', exePath: 'C:\\remotea\\remotea.exe' };
   }
 
   function pointTempAt(dir: string): void {
@@ -653,7 +654,7 @@ describe('applyStagedPortableUpdate', () => {
 
   beforeEach(() => {
     payload = tempDir();
-    fs.writeFileSync(path.join(payload, 'wmux.exe'), '');
+    fs.writeFileSync(path.join(payload, 'remotea.exe'), '');
     // os.tmpdir() reads the environment on every call, so the helper lands in
     // a scratch dir rather than the real %TEMP%.
     scratchTemp = tempDir();
@@ -670,13 +671,15 @@ describe('applyStagedPortableUpdate', () => {
   });
 
   it('checks the payload for the exe this install runs', async () => {
+    // A pre-rename payload: it carries only the old exe.
+    fs.renameSync(path.join(payload, 'remotea.exe'), path.join(payload, LEGACY_APP_EXE));
     const remoteaInstall = { ...staged(), installDir: 'C:\\remotea', exePath: 'C:\\remotea\\remotea.exe' };
     await expect(applyStagedPortableUpdate(remoteaInstall)).rejects.toMatchObject({ code: 'PAYLOAD_MISSING' });
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
   it('refuses a payload that is gone, without writing, spawning or quitting', async () => {
-    fs.unlinkSync(path.join(payload, 'wmux.exe'));
+    fs.unlinkSync(path.join(payload, 'remotea.exe'));
     await expect(applyStagedPortableUpdate(staged())).rejects.toMatchObject({ code: 'PAYLOAD_MISSING' });
     expect(spawnMock).not.toHaveBeenCalled();
     expect(app.quit).not.toHaveBeenCalled();
@@ -691,7 +694,7 @@ describe('applyStagedPortableUpdate', () => {
   });
 
   it('does not quit when a path would be rewritten on the helper command line', async () => {
-    const withPercentPair = { ...staged(), installDir: 'C:\\tools\\%OS%\\wmux', exePath: 'C:\\tools\\%OS%\\wmux\\wmux.exe' };
+    const withPercentPair = { ...staged(), installDir: 'C:\\tools\\%OS%\\remotea', exePath: 'C:\\tools\\%OS%\\remotea\\remotea.exe' };
     await expect(applyStagedPortableUpdate(withPercentPair)).rejects.toThrow(/expand/);
     expect(spawnMock).not.toHaveBeenCalled();
     expect(app.quit).not.toHaveBeenCalled();
@@ -727,8 +730,8 @@ describe('applyStagedPortableUpdate', () => {
     expect(() => child.emit('error', new Error('later'))).not.toThrow();
 
     const [, args, opts] = spawnMock.mock.calls[0];
-    const helper = path.join(scratchTemp, `wmux-apply-update-${process.pid}.cmd`);
-    expect(args).toEqual(buildHelperArgs(helper, [String(process.pid), payload, 'C:\\wmux', 'C:\\wmux\\wmux.exe']));
+    const helper = path.join(scratchTemp, `remotea-apply-update-${process.pid}.cmd`);
+    expect(args).toEqual(buildHelperArgs(helper, [String(process.pid), payload, 'C:\\remotea', 'C:\\remotea\\remotea.exe']));
     expect(opts).toMatchObject({ detached: true, windowsHide: true, stdio: 'ignore', windowsVerbatimArguments: true });
   });
 });
@@ -736,32 +739,32 @@ describe('applyStagedPortableUpdate', () => {
 // `cmd /c` strips the first and last quote of a line that starts with one and
 // holds more than two, so a %TEMP% with a space ("C:\Users\First Last\...")
 // turned the helper path into `C:\Users\First` and the update did nothing
-// after wmux had already quit.
+// after remotea had already quit.
 describe('buildHelperArgs', () => {
   it('wraps every piece in quotes inside one outer pair, under /s', () => {
-    const args = buildHelperArgs('C:\\Users\\First Last\\AppData\\Local\\Temp\\wmux-apply-update-7.cmd', [
-      '7', 'C:\\Users\\First Last\\AppData\\Local\\Temp\\wmux-update-9.9.9-7', 'C:\\Program Files\\wmux', 'C:\\Program Files\\wmux\\wmux.exe',
+    const args = buildHelperArgs('C:\\Users\\First Last\\AppData\\Local\\Temp\\remotea-apply-update-7.cmd', [
+      '7', 'C:\\Users\\First Last\\AppData\\Local\\Temp\\remotea-update-9.9.9-7', 'C:\\Program Files\\remotea', 'C:\\Program Files\\remotea\\remotea.exe',
     ]);
     expect(args).toEqual([
       '/d', '/s', '/c',
-      '""C:\\Users\\First Last\\AppData\\Local\\Temp\\wmux-apply-update-7.cmd" "7" ' +
-        '"C:\\Users\\First Last\\AppData\\Local\\Temp\\wmux-update-9.9.9-7" "C:\\Program Files\\wmux" ' +
-        '"C:\\Program Files\\wmux\\wmux.exe""',
+      '""C:\\Users\\First Last\\AppData\\Local\\Temp\\remotea-apply-update-7.cmd" "7" ' +
+        '"C:\\Users\\First Last\\AppData\\Local\\Temp\\remotea-update-9.9.9-7" "C:\\Program Files\\remotea" ' +
+        '"C:\\Program Files\\remotea\\remotea.exe""',
     ]);
   });
 
   it('refuses a piece that would add a quote of its own', () => {
-    expect(() => buildHelperArgs('C:\\t\\h.cmd', ['1', 'C:\\a" & calc & "', 'C:\\w', 'C:\\w\\wmux.exe'])).toThrow(/double quote/);
+    expect(() => buildHelperArgs('C:\\t\\h.cmd', ['1', 'C:\\a" & calc & "', 'C:\\w', 'C:\\w\\remotea.exe'])).toThrow(/double quote/);
   });
 
   // cmd expands a defined %NAME% even inside quotes, so `C:\x\%OS%\y` would
   // reach the helper as `C:\x\Windows_NT\y` and the install would do nothing.
   it('refuses a %…% pair anywhere, including the helper path', () => {
-    expect(() => buildHelperArgs('C:\\t\\h.cmd', ['1', 'C:\\x\\%OS%\\y', 'C:\\w', 'C:\\w\\wmux.exe'])).toThrow(/expand/);
-    expect(() => buildHelperArgs('C:\\Users\\a%b%c\\Temp\\h.cmd', ['1', 'C:\\p', 'C:\\w', 'C:\\w\\wmux.exe'])).toThrow(/expand/);
+    expect(() => buildHelperArgs('C:\\t\\h.cmd', ['1', 'C:\\x\\%OS%\\y', 'C:\\w', 'C:\\w\\remotea.exe'])).toThrow(/expand/);
+    expect(() => buildHelperArgs('C:\\Users\\a%b%c\\Temp\\h.cmd', ['1', 'C:\\p', 'C:\\w', 'C:\\w\\remotea.exe'])).toThrow(/expand/);
   });
 
   it('allows a lone percent sign, which cmd leaves alone', () => {
-    expect(buildHelperArgs('C:\\t\\h.cmd', ['1', 'C:\\100%\\p', 'C:\\w', 'C:\\w\\wmux.exe'])[3]).toContain('"C:\\100%\\p"');
+    expect(buildHelperArgs('C:\\t\\h.cmd', ['1', 'C:\\100%\\p', 'C:\\w', 'C:\\w\\remotea.exe'])[3]).toContain('"C:\\100%\\p"');
   });
 });

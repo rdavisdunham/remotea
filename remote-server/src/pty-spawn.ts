@@ -8,7 +8,7 @@
  *
  * The server itself runs under systemd with a minimal environment; the login
  * shell rebuilds the user's real one. Variables that would make a child
- * report to the wrong multiplexer (herdr's, or a wmux pane's when the server
+ * report to the wrong multiplexer (herdr's, or a remotea pane's when the server
  * was started from one) are stripped.
  */
 import fs from 'fs';

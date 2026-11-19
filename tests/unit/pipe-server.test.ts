@@ -5,7 +5,7 @@ import { PipeServer } from '../../src/main/pipe-server';
 // Each test gets a unique pipe name to avoid reuse conflicts on Windows
 let testCounter = 0;
 function uniquePipe(): string {
-  return `\\\\.\\pipe\\wmux-test-${process.pid}-${++testCounter}`;
+  return `\\\\.\\pipe\\remotea-test-${process.pid}-${++testCounter}`;
 }
 
 function connectAndSend(pipePath: string, message: string): Promise<string> {
@@ -222,7 +222,7 @@ describe('PipeServer', () => {
     const pipe = uniquePipe();
     server = new PipeServer(pipe, 'secret');
     server.on('v2', (req, respond) => {
-      if (req.method === 'system.identify') respond({ name: 'wmux' });
+      if (req.method === 'system.identify') respond({ name: 'remotea' });
     });
     server.start();
     await new Promise(r => setTimeout(r, 200));
@@ -233,7 +233,7 @@ describe('PipeServer', () => {
       id: 6,
     }));
     const parsed = JSON.parse(response);
-    expect(parsed.result.name).toBe('wmux');
+    expect(parsed.result.name).toBe('remotea');
   });
 
   it('rejects pane.answer_agent without a token', async () => {
@@ -309,11 +309,11 @@ describe('PipeServer', () => {
 
 // The server closes the connection itself, right behind the reply.
 //
-// Every wmux client is one request per connection and one reply per request, and
+// Every remotea client is one request per connection and one reply per request, and
 // every one of them used to finish with `socket.end()` — a half-close. On a Windows
 // named pipe libuv answers a half-close by arming a 50 ms `eof_timeout`
 // (src/win/pipe.c) before it will report EOF, and since the server never closed its
-// side, every round trip paid that timer: `wmux ping` measured 96 ms against a pipe
+// side, every round trip paid that timer: `remotea ping` measured 96 ms against a pipe
 // that answers in 1 ms. A server that replies with `end()` does not help — both
 // sides then arm the timer. It has to be `write(reply, () => destroy())`, and the
 // client has to see 'close' within a few ms of the reply, not 50+.
@@ -400,7 +400,7 @@ describe('PipeServer closes right behind its reply (libuv eof_timeout)', () => {
   });
 
   it('V2: a reply that is not the last one pending keeps the connection open', async () => {
-    // No wmux client pipelines two requests on one connection (audited: the CLI,
+    // No remotea client pipelines two requests on one connection (audited: the CLI,
     // the hook helper, the shell integrations, the OpenCode plugin and the bridge
     // are all one-shot). The framing loop still handles a chunk carrying two
     // lines, so a close on the FIRST reply would eat the second — hence the

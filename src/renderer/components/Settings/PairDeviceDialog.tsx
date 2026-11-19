@@ -422,7 +422,7 @@ const RECIPES: { key: TranslationKey; command: (port: number) => string }[] = [
 ];
 
 /**
- * The two supported ways to reach a loopback-bound console from a phone. wmux
+ * The two supported ways to reach a loopback-bound console from a phone. remotea
  * speaks plain HTTP and never terminates TLS itself; both recipes put the
  * encryption in a tool that already does it well. Funnel is named as
  * unsupported because it is the obvious next thing a Tailscale user tries, and

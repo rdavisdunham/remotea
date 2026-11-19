@@ -376,7 +376,7 @@ Eridani sends:
 ## Turn capture
 
 The hook helper (`resources/cli/remotea-hook.js`) forwards these on `Stop`, and
-only to a remotea server's bridge, never to a local wmux:
+only to a remotea server's bridge, never to the local desktop app:
 
 - `last_assistant_message` (cut at 16,000 code points, flagged)
 - Codex's `turn_id` and `transcript_path`

@@ -530,7 +530,7 @@ export class WindowManager {
     return true;
   }
 
-  /** Any wmux window currently hidden to the tray (#442). */
+  /** Any remotea window currently hidden to the tray (#442). */
   hasHiddenWindows(): boolean {
     return this.getAllWindows().some(e => !e.window.isVisible());
   }

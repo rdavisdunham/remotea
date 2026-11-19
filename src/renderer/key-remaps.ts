@@ -21,7 +21,7 @@ export function subscribeKeyRemaps(listener: () => void): () => void {
 
 /**
  * Replace the active remaps. Called with the whole list (never a patch) so
- * `wmux reload-config` is idempotent: deleting `[keys]` from the file really
+ * `remotea reload-config` is idempotent: deleting `[keys]` from the file really
  * does remove the bindings instead of leaving the last run's values sticky.
  */
 export function setKeyRemaps(next: readonly KeyRemap[] | undefined): void {
@@ -61,7 +61,7 @@ export interface RemapKeyEvent extends ChordEvent {
  *    otherwise turn into a second, un-remapped character (the duplicate-input
  *    bug issue #119 fixed for Shift+Enter).
  *  - stopPropagation stops the document-level shortcut listener, so remapping a
- *    chord that is also a wmux shortcut actually replaces it inside a terminal
+ *    chord that is also a remotea shortcut actually replaces it inside a terminal
  *    instead of doing both things.
  */
 export function applyKeyRemap(event: RemapKeyEvent, emit: (data: string) => void): boolean {

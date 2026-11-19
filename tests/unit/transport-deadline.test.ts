@@ -23,7 +23,7 @@ import {
  * literal is exactly how this came back the first time.
  */
 
-const WIN_PIPE = '\\\\.\\pipe\\wmux';
+const WIN_PIPE = '\\\\.\\pipe\\remotea';
 
 const t = (over: Partial<Transport> = {}): Transport => ({
   remote: false,
@@ -41,7 +41,7 @@ describe('usesNpiperelay', () => {
     // Native Windows: the pipe is dialled directly.
     expect(usesNpiperelay(t({ env: {} }))).toBe(false);
     // A POSIX socket path is not a Windows pipe, whatever the environment says.
-    expect(usesNpiperelay(t({ pipePath: '/tmp/wmux.sock', env: { WSL_DISTRO_NAME: 'Ubuntu' } }))).toBe(false);
+    expect(usesNpiperelay(t({ pipePath: '/tmp/remotea.sock', env: { WSL_DISTRO_NAME: 'Ubuntu' } }))).toBe(false);
   });
 
   it('is false when a remote target has taken over the transport', () => {
@@ -72,7 +72,7 @@ describe('isWslHost (#288)', () => {
 
 describe('transportDeadline', () => {
   it('leaves a local pipe exactly as it was', () => {
-    // The floor must not move timings for the platform wmux ships for.
+    // The floor must not move timings for the platform remotea ships for.
     expect(transportDeadline(DEFAULT_V2_TIMEOUT_MS, t())).toBe(DEFAULT_V2_TIMEOUT_MS);
     expect(transportDeadline(45000, t())).toBe(45000);
   });

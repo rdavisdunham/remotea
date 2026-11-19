@@ -33,7 +33,7 @@ import type { PaneId, SurfaceId, WorkspaceId, SurfaceRef, SplitNode } from '../.
 // xterm registry; ipc-handlers reaches Electron and the app data dir. None of
 // that is what is under test, and the app data dir in particular must be
 // redirected: `PtyLedger.takeOver()` runs at ipc-handlers import time and
-// REWRITES the ledger, which for an unmocked path is the live wmux's own.
+// REWRITES the ledger, which for an unmocked path is the live remotea's own.
 
 type TestStore = WorkspaceSlice & SurfaceSlice;
 const makeStore = () =>
@@ -55,7 +55,7 @@ vi.mock('../../src/renderer/hooks/useTerminal', () => ({
 
 vi.mock('../../src/shared/instance', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getAppDataDir: () => path.join(os.tmpdir(), 'wmux-agent-browser-ipc-test'),
+  getAppDataDir: () => path.join(os.tmpdir(), 'remotea-agent-browser-ipc-test'),
 }));
 vi.mock('electron', () => ({
   ipcMain: { on: () => {}, handle: () => {} },
@@ -205,22 +205,22 @@ function harness(overrides: Partial<AgentBrowserDeps> = {}, run?: AgentBrowserDe
 
 describe('enable argv', () => {
   it('pins the tab to the session and opens the current url', () => {
-    expect(agentBrowserOpenArgv('wmux-surf-a', 'https://example.com')).toEqual([
-      '--session', 'wmux-surf-a', '--pin-tab', 'open', 'https://example.com',
+    expect(agentBrowserOpenArgv('remotea-surf-a', 'https://example.com')).toEqual([
+      '--session', 'remotea-surf-a', '--pin-tab', 'open', 'https://example.com',
     ]);
   });
 
   // about:blank is what a browser surface reports before it has ever
   // navigated; passing it through would spend a page load arriving at nothing.
   it('omits about:blank', () => {
-    expect(agentBrowserOpenArgv('wmux-surf-a', 'about:blank')).toEqual([
-      '--session', 'wmux-surf-a', '--pin-tab', 'open',
+    expect(agentBrowserOpenArgv('remotea-surf-a', 'about:blank')).toEqual([
+      '--session', 'remotea-surf-a', '--pin-tab', 'open',
     ]);
   });
 
   it('omits an absent url', () => {
-    expect(agentBrowserOpenArgv('wmux-surf-a')).toEqual([
-      '--session', 'wmux-surf-a', '--pin-tab', 'open',
+    expect(agentBrowserOpenArgv('remotea-surf-a')).toEqual([
+      '--session', 'remotea-surf-a', '--pin-tab', 'open',
     ]);
   });
 

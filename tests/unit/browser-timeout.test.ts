@@ -4,7 +4,7 @@ import path from 'path';
 import { browserRequest, timeoutMessage } from '../../src/cli/remotea';
 
 /**
- * `wmux browser open <url>` failed with a bare `Error: timeout` after ~5s on any
+ * `remotea browser open <url>` failed with a bare `Error: timeout` after ~5s on any
  * page that took longer than that to load — while the navigation itself went on
  * to succeed. The CLI applied one flat 5s deadline to every V2 method, but the
  * main process is allowed to spend far more than that serving a browser command:
@@ -80,7 +80,7 @@ const deadlineOf = (argv: string[]): number => {
   return req.timeoutMs;
 };
 
-// Every verb the CLI exposes, as `wmux browser …` argv.
+// Every verb the CLI exposes, as `remotea browser …` argv.
 const VERBS: string[][] = [
   ['browser', 'open', 'https://example.com'],
   ['browser', 'snapshot'],
@@ -200,7 +200,7 @@ describe('the agent engine fits inside the same client deadlines', () => {
 describe('--surface targets a browser from outside a pane', () => {
   // The rest of the CLI already takes --surface (send, read-screen,
   // agent-activity, report-agent). Browser commands only ever read
-  // $REMOTEA_SURFACE_ID, so a shell wmux did not spawn had no way to say which
+  // $REMOTEA_SURFACE_ID, so a shell remotea did not spawn had no way to say which
   // pane's browser it meant.
   it('sends the surface as the caller the isolation routing expects', () => {
     const req = browserRequest(['browser', 'snapshot'], 'surf-abc');

@@ -260,7 +260,7 @@ export function RemoteApp({ pairSecret, laterSecrets }: Readonly<{ pairSecret: s
     };
   }, [consoleActive, currentKey]);
 
-  // ── Title: "(N) wmux", N = agents waiting on a human.
+  // ── Title: "(N) remotea", N = agents waiting on a human.
   const blockedCount = roster.filter((e) => e.state === 'blocked').length;
   useEffect(() => {
     document.title = blockedCount > 0 ? `(${blockedCount}) remotea` : 'remotea';

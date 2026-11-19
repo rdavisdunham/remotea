@@ -2,20 +2,20 @@
  * Touch pan → wheel, the recognition half (issue #243).
  *
  * A finger dragged over a terminal pane scrolled nothing. The cause is upstream
- * and precise: wmux pins `@xterm/xterm` 6.0.0, which is where xterm replaced its
+ * and precise: remotea pins `@xterm/xterm` 6.0.0, which is where xterm replaced its
  * native overflow scroller (a finger could drag it) with the VS Code
  * `SmoothScrollableElement` — a custom overlay scrollbar that is wheel-only, and
  * it shipped no touch replacement (xtermjs/xterm.js#5489). The fix for that,
  * xtermjs/xterm.js#5563, is milestoned 7.0.0 and is in no stable release.
  *
  * A dependency bump would not have been the whole fix anyway, and would have
- * been the wrong fix here for a reason specific to wmux: the upstream repair
+ * been the wrong fix here for a reason specific to remotea: the upstream repair
  * only moves the scrollable position, which drives SCROLLBACK, and the alternate
- * buffer has no scrollback. The panes wmux exists to show — opencode, Claude
+ * buffer has no scrollback. The panes remotea exists to show — opencode, Claude
  * Code, Codex — all switch to the alt screen (`\x1b[?1049h`), so upstream's fix
  * would leave a finger inert in exactly those panes.
  *
- * wmux does not use xterm's wheel pipeline at all. `handleTerminalWheel` in
+ * remotea does not use xterm's wheel pipeline at all. `handleTerminalWheel` in
  * `useTerminal.ts` takes the wheel on the CAPTURE phase and already decides
  * between the three outcomes — scrollback, SGR wheel reports, and arrow keys for
  * a non-mouse pager on the alt screen. So the whole fix is to put the gesture
@@ -50,7 +50,7 @@
  * A finger is not a mouse: a "stationary" touch wanders a few pixels from skin
  * deformation and sensor noise alone, so a zero threshold would scroll on every
  * tap. 8px is the conventional Android/Chromium touch slop, and it is smaller
- * than one terminal cell at every font size wmux ships, so nothing is lost by
+ * than one terminal cell at every font size remotea ships, so nothing is lost by
  * discarding it.
  */
 export const TAP_SLOP_PX = 8;

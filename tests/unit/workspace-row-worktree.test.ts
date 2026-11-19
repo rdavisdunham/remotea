@@ -22,11 +22,11 @@ vi.mock('../../src/renderer/store', () => ({ get useStore() { return store; } })
 vi.mock('../../src/renderer/i18n', () => ({ useT: () => (_key: string, fallback: string) => fallback }));
 
 const sampleWorktree: WorktreeMetadata = {
-  repoRoot: 'C:\\projects\\wmux',
+  repoRoot: 'C:\\projects\\remotea',
   branch: 'feat/wt-feature',
   baseBranch: 'main',
   baseSha: '0123456789abcdef0123456789abcdef01234567',
-  worktreePath: 'C:\\projects\\wmux\\.remotea\\worktrees\\feat-wt-feature',
+  worktreePath: 'C:\\projects\\remotea\\.remotea\\worktrees\\feat-wt-feature',
 };
 
 const baseWorkspace: WorkspaceInfo = {

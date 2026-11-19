@@ -140,7 +140,7 @@ describe('webviewWindowOpenPolicy (#281)', () => {
 });
 
 describe('needsAppWindowNavigationLock (#281)', () => {
-  it("locks wmux's own windows", () => {
+  it("locks remotea's own windows", () => {
     expect(needsAppWindowNavigationLock('window', false)).toBe(true);
   });
   it('never locks a webview', () => {
@@ -156,7 +156,7 @@ describe('popupWindowTitle (#281)', () => {
     expect(popupWindowTitle('https://accounts.google.com/signin', 'Sign in - Google Accounts')).toBe('accounts.google.com — Sign in - Google Accounts');
   });
   it('a page cannot title itself as something else without its host showing', () => {
-    expect(popupWindowTitle('https://evil.example/x', 'wmux — Sign in')).toBe('evil.example — wmux — Sign in');
+    expect(popupWindowTitle('https://evil.example/x', 'remotea — Sign in')).toBe('evil.example — remotea — Sign in');
   });
   it('no title yet, or a title that is just the host: the host alone', () => {
     expect(popupWindowTitle('https://a.example:8443/', '')).toBe('a.example:8443');

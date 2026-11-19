@@ -4,7 +4,7 @@ import net from 'net';
 import path from 'path';
 
 /**
- * What a LARGE hook payload does to the fields wmux reads out of it (issue #207).
+ * What a LARGE hook payload does to the fields remotea reads out of it (issue #207).
  *
  * The prompt log made stdin size a correctness question rather than a comfort
  * one. Before it, every field this helper extracted was short — a file path, a

@@ -98,11 +98,11 @@ describe('surface labels', () => {
   it('shows the folder name from currentCwd for terminal labels', () => {
     expect(
       getSurfaceLabel(
-        surface('surf-1', { currentCwd: 'C:\\Users\\me\\coding\\wmux' }),
+        surface('surf-1', { currentCwd: 'C:\\Users\\me\\coding\\remotea' }),
         undefined,
         'pwsh.exe',
       ),
-    ).toBe('wmux');
+    ).toBe('remotea');
   });
 
   it('falls back to shell name when currentCwd is empty', () => {
@@ -118,7 +118,7 @@ describe('surface labels', () => {
   it('prefers custom title over currentCwd', () => {
     expect(
       getSurfaceLabel(
-        surface('surf-1', { customTitle: 'My Tab', currentCwd: 'C:\\Users\\me\\coding\\wmux' }),
+        surface('surf-1', { customTitle: 'My Tab', currentCwd: 'C:\\Users\\me\\coding\\remotea' }),
       ),
     ).toBe('My Tab');
   });
@@ -127,7 +127,7 @@ describe('surface labels', () => {
 describe('window titles as tab labels (issue #221)', () => {
   it('labels a terminal from the OSC title its program set', () => {
     expect(
-      getSurfaceLabel(surface('surf-1', { currentCwd: 'C:\\repos\\wmux' }), undefined, undefined, undefined, 'Fix issue #221'),
+      getSurfaceLabel(surface('surf-1', { currentCwd: 'C:\\repos\\remotea' }), undefined, undefined, undefined, 'Fix issue #221'),
     ).toBe('Fix issue #221');
   });
 
@@ -140,7 +140,7 @@ describe('window titles as tab labels (issue #221)', () => {
   });
 
   it('keeps an agent spawn label above the program', () => {
-    // `wmux agent spawn --label reviewer` is the orchestrator naming this
+    // `remotea agent spawn --label reviewer` is the orchestrator naming this
     // worker, which identifies the pane within a wave better than whatever the
     // agent's own TUI is announcing this second.
     expect(
@@ -150,11 +150,11 @@ describe('window titles as tab labels (issue #221)', () => {
 
   it('falls back to the cwd when no title has been set', () => {
     expect(
-      getSurfaceLabel(surface('surf-1', { currentCwd: 'C:\\repos\\wmux' }), undefined, undefined, undefined, undefined),
-    ).toBe('wmux');
+      getSurfaceLabel(surface('surf-1', { currentCwd: 'C:\\repos\\remotea' }), undefined, undefined, undefined, undefined),
+    ).toBe('remotea');
     expect(
-      getSurfaceLabel(surface('surf-1', { currentCwd: 'C:\\repos\\wmux' }), undefined, undefined, undefined, ''),
-    ).toBe('wmux');
+      getSurfaceLabel(surface('surf-1', { currentCwd: 'C:\\repos\\remotea' }), undefined, undefined, undefined, ''),
+    ).toBe('remotea');
   });
 
   it('ignores a title on a surface that is not a terminal', () => {
@@ -171,12 +171,12 @@ describe('template names yield to the program (issue #291)', () => {
   it('lets the OSC title take over a quick-launch profile name', () => {
     // The reporter's case: a profile named `opencode`, and opencode writing
     // `OC | <session title>` the moment it opens a session.
-    const tab = surface('surf-1', { defaultTitle: 'opencode', currentCwd: 'C:\repos\wmux' });
+    const tab = surface('surf-1', { defaultTitle: 'opencode', currentCwd: 'C:\repos\remotea' });
     expect(getSurfaceLabel(tab, undefined, undefined, undefined, 'OC | Fix the tab labels')).toBe('OC | Fix the tab labels');
   });
 
   it('shows the profile name, not the folder, until the program sets a title', () => {
-    const tab = surface('surf-1', { defaultTitle: 'opencode', currentCwd: 'C:\repos\wmux' });
+    const tab = surface('surf-1', { defaultTitle: 'opencode', currentCwd: 'C:\repos\remotea' });
     expect(getSurfaceLabel(tab, undefined, undefined, undefined, undefined)).toBe('opencode');
   });
 

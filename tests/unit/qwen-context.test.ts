@@ -21,7 +21,7 @@ import {
 } from '../../src/main/qwen-context';
 
 /**
- * Qwen Code does not read Claude Code's files, so wmux writes the Claude
+ * Qwen Code does not read Claude Code's files, so remotea writes the Claude
  * integration again into ~/.qwen. What this suite pins is that those writes
  * stay guests in a file Qwen owns — every user key and hook kept, nothing at
  * all on a machine that never ran Qwen, and an exact inverse (#132).
@@ -30,10 +30,10 @@ describe('qwen context', () => {
   let tmp: string;
   let saved: Record<string, string | undefined>;
   const KEYS = ['USERPROFILE', 'HOME', 'QWEN_HOME'];
-  const HOOK = 'C:/wmux/resources/cli/remotea-hook.js';
+  const HOOK = 'C:/remotea/resources/cli/remotea-hook.js';
 
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-qwen-'));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-qwen-'));
     saved = Object.fromEntries(KEYS.map(k => [k, process.env[k]]));
     process.env.USERPROFILE = tmp;
     process.env.HOME = tmp;
@@ -115,7 +115,7 @@ describe('qwen context', () => {
     });
 
     it('replaces the quoted ≤ 2.42.0 entry pointing into a spaced install path', () => {
-      const legacy = 'node "C:/Users/me/OneDrive - Org/wmux/resources/cli/remotea-hook.js" --event Stop --provider qwen';
+      const legacy = 'node "C:/Users/me/OneDrive - Org/remotea/resources/cli/remotea-hook.js" --event Stop --provider qwen';
       const old = { hooks: { Stop: [{ hooks: [{ type: 'command', command: legacy }] }] } };
       const next = applyQwenHooks(old, 'C:/Users/me/.qwen/remotea-qwen-hook.cjs');
       expect(next.hooks.Stop).toHaveLength(1);
@@ -138,7 +138,7 @@ describe('qwen context', () => {
       expect(removeQwenHooksFrom(applyQwenHooks({ a: 1 }, HOOK))).toEqual({ a: 1 });
     });
 
-    it('re-registers over a wmux entry written from another install path', () => {
+    it('re-registers over a remotea entry written from another install path', () => {
       const old = applyQwenHooks({}, 'D:/old/remotea-hook.js');
       const next = applyQwenHooks(old, HOOK);
       expect(JSON.stringify(next)).not.toContain('D:/old');

@@ -1,10 +1,10 @@
 /**
  * Screen-manifest detection — the data model.
  *
- * Phase 1 and 2 gave wmux "who needs me?" and "which agent is this?". Both
+ * Phase 1 and 2 gave remotea "who needs me?" and "which agent is this?". Both
  * still depend on the agent COOPERATING: declared state comes from hooks and
  * the CLI, and identity from a command line. An agent that neither reports nor
- * was launched under a name wmux recognises is a pane wmux can see and cannot
+ * was launched under a name remotea recognises is a pane remotea can see and cannot
  * read. This module closes that by reading the one thing every agent produces
  * unconditionally — its own UI.
  *
@@ -16,7 +16,7 @@
  *
  *   1. The no-match fallback is `unknown`, NOT `idle`. herdr has no unknown
  *      state so it must guess, and labels the guess
- *      `default_known_agent_idle_fallback`. wmux has a real `unknown`, and
+ *      `default_known_agent_idle_fallback`. remotea has a real `unknown`, and
  *      invariant 1 of the declared-state protocol says `idle` is a CLAIM. An
  *      agent whose screen we failed to parse has claimed nothing.
  *   2. Detection NEVER overrides declared state. See DetectionResult.
@@ -151,7 +151,7 @@ export interface DetectionResult {
    *
    * This is ALWAYS a separate field from declared state, all the way to the UI.
    * A caller merges them at render time; nothing merges them at store time, so
-   * an operator running `wmux agent-state` can still tell a reported block from
+   * an operator running `remotea agent-state` can still tell a reported block from
    * a seen one.
    */
   state: DetectedState | 'unknown';

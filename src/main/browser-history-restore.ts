@@ -72,7 +72,7 @@ export function forgetHistoryRestore(guestId: number): void {
   claimed.delete(guestId);
 }
 
-/** The stack a guest holds now, in the shape wmux persists. */
+/** The stack a guest holds now, in the shape remotea persists. */
 export function readGuestHistory(guest: HistoryGuest): BrowserHistory | null {
   return sanitizeBrowserHistory({
     entries: guest.navigationHistory.getAllEntries().map(({ url, title }) => ({ url, title })),

@@ -47,7 +47,7 @@ const find = (files: Changed[], rel: string): Changed | undefined =>
   files.find((f) => f.path === rel);
 
 beforeEach(async () => {
-  repo = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'wmux-untracked-'));
+  repo = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'remotea-untracked-'));
   vi.resetModules();
   const mod = await import('../../src/main/diff-provider');
   getChangedFiles = mod.getChangedFiles as typeof getChangedFiles;

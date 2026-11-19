@@ -56,7 +56,7 @@ export function quoteOmpArg(id: string, shell?: string): string | null {
 }
 
 /**
- * The agents wmux can resume, how each takes a stored handle, and the
+ * The agents remotea can resume, how each takes a stored handle, and the
  * executable names that mean it.
  *
  * `\d*` accepts the numbered-alias convention people use to keep two majors

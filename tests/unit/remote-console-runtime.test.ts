@@ -85,8 +85,8 @@ function httpServerOf(rt: ConsoleRuntime): http.Server {
 }
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-rc-rt-'));
-  staticRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-rc-rt-static-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-rc-rt-'));
+  staticRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-rc-rt-static-'));
   fs.mkdirSync(path.join(staticRoot, 'remote'));
   fs.writeFileSync(path.join(staticRoot, 'remote', 'index.html'), '<!doctype html>');
   fs.writeFileSync(path.join(staticRoot, 'remote-manifest.json'), JSON.stringify({ 'remote/index.html': { file: 'assets/r.js' } }));

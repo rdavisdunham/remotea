@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { pickBrowserSurface } from '../../src/main/browser-engine-surface';
 
 /**
- * `wmux browser engine [web|agent] [--surface <id>]` carries its surface in
+ * `remotea browser engine [web|agent] [--surface <id>]` carries its surface in
  * `params.caller`, the same slot every other browser verb uses. So the caller is
  * sometimes a terminal (resolve it to the browser pane it drives) and sometimes
  * a browser surface itself (`--surface` was passed explicitly).

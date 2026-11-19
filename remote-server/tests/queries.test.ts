@@ -62,7 +62,7 @@ describe('server-side query replies', () => {
     s.dispose();
   });
 
-  it('uses wmux DA1 and the theme colours', async () => {
+  it('uses remotea DA1 and the theme colours', async () => {
     const { s, pty } = session();
     pty.emit(QUERIES.DA1);
     pty.emit(QUERIES.OSC11);

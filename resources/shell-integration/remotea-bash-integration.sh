@@ -77,7 +77,7 @@ _remotea_report() {
 }
 
 # How a native report reaches the named pipe, resolved once per source. bash
-# cannot open the pipe itself: under Git Bash `> //./pipe/wmux` fails after
+# cannot open the pipe itself: under Git Bash `> //./pipe/remotea` fails after
 # seconds (measured), and WSL has no Windows pipes at all. Until #427/#428 this
 # branch appended to a temp file that nothing in remotea has ever read, so Git Bash
 # and WSL panes reported no cwd, no branch and no shell state.

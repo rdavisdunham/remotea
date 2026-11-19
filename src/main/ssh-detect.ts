@@ -4,7 +4,7 @@
  *
  * Three sources feed one per-surface cache, in precedence order:
  *
- *   1. Managed  — the surface was created by `wmux ssh user@host`, so its
+ *   1. Managed  — the surface was created by `remotea ssh user@host`, so its
  *                 `shell` string IS the ssh command line. Authoritative, free.
  *   2. Reported — the shell-integration preexec hook told us the user just ran
  *                 an ssh command. Instant, covers the typed `ssh host` case,
@@ -212,7 +212,7 @@ export class SshDetector {
 
   /**
    * Layer 1. Called when a surface's PTY is created, with the shell spec it was
-   * requested with (`wmux ssh user@host` stores the whole command there).
+   * requested with (`remotea ssh user@host` stores the whole command there).
    */
   setSurfaceShell(
     surfaceId: string,
@@ -499,7 +499,7 @@ const MAX_ANCESTRY_DEPTH = 64;
 /**
  * Walk up from `pid` to a PTY root, starting AT the pid itself.
  *
- * Starting at the parent would miss the commonest managed case: `wmux ssh`
+ * Starting at the parent would miss the commonest managed case: `remotea ssh`
  * spawns ssh as the pane's own shell, so the PTY root pid *is* the ssh pid and
  * it is its own owner at depth 0.
  *

@@ -6,7 +6,7 @@ import type { SessionData } from '../../src/main/session-persistence';
 import type { WorktreeMetadata } from '../../src/shared/types';
 
 // Use a temp directory for tests
-const TEST_DIR = path.join(os.tmpdir(), 'wmux-test-sessions-' + process.pid);
+const TEST_DIR = path.join(os.tmpdir(), 'remotea-test-sessions-' + process.pid);
 
 describe('session-persistence', () => {
   beforeEach(() => {
@@ -86,7 +86,7 @@ describe('session-persistence', () => {
 // auto session.json is reset. The module computes its storage paths from
 // %APPDATA% at import time, so we override APPDATA and re-import per test.
 describe('handleVersionChange (issue #35)', () => {
-  const APPDATA_OVERRIDE = path.join(os.tmpdir(), 'wmux-vc-test-' + process.pid);
+  const APPDATA_OVERRIDE = path.join(os.tmpdir(), 'remotea-vc-test-' + process.pid);
   let mod: typeof import('../../src/main/session-persistence');
   let savedAppData: string | undefined;
 
@@ -285,7 +285,7 @@ describe('handleVersionChange (issue #35)', () => {
 // customTitle".
 // ─────────────────────────────────────────────────────────────────────────────
 describe('saveSession never leaves the session file missing', () => {
-  const APPDATA_OVERRIDE = path.join(os.tmpdir(), 'wmux-atomic-test-' + process.pid);
+  const APPDATA_OVERRIDE = path.join(os.tmpdir(), 'remotea-atomic-test-' + process.pid);
   let mod: typeof import('../../src/main/session-persistence');
   let savedAppData: string | undefined;
   const leaf = { type: 'leaf', paneId: 'pane-1', surfaces: [], activeSurfaceIndex: 0 };
@@ -365,7 +365,7 @@ describe('saveSession never leaves the session file missing', () => {
 });
 
 describe('explorer panel state persistence', () => {
-  const APPDATA_OVERRIDE = path.join(os.tmpdir(), 'wmux-explorer-test-' + process.pid);
+  const APPDATA_OVERRIDE = path.join(os.tmpdir(), 'remotea-explorer-test-' + process.pid);
   let mod: typeof import('../../src/main/session-persistence');
   let savedAppData: string | undefined;
   const leaf = { type: 'leaf', paneId: 'pane-1', surfaces: [], activeSurfaceIndex: 0 };
@@ -456,7 +456,7 @@ describe('explorer panel state persistence', () => {
 });
 
 describe('worktree metadata persistence (#366)', () => {
-  const APPDATA_OVERRIDE = path.join(os.tmpdir(), 'wmux-worktree-session-test-' + process.pid);
+  const APPDATA_OVERRIDE = path.join(os.tmpdir(), 'remotea-worktree-session-test-' + process.pid);
   let mod: typeof import('../../src/main/session-persistence');
   let savedAppData: string | undefined;
   const leaf = { type: 'leaf', paneId: 'pane-1', surfaces: [], activeSurfaceIndex: 0 };

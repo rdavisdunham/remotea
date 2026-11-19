@@ -5,7 +5,7 @@
 //   workspace.export    {to, name?}                → the manifest to write
 //   workspace.list_manifests                       → manifests trusted on this machine
 //
-// NOT `workspace.list`: that name is the bridge method behind `wmux
+// NOT `workspace.list`: that name is the bridge method behind `remotea
 // list-workspaces` (v2-bridge.ts), and routeSpecialV2 matches this set FIRST,
 // so reusing it made list-workspaces answer `{manifests: []}` (#398).
 //

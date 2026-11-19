@@ -77,7 +77,7 @@ function readWslNetworkingMode() {
 // does — restated rather than imported, because the CLI ships file by file (see
 // remotea-hook.ts). It used to be the installed pipe whatever the instance, while
 // readPipeToken() below already read that instance's token: a CLI run outside a
-// pane against a side-by-side build sent the dev token to the installed wmux.
+// pane against a side-by-side build sent the dev token to the installed remotea.
 function cliPipePath(env) {
     if (env.REMOTEA_PIPE)
         return env.REMOTEA_PIPE;
@@ -123,10 +123,10 @@ function parseRemoteTarget(spec) {
     }
     return { host: spec.slice(0, idx) || '127.0.0.1', port };
 }
-// ─── WSL2 transport: reach the Windows \\.\pipe\wmux from inside WSL2 ─────────
+// ─── WSL2 transport: reach the Windows \\.\pipe\remotea from inside WSL2 ─────────
 //
 // A remotea CLI (or `remotea bridge`) running inside WSL2 needs to talk to the remotea
-// process on the Windows host over the \\.\pipe\wmux named pipe. AF_VSOCK,
+// process on the Windows host over the \\.\pipe\remotea named pipe. AF_VSOCK,
 // TCP-over-gateway and cross-boundary Unix sockets were all evaluated and
 // rejected (HCS-managed WSL2 UVMs ignore GuestCommunicationServices; gateway
 // IPs/firewall policy are unreliable on corporate networks; 9P does not forward
@@ -200,18 +200,18 @@ function findNpiperelay() {
 function connectViaNpiperelay(pipePath, onConnect) {
     const bin = findNpiperelay();
     if (!bin) {
-        console.error('wmux: npiperelay.exe not found.');
+        console.error('remotea: npiperelay.exe not found.');
         console.error('  Install it with scripts/install-npiperelay.sh, or fetch it from:');
         console.error('  https://github.com/albertony/npiperelay/releases/latest');
         process.exit(1);
     }
-    // npiperelay names the pipe with forward slashes: \\.\pipe\wmux → //./pipe/wmux
+    // npiperelay names the pipe with forward slashes: \\.\pipe\remotea → //./pipe/remotea
     const child = (0, child_process_1.spawn)(bin, ['-ei', '-s', pipePath.replace(/\\/g, '/')], {
         stdio: ['pipe', 'pipe', 'pipe'],
     });
     let relayError = '';
     child.stderr?.on('data', (chunk) => {
-        // npiperelay writes "open //./pipe/wmux: All pipe instances are busy" here
+        // npiperelay writes "open //./pipe/remotea: All pipe instances are busy" here
         // and exits non-zero. Keep it on the error so the caller can tell a busy
         // pipe (safe to retry for an idempotent request) from a missing one.
         if (relayError.length < 2_000)
@@ -1529,7 +1529,7 @@ function cmdOpencodeTui(args) {
     }
     const sourceDir = (0, opencode_tui_install_1.opencodePluginSourceDir)(__dirname);
     if (!sourceDir) {
-        console.error('wmux: the shipped OpenCode TUI plugin files are missing next to the CLI.');
+        console.error('remotea: the shipped OpenCode TUI plugin files are missing next to the CLI.');
         process.exit(1);
     }
     const result = (0, opencode_tui_install_1.installOpencodeTui)({ sourceDir, configDir });
@@ -1699,7 +1699,7 @@ function describeWerConfig(cfg) {
     const full = cfg.dumpType === '2';
     return [
         '',
-        `!! Local crash dumps are ENABLED for wmux.exe on this machine (DumpType=${cfg.dumpType ?? '?'}${full ? ', full memory' : ', minidump'}).`,
+        `!! Local crash dumps are ENABLED for remotea.exe on this machine (DumpType=${cfg.dumpType ?? '?'}${full ? ', full memory' : ', minidump'}).`,
         `!! ${full
             ? 'A full dump contains your environment block AND the process heap.'
             : 'A minidump contains your environment block.'}`,
@@ -1732,19 +1732,19 @@ function readWerConfig() {
     };
 }
 /**
- * The last N crashes of wmux.exe, from both providers.
+ * The last N crashes of remotea.exe, from both providers.
  *
  * The app name is matched on the property rather than anywhere in the rendered
  * text. Substring-matching the message attributes any crash whose *path*
  * happens to contain the string — on the machine this was written, a sibling
- * project at `...\newmux\smux.exe` was being reported as a remotea crash, with a
+ * project at `...\neremotea\smux.exe` was being reported as a remotea crash, with a
  * fault offset identical to the one #150 is about. A crash report that
  * confidently hands the maintainer another program's crash is worse than none.
  */
 function readCrashEvents(limit) {
     if (process.platform !== 'win32')
         return [];
-    const EXE = 'wmux.exe';
+    const EXE = 'remotea.exe';
     // -Oldest is invalid for a hashtable filter, so the newest come back first.
     // Both queries scan a fixed window and are then narrowed, because Get-WinEvent
     // cannot filter on a property value server-side.
@@ -1844,7 +1844,7 @@ function formatCrashReport(input) {
         `platform    : ${input.platform} ${input.osVersion}`,
         `remotea version: ${version}`,
     ];
-    out.push('', '## Windows Event Log — Application Error, wmux.exe', '');
+    out.push('', '## Windows Event Log — Application Error, remotea.exe', '');
     if (input.platform !== 'win32') {
         out.push('(not Windows — no Application Error log to read)');
     }

@@ -1,10 +1,10 @@
 /**
  * Git worktree workspaces (#366) — the main-process half.
  *
- * A worktree workspace is a checkout wmux created for one branch, under
+ * A worktree workspace is a checkout remotea created for one branch, under
  * `%LOCALAPPDATA%\remotea\wt\<repo-slug>\<branch-dir>`. Creating one is cheap;
  * REMOVING one is where user work dies, so the whole module is organised
- * around one rule: **wmux never destroys work it was not explicitly told to
+ * around one rule: **remotea never destroys work it was not explicitly told to
  * destroy, and when in doubt it leaves the files on disk and says so.**
  *
  * - There is no background sweep. A startup collector once removed "unclaimed
@@ -371,7 +371,7 @@ export async function createWorktree(i: { repoRoot: string; branch: string; base
   try {
     recordWorktree(record);
   } catch (err) {
-    // The checkout exists and is the user's now; without a record wmux will
+    // The checkout exists and is the user's now; without a record remotea will
     // simply never remove it. Say so rather than undo the add.
     console.warn(`[worktree] registry write failed: ${(err as NodeJS.ErrnoException).code ?? 'UNKNOWN'}`);
   }
@@ -435,7 +435,7 @@ async function countWork(worktreePath: string): Promise<{ count: number } | { er
 }
 
 /**
- * Read-only pre-flight for the close dialog: is this a worktree wmux may
+ * Read-only pre-flight for the close dialog: is this a worktree remotea may
  * remove, and does it hold anything Keep would refuse to lose? Runs while the
  * workspace is still open, so a refusal costs the user nothing.
  */
@@ -465,7 +465,7 @@ async function removeEmptyLeftover(dir: string, discard: boolean): Promise<boole
 }
 
 /**
- * Removes a worktree wmux created.
+ * Removes a worktree remotea created.
  *
  * - `keep`: refuses with `has-work` if `status --ignored --untracked-files=all`
  *   lists anything, then an UNFORCED `git worktree remove`. The branch stays.

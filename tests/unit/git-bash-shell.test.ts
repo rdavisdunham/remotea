@@ -21,7 +21,7 @@ import {
 
 /**
  * Issue #252: Settings → Workspace → Default shell → "Git Bash" stores the bare
- * name `bash.exe`, which was resolved with `where` against wmux's OWN PATH.
+ * name `bash.exe`, which was resolved with `where` against remotea's OWN PATH.
  * Git for Windows only puts `<Git>\cmd` there, so the lookup either missed
  * (silent fallback to pwsh — "the setting has no effect") or found the WSL
  * launcher in System32.
@@ -99,7 +99,7 @@ describe('resolveExistingShellPath for a bare bash (#252)', () => {
     vi.spyOn(shellProbe, 'onPath').mockImplementation((name: string) => map[name]);
   }
 
-  it('the reporter\'s machine: no bash on wmux\'s PATH → Git Bash, not a silent pwsh fallback', () => {
+  it('the reporter\'s machine: no bash on remotea\'s PATH → Git Bash, not a silent pwsh fallback', () => {
     if (process.platform !== 'win32') return;
     onPath({});
     vi.spyOn(gitBashProbe, 'find').mockReturnValue(GIT_BASH);
@@ -138,7 +138,7 @@ describe('resolveExistingShellPath for a bare bash (#252)', () => {
   it('gitBashProbe finds a real install through the git on PATH', () => {
     if (process.platform !== 'win32') return;
     // A portable Git somewhere no default location would look.
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-252-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-252-'));
     try {
       fs.mkdirSync(path.join(root, 'Git', 'cmd'), { recursive: true });
       fs.mkdirSync(path.join(root, 'Git', 'bin'), { recursive: true });

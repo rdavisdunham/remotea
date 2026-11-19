@@ -31,7 +31,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../../src/shared/instance', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getAppDataDir: () => path.join(os.tmpdir(), 'wmux-worktree-ipc-test'),
+  getAppDataDir: () => path.join(os.tmpdir(), 'remotea-worktree-ipc-test'),
 }));
 
 const mockCreateWorktree = vi.fn();
@@ -53,7 +53,7 @@ vi.mock('../../src/main/git-worktree', () => ({
 
 import { registerIpcHandlers, ptyManager } from '../../src/main/ipc-handlers';
 
-const WT = 'C:\\Users\\user\\AppData\\Local\\wmux\\wt\\repo\\feat-12345678';
+const WT = 'C:\\Users\\user\\AppData\\Local\\remotea\\wt\\repo\\feat-12345678';
 
 describe('worktree IPC handlers (#366)', () => {
   let createHandler: Function;
@@ -166,7 +166,7 @@ describe('worktree IPC handlers (#366)', () => {
 
     it('logs the outcome only, never the path (#174)', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const secretPath = 'C:\\Users\\sensitive-username\\AppData\\Local\\wmux\\wt\\proj\\branch-12345678';
+      const secretPath = 'C:\\Users\\sensitive-username\\AppData\\Local\\remotea\\wt\\proj\\branch-12345678';
       for (const outcome of ['has-work', 'not-ours', 'absent', 'left-behind', 'error']) {
         warnSpy.mockClear();
         mockRemoveWorktree.mockResolvedValueOnce({ outcome });
@@ -207,8 +207,8 @@ describe('worktree IPC handlers (#366)', () => {
     });
 
     it('forwards a valid dir, and turns a throw into null', async () => {
-      mockProbeRepo.mockResolvedValueOnce({ repoRoot: 'C:\\code\\wmux', currentBranch: 'main' });
-      expect(await probeHandler({}, 'C:\\code\\wmux\\src')).toEqual({ repoRoot: 'C:\\code\\wmux', currentBranch: 'main' });
+      mockProbeRepo.mockResolvedValueOnce({ repoRoot: 'C:\\code\\remotea', currentBranch: 'main' });
+      expect(await probeHandler({}, 'C:\\code\\remotea\\src')).toEqual({ repoRoot: 'C:\\code\\remotea', currentBranch: 'main' });
       mockProbeRepo.mockRejectedValueOnce(new Error('spawn ENOENT'));
       expect(await probeHandler({}, 'C:\\broken')).toBeNull();
     });

@@ -14,7 +14,7 @@ import * as marks from './prompt-marks';
  *
  *   • `recordAgentPrompt` — Claude Code's UserPromptSubmit hook, arriving via
  *     App.tsx. Carries the text verbatim.
- *   • `handlePromptMark` — OSC 133 from wmux's shell integration, arriving via
+ *   • `handlePromptMark` — OSC 133 from remotea's shell integration, arriving via
  *     the xterm parser in useTerminal. Carries a boundary; the text is read back
  *     out of the buffer.
  *
@@ -231,7 +231,7 @@ function scheduleTintRetry(
  *
  * One `hook.event`, two producers, two spellings of "which pane": Claude Code's
  * `remotea-hook.js` talks JSON-RPC itself and sends `surfaceId`; the OpenCode
- * plugin goes through `wmux hook`, whose transport stamps the calling pane as
+ * plugin goes through `remotea hook`, whose transport stamps the calling pane as
  * `caller` — the same `$REMOTEA_SURFACE_ID` the browser verbs route by (issue
  * #62).
  *
@@ -251,7 +251,7 @@ export function hookEventSurface(event: { surfaceId?: unknown; caller?: unknown 
 /**
  * A user prompt submitted to an in-pane agent.
  *
- * `text` is the only free-text body wmux forwards from a hook payload besides a
+ * `text` is the only free-text body remotea forwards from a hook payload besides a
  * Notification's message, and it is the user's own words to their own agent,
  * already on screen in this very renderer — but it is still text crossing a
  * process boundary into a web context, so it is length-capped
@@ -298,7 +298,7 @@ export function recordAgentPrompt(
  * How many terminal rows a prompt of this text occupies.
  *
  * An estimate, and knowingly so: an agent TUI adds its own prefix, indent and
- * wrapping, none of which wmux can see. It only sizes a highlight, so being a
+ * wrapping, none of which remotea can see. It only sizes a highlight, so being a
  * row out is a cosmetic error — which is why it is worth doing at all rather
  * than highlighting a single row for a ten-line prompt.
  */

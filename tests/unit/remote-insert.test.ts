@@ -38,8 +38,8 @@ const session = (over: Partial<DetectedSsh> = {}): DetectedSsh => ({
 const fs = await import('fs');
 const os = await import('os');
 const path = await import('path');
-const FILE_A = path.join(os.tmpdir(), 'wmux-insert-a.png');
-const FILE_B = path.join(os.tmpdir(), 'wmux-insert-b.png');
+const FILE_A = path.join(os.tmpdir(), 'remotea-insert-a.png');
+const FILE_B = path.join(os.tmpdir(), 'remotea-insert-b.png');
 
 beforeEach(() => {
   fs.writeFileSync(FILE_A, 'a');

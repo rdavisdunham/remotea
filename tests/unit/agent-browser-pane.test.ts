@@ -28,7 +28,7 @@ import { fr } from '../../src/renderer/i18n/locales/fr';
  *
  *  2. Source-level guards, in the style of the "BrowserPane agent-mode guards"
  *     reasoning in agent-browser-routing.test.ts. vitest runs with
- *     `environment: 'node'` and wmux ships no React test renderer, so a webview
+ *     `environment: 'node'` and remotea ships no React test renderer, so a webview
  *     cannot be mounted — but the properties at stake are structural
  *     ("the guard is INSIDE claimCdp, not at its call sites") and structure is
  *     exactly what reading the source can pin.
@@ -81,7 +81,7 @@ const PANE_CODE = stripComments(PANE);
 describe('claimCdp refuses an agent-mode surface', () => {
   /**
    * In agent mode the webview shows agent-browser's dashboard SPA. Registering
-   * that as a CDP target makes `wmux browser click e2` aimed at this surface
+   * that as a CDP target makes `remotea browser click e2` aimed at this surface
    * click on the DASHBOARD's own DOM instead of the remote page — silently, on
    * the pane the user is watching.
    */
@@ -511,7 +511,7 @@ describe('i18n coverage for the new UI', () => {
 // ── the address bar, in agent mode, telling the truth ───────────────────────
 //
 // The pane shows agent-browser's dashboard while the actual page lives in a
-// Chrome outside wmux that the AGENT drives. So the bar cannot observe
+// Chrome outside remotea that the AGENT drives. So the bar cannot observe
 // navigation the way it observes the webview's: left alone it shows the last
 // URL the PANE asked for, which stops being true the moment the agent clicks
 // anything. These pin the poll that fixes it — and, just as importantly, the
@@ -593,7 +593,7 @@ describe('shouldPollAgentUrl', () => {
 });
 
 describe('elementHidden', () => {
-  // wmux's keep-alive tabs stay MOUNTED and are hidden with `visibility`, which
+  // remotea's keep-alive tabs stay MOUNTED and are hidden with `visibility`, which
   // offsetParent does not report — hence checkVisibility, which does.
   it('believes checkVisibility when the platform has it', () => {
     expect(elementHidden({ checkVisibility: () => false } as unknown as HTMLElement)).toBe(true);

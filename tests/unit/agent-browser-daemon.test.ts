@@ -166,7 +166,7 @@ describe('DashboardDaemon', () => {
     await Promise.all([acquirePromise, shutdownPromise]);
 
     // The whole point: shutdown() must not resolve believing there's nothing
-    // to stop, only for the in-flight start to finish AFTER wmux has already
+    // to stop, only for the in-flight start to finish AFTER remotea has already
     // exited and spawn a dashboard process nothing will ever reap.
     expect(calls).toEqual(['start', 'stop']);
     expect(d.isAvailable).toBe(false);

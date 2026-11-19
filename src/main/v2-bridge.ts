@@ -190,7 +190,7 @@ function targetForCaller(caller: unknown): Promise<CallerTarget<BrowserWindow> |
 
 const SPECS: Record<string, BridgeSpec> = {
   /**
-   * A URL an agent or CLI asked wmux to open (`wmux open`).
+   * A URL an agent or CLI asked remotea to open (`remotea open`).
    *
    * Deliberately not `callerScoped`: the window is resolved from the caller,
    * but `openInRemoteaBrowser` uses that window's active workspace, exactly like a

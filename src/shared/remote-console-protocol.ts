@@ -24,7 +24,7 @@ export const CHOICE_ID_RE = /^[A-Za-z0-9_-]{1,32}$/;
 /**
  * The id each declared choice travels under, index for index (#254).
  *
- * `wmux report-agent --choices` accepts any non-blank id ("allow once", "1.",
+ * `remotea report-agent --choices` accepts any non-blank id ("allow once", "1.",
  * a 40-character one) and always has; the desktop answers by that id. The wire
  * carries only CHOICE_ID_RE, so a declared id of that shape goes as-is and any
  * other goes as an OPAQUE id: `c<index>` into the declared array, prefixed

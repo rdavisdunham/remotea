@@ -1,15 +1,15 @@
 /**
- * Orphan reaping across an abnormal wmux death (issue #139).
+ * Orphan reaping across an abnormal remotea death (issue #139).
  *
  * `PtyManager.kill()` already tree-kills a pane's whole subtree with
  * `taskkill /T /F` (issue #65) — Claude Code's backend and the MCP servers it
  * spawns are grandchildren that do not share the pseudoconsole's lifetime, so
- * nothing else reaps them. But every caller of that path requires wmux to be
+ * nothing else reaps them. But every caller of that path requires remotea to be
  * alive and cooperating: closing a pane, or `killAll()` on `will-quit`.
  *
  * A native crash reaches none of them, and Windows does not tear down a process
  * tree when the root dies — descendants are reparented and keep running. So a
- * crashed wmux leaves every pane's shell, its agent, and each of that agent's
+ * crashed remotea leaves every pane's shell, its agent, and each of that agent's
  * MCP servers resident. Restarting restores the session and spawns a fresh set
  * beside them; a crash-loop multiplies rather than replaces (the reporter saw
  * 251 processes / 3.3 GB across six crash cycles).

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readScreenParams } from '../../src/cli/remotea';
 
 /**
- * `wmux read-screen` argv → the `surface.read_text` params. `--events` asks for
+ * `remotea read-screen` argv → the `surface.read_text` params. `--events` asks for
  * the per-surface history of buffer switches and resizes (see
  * renderer/utils/screen-report.ts); it is opt-in because agents call
  * read-screen constantly and only a diagnosis wants the history.

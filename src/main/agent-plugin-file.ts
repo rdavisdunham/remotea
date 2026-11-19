@@ -1,5 +1,5 @@
 /**
- * The version marker wmux stamps into every plugin/extension file it installs
+ * The version marker remotea stamps into every plugin/extension file it installs
  * into another program's config directory, and the two decisions that depend
  * on it.
  *
@@ -10,7 +10,7 @@
  *   remove   is the copy on disk ours at all?
  *
  * The second is the one that must not be reimplemented per agent. Removing a
- * file the user wrote under a name wmux happens to use is unrecoverable data
+ * file the user wrote under a name remotea happens to use is unrecoverable data
  * loss, and it is the kind of guard a second copy loses first: the copy written
  * for omp had already dropped `trimEnd()` from the block splice (see
  * agent-instructions.ts), which is the same failure mode with a cosmetic
@@ -42,7 +42,7 @@ export function pluginNeedsUpdate(src: string, target: string | null): boolean {
   return s !== t;
 }
 
-/** Is this file one wmux installed? The guard on every uninstall path. */
+/** Is this file one remotea installed? The guard on every uninstall path. */
 export function isRemoteaPluginFile(contents: string): boolean {
   return PLUGIN_VERSION_RE.test(contents);
 }

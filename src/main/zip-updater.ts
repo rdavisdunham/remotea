@@ -5,22 +5,23 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { fetchLatestRelease, compareVersions, type GithubReleaseAsset } from './update-checker';
+import { LEGACY_APP_EXE } from '../shared/legacy-names';
 
 // ── Portable zip in-place update ────────────────────────────────────────────
-// wmux's README install is "extract the win-x64 zip anywhere and run
-// wmux.exe". That layout has no NSIS uninstaller, so electron-updater's
+// remotea's README install is "extract the win-x64 zip anywhere and run
+// remotea.exe". That layout has no NSIS uninstaller, so electron-updater's
 // NsisUpdater cannot replace it: a zip listed in latest.yml downloads and
 // then quitAndInstall() no-ops (issue #96, endless "update ready" loop),
 // and a setup.exe listed there would install a *second* copy under
 // %LOCALAPPDATA% while leaving the zip extract untouched.
 //
 // This path is the in-app equivalent of a user downloading the zip, killing
-// wmux, and copying over the folder. It is user-initiated only — there is
+// remotea, and copying over the folder. It is user-initiated only — there is
 // no unattended download. The titlebar badge / Help button click is the
 // consent; the same confirmation dialog as the NSIS path still fires
 // before the swap.
 //
-// Apply cannot overwrite a running wmux.exe, so after the zip is extracted
+// Apply cannot overwrite a running remotea.exe, so after the zip is extracted
 // we write a tiny cmd helper, detach it, and quit. The helper waits for
 // this PID to exit, robocopies the payload over the install root, and
 // relaunches.
@@ -32,8 +33,8 @@ import { fetchLatestRelease, compareVersions, type GithubReleaseAsset } from './
 // otherwise identical non-detached one does not). A user reported the result
 // as an empty console titled `findstr.exe /I /C:" <pid> "`, with no way to
 // tell whether it wanted input or wanted closing. Hiding it is the wrong fix
-// twice over: dropping `detached` risks the helper dying with wmux, which is
-// the one failure the user cannot recover from (wmux has already quit), and a
+// twice over: dropping `detached` risks the helper dying with remotea, which is
+// the one failure the user cannot recover from (remotea has already quit), and a
 // hidden detached script that overwrites an unsigned exe and relaunches it is
 // the dropper shape #3 is about. So the window states its purpose instead.
 //
@@ -55,12 +56,11 @@ import { fetchLatestRelease, compareVersions, type GithubReleaseAsset } from './
 /**
  * The packaged exe. electron-builder names it after `productName` in
  * electron-builder.json (no `executableName` is set); zip-updater.test.ts
- * fails if the two drift apart. `LEGACY_EXE` is the name before the remotea
+ * fails if the two drift apart. `LEGACY_APP_EXE` is the name before the remotea
  * rename: an install still running it is recognised and updated in kind.
  */
 export const APP_EXE = 'remotea.exe';
-const LEGACY_EXE = 'wmux.exe';
-const INSTALL_EXES = [APP_EXE, LEGACY_EXE];
+const INSTALL_EXES = [APP_EXE, LEGACY_APP_EXE];
 /** NSIS writes `Uninstall <productName>.exe` beside the exe; a zip extract has none. */
 const UNINSTALLER_NAMES = INSTALL_EXES.map((exe) => `Uninstall ${exe}`);
 
@@ -119,10 +119,10 @@ export function findPayloadRoot(extractDir: string, exeName: string = APP_EXE): 
 // Every name the update flow creates in os.tmpdir() is built here, and the
 // sweep parses names with the inverse of these same builders, so what is
 // created and what may be removed cannot drift apart. All three names carry
-// the PID of the wmux that downloaded and applied the update.
+// the PID of the remotea that downloaded and applied the update.
 
 export function updateStampName(version: string, pid: number): string {
-  return `wmux-update-${version}-${pid}`;
+  return `remotea-update-${version}-${pid}`;
 }
 
 export function updateZipName(version: string, pid: number): string {
@@ -130,15 +130,15 @@ export function updateZipName(version: string, pid: number): string {
 }
 
 export function updateHelperName(pid: number): string {
-  return `wmux-apply-update-${pid}.cmd`;
+  return `remotea-apply-update-${pid}.cmd`;
 }
 
 export type UpdateLeftoverKind = 'helper' | 'extract-dir' | 'zip';
 
 const LEFTOVER_PATTERNS: ReadonlyArray<{ kind: UpdateLeftoverKind; re: RegExp }> = [
-  { kind: 'helper', re: /^wmux-apply-update-(\d+)\.cmd$/ },
-  { kind: 'zip', re: /^wmux-update-[0-9A-Za-z.+-]+-(\d+)\.zip$/ },
-  { kind: 'extract-dir', re: /^wmux-update-[0-9A-Za-z.+-]+-(\d+)$/ },
+  { kind: 'helper', re: /^remotea-apply-update-(\d+)\.cmd$/ },
+  { kind: 'zip', re: /^remotea-update-[0-9A-Za-z.+-]+-(\d+)\.zip$/ },
+  { kind: 'extract-dir', re: /^remotea-update-[0-9A-Za-z.+-]+-(\d+)$/ },
 ];
 
 const MAX_PID = 0xffffffff;
@@ -235,7 +235,7 @@ function mustKeepLeftover(
  *     whatever its own age: after "Later" the payload can be days old by the
  *     time a helper starts copying from it, and only the helper's mtime is set
  *     at apply time;
- *   - a live PID may be a running wmux holding the payload as a staged update;
+ *   - a live PID may be a running remotea holding the payload as a staged update;
  *   - symlinks and junctions are never followed or removed, and an entry whose
  *     type does not match its name is left alone.
  *
@@ -305,19 +305,19 @@ export function buildApplyUpdateCmd(): string {
     // The one thing this helper cannot work around is having no exe to
     // start, so that is the only line here that exits without reaching
     // :relaunch. Everything else is decided into SKIPCOPY and settled at
-    // the branch below, because wmux calls existsSync on the payload
+    // the branch below, because remotea calls existsSync on the payload
     // BEFORE it spawns this script and quits right after — the two checks
     // sit on opposite sides of app.quit(), so an antivirus or a temp
     // cleaner taking %SRC% away in between used to hit a bare `exit /b 1`
-    // here, with wmux already gone and nothing left to restart it.
+    // here, with remotea already gone and nothing left to restart it.
     'if not defined EXE exit /b 1',
-    // Both flags are cleared before use: this script inherits wmux's
+    // Both flags are cleared before use: this script inherits remotea's
     // environment, so a variable of either name already living there would
     // otherwise decide a branch nobody here set.
     'set "SKIPCOPY="',
     'set "KEEPSRC="',
-    // No pid is no way to know when the old wmux let go of its files, and
-    // copying over a live install is how a half-written wmux.exe happens.
+    // No pid is no way to know when the old remotea let go of its files, and
+    // copying over a live install is how a half-written remotea.exe happens.
     'if not defined PID set "SKIPCOPY=there is no remotea process to wait for"',
     'if not exist "%SRC%\\%EXENAME%" set "SKIPCOPY=the downloaded files are no longer on disk"',
     'echo.',
@@ -329,13 +329,13 @@ export function buildApplyUpdateCmd(): string {
     // `tasklist | findstr`, findstr returns only on EOF, and EOF only comes
     // once every copy of the pipe's write end is closed. On the reporter's
     // machine (zh-TW, Windows Terminal as default terminal) one of them
-    // outlived tasklist: findstr sat on one PID for minutes, the old wmux long
+    // outlived tasklist: findstr sat on one PID for minutes, the old remotea long
     // gone, and the update never landed — on three releases in a row. Reading
     // a file, findstr stops at its end whoever else is alive. Same name as the
     // payload's pid so two helpers never share one, and deleted after the loop.
-    'set "LIST=%TEMP%\\wmux-update-wait-%PID%.txt"',
+    'set "LIST=%TEMP%\\remotea-update-wait-%PID%.txt"',
     // And the wait is bounded, so no probe that misbehaves in a way not yet
-    // seen can hold this window open forever. wmux's own exit watchdog kills a
+    // seen can hold this window open forever. remotea's own exit watchdog kills a
     // wedged quit within ~20 s, so ~2 minutes of a live pid means something
     // else is wrong: skip the copy (never write over a running install) and
     // keep the payload, since the next attempt needs it.
@@ -351,7 +351,7 @@ export function buildApplyUpdateCmd(): string {
     // which is the textbook batch-sleep idiom in droppers — the one shape this
     // helper is trying not to have. Where waitfor.exe is absent the loop
     // degrades to the spin it already had, never to a wrong answer.
-    '"%SYS%\\waitfor.exe" /t 1 wmuxUpdateWait >nul 2>nul',
+    '"%SYS%\\waitfor.exe" /t 1 remoteaUpdateWait >nul 2>nul',
     '"%SYS%\\tasklist.exe" /FI "PID eq %PID%" >"%LIST%" 2>nul',
     '"%SYS%\\findstr.exe" /I /C:" %PID% " "%LIST%" >nul 2>nul',
     'if errorlevel 1 goto waited',
@@ -361,10 +361,10 @@ export function buildApplyUpdateCmd(): string {
     'set "KEEPSRC=1"',
     ':waited',
     'del "%LIST%" >nul 2>nul',
-    '"%SYS%\\waitfor.exe" /t 2 wmuxUpdateWait >nul 2>nul',
+    '"%SYS%\\waitfor.exe" /t 2 remoteaUpdateWait >nul 2>nul',
     'title remotea update',
     // The wait happens whatever SKIPCOPY says. It costs a second or two
-    // and it is what keeps `start "" "%EXE%"` from racing a wmux that has
+    // and it is what keeps `start "" "%EXE%"` from racing a remotea that has
     // not finished quitting; only the copy is worth skipping. The reason
     // is printed rather than swallowed, because this console is the user's
     // whole view of the update, and a window that says "Installing" and
@@ -388,8 +388,8 @@ export function buildApplyUpdateCmd(): string {
     'goto relaunch',
     // A failed copy used to jump straight to :relaunch, which read as correct
     // because :relaunch was the next line anyway — and that is what made it
-    // silent: the only thing on screen was "Installing the wmux update."
-    // followed by "Starting wmux...". So the failure gets its own label.
+    // silent: the only thing on screen was "Installing the remotea update."
+    // followed by "Starting remotea...". So the failure gets its own label.
     //
     // What it must NOT claim is a rollback. robocopy walks the payload file by
     // file and `>= 8` means at least one of them failed, not that none of them
@@ -405,8 +405,8 @@ export function buildApplyUpdateCmd(): string {
     'echo   remotea is starting anyway. Please install the update again.',
     'set "KEEPSRC=1"',
     // The relaunch itself stays unconditional, including after a failed copy.
-    // wmux has already quit by the time this runs, so bailing out here is the
-    // one outcome the user cannot recover from without finding wmux.exe by hand.
+    // remotea has already quit by the time this runs, so bailing out here is the
+    // one outcome the user cannot recover from without finding remotea.exe by hand.
     ':relaunch',
     'echo   Starting remotea...',
     'start "" "%EXE%"',
@@ -423,7 +423,7 @@ export function buildApplyUpdateCmd(): string {
     // updater triggering a heavy AV scan/lockdown. %TEMP% is NOT reclaimed
     // on its own (only Storage Sense does that, and it is off by default),
     // so the leftover .cmd is removed by sweepUpdateLeftovers() instead —
-    // from a later wmux process, long after this script has exited.
+    // from a later remotea process, long after this script has exited.
   ].join('\r\n');
 }
 
@@ -436,7 +436,7 @@ export function buildApplyUpdateCmd(): string {
  * the first and the LAST quote on the line. A %TEMP% with a space in it — any
  * Windows account named "First Last" — made the helper path arrive as
  * `C:\Users\First`, "is not recognized", and cmd.exe exited having done
- * nothing, after wmux had already quit into the update. cmd.exe itself had
+ * nothing, after remotea had already quit into the update. cmd.exe itself had
  * started, so no spawn error could report it.
  *
  * `/s` plus one outer pair of quotes is the documented way out: cmd strips
@@ -449,7 +449,7 @@ export function buildApplyUpdateCmd(): string {
  * `"C:\x\%OS%\y"` arrives as `C:\x\Windows_NT\y`). `%` is legal in a Windows
  * path, and a path that changes on the way in is the same silent no-restart
  * as the space was. A lone `%` survives, so only a pair is refused — here,
- * while wmux is still running to say so.
+ * while remotea is still running to say so.
  */
 export function buildHelperArgs(helper: string, args: string[]): string[] {
   const parts = [helper, ...args];
@@ -662,9 +662,9 @@ export async function runPortableZipUpdate(opts: {
 
 /**
  * Hands the swap to the detached helper and quits — but only once the helper
- * is actually running. Every failure wmux can still observe rejects WITHOUT
+ * is actually running. Every failure remotea can still observe rejects WITHOUT
  * quitting, because a quit whose helper never runs leaves the user with no
- * wmux and nothing to restart it (#3):
+ * remotea and nothing to restart it (#3):
  *
  *   - the payload is gone (Storage Sense, a temp cleanup, days after "Later"):
  *     rejects with code PAYLOAD_MISSING, and only a fresh download can help;
@@ -704,8 +704,8 @@ export async function applyStagedPortableUpdate(staged: StagedZipUpdate): Promis
     // `windowsHide` does NOT hide this one: DETACHED_PROCESS makes Windows
     // ignore CREATE_NO_WINDOW, so cmd.exe opens a console anyway (see the
     // header). It stays because dropping `detached` to make it work would
-    // put the helper's life back in wmux's hands, and the helper outliving
-    // wmux is the whole point. The console is where `buildApplyUpdateCmd`'s
+    // put the helper's life back in remotea's hands, and the helper outliving
+    // remotea is the whole point. The console is where `buildApplyUpdateCmd`'s
     // title and messages land.
     windowsHide: true,
     windowsVerbatimArguments: true,

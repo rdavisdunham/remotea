@@ -19,7 +19,7 @@
  *   remotea rotate-token           issue a new token; the running server closes every connection that used the
  *                                  old one (sessions keep running) until each app is given the new one
  *   remotea hooks install|remove|status
- *                                  register wmux's hook helper with Claude Code and Codex in this WSL,
+ *                                  register remotea's hook helper with Claude Code and Codex in this WSL,
  *                                  so agents report their status to the apps (see hook-bridge.ts)
  *   remotea hooks --remove-legacy-collector [--dry-run]
  *                                  collector cutover: strip only the Python collector's SessionStart hook
@@ -589,7 +589,7 @@ usage:
   remotea doctor [--json] [--probe]                             readiness report (ok/warn/fail per check; exit 1 on a fail)
   remotea upgrade [--yes] [--timeout <s>] [--unit <name>] [--json]
                                                                 drain, restart the server only, check the sessions came back
-  remotea move [--yes] [--json]                                 once, after the upgrade that renamed wmux: rewrite old hook entries,
+  remotea move [--yes] [--json]                                 once, after the upgrade from the old name: rewrite old hook entries,
                                                                 remove the old helper files (--yes also removes old plugin files)
   remotea open --group <name> [--cwd <dir>] [--title <t>] [--id surf-...] [--json] -- <command...>
   remotea close <surf-id>

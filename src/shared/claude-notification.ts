@@ -8,7 +8,7 @@
  * question on screen. The idle reminder is the pane being idle, which is the
  * opposite of "Needs you".
  *
- * wmux used to treat every one of them as a question, and #151 papered over
+ * remotea used to treat every one of them as a question, and #151 papered over
  * the common case by reading the pane's run depth instead ("a prompt can only
  * occur inside a live turn, so depth 0 means nudge"). #253 is where that
  * inference breaks: a BACKGROUND subagent keeps firing PreToolUse/PostToolUse
@@ -40,7 +40,7 @@ export type ClaudeNotificationKind = 'attention' | 'idle' | 'info' | 'unknown';
  * The idle reminder's text, verbatim. Used ONLY when `notification_type` is
  * absent, and only as an exact match: if Claude Code ever rewords it, the
  * message stops matching and falls to `unknown` — the pre-#253 behaviour — so a
- * rewording can make wmux too eager again but can never make it swallow a real
+ * rewording can make remotea too eager again but can never make it swallow a real
  * permission prompt. Prefix or substring matching would not have that property.
  */
 export const CLAUDE_IDLE_MESSAGE = 'Claude is waiting for your input';

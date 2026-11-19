@@ -10,7 +10,7 @@ import { WorkspaceSlice } from './workspace-slice';
 //
 // Closing the pane/tab that reported a PR used to leave its sidebar badge up
 // forever. A killed PTY never runs a shell-side exit trap, so `clear_pr`
-// never arrives for a Ctrl+W, a tab-× click, or `wmux close-pane` — the store
+// never arrives for a Ctrl+W, a tab-× click, or `remotea close-pane` — the store
 // has to notice the loss itself, at the SAME state transitions that already
 // reap the PTY (closeSurface, closePane, closeOtherSurfaces,
 // closeSurfacesToRight — everywhere `killSurfacePty` is called for a real
@@ -113,7 +113,7 @@ export interface SurfaceSlice {
    * The path behind every USER close gesture for a tab (the tab ×, Ctrl+W).
    * Closes immediately unless the surface holds unsaved markdown edits (issue
    * #116, F3), in which case it parks the request in `pendingCloseSurface` for
-   * the confirmation dialog. Programmatic closes (`wmux close-surface`) call
+   * the confirmation dialog. Programmatic closes (`remotea close-surface`) call
    * closeSurface directly and never see the dialog — a CLI call must not block
    * on a modal nobody is looking at.
    *
@@ -129,7 +129,7 @@ export interface SurfaceSlice {
   /**
    * Close a whole pane, reaping every shell it holds.
    *
-   * Lives in the store rather than in PaneWrapper so the UI button, `wmux
+   * Lives in the store rather than in PaneWrapper so the UI button, `remotea
    * close-pane` and closeSurface's last-tab path share ONE implementation —
    * the same reasoning pty-teardown.ts records for PTY reaping. The three
    * copies this replaces had each independently gotten the last-pane case
@@ -144,7 +144,7 @@ export interface SurfaceSlice {
    * The pane × button. remotea: a pane holding remote sessions — or the last
    * pane of a workspace bound to a server group — goes to the remote close
    * dialog (routeRemoteClose) instead of ending them; otherwise closePane.
-   * `wmux close-pane` stays on closePane and never prompts.
+   * `remotea close-pane` stays on closePane and never prompts.
    */
   requestClosePane: (workspaceId: WorkspaceId, paneId: PaneId) => void;
 
@@ -271,7 +271,7 @@ export interface SurfaceSlice {
  *
  * The subtle rule is which fields a content-only push is allowed to touch. Only
  * a load *from a file* may set the tab label and backing path — otherwise
- * `wmux markdown set --content` against a file-backed surface would silently
+ * `remotea markdown set --content` against a file-backed surface would silently
  * re-point or clear the path it saves and reloads from.
  *
  * Dirty state follows the same reasoning (F3, issue #116): a load from disk
@@ -562,7 +562,7 @@ export const createSurfaceSlice: StateCreator<SliceState, [], [], SurfaceSlice> 
 
     // Remember the closed surface so Ctrl+Shift+T can bring it back (issue #64),
     // then reap its shell. Killing here — at the state transition — is what fixes
-    // the leak (issue #65): Ctrl+W and `wmux close-surface` both funnel through
+    // the leak (issue #65): Ctrl+W and `remotea close-surface` both funnel through
     // this action, and neither used to kill the PTY (only the tab-× button did).
     const closing = leaf.surfaces.find((s) => s.id === surfaceId);
     if (closing) {
@@ -613,7 +613,7 @@ export const createSurfaceSlice: StateCreator<SliceState, [], [], SurfaceSlice> 
     //
     // All three previous copies killed the pane's PTYs first and only then asked
     // removeLeaf what the tree should become. When the answer was null — the
-    // pane was the workspace's only one, which is what `wmux new-workspace`
+    // pane was the workspace's only one, which is what `remotea new-workspace`
     // creates — they read it as "nothing to do" and returned, having already
     // killed a dev server, an agent and every shell in the pane. The UI was
     // unchanged, so nothing told the user it had happened.

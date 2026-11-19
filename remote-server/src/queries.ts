@@ -9,13 +9,13 @@
  * is never answered twice.
  *
  * Most replies come straight from headless xterm's own `onData`. Two need
- * help: DA1, where wmux advertises a richer attribute set than xterm's
+ * help: DA1, where remotea advertises a richer attribute set than xterm's
  * default (see DA1 in src/main/pty-manager.ts), and OSC 10/11/12 colour
  * queries, which headless cannot answer because it has no theme service.
  */
 import type { Terminal } from '@xterm/headless';
 
-/** wmux's DA1 reply: VT220, Sixel, 9, ANSI colour — same as src/main/pty-manager.ts. */
+/** remotea's DA1 reply: VT220, Sixel, 9, ANSI colour — same as src/main/pty-manager.ts. */
 export const DA1_REPLY = '\x1b[?62;4;9;22c';
 
 export interface ThemeColors {

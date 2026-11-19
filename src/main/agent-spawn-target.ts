@@ -41,7 +41,7 @@ export interface SpawnTargetLookups {
    * Which workspace holds this SURFACE, across every window, or null (#246).
    * Asked about the caller's own terminal — the `caller` every CLI call carries
    * as `$REMOTEA_SURFACE_ID` — so it has the same every-window rule. A miss is not
-   * an error here: it is a stale id or a shell wmux did not start, and the
+   * an error here: it is a stale id or a shell remotea did not start, and the
    * resolution simply moves on to the active workspace.
    */
   workspaceForSurface(surfaceId: string): Promise<string | null>;
@@ -78,10 +78,10 @@ export class SpawnTargetError extends Error {
  * so an agent spawned from a background workspace was filed in whichever one
  * the user happened to have focused, and a hand-rolled spawn loop scattered its
  * agents across every workspace the user clicked while it ran. "The workspace I
- * am typing in" is what a bare `wmux agent spawn` means; the focused one is only
+ * am typing in" is what a bare `remotea agent spawn` means; the focused one is only
  * the right answer when there is no caller to ask about.
  *
- * A caller that does not resolve (stale id, a shell wmux did not start) falls
+ * A caller that does not resolve (stale id, a shell remotea did not start) falls
  * through to the active workspace SILENTLY — the rule resolveCallerTarget
  * applies, and the pre-#246 behaviour rather than an error nobody can act on.
  */

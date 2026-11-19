@@ -2,8 +2,8 @@
  * Claude Code hooks → declared agent state (issue #128).
  *
  * The protocol in agent-state.ts is agent-agnostic: anything that can write a
- * line of JSON to the wmux pipe can drive it. But Claude Code is what most wmux
- * panes actually run, and wmux ALREADY configures four of its hooks in
+ * line of JSON to the remotea pipe can drive it. But Claude Code is what most remotea
+ * panes actually run, and remotea ALREADY configures four of its hooks in
  * ~/.claude/settings.json (see ensureClaudeHooks in claude-context.ts):
  *
  *   PostToolUse   — a tool just finished running
@@ -72,7 +72,7 @@ let turnStartTracked = false;
  *   same batch finishing says nothing about the one waiting for permission.
  *
  * Subagent events (`agent_id`) and events without a `tool_use_id` (older
- * helpers, other agents) never count: wmux cannot tell whose they are. A denied
+ * helpers, other agents) never count: remotea cannot tell whose they are. A denied
  * prompt produces neither event, so it ends the old way, on the human's
  * keystroke or the turn ending, which is the safe direction.
  */
@@ -223,7 +223,7 @@ export function applyHookToAgentState(
   watchHookBlock(surfaceId, hookEvent, hookAt);
 }
 
-/** A tool event wmux can attribute to the main thread, or null (#399). */
+/** A tool event remotea can attribute to the main thread, or null (#399). */
 function mainThreadToolEvent(
   event: ClaudeHookEvent,
   origin: HookOrigin,

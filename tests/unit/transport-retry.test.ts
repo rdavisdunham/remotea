@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { isTransientRemoteaError, retryTransient } from '../../src/cli/transport-retry';
 
 /**
- * A busy wmux named pipe answers `All pipe instances are busy` (native) or
+ * A busy remotea named pipe answers `All pipe instances are busy` (native) or
  * makes npiperelay exit before it attaches (WSL). Session/status reports are
  * idempotent, so the CLI may ask again instead of losing the handle.
  */
@@ -15,14 +15,14 @@ describe('isTransientRemoteaError', () => {
 
   it('recognises the npiperelay busy message', () => {
     expect(isTransientRemoteaError(
-      new Error('npiperelay exited with code 1: open //./pipe/wmux: All pipe instances are busy'),
+      new Error('npiperelay exited with code 1: open //./pipe/remotea: All pipe instances are busy'),
     )).toBe(true);
     expect(isTransientRemoteaError(
-      new Error('pane.report_agent_session timed out after 1500ms — wmux accepted the request but sent no reply.'),
+      new Error('pane.report_agent_session timed out after 1500ms — remotea accepted the request but sent no reply.'),
     )).toBe(true);
   });
 
-  it('does not retry a missing wmux or a protocol answer', () => {
+  it('does not retry a missing remotea or a protocol answer', () => {
     expect(isTransientRemoteaError(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
     expect(isTransientRemoteaError(new Error('Unknown method'))).toBe(false);
     expect(isTransientRemoteaError(null)).toBe(false);
@@ -46,10 +46,10 @@ describe('retryTransient', () => {
 
   it('does not retry a permanent answer', async () => {
     const request = vi.fn(async () => {
-      throw Object.assign(new Error('no wmux'), { code: 'ENOENT' });
+      throw Object.assign(new Error('no remotea'), { code: 'ENOENT' });
     });
 
-    await expect(retryTransient(request, { budgetMs: 5_000, firstAttemptMs: 1_000 })).rejects.toThrow('no wmux');
+    await expect(retryTransient(request, { budgetMs: 5_000, firstAttemptMs: 1_000 })).rejects.toThrow('no remotea');
     expect(request).toHaveBeenCalledTimes(1);
   });
 

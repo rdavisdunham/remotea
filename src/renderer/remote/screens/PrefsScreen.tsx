@@ -3,7 +3,7 @@
  * "Forget this device".
  *
  * These live in this browser's localStorage and nowhere else — they are about
- * how THIS phone renders, not about wmux, and the desktop never needs to know.
+ * how THIS phone renders, not about remotea, and the desktop never needs to know.
  * Every access is in try/catch (private mode, blocked site data) and a failure
  * just means the defaults.
  *

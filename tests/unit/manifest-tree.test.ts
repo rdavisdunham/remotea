@@ -52,7 +52,7 @@ describe('buildManifestTree', () => {
   });
 });
 
-describe('describeWorkspaceTree (what `wmux workspace save` writes from)', () => {
+describe('describeWorkspaceTree (what `remotea workspace save` writes from)', () => {
   it('takes each pane\'s live cwd, its startup commands and env, and every browser url', () => {
     const { tree } = buildManifestTree(spec);
     const ls = leaves(tree);

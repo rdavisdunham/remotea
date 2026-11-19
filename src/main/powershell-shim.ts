@@ -1,13 +1,13 @@
 /**
  * powershell-shim.ts — Decide whether PowerShell can be given a .ps1 shim for
- * `wmux` (issue #154).
+ * `remotea` (issue #154).
  *
- * The bug: wmux prepends its cli-bin dir to PATH, PowerShell resolves `wmux` to
+ * The bug: remotea prepends its cli-bin dir to PATH, PowerShell resolves `remotea` to
  * `remotea.cmd` there, and a .cmd puts cmd.exe's parser between the caller and the
  * CLI. PowerShell strips the user's quoting when invoking a batch file, so any
  * `>`, `|`, `&` or `<` inside free-form text is re-read as shell syntax —
- * `wmux browser eval "document.title.length>0"` silently redirects its own
- * output into a file named `0`, and `wmux send "npm run build > out.log"` sends
+ * `remotea browser eval "document.title.length>0"` silently redirects its own
+ * output into a file named `0`, and `remotea send "npm run build > out.log"` sends
  * different text than the user typed. The redirect is applied to cmd.exe's
  * invocation line BEFORE remotea.cmd runs, so nothing inside the batch file can
  * recover the arguments; only keeping cmd.exe off the path can.
@@ -21,10 +21,10 @@
  *     client Windows and blocks every script, signed or not.
  *   - Mark of the Web. Files extracted from a downloaded zip carry a
  *     :Zone.Identifier stream, which the (pwsh default) RemoteSigned policy
- *     treats as remote and unsigned. wmux is not code-signed by a trusted CA.
+ *     treats as remote and unsigned. remotea is not code-signed by a trusted CA.
  *
  * Shipping the shim unconditionally would trade a silent wrong result for a
- * `wmux` that does not run at all. So wmux verifies instead of assuming: strip
+ * `remotea` that does not run at all. So remotea verifies instead of assuming: strip
  * the Mark of the Web where it can, then actually execute a probe script from
  * the shim's own directory in each installed PowerShell host. Only if the probe
  * prints its marker is the dir put on PATH. Anything else and PowerShell keeps
@@ -36,7 +36,7 @@ import path from 'path';
 
 export const SHIM_PROBE_MARKER = 'remotea-shim-ok';
 
-/** PowerShell hosts whose resolution of `wmux` the shim would change. */
+/** PowerShell hosts whose resolution of `remotea` the shim would change. */
 export const POWERSHELL_HOSTS = ['powershell.exe', 'pwsh.exe'];
 
 export type ProbeOutcome =
@@ -54,7 +54,7 @@ export interface ShimProbeDeps {
  * May the shim dir go on PATH?
  *
  * Every installed host must run the probe successfully — one that refuses is
- * one where `wmux` would stop working, and a user's panes and their children do
+ * one where `remotea` would stop working, and a user's panes and their children do
  * not all use the same host. Absent hosts do not vote. No host at all (a machine
  * with no PowerShell, or a probe we could not run) means no, since the shim
  * would then be unverified rather than merely unused.
@@ -89,7 +89,7 @@ export function stripMarkOfTheWeb(file: string): void {
  * Run the probe script in one host.
  *
  * `-NoProfile` keeps a user profile from printing over the marker.
- * `PSExecutionPolicyPreference` is cleared because wmux itself may have been
+ * `PSExecutionPolicyPreference` is cleared because remotea itself may have been
  * started from a shell running under `-ExecutionPolicy Bypass` (its own panes
  * are), and inheriting that would make the probe pass for a machine where a
  * fresh PowerShell would refuse the shim.

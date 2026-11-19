@@ -4,7 +4,7 @@
  * A button carries only the choice `id`. The payload it stands for (a key, or
  * literal text) never left main — `toWire` strips it (I7) — and main looks it
  * up again when the answer arrives, through the same `deliverAnswer` →
- * `answerAgent` path as `wmux answer-agent`. So this row cannot send anything
+ * `answerAgent` path as `remotea answer-agent`. So this row cannot send anything
  * the agent did not declare, and cannot clear `blocked` either: answering never
  * does, the agent must confirm.
  */

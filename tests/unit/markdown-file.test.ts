@@ -17,7 +17,7 @@ import {
 let dir: string;
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-md-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-md-'));
 });
 
 afterEach(() => {

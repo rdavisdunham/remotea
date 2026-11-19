@@ -90,7 +90,7 @@ export function buildAccessibilityTree(
  * `get_text`, `wait`) failed with `ref_not_found` immediately after a snapshot
  * that had just minted that very ref (issue #121). And `@e12` isn't a usable
  * workaround from PowerShell, where a leading `@` is the splatting operator and
- * the argument is mangled before wmux sees it — which is exactly why the docs
+ * the argument is mangled before remotea sees it — which is exactly why the docs
  * told callers to drop it. Both spellings (and a bare number) now resolve.
  */
 export function normalizeRef(ref: unknown): string | null {
@@ -119,7 +119,7 @@ export const CAPTURE_FALLBACK_DELAY_MS = 1000;
  * Settle a `Page.captureScreenshot` on a page that is not painting (#262).
  *
  * The command does not read the last frame — it waits for the NEXT one. When
- * the wmux window is unfocused and covered, Chromium's native occlusion stops
+ * the remotea window is unfocused and covered, Chromium's native occlusion stops
  * BeginFrames for the guest entirely (requestAnimationFrame stops too, which is
  * why a page-side rAF nudge cannot help), so an idle page never produces that
  * frame and the call hangs until the CLI gives up. Measured with a bare
@@ -364,7 +364,7 @@ export class CDPBridge {
   /**
    * Step through session history by a signed offset.
    *
-   * Deliberately a no-op at either end rather than a throw: `wmux browser back`
+   * Deliberately a no-op at either end rather than a throw: `remotea browser back`
    * on the first page of a pane is a user pressing a button that is simply not
    * available, not an error worth failing an agent's turn over.
    */

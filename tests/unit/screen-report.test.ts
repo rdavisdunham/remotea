@@ -11,7 +11,7 @@ import {
 } from '../../src/renderer/utils/screen-report';
 
 /**
- * `wmux read-screen` used to answer text only, so a pane whose fullscreen TUI
+ * `remotea read-screen` used to answer text only, so a pane whose fullscreen TUI
  * had lost its frame could not say whether it was still on the alternate
  * buffer, how many rows it had, or whether it had been resized or switched
  * buffers since. Those are the three facts that tell a stale-frame report's two

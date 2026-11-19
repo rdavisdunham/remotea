@@ -8,7 +8,7 @@ import { getDiagnosticsPath, logDiagnostic } from '../../src/main/crash-diagnost
  * Issue #150. The main process has been dying with the same uncaught
  * `Napi::Error` from conpty.node since 0.10, and the question the investigation
  * finally turned on — "was the crash guard actually installed in the process
- * that died?" — could not be answered by anyone, because wmux wrote no log at
+ * that died?" — could not be answered by anyone, because remotea wrote no log at
  * all. The guard reported through `console.warn`, which in a packaged Electron
  * build goes nowhere anybody can read afterwards.
  *
@@ -23,7 +23,7 @@ describe('crash diagnostics (issue #150)', () => {
   let saved: { APPDATA?: string; USERPROFILE?: string; HOME?: string };
 
   beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-diag-'));
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-diag-'));
     saved = { APPDATA: process.env.APPDATA, USERPROFILE: process.env.USERPROFILE, HOME: process.env.HOME };
     process.env.APPDATA = home;
     process.env.USERPROFILE = home;
@@ -40,7 +40,7 @@ describe('crash diagnostics (issue #150)', () => {
 
   const read = () => fs.readFileSync(getDiagnosticsPath(), 'utf8');
 
-  it('writes inside wmux\'s own data directory', () => {
+  it('writes inside remotea\'s own data directory', () => {
     // Never outside it: anything else would belong behind the #132 consent
     // gate, and a crash log is not worth asking for permission to write.
     expect(getDiagnosticsPath().startsWith(home)).toBe(true);

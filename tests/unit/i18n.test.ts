@@ -179,7 +179,7 @@ describe('i18n: detectDefaultLanguage OS display language (issue #114)', () => {
     // The OS list is authoritative: its first entry is what the user's UI
     // shows, so a supported language further down the list must NOT win.
     // (German used to be that "unsupported" example; now that de is bundled,
-    // Tatar stands in as a language wmux will never ship.)
+    // Tatar stands in as a language remotea will never ship.)
     stubPreferred(['tt-RU', 'fr-FR']);
     expect(detectDefaultLanguage()).toBe('en');
   });

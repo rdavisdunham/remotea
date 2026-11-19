@@ -183,7 +183,7 @@ export interface CodeWriteOk {
  * guard exactly rather than inventing a second conflict rule.
  *
  * Passing `undefined` skips the check, for a caller that genuinely has no prior
- * read to compare against. Every caller in wmux passes one.
+ * read to compare against. Every caller in remotea passes one.
  */
 export function writeCodeFile(
   absPath: string,

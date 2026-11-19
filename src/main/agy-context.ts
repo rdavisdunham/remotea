@@ -1,14 +1,14 @@
 import { reportIntegrationFailure } from './integration-failures';
 /**
- * Antigravity CLI (`agy`) integration: a plugin of wmux's own that reports each
+ * Antigravity CLI (`agy`) integration: a plugin of remotea's own that reports each
  * pane's conversation, so a restored tab can reopen it with
  * `agy --conversation <id>` (see agy-resume.ts).
  *
  * agy loads every plugin under ~/.gemini/config/plugins/, and a plugin is a
  * directory holding `plugin.json` and, at its root, a `hooks.json`. So this is a
- * directory of wmux's own rather than an edit to the user's ~/.gemini/config/
+ * directory of remotea's own rather than an edit to the user's ~/.gemini/config/
  * hooks.json: nothing the user wrote is ever parsed, merged or rewritten, and
- * taking it back is deleting three files wmux can recognise as its own.
+ * taking it back is deleting three files remotea can recognise as its own.
  *
  * Nothing is written unless agy has run on this machine (its
  * ~/.gemini/antigravity-cli exists): creating ~/.gemini for a program the user
@@ -71,9 +71,9 @@ function isDirectory(p: string): boolean {
 }
 
 /**
- * Is the plugin directory wmux's? Its hook script carries the version marker
- * every file wmux installs elsewhere carries. A directory that exists without
- * it, and is not empty, is a plugin the user happened to call `wmux`.
+ * Is the plugin directory remotea's? Its hook script carries the version marker
+ * every file remotea installs elsewhere carries. A directory that exists without
+ * it, and is not empty, is a plugin the user happened to call `remotea`.
  */
 function ownsPluginDir(dir: string): boolean {
   const script = readOrNull(path.join(dir, HOOK_SCRIPT));
@@ -117,13 +117,13 @@ export function ensureAgyPlugin(home = os.homedir(), scriptSrc = getHookScriptSr
   }
 }
 
-/** Take the plugin back — only from a directory wmux can prove is its own. */
+/** Take the plugin back — only from a directory remotea can prove is its own. */
 export function removeAgyPlugin(home = os.homedir()): void {
   try {
     const dir = getAgyPluginDir(home);
     const script = readOrNull(path.join(dir, HOOK_SCRIPT));
     if (script === null || !isRemoteaPluginFile(script)) return;
-    // The two JSON files go only when they are still exactly what wmux wrote.
+    // The two JSON files go only when they are still exactly what remotea wrote.
     for (const [name, ours] of [['plugin.json', buildAgyPluginManifest()], ['hooks.json', buildAgyHooks()]] as const) {
       const file = path.join(dir, name);
       if (readOrNull(file) === ours) fs.unlinkSync(file);

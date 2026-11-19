@@ -8,7 +8,7 @@
  * no compositor frames, no requestAnimationFrame, timers throttled to about one
  * a second. Verbs that only read the DOM (`eval`, `get-text`, `snapshot`) still
  * answer, but `Page.captureScreenshot` and `capturePage()` both wait for a frame
- * that never comes, so `wmux browser screenshot` timed out the moment the user
+ * that never comes, so `remotea browser screenshot` timed out the moment the user
  * switched workspace, and a CDP client attached through the proxy
  * (chrome-devtools-mcp) hung on anything that waits for the page to move.
  *
@@ -52,7 +52,7 @@ export const KEEP_RENDERING_RENEW_MS = 30_000;
  * How long a verb waits for the renderers to take a lease. Every web verb and
  * every proxied CDP command awaits the grant before it runs, and
  * `executeJavaScript` on a HUNG renderer never settles (#289), so an unbounded
- * wait would hang `wmux browser` and chrome-devtools-mcp along with it, where
+ * wait would hang `remotea browser` and chrome-devtools-mcp along with it, where
  * before leases they kept working. A healthy renderer answers in a few ms.
  */
 export const KEEP_RENDERING_GRANT_TIMEOUT_MS = 250;

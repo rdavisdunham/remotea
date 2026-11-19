@@ -148,10 +148,10 @@ describe('Codex launch compatibility', () => {
 });
 
 // A restore starts every saved Codex at once. Each launcher used to get one
-// 2 s answer from wmux and one 5 s `codex --help`; under that burst about half
+// 2 s answer from remotea and one 5 s `codex --help`; under that burst about half
 // timed out and ran without session capture.
 describe('launcher patience during a restore burst', () => {
-  const busy = () => Object.assign(new Error('wmux did not respond'), { name: 'RemoteaBusyError' });
+  const busy = () => Object.assign(new Error('remotea did not respond'), { name: 'RemoteaBusyError' });
   // The real busy error is a private class; reproduce it through the request itself.
   function flaky(failures: number, error: () => Error = () => { const e = new Error('x') as NodeJS.ErrnoException; e.code = 'EBUSY'; return e; }) {
     const timeouts: number[] = [];
@@ -164,7 +164,7 @@ describe('launcher patience during a restore burst', () => {
     return { request, timeouts, calls: () => calls };
   }
 
-  it('asks a busy wmux again, with longer attempts, and says so once', async () => {
+  it('asks a busy remotea again, with longer attempts, and says so once', async () => {
     const { request, timeouts } = flaky(2);
     const onWait = vi.fn();
     const result = await remoteaRequestPatiently('pane.codex_restore_config', {}, { budgetMs: 60_000, firstAttemptMs: 3_000, onWait }, request);
@@ -182,9 +182,9 @@ describe('launcher patience during a restore burst', () => {
   });
 
   it.each([
-    ['no wmux at all', () => Object.assign(new Error('connect ENOENT'), { code: 'ENOENT' })],
-    ['an older wmux refusing the method', () => new Error('Unknown method')],
-    ['outside wmux', () => new Error('Outside wmux')],
+    ['no remotea at all', () => Object.assign(new Error('connect ENOENT'), { code: 'ENOENT' })],
+    ['an older remotea refusing the method', () => new Error('Unknown method')],
+    ['outside remotea', () => new Error('Outside remotea')],
   ])('answers at once for %s', async (_label, error) => {
     const { request, calls } = flaky(Infinity, error);
     await expect(remoteaRequestPatiently('m', {}, { budgetMs: 60_000, firstAttemptMs: 3_000 }, request)).rejects.toThrow();

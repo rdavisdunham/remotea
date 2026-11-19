@@ -630,7 +630,7 @@ export async function getChangedFiles(cwd: string, baseRef?: string): Promise<Ch
  * The explorer's +N/-N column needs this because the two backends answer
  * genuinely different questions — git compares against HEAD ("everything
  * uncommitted"), the snapshot against a baseline taken when the session started
- * ("changed since you opened wmux") — and a column of numbers that silently
+ * ("changed since you opened remotea") — and a column of numbers that silently
  * means one or the other is a column the user cannot interpret. The panel
  * labels itself from this.
  *

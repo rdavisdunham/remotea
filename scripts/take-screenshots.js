@@ -46,22 +46,22 @@ app.whenReady().then(async () => {
   console.log('Capturing screenshots:');
 
   // 1. Full app (no tutorial)
-  await capture(win, 'wmux-full');
+  await capture(win, 'remotea-full');
 
   // 2. Sidebar crop
-  await capture(win, 'wmux-sidebar', { x: 0, y: 0, width: 260, height: 900 });
+  await capture(win, 'remotea-sidebar', { x: 0, y: 0, width: 260, height: 900 });
 
   // 3. Terminal area
-  await capture(win, 'wmux-terminals', { x: 260, y: 0, width: 720, height: 900 });
+  await capture(win, 'remotea-terminals', { x: 260, y: 0, width: 720, height: 900 });
 
   // 4. Browser panel
-  await capture(win, 'wmux-browser', { x: 960, y: 0, width: 440, height: 900 });
+  await capture(win, 'remotea-browser', { x: 960, y: 0, width: 440, height: 900 });
 
   // 5. Now show tutorial
   await win.webContents.executeJavaScript("localStorage.removeItem('remotea-tutorial-seen')");
   win.reload();
   await new Promise(r => setTimeout(r, 5000));
-  await capture(win, 'wmux-tutorial');
+  await capture(win, 'remotea-tutorial');
 
   // 6. Close tutorial and take one more clean shot
   await win.webContents.executeJavaScript(`

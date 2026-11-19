@@ -3,7 +3,7 @@ import * as path from 'path';
 import { findNodeRuntime, getNodeRuntime, resetNodeRuntimeCache } from '../../src/main/node-runtime';
 
 /**
- * Issue #187: wmux hands agents a `.js` path (`REMOTEA_CLI`) and assumed everyone
+ * Issue #187: remotea hands agents a `.js` path (`REMOTEA_CLI`) and assumed everyone
  * downstream had something to run it with. Nobody does, reliably.
  */
 const only = (...present: string[]) => (p: string) => present.includes(p);
@@ -28,7 +28,7 @@ describe('findNodeRuntime', () => {
   });
 
   it('does not accept Electron either (it needs ELECTRON_RUN_AS_NODE)', () => {
-    const found = findNodeRuntime({}, 'C:\\wmux\\wmux.exe', 'win32', () => false);
+    const found = findNodeRuntime({}, 'C:\\remotea\\remotea.exe', 'win32', () => false);
     expect(found).toBeNull();
   });
 
@@ -61,7 +61,7 @@ describe('findNodeRuntime', () => {
   });
 
   it('reads PATH under any casing — Windows spells it `Path`', () => {
-    // path.join, not a literal: the separator is the HOST's, and wmux runs on
+    // path.join, not a literal: the separator is the HOST's, and remotea runs on
     // Windows even when the case under test describes a posix layout.
     const nodePath = path.join('/usr/bin', 'node');
     const found = findNodeRuntime({ Path: '/usr/bin' }, '/opt/opencode', 'linux', only(nodePath));
@@ -74,7 +74,7 @@ describe('findNodeRuntime', () => {
 });
 
 describe('getNodeRuntime', () => {
-  it('never dead-ends: falls back to wmux itself, flagged as Electron', () => {
+  it('never dead-ends: falls back to remotea itself, flagged as Electron', () => {
     resetNodeRuntimeCache();
     const runtime = getNodeRuntime();
     expect(runtime.path).toBeTruthy();

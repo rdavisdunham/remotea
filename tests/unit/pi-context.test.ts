@@ -30,7 +30,7 @@ describe('#231 pi context', () => {
   let saved: { USERPROFILE?: string; HOME?: string; PI_CODING_AGENT_DIR?: string };
 
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-pi-'));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-pi-'));
     saved = {
       USERPROFILE: process.env.USERPROFILE,
       HOME: process.env.HOME,
@@ -201,7 +201,7 @@ describe('#231 pi extension install', () => {
   let saved: { USERPROFILE?: string; HOME?: string };
 
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-pi-ext-'));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-pi-ext-'));
     saved = { USERPROFILE: process.env.USERPROFILE, HOME: process.env.HOME };
     process.env.USERPROFILE = tmp;
     process.env.HOME = tmp;

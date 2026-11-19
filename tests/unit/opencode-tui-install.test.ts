@@ -82,7 +82,7 @@ describe('install and remove (#310)', () => {
   const ENTRY = 'remotea-plugin-version: 1';
 
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-opencode-tui-'));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-opencode-tui-'));
     sourceDir = path.join(tmp, 'resources', 'opencode-plugin');
     configDir = path.join(tmp, 'home', '.config', 'opencode');
     fs.mkdirSync(sourceDir, { recursive: true });
@@ -165,9 +165,11 @@ describe('the shipped entry file (#310)', () => {
     // v5 → v6 retries a session report that never landed and reasserts the
     // handle when the pane starts a turn, so a transient CLI failure no longer
     // leaves the sidebar without that pane's session until the next switch.
-    // v6 → v7 renames the plugin's code symbols from wmux to remotea; the bump
+    // v6 → v7 renames the plugin's code symbols to remotea; the bump
     // makes installed copies pick the rename up.
-    expect(src).toMatch(/remotea-plugin-version:\s*7/);
+    // v7 → v8 makes the PATH fallback run `remotea`, the command that exists
+    // since the rename.
+    expect(src).toMatch(/remotea-plugin-version:\s*8/);
   });
 
   it('is a v2 CLI plugin definition and the only export', () => {
@@ -244,7 +246,7 @@ describe('the shipped entry file (#310)', () => {
     expect(coreSrc).not.toMatch(/console\.(error|log|warn)\s*\(/);
   });
 
-  it('the core imports node builtins only, so wmux\'s suite can load it', () => {
+  it('the core imports node builtins only, so remotea\'s suite can load it', () => {
     const specifiers = [...coreSrc.matchAll(/^import .* from "([^"]+)"/gm)].map((m) => m[1]);
     expect(specifiers.every((s) => s.startsWith('node:'))).toBe(true);
   });

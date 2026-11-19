@@ -290,7 +290,7 @@ function registerFileLinks(
   ));
 }
 
-/** Buffer switches and resizes for `wmux read-screen --events`; none without a surface. */
+/** Buffer switches and resizes for `remotea read-screen --events`; none without a surface. */
 function trackScreenEventsFor(surfaceId: string | undefined, terminal: Terminal) {
   return surfaceId ? trackScreenEvents(surfaceId, terminal) : undefined;
 }
@@ -452,7 +452,7 @@ const surfaceBufferCache = new RemountSnapshotCache({
 });
 
 // Live xterm instances keyed by surfaceId, so the pipe bridge can read screen
-// content (surface.read_text / `wmux read-screen`) from the active buffer.
+// content (surface.read_text / `remotea read-screen`) from the active buffer.
 // Module-level like surfaceMouseModes: survives remounts; entries are
 // registered on mount and removed on unmount (guarded so a StrictMode
 // setup→cleanup→setup sequence can't delete the replacement instance).
@@ -466,9 +466,9 @@ function writePaneNotice(term: Terminal, text: string): void {
 }
 
 /**
- * Show a `[wmux] …` line in a terminal — a workspace-manifest pane held back
+ * Show a `[remotea] …` line in a terminal — a workspace-manifest pane held back
  * by `after`/`waitFor`, or one whose wait gave up (#284). Written to xterm,
- * never to the PTY: it is wmux talking, not input. Parked until the pane
+ * never to the PTY: it is remotea talking, not input. Parked until the pane
  * mounts when it arrives first, which it can: the workspace is a frame old.
  */
 export function showPaneNotice(surfaceId: string, text: string): void {
@@ -527,7 +527,7 @@ function resolveSurfaceTerminal(surfaceId: string): Terminal | undefined {
 /**
  * surfaceId → the last OSC 0/2 title the pane set.
  *
- * xterm parses these and, until now, wmux threw every one away —
+ * xterm parses these and, until now, remotea threw every one away —
  * `terminal.onTitleChange` had zero occurrences in src/. Agent TUIs set it
  * ("✳ Claude Code", "codex — running"), so it is detection evidence that
  * survives a full-screen repaint scrolling the footer out of reach, and it is
@@ -579,7 +579,7 @@ function publishTitle(surfaceId: string): void {
  * with no id.
  *
  * Two consumers now, and the second one is issue #221. It used to be recorded
- * and never RENDERED, on the reasoning that wmux tab titles are the user's to
+ * and never RENDERED, on the reasoning that remotea tab titles are the user's to
  * set and letting a program rewrite them would take that away. That reasoning
  * survives intact and is now expressed by the label chain instead: an explicit
  * `renameSurface` still wins outright, and the title only fills the gap where
@@ -668,9 +668,9 @@ function registerPromptMarks(terminal: Terminal, surfaceId: string | undefined) 
   if (!surfaceId) return null;
 
   // OSC 133 is the FinalTerm convention, as implemented by iTerm2, VS Code,
-  // WezTerm and Windows Terminal. wmux's own shell integration emits it, and so
+  // WezTerm and Windows Terminal. remotea's own shell integration emits it, and so
   // do bash-preexec, Starship and oh-my-posh — so a user who already had prompt
-  // marks configured gets the prompt log with no wmux-specific setup at all.
+  // marks configured gets the prompt log with no remotea-specific setup at all.
   terminal.parser.registerOscHandler(133, (data) => {
     try {
       return handlePromptMark(terminal, surfaceId, data);
@@ -844,7 +844,7 @@ function writeWheelToPty(
 // Capture-phase wheel handler. We always take ownership (xterm's own forwarding
 // is unreliable after the WebGL context swap, #41, and an adjacent <webview>
 // compositor otherwise steals un-prevented wheel events, #47):
-//   normal buffer + plain shell     → scroll wmux's own scrollback
+//   normal buffer + plain shell     → scroll remotea's own scrollback
 //   alt buffer OR mouse-tracking app → forward to the PTY
 // surfaceMouseModes (survives remounts) is the reliable mouse-active signal,
 // since tmux doesn't re-send its DECSET enables on SIGWINCH after a remount.
@@ -1154,7 +1154,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // Read at click time, so referencing `terminal` here is safe (#280).
       linkHandler: links.linkHandler,
       scrollback: prefs.scrollbackLines || 10000,
-      // Every wmux PTY is ConPTY, and xterm grows rows differently for one.
+      // Every remotea PTY is ConPTY, and xterm grows rows differently for one.
       // Without this a pane that gets TALLER (an adjacent pane closed, the
       // window resized) leaves xterm and ConPTY disagreeing about which row the
       // cursor is on, and the prompt strands itself in the middle of old output.
@@ -1376,7 +1376,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // own forwarding is unreliable after the WebGL context swap, #41, and an
     // adjacent <webview> compositor otherwise steals un-prevented wheel events,
     // #47). Two outcomes, decided per surface:
-    //   normal buffer + plain shell      → scroll wmux's own scrollback
+    //   normal buffer + plain shell      → scroll remotea's own scrollback
     //   alt buffer OR mouse-tracking app  → forward to the PTY (SGR wheel reports
     //                                        if mouse tracking is on, else arrows)
     //
@@ -1400,7 +1400,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
 
     // Touch pan → wheel (issue #243). A finger dragged over a pane scrolled
     // nothing: xterm 6.0.0 replaced its native overflow scroller with a
-    // wheel-only overlay and shipped no touch replacement, and wmux added no
+    // wheel-only overlay and shipped no touch replacement, and remotea added no
     // fallback of its own.
     //
     // This SYNTHESIZES a wheel event rather than calling scrollLines, and that
@@ -1540,7 +1540,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       if (cancelFlingRef.current === cancelFling) cancelFlingRef.current = null;
     });
 
-    // A Ctrl+click wmux opens must not also be reported to the app (#353) —
+    // A Ctrl+click remotea opens must not also be reported to the app (#353) —
     // see claimsLinkMouseDown. Capture phase on the container, so the press
     // stops before xterm's reporter and its Linkifier, both on descendants.
     // The release is taken on `window` like xterm's own (it binds `document`
@@ -1730,7 +1730,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // OSC 7: the shell's working directory, reported through its own output
     // (#378) — how a WSL shell, which has no pipe and no REMOTEA_SURFACE_ID when
     // `wsl` is typed into a PowerShell pane, moves the explorer. Forwarded raw;
-    // main decides whether the path is one wmux may act on.
+    // main decides whether the path is one remotea may act on.
     terminal.parser.registerOscHandler(7, (data) => {
       const surfaceId = ptyIdRef.current as SurfaceId;
       if (surfaceId) void applyOsc7Cwd(surfaceId, data);
@@ -1813,7 +1813,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     // Attach custom key handler for Ctrl+C and Ctrl+V (image paste)
     terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       // User key remaps from `~/.remotea/config.toml` win over everything,
-      // including wmux's own shortcuts — that is the point of remapping
+      // including remotea's own shortcuts — that is the point of remapping
       // (issue #146). Routed through terminal.input (→ onData) rather than
       // pty.write so broadcast-input fans a remapped key out like any other.
       if (!managedInputBlocked(latestRemoteViews(), surfaceId) && applyKeyRemap(event, (data) => terminal.input(data, true))) return false;
@@ -1864,7 +1864,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       if (isShiftEnter(event)) {
         return handleShiftEnter(event, (data) => terminal.input(data, true));
       }
-      // Let wmux's own shortcuts escape the terminal.
+      // Let remotea's own shortcuts escape the terminal.
       //
       // Every global binding lives on a document-level keydown listener
       // (App.tsx's palette, useKeyboardShortcuts, PaneWrapper's find). xterm's
@@ -2027,7 +2027,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
 
     // A shell spec that could not be resolved used to fall back to the default
     // shell with nothing but a console.warn in main (#252): a Settings choice
-    // wmux could not honour looked exactly like one it ignored. Say so in the
+    // remotea could not honour looked exactly like one it ignored. Say so in the
     // pane, once, before the shell's own output.
     const noteShellFallback = (created: { shell: string; shellFallbackFrom?: string }) => {
       if (!created.shellFallbackFrom) return;
@@ -2039,9 +2039,9 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     const effectiveShell = withPreference(shell, useStore.getState().workspacePrefs.defaultShell);
 
     // Same rule for the directory (issue #205): the surface's own cwd wins —
-    // a split inheriting its parent, "Open in wmux", `--cwd`, a restored
+    // a split inheriting its parent, "Open in remotea", `--cwd`, a restored
     // session — and the preference only fills the hole that was otherwise left
-    // to node-pty's default (wherever wmux.exe was launched from). Read at
+    // to node-pty's default (wherever remotea.exe was launched from). Read at
     // spawn time for the same reason as the shell: changing it must not
     // re-spawn the PTYs already running. Left as the user typed it; `~` and
     // `%VAR%` are expanded in the main process by resolveSpawnCwd.
@@ -2295,8 +2295,8 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
   }, [surfaceId]);
 
   // Manual pane recovery (issue #175). The PTY-exit path above handles the case
-  // where wmux can see the application die; this handles the one where it
-  // cannot — a TUI that crashed *inside* a still-running shell. wmux has no
+  // where remotea can see the application die; this handles the one where it
+  // cannot — a TUI that crashed *inside* a still-running shell. remotea has no
   // signal for that (the PTY is alive and quiet, which is also what a healthy
   // idle shell looks like), so the user has to say so, which is exactly the
   // "provide a keybinding to force-reset the pane state" the issue asked for.
@@ -2332,7 +2332,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     return () => document.removeEventListener('remotea:reset-terminal', handler);
   }, [surfaceId]);
 
-  // `[wmux] …` notices from a workspace manifest (#284): a pane held back by
+  // `[remotea] …` notices from a workspace manifest (#284): a pane held back by
   // `after`/`waitFor`, or one whose wait gave up. Written to xterm, never the
   // PTY. A notice can beat the pane's first mount (the workspace was created a
   // frame ago), so it is parked per surface and drained once xterm exists.

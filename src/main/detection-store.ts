@@ -2,7 +2,7 @@
  * Detection results, mirrored into main.
  *
  * The loop runs in the renderer (that is where the screen is), but the CLI and
- * the pipe live here, so `wmux agent-state` and `wmux detect explain` need a
+ * the pipe live here, so `remotea agent-state` and `remotea detect explain` need a
  * copy. A mirror rather than a query: `executeJavaScript` per CLI call would
  * work, but the renderer is also the thread drawing every terminal, and a
  * debugging command should not have to interrupt it.
@@ -137,7 +137,7 @@ export function explainSurface(surfaceId: string): ExplainResult {
  * The offline half: replay a captured screen with no running detection.
  *
  * Worth every minute it costs. It is how a rule regression gets debugged from a
- * `wmux read-screen` capture committed to a fixture, on a machine where the
+ * `remotea read-screen` capture committed to a fixture, on a machine where the
  * agent in question is not installed — which is exactly the situation the
  * bundled Codex and OpenCode manifests were written in.
  */

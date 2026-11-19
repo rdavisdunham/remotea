@@ -5,13 +5,13 @@
  * the bundled manifest for that agent entirely.
  *
  * This is the hotfix path, and it is the ONLY part of the prior art's manifest
- * distribution wmux adopts. What is deliberately NOT adopted is remote fetching:
+ * distribution remotea adopts. What is deliberately NOT adopted is remote fetching:
  * theirs downloads rule updates from a hardcoded host with no signature and no
  * checksum — trust is 100% curl's TLS — and its catalog URL env var accepts
- * `file://`. wmux is an unsigned Electron app already fighting SmartScreen;
+ * `file://`. remotea is an unsigned Electron app already fighting SmartScreen;
  * adding a network-fetched rule feed to it is a bad trade for a feature nobody
  * asked for. A user whose agent changed its prompt shape edits one JSON file, or
- * waits for a release, which wmux cuts often.
+ * waits for a release, which remotea cuts often.
  *
  * Every failure here degrades to "use the bundled manifest" with a warning.
  * A malformed override must never take detection down with it.
@@ -24,7 +24,7 @@ import { isSafeRegexSource } from '../shared/detection/engine';
 import { AGENT_ALIASES } from './agent-argv';
 
 /**
- * wmux's own data dir, not Electron's userData: the two stopped being the same
+ * remotea's own data dir, not Electron's userData: the two stopped being the same
  * directory in 2.22.0 (#282, chromium-profile.ts), and these are the user's
  * files, which stay where they always were.
  */
@@ -116,7 +116,7 @@ function validRule(raw: unknown, allowRegex: boolean): Rule | null {
  * Parse and validate one override.
  *
  * Exported and pure so it can be tested without a filesystem, and so the same
- * validation runs in `wmux detect explain --file`.
+ * validation runs in `remotea detect explain --file`.
  */
 export function parseUserManifest(
   json: unknown,
@@ -128,7 +128,7 @@ export function parseUserManifest(
   const raw = json as Record<string, unknown>;
   const agent = typeof raw.agent === 'string' ? raw.agent : '';
   if (!agent) return { manifest: null, errors: ['missing "agent"'] };
-  // Bound to agents wmux can otherwise name, so an override cannot invent a
+  // Bound to agents remotea can otherwise name, so an override cannot invent a
   // kind that no other layer will ever agree with.
   if (!(agent in AGENT_ALIASES)) {
     return { manifest: null, errors: [`unknown agent "${agent}" — see AGENT_ALIASES`] };

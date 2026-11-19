@@ -28,7 +28,7 @@ describe('#148 Kiro steering', () => {
   // since ESM namespaces are not spy-able and the point of these tests is the
   // actual on-disk result.
   beforeEach(() => {
-    home = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-kiro-'));
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-kiro-'));
     saved = { USERPROFILE: process.env.USERPROFILE, HOME: process.env.HOME };
     process.env.USERPROFILE = home;
     process.env.HOME = home;
@@ -76,7 +76,7 @@ describe('#148 Kiro steering', () => {
 
   it('leaves no unsubstituted placeholder in the steering file (issue #158)', () => {
     // A placeholder that reached disk would hand the reader a literal
-    // "{{REMOTEA_CLI_BIN}}/wmux ping" to run, which is worse than the ambiguity it
+    // "{{REMOTEA_CLI_BIN}}/remotea ping" to run, which is worse than the ambiguity it
     // was added to remove.
     ensureKiroContext();
     expect(read()).not.toContain(CLI_BIN_PLACEHOLDER);

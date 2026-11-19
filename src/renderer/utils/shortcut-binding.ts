@@ -54,7 +54,7 @@ export function bindingFromEvent(e: KeyEventLike): ShortcutBinding | null {
   };
 }
 
-// ─── "Does wmux claim this keystroke?" (issue: Ctrl+N dead over a terminal) ──
+// ─── "Does remotea claim this keystroke?" (issue: Ctrl+N dead over a terminal) ──
 // Lives here, next to bindingsEqual, because TWO callers must agree on the
 // answer or keys get swallowed by neither side:
 //
@@ -67,7 +67,7 @@ export function bindingFromEvent(e: KeyEventLike): ShortcutBinding | null {
 // One predicate, imported by both, makes that state unrepresentable.
 
 /**
- * Bare-Ctrl keys wmux takes even when a terminal has focus.
+ * Bare-Ctrl keys remotea takes even when a terminal has focus.
  *
  * Every other `Ctrl+<key>` with no Shift/Alt belongs to the shell: Ctrl+A/E
  * (line start/end), Ctrl+R (reverse search), Ctrl+U/K (kill line) and friends
@@ -97,7 +97,7 @@ export function isSafeToIntercept(e: KeyEventLike): boolean {
   if (e.key === '=' || e.key === '-' || e.key === '0') return true;
 
   // Ctrl+Tab is safe (#249) — browser-style tab cycling, the nextSurface
-  // default. It is not a shell key: readline and the TUIs wmux hosts read Tab
+  // default. It is not a shell key: readline and the TUIs remotea hosts read Tab
   // and Shift+Tab, and xterm has no encoding for a Ctrl-modified Tab at all —
   // it drops the Ctrl and sends a plain TAB, so before this a Ctrl+Tab over a
   // terminal quietly triggered completion. Ctrl+Shift+Tab was already free
@@ -115,7 +115,7 @@ export function isSafeToIntercept(e: KeyEventLike): boolean {
 export type ShortcutKeyEvent = KeyEventLike & { code?: string };
 
 /**
- * True when some document-level wmux listener will act on this keystroke.
+ * True when some document-level remotea listener will act on this keystroke.
  *
  * Covers both families that live on `document`: the rebindable ShortcutAction
  * table, and the numeric index rows (`Ctrl+1…9` / `Ctrl+Alt+1…9`). The index

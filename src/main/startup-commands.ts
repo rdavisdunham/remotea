@@ -1,6 +1,6 @@
 // ─── Typing startup commands only once the shell is reading (issue #251) ─────
 //
-// A pane's `startupCommands` (quick-launch profiles #32, `wmux agent spawn`,
+// A pane's `startupCommands` (quick-launch profiles #32, `remotea agent spawn`,
 // `claude --resume <id>` on restore #186, a devcontainer re-entry #19) reach
 // the shell one of two ways:
 //
@@ -14,7 +14,7 @@
 //     into the PTY. That used to happen in two places with two different rules.
 //     The renderer wrote `<cmd>\r` on a blind 600 ms timer after pty.create,
 //     and "pty created" is not "shell reading". agent-manager.ts had its own
-//     prompt sniff for `wmux agent spawn`. Two deliveries with two ideas of
+//     prompt sniff for `remotea agent spawn`. Two deliveries with two ideas of
 //     "ready" is how one of them stays broken while the other gets fixed.
 //
 //     This gate is NOT the fix for #251, though 2.14.0 shipped it as one. The
@@ -25,7 +25,7 @@
 //     5.1, both ConPTYs, the old blind timer at every delay from 0 to 1.8 s):
 //     the timer never lost a character — the console input buffer holds
 //     type-ahead — and a restored pwsh pane was never on this path at all. No
-//     wmux path drops that dash; the open question is what `claude` resolves
+//     remotea path drops that dash; the open question is what `claude` resolves
 //     to on the reporter's machine. Do not "fix" #251 here again.
 //
 // So PtyManager owns delivery now, for every caller, and this module is the

@@ -1,9 +1,9 @@
 // Getting a stuck window back without losing a terminal (issue #289).
 //
 // The reporter's second instance froze: the window still dragged (that is the
-// OS), clicks did nothing, `wmux ping` answered (main was fine), and every pipe
+// OS), clicks did nothing, `remotea ping` answered (main was fine), and every pipe
 // request that needed the renderer timed out. The renderer sat at 0% CPU with
-// every thread waiting — blocked, not busy — and the only way out wmux offered
+// every thread waiting — blocked, not busy — and the only way out remotea offered
 // was killing it, which kills every pane.
 //
 // It did not have to. Every PTY lives in MAIN, keyed by surface id, and a

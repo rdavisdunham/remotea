@@ -4,11 +4,11 @@
  * Sessions are EPHEMERAL: a session's process lifetime equals its surface's
  * lifetime. Nothing is persisted — no --profile dir, no --restore. That makes
  * orphan handling correct by construction rather than by heuristic: there is no
- * such thing as a legitimately-surviving wmux-owned session, so any `wmux-`
+ * such thing as a legitimately-surviving remotea-owned session, so any `remotea-`
  * prefixed session with no live surface is garbage. This is the property the
  * #139 post-mortem wanted and did not have.
  *
- * wmux allocates the stream port ITSELF rather than letting agent-browser pick
+ * remotea allocates the stream port ITSELF rather than letting agent-browser pick
  * one, because the dashboard deep-link keys on port
  * (packages/dashboard/src/store/sessions.ts reads `?port=` into activePortAtom).
  * Discovering an OS-assigned port after the fact is a race against the webview
@@ -16,9 +16,9 @@
  *
  * IMPORTANT — this registry is NOT ground truth for what is live. `sessions`
  * and `usedPorts` are in-memory and start empty on every fresh
- * `SessionRegistry` (a new wmux process after a restart or a crash). The
+ * `SessionRegistry` (a new remotea process after a restart or a crash). The
  * "correct by construction" claim above holds only while THIS process stays
- * up: a `wmux-`-prefixed agent-browser session that survived a wmux crash is
+ * up: a `remotea-`-prefixed agent-browser session that survived a remotea crash is
  * real on the OS and completely invisible here. Reconciliation after a crash
  * therefore asks `agent-browser session list` — the real ground truth — never
  * this registry (see `reconcileOrphanSessions` in agent-browser-runtime.ts),
@@ -31,18 +31,18 @@ import type { SurfaceId } from '../shared/types';
 /** agent-browser's dashboard default. */
 export const DASHBOARD_PORT = 4848;
 
-/** First stream port wmux hands out. Above the CDP proxy's 9222-9230 range. */
+/** First stream port remotea hands out. Above the CDP proxy's 9222-9230 range. */
 export const STREAM_PORT_BASE = 9300;
 
 /**
  * Session names are prefixed so the reaper and `agent-browser session list` can
- * tell a wmux-owned session from one the user made by hand. Never close a
+ * tell a remotea-owned session from one the user made by hand. Never close a
  * session without this prefix.
  */
-export const REMOTEA_SESSION_PREFIX = 'wmux-';
+export const REMOTEA_SESSION_PREFIX = 'remotea-';
 
 /**
- * wmux mints surface ids itself as `surf-<uuid>`, so this should never reject
+ * remotea mints surface ids itself as `surf-<uuid>`, so this should never reject
  * a real one. The check exists anyway because `sessionName` reaches a command
  * line as `--session <name>` (see agent-browser-cli.ts's `runAgentBrowser`),
  * and the same reasoning that makes `CLAUDE_SESSION_ID_RE` a security boundary
@@ -51,12 +51,12 @@ export const REMOTEA_SESSION_PREFIX = 'wmux-';
  * whitespace or a path separator could produce a session agent-browser cannot
  * address, or a state file outside its own directory. `sessionNameFor` throws
  * rather than sanitising — a surface id that does not look like one means
- * wmux's own invariants are already broken, and silently rewriting it would
+ * remotea's own invariants are already broken, and silently rewriting it would
  * hide that.
  *
  * Bounded at 128 characters after the `surf-` prefix, matching the same bound
  * `CLAUDE_SESSION_ID_RE` uses (`{8,128}`) for the same reason — an unbounded
- * pattern is not actually a boundary. A real wmux surface id is `surf-<uuid>`
+ * pattern is not actually a boundary. A real remotea surface id is `surf-<uuid>`
  * (36 chars), so 128 leaves generous headroom without accepting an
  * arbitrarily long string onto a command line.
  */
@@ -72,22 +72,22 @@ export const SURFACE_ID_RE = /^surf-[A-Za-z0-9-]{1,128}$/;
 const INSTANCE_NAME_RE = /[^A-Za-z0-9-]/g;
 
 /**
- * This wmux instance's session-name prefix.
+ * This remotea instance's session-name prefix.
  *
- * `REMOTEA_INSTANCE=<name>` runs wmux side by side with another wmux (the
+ * `REMOTEA_INSTANCE=<name>` runs remotea side by side with another remotea (the
  * documented use is a dev build alongside an installed one — see
  * shared/instance.ts, which suffixes the pipe and the APPDATA dir the same
  * way). agent-browser's session namespace is MACHINE-global and has no such
  * suffix, so without this the two instances share it — and startup
- * reconciliation, whose whole premise is "every `wmux-` session with no live
+ * reconciliation, whose whole premise is "every `remotea-` session with no live
  * surface is garbage", would close the OTHER instance's live browsers. Another
- * wmux is exactly as much "not us" as a human's hand-made session is.
+ * remotea is exactly as much "not us" as a human's hand-made session is.
  *
- * The default instance is deliberately left alone (`wmux-`), so this changes
+ * The default instance is deliberately left alone (`remotea-`), so this changes
  * nothing for anyone not opting into a named instance. The two forms cannot be
  * confused in either direction because `SURFACE_ID_RE` anchors on `surf-`:
- * `wmux-dev-surf-x` read with the default prefix leaves `dev-surf-x`, which is
- * not a surface id, and `wmux-surf-x` does not start with `wmux-dev-` at all.
+ * `remotea-dev-surf-x` read with the default prefix leaves `dev-surf-x`, which is
+ * not a surface id, and `remotea-surf-x` does not start with `remotea-dev-` at all.
  *
  * Read from the environment at call time rather than captured at module load,
  * matching how `shared/instance.ts` derives its own suffix. Duplicated from
@@ -108,7 +108,7 @@ export function sessionNameFor(surfaceId: SurfaceId, env?: NodeJS.ProcessEnv): s
 }
 
 /**
- * Is this a session name wmux itself could have minted?
+ * Is this a session name remotea itself could have minted?
  *
  * The exact inverse of `sessionNameFor`, and it is a SECURITY boundary, not a
  * tidiness check. Its one consumer is startup reconciliation, which reads names
@@ -120,16 +120,16 @@ export function sessionNameFor(surfaceId: SurfaceId, env?: NodeJS.ProcessEnv): s
  *
  *   1. THIS INSTANCE's prefix must be present (`sessionPrefix`). A session
  *      without it belongs to somebody else — a human, another tool, or a
- *      side-by-side wmux — and closing it would kill a browser this process
+ *      side-by-side remotea — and closing it would kill a browser this process
  *      never started.
  *   2. What follows the prefix must still be a valid surface id. The prefix
- *      alone is not enough: `wmux-` is a string anyone can type, and a name
- *      like `wmux- --all` or `wmux-;rm` would reach argv. wmux only ever mints
+ *      alone is not enough: `remotea-` is a string anyone can type, and a name
+ *      like `remotea- --all` or `remotea-;rm` would reach argv. remotea only ever mints
  *      `<prefix>surf-<uuid>`, so requiring the full shape rejects nothing this
  *      process could have created while rejecting everything it could not.
  *
  * Rule 2 makes reconciliation strictly more conservative than "close anything
- * `wmux-` prefixed", which is the correct direction to err: leaking a session
+ * `remotea-` prefixed", which is the correct direction to err: leaking a session
  * is recoverable at the next launch, closing a stranger's browser is not.
  */
 export function isRemoteaSessionName(name: unknown, env?: NodeJS.ProcessEnv): boolean {
@@ -138,7 +138,7 @@ export function isRemoteaSessionName(name: unknown, env?: NodeJS.ProcessEnv): bo
   return SURFACE_ID_RE.test(name.slice(prefix.length));
 }
 
-/** The surface a wmux session name belongs to, or undefined if it is not one. */
+/** The surface a remotea session name belongs to, or undefined if it is not one. */
 export function surfaceIdFromSessionName(name: string, env?: NodeJS.ProcessEnv): SurfaceId | undefined {
   return isRemoteaSessionName(name, env) ? (name.slice(sessionPrefix(env).length) as SurfaceId) : undefined;
 }
@@ -200,8 +200,8 @@ export class SessionRegistry {
    * `ensure`, but the port is one the OS agreed we could bind.
    *
    * `nextPort()` tracks only what THIS registry handed out, so a port it
-   * believes is free may be held by an orphan from a previous wmux, by a second
-   * wmux instance, or by an unrelated program. The session then launches with
+   * believes is free may be held by an orphan from a previous remotea, by a second
+   * remotea instance, or by an unrelated program. The session then launches with
    * `AGENT_BROWSER_STREAM_PORT=<taken>`, its stream server cannot bind, and the
    * dashboard deep-link (`?port=<streamPort>`) points at nothing — a pane that
    * renders an empty viewer with no error anywhere. Nothing downstream can

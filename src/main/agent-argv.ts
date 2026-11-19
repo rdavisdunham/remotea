@@ -1,9 +1,9 @@
 /**
  * agent-argv.ts — which coding agent, if any, is this command line?
  *
- * wmux knows a pane's declared state only when the agent reports it, which
+ * remotea knows a pane's declared state only when the agent reports it, which
  * means Claude Code, OpenCode and Kiro. Everything else — Codex, Gemini, Aider,
- * Amp, Cursor, Copilot — runs in a pane wmux cannot name. This module is the
+ * Amp, Cursor, Copilot — runs in a pane remotea cannot name. This module is the
  * first half of fixing that: turn a command line into an agent kind.
  *
  * Pure, and deliberately free of every Electron and Node API so it can be

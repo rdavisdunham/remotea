@@ -1,7 +1,7 @@
 /**
  * Stops a PTY-side error from taking the whole app down (issue #150).
  *
- * wmux runs every pane's PTY in the Electron *main* process. That makes main a
+ * remotea runs every pane's PTY in the Electron *main* process. That makes main a
  * single point of failure that no pane can survive: a throw anywhere on the PTY
  * path doesn't kill one terminal, it kills the window, every workspace and every
  * agent mid-run. #150 reported exactly that — 12 disappearances between
@@ -9,7 +9,7 @@
  * (`0xc0000409` / `FAST_FAIL_FATAL_APP_EXIT`, i.e. the CRT `abort()` path) and
  * no error dialog at all.
  *
- * Two distinct routes get there. Both are inside node-pty rather than wmux,
+ * Two distinct routes get there. Both are inside node-pty rather than remotea,
  * which is why neither is fixable by a try/catch around our own calls, and both
  * are closed from this file.
  *
@@ -39,7 +39,7 @@
  * the bundled conpty.dll fails to load) touches `this._outSocket`, which is
  * exactly the sort of thing that is null when a spawn half-failed.
  *
- * We cannot patch conpty.cc — wmux ships node-pty's prebuilt binaries and never
+ * We cannot patch conpty.cc — remotea ships node-pty's prebuilt binaries and never
  * compiles them. But the C++ throw is only reachable *through* a JS throw, so
  * making the JS callback total closes it: wrap `_$onProcessExit` so nothing
  * escapes it, and `cb.Call` has no pending exception to convert.
@@ -57,7 +57,7 @@
  *
  * That runs in a libuv callback, so the throw becomes an unhandled exception in
  * main. `Terminal._forwardEvents()` only registers `data` and `exit`, so the
- * count is 0 for every PTY wmux spawns and the guard never holds. The threshold
+ * count is 0 for every PTY remotea spawns and the guard never holds. The threshold
  * is node-pty's, not ours, so `attachErrorSink` reads the live listener count
  * rather than hardcoding 2 — if node-pty changes it, this still satisfies it.
  *
@@ -66,7 +66,7 @@
  * Both guards log and continue rather than rethrow. That is the point: an error
  * on one pane's exit path is worth a console warning, and is never worth
  * killing eleven other panes and an in-flight agent run. Nothing here hides a
- * wmux bug that used to be visible — the previous behaviour was not a stack
+ * remotea bug that used to be visible — the previous behaviour was not a stack
  * trace, it was the window vanishing.
  */
 

@@ -308,7 +308,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
   }, [surfaceId, root, cacheKey, fetchDir]);
 
   // `no_root` is "main has not been told this pane's cwd yet", and that is not
-  // permanent: a pane restored after a wmux restart (a devcontainer shell, say)
+  // permanent: a pane restored after a remotea restart (a devcontainer shell, say)
   // reports its cwd only when its shell next speaks, which can be well after
   // this panel first asked. Nothing re-fetches when that report lands, so
   // without this the error stays on screen until the user presses Refresh.
@@ -517,7 +517,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
 
           It carries the baseline label because the two backends answer
           genuinely different questions: in a repo these numbers are everything
-          uncommitted, and outside one they are everything since wmux started.
+          uncommitted, and outside one they are everything since remotea started.
           A column of numbers that silently means one or the other is a column
           the user cannot act on. */}
       {diff.total.files > 0 && (
@@ -615,7 +615,7 @@ export function ExplorerPanel({ onClose, focusedPaneId }: ExplorerPanelProps): R
           )}
           {/* Enabled for EVERY entry — folders and binaries included. Reveal
               only selects the item in Explorer, and "open in the default app"
-              is the one action that is MORE useful on a file wmux cannot
+              is the one action that is MORE useful on a file remotea cannot
               render itself. `viewable` means "remotea can show this as text",
               which was never the right question for either. */}
           <div

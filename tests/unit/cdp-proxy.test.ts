@@ -89,7 +89,7 @@ async function occupy(port: number): Promise<net.Server | null> {
  * Make sure nothing can bind `port`, and hand back whatever needs cleaning up.
  *
  * The distinction that matters is "is this port unavailable to the proxy", NOT
- * "did this test manage to take it". A machine developing wmux with wmux
+ * "did this test manage to take it". A machine developing remotea with remotea
  * already has a real instance on 9222, so a helper that gives up when it cannot
  * take the port itself silently skips the very case it was written for — which
  * is how the staging in issue #157 kept reporting on a scenario it had failed
@@ -114,7 +114,7 @@ async function release(server: net.Server | null): Promise<void> {
 describe('CDPProxy.start (port fallback when a first instance holds 9222)', () => {
   it('falls back to a free port instead of raising an uncaught error', async () => {
     // Occupy the default port to reproduce the second-instance condition. If it
-    // is already taken (a real wmux is running), that serves the same purpose.
+    // is already taken (a real remotea is running), that serves the same purpose.
     const blocker = await ensureBusy(DEFAULT_PORT);
 
     // The other half of the precondition, which used to go unstated and

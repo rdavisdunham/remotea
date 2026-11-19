@@ -1,8 +1,8 @@
 /**
- * remotea instance identity (inherited from wmux).
+ * remotea instance identity (inherited from remotea).
  *
- * remotea is built on wmux, so its base name differs from wmux's ("remotea"
- * rather than "wmux") — that keeps the pipe, APPDATA dir and taskbar id apart
+ * remotea is built on remotea, so its base name differs from remotea's ("remotea"
+ * rather than "remotea") — that keeps the pipe, APPDATA dir and taskbar id apart
  * from a stock wmux install running on the same machine.
  *
  * Set REMOTEA_INSTANCE=<name> to run a separate, side-by-side instance:
@@ -47,7 +47,7 @@ export function getLocalAppDataDir(): string {
  * APPDATA dir, and for the same reason.
  *
  * Windows resolves an AppUserModelId to exactly ONE executable. A dev build
- * that keeps the production id therefore repoints `com.wmux.app` at its own
+ * that keeps the production id therefore repoints `com.remotea.app` at its own
  * node_modules/electron/dist/electron.exe the moment it starts: from then on
  * the INSTALLED app's taskbar button borrows the dev binary's name and icon —
  * it reads "Electron" — and the user's pinned button is orphaned, because a
@@ -74,8 +74,8 @@ export function getPipeTokenPath(): string {
 
 /**
  * Reads the auth token a CLI/hook client must send. Resolution order:
- *   1. REMOTEA_PIPE_TOKEN env var (injected by wmux into spawned shells)
- *   2. the token file in APPDATA (for clients launched outside a wmux shell)
+ *   1. REMOTEA_PIPE_TOKEN env var (injected by remotea into spawned shells)
+ *   2. the token file in APPDATA (for clients launched outside a remotea shell)
  * Returns '' when none is available.
  */
 export function readPipeToken(): string {

@@ -16,10 +16,10 @@ const HOME = 'C:\\Users\\amir';
 describe('shortenCwd — `~` means the home directory and nothing else', () => {
   it.each([
     ['the home directory itself', 'C:\\Users\\amir', '~'],
-    ['a folder under home', 'C:\\Users\\amir\\dev\\wmux', '~/dev/wmux'],
+    ['a folder under home', 'C:\\Users\\amir\\dev\\remotea', '~/dev/remotea'],
     ['home with a different case (NTFS is case-insensitive)', 'c:\\users\\AMIR\\dev', '~/dev'],
     ['another drive keeps its letter (the #279 report)', 'L:\\repos\\ai\\ai-coding-crash-course', 'L:/repos/ai/ai-coding-crash-course'],
-    ['C: outside home keeps its letter', 'C:\\src\\wmux', 'C:/src/wmux'],
+    ['C: outside home keeps its letter', 'C:\\src\\remotea', 'C:/src/remotea'],
     ['a sibling whose name only STARTS with the home name', 'C:\\Users\\amir2\\dev', 'C:/Users/amir2/dev'],
     ['a WSL home', '/home/richard/repos/ai', '~/repos/ai'],
     ['WSL root\'s home', '/root/x', '~/x'],

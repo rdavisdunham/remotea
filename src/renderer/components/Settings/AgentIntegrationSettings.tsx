@@ -6,7 +6,7 @@ import type { TranslationKey } from '../../i18n';
 /**
  * Settings → Agents → Agent integration (issue #132).
  *
- * wmux writes into ~/.claude, ~/.config/opencode and ~/.kiro so coding agents drive
+ * remotea writes into ~/.claude, ~/.config/opencode and ~/.kiro so coding agents drive
  * its browser panel, markdown views and sidebar. It used to do that silently on
  * every launch, which made deleting any of it pointless — the next launch put it
  * straight back. This panel is the "you can change your mind" half of the fix:

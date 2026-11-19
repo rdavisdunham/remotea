@@ -42,7 +42,7 @@ function harness(live: FakeWindow[], focused: FakeWindow | null, cache = new Map
 const CALLER = 'surf-caller';
 
 describe('caller resolution (issue #143)', () => {
-  // The reported symptom: `wmux tree` from a pane reported a workspace the
+  // The reported symptom: `remotea tree` from a pane reported a workspace the
   // caller was not in. Knowing the WINDOW was never enough — a window holds
   // many workspaces and every unscoped method fell back to the active one.
   it('answers about the workspace holding the caller, not the window\'s active one', async () => {

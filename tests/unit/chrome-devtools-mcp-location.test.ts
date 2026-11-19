@@ -1,8 +1,8 @@
 /**
- * Issue #237, first blocker: wmux wrote its `chrome-devtools` MCP entry into
+ * Issue #237, first blocker: remotea wrote its `chrome-devtools` MCP entry into
  * `~/.claude/settings.json`, a file that has no `mcpServers` key. The settings
  * schema strips unknown keys rather than erroring, so the entry landed, changed
- * nothing, and wmux logged "Configured chrome-devtools-mcp … → localhost:9222".
+ * nothing, and remotea logged "Configured chrome-devtools-mcp … → localhost:9222".
  * `claude mcp list` never showed it.
  *
  * The failure is silent by construction — "written" and "written where nobody
@@ -28,7 +28,7 @@ describe('applyChromeDevtoolsMcp (issue #237)', () => {
 
   it('keeps every unrelated key in Claude Code\'s state file', () => {
     // ~/.claude.json holds the OAuth account, per-project history and onboarding
-    // flags; wmux rewrites it whole, so nothing may be dropped on the way.
+    // flags; remotea rewrites it whole, so nothing may be dropped on the way.
     const { next } = applyChromeDevtoolsMcp({ oauthAccount: { id: 'x' }, projects: { '/a': {} } });
     expect(next.oauthAccount).toEqual({ id: 'x' });
     expect(next.projects).toEqual({ '/a': {} });
@@ -53,12 +53,12 @@ describe('applyChromeDevtoolsMcp (issue #237)', () => {
   });
 
   it('leaves a chrome-devtools-mcp aimed at a different port alone', () => {
-    // Same package, another target — someone's own Chrome, not wmux's panel.
+    // Same package, another target — someone's own Chrome, not remotea's panel.
     const mine = { mcpServers: { 'chrome-devtools': otherPort } };
     expect(applyChromeDevtoolsMcp(mine).changed).toBe(false);
   });
 
-  it('DOES migrate an entry an older wmux wrote, when the pin has moved', () => {
+  it('DOES migrate an entry an older remotea wrote, when the pin has moved', () => {
     const old = { mcpServers: { 'chrome-devtools': { command: 'npx', args: ['-y', 'chrome-devtools-mcp@1.2.0', '--browserUrl=http://127.0.0.1:9222'] } } };
     const { next, changed } = applyChromeDevtoolsMcp(old);
     expect(changed).toBe(true);
@@ -80,7 +80,7 @@ describe('applyChromeDevtoolsMcp (issue #237)', () => {
 
 describe('stripChromeDevtoolsMcp (issue #132 + the #237 migration)', () => {
   it('removes the entry, and the empty mcpServers with it', () => {
-    // An empty key left behind is still a footprint in a file wmux was asked to
+    // An empty key left behind is still a footprint in a file remotea was asked to
     // stay out of.
     const { next, changed } = stripChromeDevtoolsMcp(applyChromeDevtoolsMcp({ a: 1 }).next);
     expect(changed).toBe(true);
@@ -102,7 +102,7 @@ describe('stripChromeDevtoolsMcp (issue #132 + the #237 migration)', () => {
 
   it('clears the stale entry older releases left in settings.json', () => {
     // The same function does the migration: the shape is identical, and it is
-    // wmux's litter wherever it sits. #237 was reported by someone who found it
+    // remotea's litter wherever it sits. #237 was reported by someone who found it
     // there, correct in every detail, while `claude mcp list` disagreed.
     const settings = {
       enabledPlugins: { 'chrome-devtools-mcp@claude-plugins-official': false },

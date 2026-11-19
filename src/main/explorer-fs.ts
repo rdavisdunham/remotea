@@ -64,7 +64,7 @@ const RESERVED_STEM = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
  * item in Explorer and executes nothing.
  *
  * A DENY-list and not an allow-list, deliberately. "Open in the default app" is
- * most useful for exactly the files wmux cannot render itself — a PDF, a
+ * most useful for exactly the files remotea cannot render itself — a PDF, a
  * spreadsheet, an image — and that set is open-ended, so an allow-list would
  * re-create the over-restriction this action was just fixed for.
  *
@@ -148,7 +148,7 @@ function mapErrno(err: any): ExplorerListError {
   if (code === 'EACCES' || code === 'EPERM') return fail('Permission denied', 'denied');
   // Node fs errors embed the full absolute path, which on Windows carries the
   // user's account name — never put that on the wire to the renderer (the
-  // same reason wmux crash-report avoids the path-bearing Win32_Process
+  // same reason remotea crash-report avoids the path-bearing Win32_Process
   // properties). Log the real message main-side only; the renderer gets a
   // fixed, English, path-free string.
   console.error('[explorer-fs] read failed:', err?.message ?? err);
@@ -263,7 +263,7 @@ export async function resolveInRoot(
 /**
  * List one directory under `root`.
  *
- * Pure w.r.t. wmux state: resolving WHICH root belongs to a surface is the IPC
+ * Pure w.r.t. remotea state: resolving WHICH root belongs to a surface is the IPC
  * handler's job (explorer-roots.ts), which is what keeps this testable without
  * faking surface state.
  */

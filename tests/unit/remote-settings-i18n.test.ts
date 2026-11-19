@@ -8,7 +8,7 @@ import { fillTemplate, offerOutcome, remoteErrorText, requestOffer } from '../..
 import { formatRemoteNotice } from '../../src/renderer/utils/remote-notice';
 import { showsProxySetup, suggestedPublicUrl } from '../../src/renderer/components/Settings/RemoteConsoleSettings';
 
-// Settings → Remote (#254). This tab is where a user decides whether wmux is
+// Settings → Remote (#254). This tab is where a user decides whether remotea is
 // reachable from another device and hands out credentials for it; an English
 // fallback there is merely untidy, but a missing warning or a dropped
 // placeholder ("Port  is already used") is the wrong sentence at the one

@@ -306,7 +306,7 @@ describe('double-click empty tab-strip space', () => {
   it('preserves surface drops from another pane', () => {
     const props = renderTabs();
     const data = transfer();
-    data.setData('application/wmux-surface', JSON.stringify({ sourcePaneId: 'pane-other', surfaceId: 'surf-other' }));
+    data.setData('application/remotea-surface', JSON.stringify({ sourcePaneId: 'pane-other', surfaceId: 'surf-other' }));
     drag(element('.surface-tab-bar'), 'drop', data);
     expect(props.onDropSurface).toHaveBeenCalledWith('pane-other', 'surf-other', paneId);
     expect(props.onNew).not.toHaveBeenCalled();

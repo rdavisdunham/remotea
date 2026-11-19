@@ -1,8 +1,8 @@
 // ─── Omp resume, main side ───────────────────────────────────────────────────
 //
 // The fourth provider beside Claude (#186), Codex (#261), and OpenCode (#290).
-// The handle comes from wmux's own omp extension, which sees session events
-// and calls `wmux report-session <path> --provider omp`; restore launches
+// The handle comes from remotea's own omp extension, which sees session events
+// and calls `remotea report-session <path> --provider omp`; restore launches
 // `omp --resume <path>`. Same shape as opencode-resume.ts / codex-resume.ts
 // on purpose — one stamp per provider, mutually exclusive through
 // agent-session-persistence.ts.

@@ -19,7 +19,7 @@ export interface HookReport {
   runDepth?: number;
 }
 
-/** The hook events wmux registers. */
+/** The hook events remotea registers. */
 export type ClaudeHookEvent =
   | 'SessionStart'
   | 'UserPromptSubmit'
@@ -70,7 +70,7 @@ export function hookEventName(
     return KNOWN_EVENTS.includes(explicit as ClaudeHookEvent) ? (explicit as ClaudeHookEvent) : null;
   }
   // No event named, but a tool did run — that is PostToolUse by construction,
-  // since it is the only hook wmux registers by bare tool name.
+  // since it is the only hook remotea registers by bare tool name.
   const tool = typeof params?.tool === 'string' ? params.tool.trim() : '';
   return tool ? 'PostToolUse' : null;
 }
@@ -83,7 +83,7 @@ export function hookEventName(
  */
 export interface HookTurnContext {
   /**
-   * Whether this pane has a declared record at all. Absent means wmux has
+   * Whether this pane has a declared record at all. Absent means remotea has
    * observed nothing about the turn — a main process restarted mid-turn sees
    * exactly this — so `runDepth` is a default, not an observation.
    */
@@ -123,7 +123,7 @@ export interface HookTurnContext {
  * That distinction is not academic, because every hook a pane's agent fires —
  * including its background shells and its parallel subagents — carries the same
  * REMOTEA_SURFACE_ID and lands on the one surface. So an agent that kicks off a
- * background command and then asks the user a question is, from wmux's side,
+ * background command and then asks the user a question is, from remotea's side,
  * a pane that is blocked AND busy at the same time. That is a legitimate state,
  * and `resolveState` in agent-state.ts already renders it correctly: `blocked`
  * outranks `runDepth > 0`, so the pane says "needs you" while the work continues
@@ -141,10 +141,10 @@ export interface HookTurnContext {
  *     `agent_id`, so the thread that asked can be told from a subagent or a
  *     sibling call, and only for a block a hook raised.
  *
- * The cost is that a prompt answered through `wmux answer-agent` — a relay, not
+ * The cost is that a prompt answered through `remotea answer-agent` — a relay, not
  * a local keystroke — keeps saying "needs you" until the turn ends rather than
  * until the next tool. That is answerAgent's rule 3 working as designed: the
- * agent confirms, wmux does not assume. `answeredAt` is what the UI shows in the
+ * agent confirms, remotea does not assume. `answeredAt` is what the UI shows in the
  * meantime ("sent — waiting for the agent"). A block that lingers is visible and
  * self-correcting; one that vanishes while the agent is still stuck is the bug.
  */
@@ -206,10 +206,10 @@ export function hookToAgentReport(
     // opening hooks are firing. A settings.json written before 0.48.0 carries
     // only the four terminal hooks, sits at depth 0 through an entire turn, and
     // would read every real prompt as a nudge — the dangerous direction again.
-    // Until wmux has seen one opening event it declines to draw the distinction
+    // Until remotea has seen one opening event it declines to draw the distinction
     // and parks the pane for both, exactly as it did before.
     //
-    // Gated on `known` for the same reason at the pane level. A pane wmux holds
+    // Gated on `known` for the same reason at the pane level. A pane remotea holds
     // no record for has a depth of 0 by DEFAULT, not by observation — which is
     // what a main process restarted in the middle of someone's turn sees, and
     // what a prompt arriving before any other hook on that pane sees. Reading
@@ -300,8 +300,8 @@ export function hookToAgentReport(
     // the pane went on to claim "Needs you" with nothing to answer.
     //
     // `known` is checked for the same reason `Notification` checks it: a pane
-    // wmux holds no record for has a depth of 0 by DEFAULT, not by observation.
-    // Nothing is lost by staying quiet there — a turn wmux never saw begin is
+    // remotea holds no record for has a depth of 0 by DEFAULT, not by observation.
+    // Nothing is lost by staying quiet there — a turn remotea never saw begin is
     // not one a subagent's completion should invent.
     case 'SubagentStop':
       if (!ctx.known || ctx.runDepth === 0) return null;

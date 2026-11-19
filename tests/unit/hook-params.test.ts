@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { hookParams } from '../../src/cli/remotea';
 
 /**
- * `wmux hook` is how the OpenCode plugin hands wmux a `UserPromptSubmit`
+ * `remotea hook` is how the OpenCode plugin hands remotea a `UserPromptSubmit`
  * (issue #304), so the flag parser is the seam between the prompt text the
  * user typed and the prompt log that renders it.
  *
@@ -11,7 +11,7 @@ import { hookParams } from '../../src/cli/remotea';
  * and a prompt whose entire text is `--tool` is a prompt, not a malformed
  * argv. The pair loop takes the next slot unconditionally.
  */
-describe('wmux hook argv (#304)', () => {
+describe('remotea hook argv (#304)', () => {
   it('carries the prompt text through to hook.event', () => {
     expect(hookParams(['hook', '--event', 'UserPromptSubmit', '--prompt', 'fix the flaky test']))
       .toEqual({ event: 'UserPromptSubmit', prompt: 'fix the flaky test' });

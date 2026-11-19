@@ -1,5 +1,5 @@
 /**
- * #398: `wmux list-workspaces` answered `{"manifests": []}`.
+ * #398: `remotea list-workspaces` answered `{"manifests": []}`.
  *
  * Workspace manifests (#284) registered their "trusted manifests" listing as
  * `workspace.list`, which was already the bridge method behind

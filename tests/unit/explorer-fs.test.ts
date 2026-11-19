@@ -8,7 +8,7 @@ let root: string;
 let outside: string;
 
 beforeAll(() => {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-explorer-'));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-explorer-'));
   root = path.join(base, 'root');
   outside = path.join(base, 'outside');
   fs.mkdirSync(path.join(root, 'docs', 'nested'), { recursive: true });

@@ -40,7 +40,7 @@ export interface WorktreeMetadata {
   branch: string;
   baseBranch: string;
   baseSha: string;       // D6 — the name moves, the SHA does not
-  worktreePath: string;  // always under the wmux root; nothing else is removable
+  worktreePath: string;  // always under the remotea root; nothing else is removable
 }
 
 /**
@@ -111,7 +111,7 @@ export interface SurfaceRef {
   /**
    * Extra environment for this terminal's shell (workspace manifests, #284).
    * Persisted as WRITTEN: a `${env:NAME}` reference stays a reference and is
-   * resolved by PtyManager when the PTY spawns, so a value pulled from wmux's
+   * resolved by PtyManager when the PTY spawns, so a value pulled from remotea's
    * own environment (a token, say) never lands in session.json.
    */
   env?: Record<string, string>;
@@ -128,24 +128,24 @@ export interface SurfaceRef {
   codexSessionId?: string;
   /**
    * OpenCode session to resume (#290), stamped by `stampOpencodeSessionIds`
-   * from what wmux's OpenCode plugin reported. Restored as `opencode -s <id>`
+   * from what remotea's OpenCode plugin reported. Restored as `opencode -s <id>`
    * when `workspacePrefs.restoreOpencodeSessions` is on.
    */
   opencodeSessionId?: string;
   /**
    * Antigravity CLI conversation to resume, stamped by `stampAgySessionIds`
-   * from what wmux's agy plugin reported. Restored as `agy --conversation <id>`
+   * from what remotea's agy plugin reported. Restored as `agy --conversation <id>`
    * when `workspacePrefs.restoreAgySessions` is on.
    */
   agySessionId?: string;
   /**
    * Qwen Code session to resume, stamped by `stampQwenSessionIds` from the
-   * `session_id` wmux's Qwen hooks report. Restored as `qwen --resume <id>`
+   * `session_id` remotea's Qwen hooks report. Restored as `qwen --resume <id>`
    * when `workspacePrefs.restoreQwenSessions` is on.
    */
   qwenSessionId?: string;
   /**
-   * Omp session to resume, stamped by `stampOmpSessionIds` from what wmux's
+   * Omp session to resume, stamped by `stampOmpSessionIds` from what remotea's
    * omp extension reported. Restored as `omp --resume <path>` when
    * `workspacePrefs.restoreOmpSessions` is on.
    */
@@ -210,7 +210,7 @@ export interface SurfaceRef {
   // ─── Code viewer surface ───────────────────────────────────────────────────
   // A read-only text view of a file the explorer opened. Deliberately its OWN
   // type rather than a flag on `markdown`: a .rs file in a surface labelled
-  // markdown lies to `wmux markdown get`, to the tab icon, and to session
+  // markdown lies to `remotea markdown get`, to the tab icon, and to session
   // restore. Read-only is structural — CodePane has no editor — not a flag
   // every future feature has to remember to check.
 
@@ -359,7 +359,7 @@ export interface ExplorerDiffOk {
   /**
    * Which baseline produced these numbers, so the panel can say so rather than
    * leaving the user to guess whether `+55` means "since my last commit" or
-   * "since I opened wmux". They are genuinely different questions and the
+   * "since I opened remotea". They are genuinely different questions and the
    * provider picks between them on its own.
    */
   baseline: 'git' | 'snapshot';
@@ -446,7 +446,7 @@ export interface WorkspaceInfo {
   id: WorkspaceId;
   title: string;
   /**
-   * True when wmux picked `title` (`Workspace N`, a layout instance, the
+   * True when remotea picked `title` (`Workspace N`, a layout instance, the
    * tab-derived name) rather than a person or a caller. Only such a name gives
    * way to the window title a terminal's program sets; a rename clears it.
    * Absent on sessions saved before it existed, so their names stay fixed.

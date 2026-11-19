@@ -1,6 +1,6 @@
 // src/main/cdp-browser-domain.ts
 /**
- * The browser-level half of the CDP protocol, answered by wmux itself
+ * The browser-level half of the CDP protocol, answered by remotea itself
  * (issue #237, second blocker).
  *
  * `cdp-proxy.ts` was a pipe: every message went straight to
@@ -19,7 +19,7 @@
  * supported` seen after #233. As #237 puts it: "the proxy has to be a browser,
  * not a pipe".
  *
- * wmux has exactly one page to offer — the browser panel's webContents — so
+ * remotea has exactly one page to offer — the browser panel's webContents — so
  * being a browser is mostly bookkeeping: one target, one session, one default
  * browser context, and a translation from the flattened session protocol every
  * modern client speaks down to the single unsessioned debugger Electron gives
@@ -43,7 +43,7 @@
  *    the browser connection. Puppeteer sends `Target.setAutoAttach` down each
  *    attached session to discover out-of-process iframes. Forwarding that to
  *    Electron's page debugger is the same "Not allowed" as before, one level
- *    down. wmux answers it with "nothing auto-attached", which is true: the
+ *    down. remotea answers it with "nothing auto-attached", which is true: the
  *    panel is one webContents and exposes no child targets.
  */
 
@@ -59,9 +59,9 @@ export interface BrowserDomainContext {
   chromeVersion: string;
   v8Version: string;
   userAgent: string;
-  /** The single target wmux exposes. Matches the `id` in `/json/list`. */
+  /** The single target remotea exposes. Matches the `id` in `/json/list`. */
   targetId: string;
-  /** The single flattened session id wmux hands out for that target. */
+  /** The single flattened session id remotea hands out for that target. */
   sessionId: string;
 }
 
@@ -80,7 +80,7 @@ export type BrowserDomainAction =
       result: Record<string, unknown>;
       /**
        * A page-level command to run for effect after replying. Used by
-       * `Target.createTarget`, which cannot create anything here: wmux has one
+       * `Target.createTarget`, which cannot create anything here: remotea has one
        * pane, so "open a new page at this URL" is honoured as "put this URL in
        * the pane" and answered with the target that was there all along. A
        * client that asked for a page gets a working page, which is a better
@@ -99,7 +99,7 @@ export interface BrowserDomainReply {
   action: BrowserDomainAction;
 }
 
-/** The `Target.TargetInfo` for wmux's single page. */
+/** The `Target.TargetInfo` for remotea's single page. */
 export function targetInfo(ctx: BrowserDomainContext): Record<string, unknown> {
   return {
     targetId: ctx.targetId,
@@ -146,12 +146,12 @@ function handleBrowserDomain(method: string, ctx: BrowserDomainContext): Browser
       // Accepted and ignored. A client sets these to make a run deterministic;
       // refusing aborts the run, while accepting costs it nothing it can see —
       // the panel is a webview with the app's own download and permission
-      // behaviour, which is not wmux's to hand over to an automation client.
+      // behaviour, which is not remotea's to hand over to an automation client.
       return ok();
     case 'Browser.getWindowForTarget':
       return ok({ windowId: 1, bounds: { windowState: 'normal' } });
     case 'Browser.close':
-      // Never. The "browser" is the user's wmux window, and a stray
+      // Never. The "browser" is the user's remotea window, and a stray
       // `browser.close()` in an agent's script must not take it down.
       return ok();
     default:
@@ -304,7 +304,7 @@ function handleTargetDomain(
  *
  * `sessionId` is the message's own field: absent for a browser-level command,
  * `ctx.sessionId` for one aimed at the page through the flattened protocol.
- * Anything else names a session wmux never handed out.
+ * Anything else names a session remotea never handed out.
  */
 export function handleBrowserCommand(
   method: string,
@@ -329,7 +329,7 @@ export function handleBrowserCommand(
     if (handled) return handled;
     // An unknown `Target.*` is still browser-level, and forwarding it to the page
     // debugger yields Electron's "Not allowed" — which reads to the client as
-    // wmux's page being broken rather than as a command wmux does not implement.
+    // remotea's page being broken rather than as a command remotea does not implement.
     return fail(`'${method}' wasn't found`, -32601);
   }
 

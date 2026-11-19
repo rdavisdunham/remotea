@@ -4,12 +4,12 @@
  * The precedence chain is lifted from `ssh-detect.ts` rather than reinvented,
  * because it answers the same platform question. Windows has no tty foreground
  * process group, so there is no equivalent of "ask the terminal what owns it";
- * what wmux has instead is three signals of decreasing authority, and the rule
+ * what remotea has instead is three signals of decreasing authority, and the rule
  * that the weakest may only CORROBORATE the others, never establish an answer
  * on its own.
  *
- *   1. Shell spec — wmux launched this pane's shell itself (`wmux new-workspace
- *                   --shell claude`, `wmux agent spawn --cmd`). If that command
+ *   1. Shell spec — remotea launched this pane's shell itself (`remotea new-workspace
+ *                   --shell claude`, `remotea agent spawn --cmd`). If that command
  *                   line is an agent, the pane is that agent for as long as it
  *                   lives. Authoritative and free.
  *   2. Command    — the shell-integration preexec hook reported the command the

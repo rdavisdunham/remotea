@@ -15,8 +15,8 @@
 // workers early in environment teardown). The only thing that can still act is
 // ANOTHER process.
 //
-// So every quit arms one: wmux's own executable run as plain Node
-// (ELECTRON_RUN_AS_NODE — no window, no second wmux, and a GUI-subsystem exe so
+// So every quit arms one: remotea's own executable run as plain Node
+// (ELECTRON_RUN_AS_NODE — no window, no second remotea, and a GUI-subsystem exe so
 // no console flashes), detached, with a ~20-line inline script. It polls the
 // parent's pid and exits the moment the parent is gone, which on a healthy quit
 // is well under a second. Only a parent that outlives the deadline is
@@ -36,7 +36,7 @@ export const EXIT_WATCHDOG_POLL_MS = 250;
 
 /**
  * The script the watchdog runs. Pure, so its behaviour is testable by
- * evaluating it against a fake `process` rather than by quitting wmux.
+ * evaluating it against a fake `process` rather than by quitting remotea.
  *
  * `process.kill(pid, 0)` throws ESRCH once the parent is gone — that is the
  * exit. Any OTHER error (EPERM) means it exists but cannot be signalled, and

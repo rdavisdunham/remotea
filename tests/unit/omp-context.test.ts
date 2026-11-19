@@ -29,7 +29,7 @@ describe('#165 omp context', () => {
   // namespaces are not spy-able and the point of these tests is what ends up
   // on disk.
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-omp-'));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-omp-'));
     saved = {
       USERPROFILE: process.env.USERPROFILE,
       HOME: process.env.HOME,

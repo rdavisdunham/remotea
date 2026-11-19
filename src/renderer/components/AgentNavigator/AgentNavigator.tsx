@@ -13,8 +13,8 @@ type Filter = 'all' | AgentPresenceState;
  * The right-hand column when the agent declared no reason.
  *
  * A `unknown` row says WHY it is unknown rather than leaving the column blank:
- * "wmux can see this agent but it never reports" is a fact about the agent's
- * integration, not a wmux failure, and the user can act on it (install the
+ * "remotea can see this agent but it never reports" is a fact about the agent's
+ * integration, not a remotea failure, and the user can act on it (install the
  * integration) in a way they cannot act on an empty cell.
  */
 function reasonFallback(

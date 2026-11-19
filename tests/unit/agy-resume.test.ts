@@ -11,7 +11,7 @@ import { instantiateLayout } from '../../src/renderer/store/split-utils';
 import type { SurfaceId, SplitNode } from '../../src/shared/types';
 
 // `agy --conversation <id>` on restore, beside Claude (#186), Codex (#261) and
-// OpenCode (#290). The id is agy's `conversationId`, reported by wmux's agy plugin.
+// OpenCode (#290). The id is agy's `conversationId`, reported by remotea's agy plugin.
 const AGY = '46b139cc-e5cf-4c37-887b-188e6274d14a';
 const AGY2 = 'a6116a3e-18f1-4fc6-93cf-75ab92f13b56';
 const CLAUDE = '11111111-2222-3333-4444-555555555555';

@@ -1,8 +1,8 @@
 import { clearIntegrationFailures } from './integration-failures';
 /**
- * Consent gate for everything wmux writes outside its own directory (issue #132).
+ * Consent gate for everything remotea writes outside its own directory (issue #132).
  *
- * wmux integrates with Claude Code, OpenCode, Kiro, omp, pi, Grok, agy and Qwen Code by editing files
+ * remotea integrates with Claude Code, OpenCode, Kiro, omp, pi, Grok, agy and Qwen Code by editing files
  * in the user's home: it appends a block to ~/.claude/CLAUDE.md,
  * ~/.config/opencode/AGENTS.md, ~/.omp/agent/AGENTS.md and pi's user-scope
  * context file, writes ~/.kiro/steering/remotea.md, registers eight hook families
@@ -16,7 +16,7 @@ import { clearIntegrationFailures } from './integration-failures';
  * "without permission and/or warning". Idempotence and consent pull in opposite
  * directions, and the code only implemented the first.
  *
- * The fix is a decision stored in wmux's OWN settings file (%APPDATA%\remotea),
+ * The fix is a decision stored in remotea's OWN settings file (%APPDATA%\remotea),
  * never in the files being written:
  *
  *   unset     nothing has been written yet; ask on first launch
@@ -69,7 +69,7 @@ import { loadSettings, saveSetting } from './settings-store';
 export type IntegrationDecision = 'unset' | 'granted' | 'declined';
 
 /**
- * The four things wmux writes, split the way a user would reason about them
+ * The four things remotea writes, split the way a user would reason about them
  * rather than the way the code is organised — each one is independently useful
  * and independently refusable.
  */
@@ -234,7 +234,7 @@ export function applyConsent(consent: IntegrationConsent): void {
  *
  * remotea does not ask at launch. Agents on a remote host are set up by that
  * host's server, which the app offers once it is connected (RemoteHooksPrompt).
- * This local integration, inherited from wmux, edits files in the home
+ * This local integration, inherited from remotea, edits files in the home
  * directory of the computer the app runs on, so it stays off until someone
  * turns it on in Settings → Agent integration. `unset` writes nothing and
  * removes nothing.

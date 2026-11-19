@@ -2,7 +2,7 @@
  * Which browser surface does a `browser.get_engine` / `browser.set_engine`
  * caller mean?
  *
- * `wmux browser engine [web|agent] [--surface <id>]` carries its surface in
+ * `remotea browser engine [web|agent] [--surface <id>]` carries its surface in
  * `params.caller` — the same slot every other browser verb uses — so the caller
  * is sometimes a TERMINAL (resolve it to the browser pane that terminal drives,
  * per the per-caller binding of issue #62) and sometimes a BROWSER surface

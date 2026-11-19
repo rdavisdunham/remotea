@@ -36,7 +36,7 @@ const load = () => import(/* @vite-ignore */ PLUGIN);
  */
 const internals = async () => (await load()).RemoteaPlugin.__remoteaInternals;
 
-/** Every wmux CLI invocation the plugin made, as flat argv (minus the script). */
+/** Every remotea CLI invocation the plugin made, as flat argv (minus the script). */
 const verbs = () => calls.map((c) => {
   const argv = c.argv.slice(1);
   // The ordering stamp is asserted separately; keep exact-shape assertions
@@ -50,7 +50,7 @@ async function pluginWith(env: Record<string, string> = {}) {
   Object.assign(process.env, {
     REMOTEA: '1',
     REMOTEA_SURFACE_ID: SURFACE,
-    REMOTEA_CLI: 'C:\\wmux\\resources\\cli\\remotea.js',
+    REMOTEA_CLI: 'C:\\remotea\\resources\\cli\\remotea.js',
     REMOTEA_NODE: process.execPath,
     ...env,
   });
@@ -82,15 +82,17 @@ afterEach(async () => {
 describe('the plugin file itself', () => {
   const src = fs.readFileSync(PLUGIN, 'utf8');
 
-  it('carries a version marker, or wmux cannot know to reinstall it', () => {
+  it('carries a version marker, or remotea cannot know to reinstall it', () => {
     // pluginNeedsUpdate() compares this; an install stuck on v4 keeps #191.
     // v5 → v6 is #271: every v5 install is the file OpenCode v2 rejects.
     // v7 → v8 is #304: without the bump no installed copy gains the prompt hook.
     // v9 → v10 retries a lost session report, keeps a shared server's signals
     // out of the starter pane, and stops a reload from releasing the handle.
-    // v10 → v11 renames the plugin's code symbols (WmuxPlugin → RemoteaPlugin);
+    // v10 → v11 renames the plugin's code symbols (the old export → RemoteaPlugin);
     // the host still recognises an installed v10 by LEGACY_OPENCODE_PLUGIN_EXPORT.
-    expect(src).toMatch(/remotea-plugin-version:\s*11/);
+    // v11 → v12 renames the plugin id OpenCode sees to "remotea" and makes the
+    // PATH fallback run `remotea`, the command that exists since the rename.
+    expect(src).toMatch(/remotea-plugin-version:\s*12/);
   });
 
   it('exports RemoteaPlugin and the default definition, NOTHING else (#191, #271)', async () => {
@@ -108,7 +110,7 @@ describe('the plugin file itself', () => {
     // (>= 1.3.4) sees the `id`, calls `default.server` and stops calling every
     // export — which is what keeps RemoteaPlugin from being invoked twice.
     const { default: def, RemoteaPlugin } = await load();
-    expect(def.id).toBe('wmux');
+    expect(def.id).toBe('remotea');
     expect(typeof def.setup).toBe('function');
     expect(def.server).toBe(RemoteaPlugin);
     expect('effect' in def).toBe(false); // v2 would take the Effect branch instead
@@ -145,12 +147,12 @@ describe('resolveNodeRuntime (#187)', () => {
   it('prefers REMOTEA_NODE — the only link that cannot come up empty', async () => {
     const { resolveNodeRuntime } = await internals();
     const runtime = resolveNodeRuntime(
-      { REMOTEA_NODE: 'C:\\wmux\\wmux.exe', REMOTEA_NODE_ELECTRON: '1' },
+      { REMOTEA_NODE: 'C:\\remotea\\remotea.exe', REMOTEA_NODE_ELECTRON: '1' },
       'C:\\x\\opencode.exe',
       'win32',
-      only('C:\\wmux\\wmux.exe'),
+      only('C:\\remotea\\remotea.exe'),
     );
-    expect(runtime).toEqual({ file: 'C:\\wmux\\wmux.exe', electron: true });
+    expect(runtime).toEqual({ file: 'C:\\remotea\\remotea.exe', electron: true });
   });
 
   it('ignores a REMOTEA_NODE that no longer exists (stale env from an old install)', async () => {
@@ -174,8 +176,8 @@ describe('spawning', () => {
     expect(calls[0].argv[0]).toBe(process.env.REMOTEA_CLI);
   });
 
-  it('sets ELECTRON_RUN_AS_NODE when the runtime is wmux itself', async () => {
-    // Without it the same exe opens a second wmux window instead of running JS.
+  it('sets ELECTRON_RUN_AS_NODE when the runtime is remotea itself', async () => {
+    // Without it the same exe opens a second remotea window instead of running JS.
     const p = await pluginWith({ REMOTEA_NODE_ELECTRON: '1' });
     await p.event({ event: { type: 'message.part.updated' } });
     expect(calls[0].opts.env.ELECTRON_RUN_AS_NODE).toBe('1');
@@ -187,7 +189,7 @@ describe('spawning', () => {
     expect(calls[0].opts.env).toBeUndefined();
   });
 
-  it('no-ops entirely outside wmux', async () => {
+  it('no-ops entirely outside remotea', async () => {
     delete process.env.REMOTEA;
     const { RemoteaPlugin } = await load();
     expect(await RemoteaPlugin()).toEqual({});
@@ -233,7 +235,7 @@ describe('event mapping (#188)', () => {
       },
     });
     expect(verbs().filter((v) => v.includes('--unblocked'))).toEqual([]);
-    // Still tells wmux the pane is alive — only the unblock is withdrawn.
+    // Still tells remotea the pane is alive — only the unblock is withdrawn.
     expect(verbs()).toEqual([['agent-activity', '--surface', SURFACE, '--active']]);
   });
 
@@ -306,7 +308,7 @@ describe('event mapping (#188)', () => {
 });
 
 describe('debug logging (#190)', () => {
-  const logPath = () => path.join(os.tmpdir(), `wmux-plugin-test-${process.pid}.log`);
+  const logPath = () => path.join(os.tmpdir(), `remotea-plugin-test-${process.pid}.log`);
   const readLog = () => (fs.existsSync(logPath()) ? fs.readFileSync(logPath(), 'utf8') : '');
 
   beforeEach(() => {
@@ -331,8 +333,8 @@ describe('debug logging (#190)', () => {
 
     it('treats any other value as an explicit path', async () => {
       const { resolveDebugLog } = await internals();
-      expect(resolveDebugLog('/var/log/wmux.log')).toBe('/var/log/wmux.log');
-      expect(resolveDebugLog(' C:\\Users\\me\\wmux.log ')).toBe('C:\\Users\\me\\wmux.log');
+      expect(resolveDebugLog('/var/log/remotea.log')).toBe('/var/log/remotea.log');
+      expect(resolveDebugLog(' C:\\Users\\me\\remotea.log ')).toBe('C:\\Users\\me\\remotea.log');
     });
   });
 
@@ -442,7 +444,7 @@ async function v2PluginWith(env: Record<string, string> = {}) {
   Object.assign(process.env, {
     REMOTEA: '1',
     REMOTEA_SURFACE_ID: SURFACE,
-    REMOTEA_CLI: 'C:\\wmux\\resources\\cli\\remotea.js',
+    REMOTEA_CLI: 'C:\\remotea\\resources\\cli\\remotea.js',
     REMOTEA_NODE: process.execPath,
     ...env,
   });
@@ -465,7 +467,7 @@ describe('OpenCode v2 (#271)', () => {
     await cleanup();
   });
 
-  it('exports the wmux env into shells through create.before', async () => {
+  it('exports the remotea env into shells through create.before', async () => {
     const { hooks, cleanup } = await v2PluginWith();
     const input = { command: 'ls', cwd: '.', timeout: 0, shell: 'pwsh', env: {} as Record<string, string> };
     await hooks['shell.create.before'](input);
@@ -477,7 +479,7 @@ describe('OpenCode v2 (#271)', () => {
   /**
    * Issue #304 — the prompt log. Its only agent-side producer is a
    * `UserPromptSubmit` hook event, and until now nothing on the OpenCode side
-   * ever sent one: the outline/Prompts pane/`wmux prompts` were empty for every
+   * ever sent one: the outline/Prompts pane/`remotea prompts` were empty for every
    * OpenCode pane, on every version.
    */
   it('forwards a submitted prompt to the prompt log (#304)', async () => {
@@ -580,7 +582,7 @@ describe('OpenCode v2 (#271)', () => {
     expect(fromV2Event({ type: 'filesystem.changed', data: { file: 'a.ts', event: 'change' } })).toBeNull();
   });
 
-  it('registers nothing outside wmux', async () => {
+  it('registers nothing outside remotea', async () => {
     const fake = fakeV2Context();
     const { default: def } = await load();
     expect(await def.setup(fake.ctx)).toBeUndefined();

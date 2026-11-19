@@ -3,7 +3,7 @@ import { StateCreator } from 'zustand';
 /**
  * surfaceId → the OSC 0/2 window title the pane's program last set (issue #221).
  *
- * xterm has always parsed these and wmux has captured them since the detection
+ * xterm has always parsed these and remotea has captured them since the detection
  * work landed, but the only consumer was agent detection: a pane whose program
  * was actively announcing what it was doing still showed a tab named after its
  * directory. This is the store half that lets the tab bar read it.
@@ -97,7 +97,7 @@ export function normalizeOscTitle(raw: unknown): string {
  * was launched from, and an elevated one prefixes that with a LOCALISED
  * "Administrator: " ("Administrateur : ", "管理员: " …). ConPTY forwards that
  * title as OSC 0 like any other, so with #221's title-as-tab-label every pwsh
- * pane in an elevated wmux was captioned
+ * pane in an elevated remotea was captioned
  * `Administrator: C:\Program Files\WindowsApps\Microsoft.PowerShell_…\pwsh.exe`
  * — and each tab first showed its folder, then "reverted" to that the moment
  * the shell's title arrived. It names no program activity, only the binary, so

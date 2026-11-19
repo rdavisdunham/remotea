@@ -1,5 +1,5 @@
 /**
- * The explorer on a remote pane: wmux's own jail and readers, run on the
+ * The explorer on a remote pane: remotea's own jail and readers, run on the
  * server, rooted at the session's directory — never a path the app names.
  */
 import { afterEach, describe, expect, it } from 'vitest';

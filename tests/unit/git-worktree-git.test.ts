@@ -71,7 +71,7 @@ describe.runIf(hasGit)('git-worktree integration with real git', { timeout: 60_0
     savedLocalAppData = process.env.LOCALAPPDATA;
     savedRemoteaInstance = process.env.REMOTEA_INSTANCE;
 
-    tempBase = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-wt-git-'));
+    tempBase = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-wt-git-'));
     process.env.LOCALAPPDATA = tempBase;
     process.env.REMOTEA_INSTANCE = 'test-git';
 
@@ -83,8 +83,8 @@ describe.runIf(hasGit)('git-worktree integration with real git', { timeout: 60_0
       gitIn(mainRepo, ['init']);
       gitIn(mainRepo, ['checkout', '-b', 'main']);
     }
-    gitIn(mainRepo, ['config', 'user.name', 'wmux Tester']);
-    gitIn(mainRepo, ['config', 'user.email', 'wmux-tester@example.com']);
+    gitIn(mainRepo, ['config', 'user.name', 'remotea Tester']);
+    gitIn(mainRepo, ['config', 'user.email', 'remotea-tester@example.com']);
 
     fs.writeFileSync(path.join(mainRepo, '.gitignore'), '.env\n');
     fs.writeFileSync(path.join(mainRepo, 'file.txt'), 'line 1\n');
@@ -314,7 +314,7 @@ describe.runIf(hasGit)('git-worktree integration with real git', { timeout: 60_0
 
     it('refuses a registered path git no longer lists as a worktree', async () => {
       const wtPath = await make('feat-unlisted');
-      // Detach it from git behind wmux's back: the admin entry goes, the folder stays.
+      // Detach it from git behind remotea's back: the admin entry goes, the folder stays.
       fs.rmSync(path.join(mainRepo, '.git', 'worktrees', path.basename(wtPath)), { recursive: true, force: true });
       fs.writeFileSync(path.join(wtPath, 'loose.txt'), 'still mine\n');
       expect((await removeWorktree(wtPath, { mode: 'discard', ...NO_DRAIN })).outcome).toBe('not-ours');

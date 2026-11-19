@@ -508,8 +508,8 @@ describe('rollupAgents — detection merge (phase 3)', () => {
   });
 
   /**
-   * THE invariant. wmux deliberately diverges from the prior art here: a visible
-   * blocker must NOT override a declaration, because wmux's `blocked` never
+   * THE invariant. remotea deliberately diverges from the prior art here: a visible
+   * blocker must NOT override a declaration, because remotea's `blocked` never
    * expires AND answering never clears it. A screen rule re-asserting `blocked`
    * on a repainted frame would make the sidebar's answer button permanently
    * useless — the user clicks, the agent moves on, and the next scan puts the

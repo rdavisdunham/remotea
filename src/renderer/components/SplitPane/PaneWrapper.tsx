@@ -230,7 +230,7 @@ export default function PaneWrapper({
   // ─── Global drag tracking ─────────────────────────────────────────────────
   useEffect(() => {
     const handleDragStart = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes('application/wmux-surface')) {
+      if (e.dataTransfer?.types.includes('application/remotea-surface')) {
         setDragActive(true);
       }
     };
@@ -333,7 +333,7 @@ export default function PaneWrapper({
               // No vendor filtering here, unlike the panel — see
               // utils/browser-start-page.ts. A tab's url is written directly by
               // openInRemoteaBrowser when the user clicks a link, so filtering it
-              // would blank a pane opened on wmux's own issue tracker on purpose.
+              // would blank a pane opened on remotea's own issue tracker on purpose.
               {...(surface.url || browserPrefs.defaultUrl
                 ? { initialUrl: surface.url || browserPrefs.defaultUrl }
                 : {})}
@@ -507,7 +507,7 @@ export default function PaneWrapper({
   const handleCloseSurface = (surfaceId: SurfaceId) => {
     if (activeWorkspaceId) {
       // PTY teardown lives in the store's closeSurface action (issue #65), so
-      // every close route — this tab-× button, Ctrl+W, and `wmux close-surface` —
+      // every close route — this tab-× button, Ctrl+W, and `remotea close-surface` —
       // reaps the shell through the same chokepoint. User gestures go through
       // requestCloseSurface first, which stops to confirm when the tab holds
       // unsaved markdown edits (issue #116, F3).
@@ -567,7 +567,7 @@ export default function PaneWrapper({
   const handleClosePane = () => {
     if (!activeWorkspaceId) return;
     // Reaping and tree surgery both live in the store action now — this button,
-    // `wmux close-pane` and closeSurface's last-tab path had each grown their own
+    // `remotea close-pane` and closeSurface's last-tab path had each grown their own
     // copy, and all three killed the shells before discovering they were not
     // going to remove anything (a one-pane workspace). See surface-slice.closePane.
     // remotea: via requestClosePane, so remote sessions go to the close dialog.
@@ -597,7 +597,7 @@ export default function PaneWrapper({
     e.preventDefault();
     setDragActive(false);
     document.body.classList.remove('remotea-dragging');
-    const data = e.dataTransfer.getData('application/wmux-surface');
+    const data = e.dataTransfer.getData('application/remotea-surface');
     if (!data || !activeWorkspaceId) {
       onSurfaceDragEnd();
       return;
@@ -638,7 +638,7 @@ export default function PaneWrapper({
     e.preventDefault();
     setDragActive(false);
     document.body.classList.remove('remotea-dragging');
-    const data = e.dataTransfer.getData('application/wmux-surface');
+    const data = e.dataTransfer.getData('application/remotea-surface');
     if (!data || !activeWorkspaceId) {
       onSurfaceDragEnd();
       return;

@@ -16,7 +16,7 @@ import path from 'path';
  * anything" and nobody notices for six versions.
  *
  * It hangs off three facts in electron-builder's own NSIS templates, none of
- * which wmux controls and all of which move on a dependency bump:
+ * which remotea controls and all of which move on a dependency bump:
  *
  *   1. `initMultiUser` populates $hasPerMachineInstallation /
  *      $hasPerUserInstallation from the registry, in .onInit, before any page.
@@ -39,7 +39,7 @@ describe('NSIS install scope is pinned on update (issue #167)', () => {
   const multiUserUi = read(`${templates}/multiUserUi.nsh`);
   const assistedInstaller = read(`${templates}/assistedInstaller.nsh`);
 
-  describe('wmux side', () => {
+  describe('remotea side', () => {
     it('defines customInstallMode', () => {
       expect(installerNsh).toMatch(/!macro\s+customInstallMode/);
     });

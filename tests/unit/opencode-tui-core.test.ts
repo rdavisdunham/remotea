@@ -7,7 +7,7 @@ import * as path from 'path';
  * The core is a plain ESM module under resources/opencode-plugin/ because that
  * is exactly what gets installed into OpenCode's config directory. It must not
  * import @opencode/plugin/tui or solid-js (the TUI host provides those at
- * runtime; the wmux test suite cannot resolve them), so everything worth
+ * runtime; the remotea test suite cannot resolve them), so everything worth
  * testing lives here and the entry file is only the reactive glue.
  */
 const calls: Array<{ file: string; argv: string[]; opts: any }> = [];
@@ -784,18 +784,18 @@ describe('callRemotea (#310)', () => {
 
   it('runs the shipped CLI on the resolved JS runtime, argv untouched', async () => {
     const { callRemotea } = await load();
-    const env = { REMOTEA_CLI: 'C:\\wmux\\resources\\cli\\remotea.js' };
+    const env = { REMOTEA_CLI: 'C:\\remotea\\resources\\cli\\remotea.js' };
     callRemotea(runtimeNode, ['report-session', 'ses_abc12345'], () => {}, env);
     expect(calls).toHaveLength(1);
     expect(calls[0].file).toBe(':node:');
-    expect(calls[0].argv).toEqual(['C:\\wmux\\resources\\cli\\remotea.js', 'report-session', 'ses_abc12345']);
+    expect(calls[0].argv).toEqual(['C:\\remotea\\resources\\cli\\remotea.js', 'report-session', 'ses_abc12345']);
     expect(calls[0].opts.env).toBeUndefined();
   });
 
-  it('marks wmux\'s own Electron binary as Node, or a second wmux window opens', async () => {
+  it('marks remotea\'s own Electron binary as Node, or a second remotea window opens', async () => {
     const { callRemotea } = await load();
     const env = { REMOTEA_CLI: 'remotea.js' };
-    callRemotea({ file: 'wmux.exe', electron: true }, ['x'], () => {}, env);
+    callRemotea({ file: 'remotea.exe', electron: true }, ['x'], () => {}, env);
     expect(calls[0].opts.env.ELECTRON_RUN_AS_NODE).toBe('1');
   });
 
@@ -837,10 +837,10 @@ describe('callRemotea (#310)', () => {
     }
   });
 
-  it('falls back to `wmux` on PATH elsewhere', async () => {
+  it('falls back to `remotea` on PATH elsewhere', async () => {
     const { callRemotea } = await load();
     callRemotea(runtimeNode, ['x'], () => {}, {}, 'linux');
-    expect(calls[0]).toMatchObject({ file: 'wmux', argv: ['x'] });
+    expect(calls[0]).toMatchObject({ file: 'remotea', argv: ['x'] });
   });
 
   it('runs the exit release synchronously and bounded', async () => {

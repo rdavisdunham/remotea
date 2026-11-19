@@ -4,13 +4,13 @@ import net from 'node:net';
 import path from 'node:path';
 
 /**
- * `wmux config path` used to build the path client-side:
+ * `remotea config path` used to build the path client-side:
  *
  *   console.log(`${os.homedir()}\\.remotea\\config.toml`)
  *
  * Run from inside WSL or a devcontainer — where this CLI spends most of its
- * life, reaching wmux over the TCP bridge — that prints
- * `/home/vscode\.remotea\config.toml`: neither the file wmux reads (it lives on the
+ * life, reaching remotea over the TCP bridge — that prints
+ * `/home/vscode\.remotea\config.toml`: neither the file remotea reads (it lives on the
  * Windows host) nor a well-formed path on either OS. Someone editing "the config
  * file" at that path is editing nothing, which is a long way to walk before
  * finding out why a setting had no effect.
@@ -19,7 +19,7 @@ import path from 'node:path';
  * `config.get` returns it.
  *
  * Spawned from dist/, not from resources/cli/remotea.js. dist/cli/remotea.js is the
- * file a released wmux runs — package.json's `bin` points at it, electron-builder
+ * file a released remotea runs — package.json's `bin` points at it, electron-builder
  * copies it into the package, and the release staging step copies it into the zip.
  * resources/cli/remotea.js is a checked-in copy of that build with nothing enforcing
  * the copy, so it drifts from src/; a test spawning it asserts against whatever
@@ -52,7 +52,7 @@ afterEach(async () => {
 });
 
 /**
- * A wmux instance that answers `config.get` and nothing else, over the same
+ * A remotea instance that answers `config.get` and nothing else, over the same
  * newline-delimited JSON-RPC the real pipe server speaks.
  */
 function startFakeInstance(token: string): Promise<number> {
@@ -103,7 +103,7 @@ function runCli(args: string[], env: Record<string, string>): Promise<string> {
   });
 }
 
-describe('wmux config path', () => {
+describe('remotea config path', () => {
   it("prints the instance's own path, not one rebuilt from the local $HOME", async () => {
     const port = await startFakeInstance('tok');
     const out = await runCli(['config', 'path'], {

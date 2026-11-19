@@ -6,7 +6,7 @@ import { renderMarkdown } from '../../src/renderer/components/Markdown/markdown-
  * The markdown sanitizer is a security boundary, and until 1.12.1 it had no
  * test at all.
  *
- * Markdown reaches a surface from CLI/pipe callers (`wmux markdown set`), from
+ * Markdown reaches a surface from CLI/pipe callers (`remotea markdown set`), from
  * agents, and from files on disk. None of that is trusted, `marked` emits raw
  * HTML by design, and the result goes through `dangerouslySetInnerHTML` into
  * the renderer that holds the preload bridge — so a surviving script inherits
@@ -36,8 +36,8 @@ describe('renderMarkdown strips what a renderer with IPC access must never run',
     const evil = renderMarkdown('[click](javascript:alert(1))');
     expect(evil).not.toMatch(/javascript:/i);
 
-    const good = renderMarkdown('[docs](https://wmux.org/)');
-    expect(good).toContain('https://wmux.org/');
+    const good = renderMarkdown('[docs](https://remotea.org/)');
+    expect(good).toContain('https://remotea.org/');
   });
 
   it('drops the tags the pane forbids outright', () => {

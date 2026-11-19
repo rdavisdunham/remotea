@@ -10,8 +10,8 @@ import {
 } from '../../src/main/chromium-profile';
 
 /**
- * #282: Electron's userData was %APPDATA%\wmux — also the default of
- * openwong2kim/wmux, a different app with the same name. Electron keys its
+ * #282: Electron's userData was %APPDATA%\remotea — also the default of
+ * openwong2kim/wmux, a different app with remotea's old name. Electron keys its
  * single-instance lock on userData, so the two could not run at once, and they
  * shared one Chromium profile. The profile now lives in a subdirectory, carried
  * over once by COPY.
@@ -21,8 +21,8 @@ let root: string;
 let appData: string;
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-profile-'));
-  appData = path.join(root, 'wmux');
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-profile-'));
+  appData = path.join(root, 'remotea');
   fs.mkdirSync(appData);
 });
 afterEach(() => {
@@ -35,7 +35,7 @@ function write(rel: string, content = 'x'): void {
   fs.writeFileSync(file, content);
 }
 
-/** The shape a real wmux 2.21 data dir has: its own files beside Chromium's. */
+/** The shape a real 2.21 data dir (from before the rename) has: its own files beside Chromium's. */
 function seedOldProfile(): void {
   write('Local Storage/leveldb/000003.log', 'prefs');
   write('Local Storage/leveldb/LOCK', '');
@@ -51,8 +51,8 @@ function seedOldProfile(): void {
 }
 
 describe('chromiumDataDir', () => {
-  it('is a subdirectory of wmux\'s own data dir, so it is a different lock', () => {
-    expect(chromiumDataDir('C:\\Users\\u\\AppData\\Roaming\\wmux')).toBe(path.join('C:\\Users\\u\\AppData\\Roaming\\wmux', 'chromium'));
+  it('is a subdirectory of remotea\'s own data dir, so it is a different lock', () => {
+    expect(chromiumDataDir('C:\\Users\\u\\AppData\\Roaming\\remotea')).toBe(path.join('C:\\Users\\u\\AppData\\Roaming\\remotea', 'chromium'));
   });
 });
 
@@ -81,7 +81,7 @@ describe('migrateChromiumProfile', () => {
     expect(fs.existsSync(path.join(appData, 'Network/Cookies'))).toBe(true);
   });
 
-  it('leaves wmux\'s own files exactly where they are', () => {
+  it('leaves remotea\'s own files exactly where they are', () => {
     seedOldProfile();
     const target = chromiumDataDir(appData);
     migrateChromiumProfile(appData, target);

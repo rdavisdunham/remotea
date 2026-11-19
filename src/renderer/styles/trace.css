@@ -124,7 +124,7 @@
 }
 
 /* A session that has never emitted a hook event gets a DASHED bus and cannot
-   be mistaken for a confident idle. wmux shipped exactly this failure — the
+   be mistaken for a confident idle. remotea shipped exactly this failure — the
    hook script missing from the package (issue #81) — and a broken install
    rendered as a perfectly plausible quiet board. */
 :root[data-ui-mode='trace'] .workspace-row[data-tr-telemetry='none'] .workspace-row__rail {

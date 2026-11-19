@@ -50,7 +50,7 @@ export function stampQwenSessionIds<T>(tree: T, lookup: (id: SurfaceId) => strin
 
 /**
  * Where Qwen keeps its transcripts: `$QWEN_RUNTIME_DIR`, else `$QWEN_HOME`,
- * else ~/.qwen. Read from wmux's own environment, absolute values only — the
+ * else ~/.qwen. Read from remotea's own environment, absolute values only — the
  * same rule qwen-context.ts applies to `QWEN_HOME`.
  */
 export function getQwenRuntimeDir(env: NodeJS.ProcessEnv = process.env, home = os.homedir()): string {

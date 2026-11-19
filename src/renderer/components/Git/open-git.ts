@@ -35,7 +35,7 @@ export function gitRootFor(workspace: WorkspaceInfo, paneId: PaneId | null): str
 /**
  * Focus a Git tab already in `paneId`, else open one there pinned to the
  * focused terminal's folder. One per pane, like the Diff shortcut — a second
- * repository is a second pane or an explicit `wmux new-surface --type git`.
+ * repository is a second pane or an explicit `remotea new-surface --type git`.
  */
 export function openGitView(ops: OpenGitOps, workspaceId: WorkspaceId, paneId: PaneId | null): SurfaceId | null {
   const workspace = ops.workspaces.find((w) => w.id === workspaceId);

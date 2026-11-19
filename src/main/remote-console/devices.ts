@@ -368,7 +368,7 @@ export class DeviceRegistry {
    * The live cutoff happens whatever the disk says (memory and the tombstone
    * are what `verify` answers from). The return value is whether it is also
    * on disk, so Settings can say so rather than show a revoke that a restart
-   * of wmux would quietly undo.
+   * of remotea would quietly undo.
    */
   revoke(id: string): boolean {
     if (!this.devices.delete(id)) return true;

@@ -5,7 +5,7 @@
  * no default menu. On Windows it is THE terminal clipboard gesture — conhost
  * QuickEdit, Windows Terminal, PuTTY and mintty all use it — so the default
  * mirrors Windows Terminal: copy the selection if there is one, else paste.
- * That is also what wmux's own Ctrl+C already does with a selection.
+ * That is also what remotea's own Ctrl+C already does with a selection.
  *
  * An app that turned on mouse tracking (vim `mouse=a`, tmux, htop, opencode)
  * owns the click: xterm has already sent it the right-button report on

@@ -8,7 +8,7 @@ let root: string;
 let outside: string;
 
 beforeAll(() => {
-  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-term-link-')));
+  const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-term-link-')));
   root = path.join(base, 'root');
   outside = path.join(base, 'outside');
   fs.mkdirSync(path.join(root, 'docs', 'itch', 'devlog'), { recursive: true });

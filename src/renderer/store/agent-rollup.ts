@@ -5,7 +5,7 @@
  * workspace row already renders "Needs you · N" from it — but that count is
  * computed inside a render and thrown away, so nothing above a single row can
  * see it. There is no "which of my ten workspaces is waiting on me?" answer
- * anywhere in wmux, which is the one question a user running several agents
+ * anywhere in remotea, which is the one question a user running several agents
  * actually has.
  *
  * This module is the missing aggregate. It is deliberately pure and free of
@@ -133,7 +133,7 @@ export interface AgentRosterEntry {
    * Kept beside the merged value rather than folded into it: "Claude says it is
    * blocked" and "Claude's screen looks blocked" are different facts with
    * different reliability, and the UI marks the second one so a user is never
-   * told wmux knows something it inferred.
+   * told remotea knows something it inferred.
    */
   stateSource: 'declared' | 'detected' | null;
   /** What the screen said, independent of what the agent declared. */
@@ -221,18 +221,18 @@ function rosterEntryFor(
   const detectedState = detection && detection.state !== 'unknown' ? detection.state : null;
   const kind = identity?.kind ?? detection?.agent ?? (declared?.sessionId ? declared.sessionProvider : null) ?? null;
 
-  // Three independent ways to be an agent pane: the agent said so, wmux
+  // Three independent ways to be an agent pane: the agent said so, remotea
   // identified the process, or the screen carries an agent's chrome. Any one is
   // enough to be listed — an agent that reports nothing AND was started outside
-  // wmux's sight is exactly the case detection exists to cover.
+  // remotea's sight is exactly the case detection exists to cover.
   if (!declaredState && !kind && !detectedState) return null;
 
   /**
    * THE precedence rule, and the point where this could have gone wrong.
    *
-   * Declared beats detected, always. wmux deliberately does NOT let a visible
+   * Declared beats detected, always. remotea deliberately does NOT let a visible
    * blocker override a stale declaration, which is where the prior art goes the
-   * other way — because in wmux `blocked` never expires AND answering never
+   * other way — because in remotea `blocked` never expires AND answering never
    * clears it, so a screen rule re-asserting `blocked` on a repainted frame
    * would make the sidebar's answer button permanently useless.
    *

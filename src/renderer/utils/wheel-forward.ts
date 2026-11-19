@@ -9,7 +9,7 @@
  *
  * ## The bug
  *
- * wmux emitted one report per LINE:
+ * remotea emitted one report per LINE:
  *
  *     for (let i = 0; i < Math.abs(count); i++) pty.write(ptyId, seq);
  *
@@ -37,7 +37,7 @@
  * why every other terminal moves one step per detent.
  *
  * The arrow branch keeps looping, and this is a DELIBERATE divergence from
- * xterm, which sends one arrow per event there too. wmux's own scrollback
+ * xterm, which sends one arrow per event there too. remotea's own scrollback
  * branch moves `lines` rows per event, so one arrow per detent would make a
  * pager in an alt-screen pane crawl at a fifth of the speed of the scrollback
  * in the pane beside it. #245 was the multiplier, and the arrow branch has
@@ -47,7 +47,7 @@
  *
  * A finger is a position, not a detent, so the touch stream keeps one report
  * per line: the gesture has to track the skin, and re-deriving that from a
- * per-event report would tie pan speed to the frame rate. wmux cannot know the
+ * per-event report would tie pan speed to the frame rate. remotea cannot know the
  * app's rows-per-report multiplier, so one report per cell crossed is the
  * closest it can get — and it is exact wherever that multiplier is 1.
  *

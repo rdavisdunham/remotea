@@ -7,7 +7,7 @@ const wt: WorktreeMetadata = {
   branch: 'feat/x',
   baseBranch: 'main',
   baseSha: 'a'.repeat(40),
-  worktreePath: 'C:\\Users\\u\\AppData\\Local\\wmux\\wt\\app\\feat-x-12345678',
+  worktreePath: 'C:\\Users\\u\\AppData\\Local\\remotea\\wt\\app\\feat-x-12345678',
 };
 
 describe('worktreeDiffBase (#366): the base applies only inside the worktree', () => {
@@ -15,7 +15,7 @@ describe('worktreeDiffBase (#366): the base applies only inside the worktree', (
     expect(worktreeDiffBase(wt.worktreePath, wt)).toBe(wt.baseSha);
     expect(worktreeDiffBase(`${wt.worktreePath}\\src`, wt)).toBe(wt.baseSha);
     expect(worktreeDiffBase(wt.worktreePath.toLowerCase(), wt)).toBe(wt.baseSha);
-    expect(worktreeDiffBase('/c/Users/u/AppData/Local/wmux/wt/app/feat-x-12345678/src', wt)).toBe(wt.baseSha);
+    expect(worktreeDiffBase('/c/Users/u/AppData/Local/remotea/wt/app/feat-x-12345678/src', wt)).toBe(wt.baseSha);
     expect(worktreeDiffBase(`${wt.worktreePath}\\`, wt)).toBe(wt.baseSha);
   });
 

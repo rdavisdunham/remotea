@@ -1,8 +1,8 @@
-// remotea-plugin-version: 7
-// wmux OpenCode CLI-side (TUI) plugin — the half that runs in the TUI process,
+// remotea-plugin-version: 8
+// remotea OpenCode CLI-side (TUI) plugin — the half that runs in the TUI process,
 // so a pane is attributable even when the server is remote or shared (#310).
-// Installed by `wmux opencode-tui` to <config>/plugins/remotea-cli/tui.js.
-// No-ops entirely outside wmux (REMOTEA !== '1').
+// Installed by `remotea opencode-tui` to <config>/plugins/remotea-cli/tui.js.
+// No-ops entirely outside remotea (REMOTEA !== '1').
 import { Plugin } from "@opencode/plugin/tui";
 import { createEffect, createRoot } from "solid-js";
 import { callRemotea, callRemoteaSync, createActivityReporter, createBlockedReporter, createPromptReporter, createSessionReporter, createSessionSeeder, eventSessionID, isHostedSession, makeLogger, resolveDebugLog, resolveNodeRuntime, routeFromTabs, tabSessionIds } from "./core.js";
@@ -259,7 +259,7 @@ export default Plugin.define({
      * Stop this plugin instance's work WITHOUT releasing the session.
      *
      * The host calls this on a clean shutdown and on a plugin RELOAD after
-     * `wmux opencode-tui` writes new files. Releasing here made every open pane
+     * `remotea opencode-tui` writes new files. Releasing here made every open pane
      * lose its restore handle the moment the plugin was updated, so the
      * release belongs to the real process exit below.
      */

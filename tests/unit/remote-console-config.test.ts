@@ -49,7 +49,7 @@ describe('validateRemoteConfig', () => {
     ['lan with a host not on this machine', { bind: 'lan', lanHost: GONE }, 'bad-lan-host'],
     ['lan with the wildcard address', { bind: 'lan', lanHost: ipv4(0, 0, 0, 0) }, 'bad-lan-host'],
     ['non-boolean allowInsecureControl', { allowInsecureControl: 1 }, 'bad-allow-insecure'],
-    ['public url with a path', { publicUrl: 'https://box.ts.net/wmux' }, 'bad-public-url'],
+    ['public url with a path', { publicUrl: 'https://box.ts.net/remotea' }, 'bad-public-url'],
     ['public url with a query', { publicUrl: 'https://box.ts.net/?a=1' }, 'bad-public-url'],
     ['public url with an empty query', { publicUrl: 'https://box.ts.net?' }, 'bad-public-url'],
     ['public url with a hash', { publicUrl: 'https://box.ts.net/#x' }, 'bad-public-url'],

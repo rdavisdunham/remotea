@@ -13,14 +13,14 @@ const ipcHandlers = new Map<string, (...args: any[]) => unknown>();
 const ipcListeners = new Map<string, (...args: any[]) => unknown>();
 vi.mock('../../src/shared/instance', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getAppDataDir: () => path.join(os.tmpdir(), 'wmux-remote-console-wiring-test'),
+  getAppDataDir: () => path.join(os.tmpdir(), 'remotea-remote-console-wiring-test'),
 }));
 vi.mock('electron', () => ({
   ipcMain: {
     on: (ch: string, fn: (...a: any[]) => unknown) => { ipcListeners.set(ch, fn); },
     handle: (ch: string, fn: (...a: any[]) => unknown) => { ipcHandlers.set(ch, fn); },
   },
-  // A sender is "one of wmux's windows" when the fake says so.
+  // A sender is "one of remotea's windows" when the fake says so.
   BrowserWindow: {
     getAllWindows: () => [],
     fromWebContents: (wc: any) => (wc?.isRemoteaWindow ? {} : null),
@@ -161,7 +161,7 @@ describe('the pty-keys move', () => {
   });
 });
 
-describe('wmux remote status (human form)', () => {
+describe('remotea remote status (human form)', () => {
   it('says off, and where to turn it on, when disabled', () => {
     const out = formatRemoteStatus({ enabled: false, running: false, bind: 'loopback', port: 9790, publicUrl: '', deviceCount: 0, connectedCount: 0, lastError: null });
     expect(out).toContain('Remote Console: off');
@@ -251,7 +251,7 @@ describe('Settings → Remote IPC gates (#254)', () => {
 
   const call = (ch: string, ev: unknown, ...args: unknown[]) => ipcHandlers.get(ch)!(ev, ...args);
 
-  it('refuses a sender that is not one of wmux\'s windows, then an absent runtime', async () => {
+  it('refuses a sender that is not one of remotea\'s windows, then an absent runtime', async () => {
     expect(await call(IPC_CHANNELS.REMOTE_CONSOLE_GET_STATE, guest)).toEqual({ error: 'forbidden' });
     expect(await call(IPC_CHANNELS.REMOTE_CONSOLE_GET_STATE, win)).toEqual({ error: 'unavailable' });
     initRemoteConsole({} as any);
@@ -272,7 +272,7 @@ describe('Settings → Remote IPC gates (#254)', () => {
     await expect(call(IPC_CHANNELS.REMOTE_CONSOLE_SET_CONFIG, win, {})).resolves.toEqual({ error: 'failed' });
   });
 
-  it('only a wmux window may supply a snapshot reply', () => {
+  it('only a remotea window may supply a snapshot reply', () => {
     initRemoteConsole({} as any);
     const reply = ipcListeners.get(IPC_CHANNELS.REMOTE_RENDERER_REPLY)!;
     reply(guest, 'req-1', { data: 'forged screen', cols: 80, rows: 24 });

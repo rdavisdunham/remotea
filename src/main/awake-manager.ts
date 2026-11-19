@@ -3,7 +3,7 @@ import type { KeepAwakeMode, KeepAwakeState } from '../shared/types';
 /**
  * Keep Windows awake while coding agents work (issue #363).
  *
- * MAIN owns the choice: the mode and the display flag are persisted in wmux's
+ * MAIN owns the choice: the mode and the display flag are persisted in remotea's
  * own settings.json (`KEEP_AWAKE_SETTINGS_KEY`) and read when the manager is
  * built, so the mode picked in one window is the mode every window shows and
  * the one the next launch starts in. A renderer copy would be a second answer

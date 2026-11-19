@@ -10,11 +10,11 @@
   fake terminal in a unit test can only restate it; this runs the real
   @xterm/xterm 6.0.0 + @xterm/addon-serialize 0.14.0 in real Chromium.
 
-  Run it in the wmux browser panel (never a second Electron — it collides with
+  Run it in the remotea browser panel (never a second Electron — it collides with
   the live instance's pipe and CDP port):
 
-    wmux browser open "file:///<repo>/tests/harness/remote-fence.html"
-    wmux browser eval "JSON.stringify(window.__fenceResult)"
+    remotea browser open "file:///<repo>/tests/harness/remote-fence.html"
+    remotea browser eval "JSON.stringify(window.__fenceResult)"
 
   Each case writes chunk A (large, so xterm's WriteBuffer spreads it over
   several setTimeout passes and the fence genuinely has to wait), then
@@ -23,8 +23,8 @@
   candidates, a fence with nothing queued ahead of it, and a fence behind
   several small writes.
 
-  Result, 2026-09-29, wmux 2.14.0 browser panel (Chromium), read back through
-  `wmux browser get-text`: 8/8 PASS — byFence {"empty":true,"osc6973":true}.
+  Result, 2026-09-29, remotea 2.14.0 browser panel (Chromium), read back through
+  `remotea browser get-text`: 8/8 PASS — byFence {"empty":true,"osc6973":true}.
   Every case held A (a 20 000-line chunk serialized to 76 657 chars at
   scrollback 1000; 50 small writes all present) and none of B, and the OSC
   fence never leaked into the output. xterm's WriteBuffer queues an empty write

@@ -18,7 +18,7 @@ import { applyMouseModeSequences, emptyMouseModeState, isMouseTracking } from '.
  * `?1002`/`?1003` tracking keeps routing mousedown to an application that is
  * no longer there.
  *
- * wmux cleared its own record of the modes on PTY exit but never told xterm to
+ * remotea cleared its own record of the modes on PTY exit but never told xterm to
  * leave them, which is the gap these tests pin.
  */
 describe('terminal reset (issue #175)', () => {
@@ -133,7 +133,7 @@ describe('terminal reset (issue #175)', () => {
   });
 
   /**
-   * The reset and wmux's own mouse-mode cache have to be cleared together. If
+   * The reset and remotea's own mouse-mode cache have to be cleared together. If
    * only the emulator is reset, the next remount replays the cached modes
    * straight back in (mouseModeReplaySequence, issue #164) and the pane is
    * stuck again — which is why both call sites in useTerminal delete the map
@@ -206,7 +206,7 @@ describe('manual reset under a live fullscreen program (issue #347)', () => {
 
 /**
  * Issue #357: since #347 the manual reset left the alternate screen only when
- * the shell had reported it was back at its prompt, and only wmux's PowerShell
+ * the shell had reported it was back at its prompt, and only remotea's PowerShell
  * integration reports that. A pane stuck on a dead program's alternate screen
  * in cmd, Git Bash, WSL, SSH or a nested shell could no longer be recovered.
  *

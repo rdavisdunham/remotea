@@ -20,7 +20,7 @@ describe('agentsForWorkspace', () => {
     expect(out).toMatchObject({ total: 1, running: 1 });
   });
 
-  it('merges wmux-spawned agents with their paneId and ✓ when exited', () => {
+  it('merges remotea-spawned agents with their paneId and ✓ when exited', () => {
     const tree = leaf('pane-1', ['surf-a', 'surf-b']);
     const meta = new Map([
       ['surf-b' as SurfaceId, { agentId: 'ag-1', label: 'worker-1', status: 'exited' as const }],
@@ -92,7 +92,7 @@ describe('agentsForWorkspace', () => {
     expect(out).toMatchObject({ total: 5, running: 3 });
   });
 
-  it('merges one observer agent and one wmux agent in the same call', () => {
+  it('merges one observer agent and one remotea agent in the same call', () => {
     const tree = leaf('pane-1', ['surf-a', 'surf-b']);
     const meta = new Map([
       ['surf-b' as SurfaceId, { agentId: 'ag-1', label: 'worker-1', status: 'running' as const }],

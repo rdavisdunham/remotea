@@ -1,4 +1,4 @@
-; wmux NSIS customisations.
+; remotea NSIS customisations.
 ;
 ; Install scope on update (issues #158, #167)
 ; ------------------------------------------
@@ -6,7 +6,7 @@
 ; not have to: with `oneClick: false`, `allowToChangeInstallationDirectory:
 ; true` and no `perMachine` pin, the assisted installer re-offered the SCOPE
 ; page mid-update, so a user who picked "All Users" over a per-user install
-; moved the root from %LOCALAPPDATA%\Programs\wmux to C:\Program Files\wmux and
+; moved the root from %LOCALAPPDATA%\Programs\remotea to C:\Program Files\remotea and
 ; the old directory was removed under them. Anything holding an absolute path
 ; to the old root — a hand-added PATH entry, a script — was silently
 ; invalidated, and #167 is the sharper consequence: the relocated install is
@@ -40,7 +40,7 @@
 ; The directory page is untouched: it is guarded on update already, and
 ; relocating within a scope is a thing the user is choosing on purpose.
 ;
-; This does NOT make the install path an invariant, and nothing in wmux may
+; This does NOT make the install path an invariant, and nothing in remotea may
 ; treat it as one — a user can still relocate deliberately. The agent-context
 ; block handles that by interpolating `process.resourcesPath` fresh on every
 ; startup rather than recording it once (see src/main/agent-instructions.ts).
@@ -59,7 +59,7 @@
 
 ; Icon cache (issue #137)
 ; ----------------------
-; wmux installs to the same path on every update — now actually true for the
+; remotea installs to the same path on every update — now actually true for the
 ; scope, per the block above — and Windows caches shell icons per path in
 ; %LocalAppData%\Microsoft\Windows\Explorer\iconcache_*.db.
 ; So after an update that changed the artwork, the taskbar button, the pinned
@@ -85,7 +85,7 @@
 ;
 ; It does NOT reach a shortcut the user has pinned to the taskbar. A pinned
 ; button's bitmap lives in the taskband store, keyed on the AppUserModelId
-; (com.wmux.app), and nothing short of an Explorer restart or an unpin/repin
+; (com.remotea.app), and nothing short of an Explorer restart or an unpin/repin
 ; refreshes it. That case is left alone deliberately: it is cosmetic, and it
 ; heals by itself at the next sign-out, since Explorer rewrites the cache as it
 ; exits. Chasing it from an installer would cost more than the defect.

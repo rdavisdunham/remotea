@@ -140,7 +140,7 @@ describe('detectScreen — Claude Code', () => {
 
   /**
    * The narrowness that matters. Claude quoting a previous prompt back at the
-   * user must not put the pane in the "needs you" queue — wmux's blocked never
+   * user must not put the pane in the "needs you" queue — remotea's blocked never
    * expires, so a false positive there is permanent until the user notices.
    */
   it('does not call it blocked when the question text appears with no answer list', () => {
@@ -159,14 +159,14 @@ describe('detectScreen — Claude Code', () => {
 
 describe('detectScreen — current business question', () => {
   it('reads a finished turn that ends on a question, over an empty prompt, as a question rather than idle', () => {
-    const out = read('wmux-current-question-pending');
+    const out = read('remotea-current-question-pending');
     expect(out).toMatchObject({ agent: 'claude', state: 'question', ruleId: 'claude.question.pending' });
   });
 
   // The turn-done marker counts hours too ("for 1h 2m"), as the idle and
   // working rules' marker exclusion does; a long turn must not lose its question.
   it('reads a question after a turn that ran for over an hour', () => {
-    const lines = screen('wmux-current-question-pending').lines.map((l) =>
+    const lines = screen('remotea-current-question-pending').lines.map((l) =>
       l.startsWith('✻ Cooked for') ? '✻ Cooked for 1h 2m · done 3:44 PM' : l);
     expect(detectScreen({ lines }, BUNDLED_MANIFESTS)).toMatchObject({ state: 'question', ruleId: 'claude.question.pending' });
   });
@@ -174,7 +174,7 @@ describe('detectScreen — current business question', () => {
   // The shape of the screen that started this: the question is followed by
   // more text on its own line, so "the line ends in ?" never saw it.
   it('reads a question that is followed by more text on the same line', () => {
-    const out = read('wmux-current-question-inline');
+    const out = read('remotea-current-question-inline');
     expect(out).toMatchObject({ agent: 'claude', state: 'question', ruleId: 'claude.question.pending' });
     expect(out.evidence.some((l) => l.includes('Je fais ces modifications ?'))).toBe(true);
   });
@@ -182,11 +182,11 @@ describe('detectScreen — current business question', () => {
   // The question belongs to the PREVIOUS turn: the user answered it and a later
   // turn finished without asking anything. It is still inside the bottom window.
   it('does not read an answered question from an earlier turn as current', () => {
-    expect(read('wmux-current-question-stale').state).not.toBe('question');
+    expect(read('remotea-current-question-stale').state).not.toBe('question');
   });
 
   it('does not read a quoted past question as current', () => {
-    expect(read('wmux-current-question-quoted').state).not.toBe('question');
+    expect(read('remotea-current-question-quoted').state).not.toBe('question');
   });
 
   // The user's own submitted prompt sits right above a short answer. It ends in
@@ -264,7 +264,7 @@ describe('detectScreen — current business question', () => {
   // prompt line, and plain text cannot tell it from typing. Captured live
   // (Claude Code 2.1.304): ">" + U+00A0 + the suggestion, under the question.
   it('reads a question as current while Claude Code suggests an answer on the prompt line', () => {
-    const out = read('wmux-current-question-suggested');
+    const out = read('remotea-current-question-suggested');
     expect(out).toMatchObject({ agent: 'claude', state: 'question', ruleId: 'claude.question.pending' });
     expect(out.evidence.some((l) => l.includes('Ce deuxième essai est-il réussi ?'))).toBe(true);
   });
@@ -272,7 +272,7 @@ describe('detectScreen — current business question', () => {
   // A typed draft keeps the box's U+00A0: captured live (Claude Code 2.1.305)
   // as ">" + U+00A0 + "oui mais".
   it('keeps the question current until the answer is sent, even once the user types', () => {
-    const lines = screen('wmux-current-question-inline').lines.map((l) => (l === '> ' ? '> oui mais' : l));
+    const lines = screen('remotea-current-question-inline').lines.map((l) => (l === '> ' ? '> oui mais' : l));
     expect(lines).toContain('> oui mais');
     expect(detectScreen({ lines }, BUNDLED_MANIFESTS)).toMatchObject({
       state: 'question', ruleId: 'claude.question.pending',
@@ -283,7 +283,7 @@ describe('detectScreen — current business question', () => {
   // plain space. With no prompt box on screen (a dialog no rule knows), that
   // echo is not a prompt, and the question is not read.
   it('reads no question when the only ">" line is the user’s echoed message', () => {
-    const s = screen('wmux-current-question-suggested');
+    const s = screen('remotea-current-question-suggested');
     const lines = s.lines.filter((l) => !l.startsWith('> '));
     expect(lines).toHaveLength(s.lines.length - 1);
     expect(lines.some((l) => l.startsWith('> Deuxième essai'))).toBe(true);
@@ -293,7 +293,7 @@ describe('detectScreen — current business question', () => {
   // Sent: the answer is now in the transcript and a new turn has closed under
   // it without asking anything, so the question is above an older marker.
   it('lets the question go once the answer is sent and the next turn ends', () => {
-    const lines = screen('wmux-current-question-suggested').lines;
+    const lines = screen('remotea-current-question-suggested').lines;
     const prompt = lines.findIndex((l) => l.startsWith('> '));
     const sent = [
       ...lines.slice(0, prompt - 1),
@@ -426,7 +426,7 @@ describe('detectScreen — fallbacks', () => {
    */
   it('returns unknown — never idle — for a known agent whose screen matched no rule', () => {
     const out = detectScreen({
-      lines: ['  ⏵⏵ accept edits on', 'something wmux has never seen'],
+      lines: ['  ⏵⏵ accept edits on', 'something remotea has never seen'],
     }, BUNDLED_MANIFESTS);
     expect(out).toMatchObject({ agent: 'claude', state: 'unknown', reason: 'no-rule-matched' });
   });
@@ -644,7 +644,7 @@ describe('bundled manifests', () => {
 /**
  * The OSC title is a real input now, not a typed-but-never-filled field.
  *
- * wmux threw every OSC 0/2 away until phase 4 — `onTitleChange` had zero
+ * remotea threw every OSC 0/2 away until phase 4 — `onTitleChange` had zero
  * occurrences in src/ — so a `region: { id: 'osc_title' }` rule could be written
  * and could never fire. These pin the path itself; no bundled manifest keys on
  * a title yet, because no agent's title has actually been captured under

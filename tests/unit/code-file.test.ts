@@ -9,7 +9,7 @@ import {
 let dir: string;
 
 beforeAll(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-code-file-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-code-file-'));
   fs.writeFileSync(path.join(dir, 'index.ts'), 'export {}\r\nconst a = 1\n');
   fs.writeFileSync(path.join(dir, 'empty.txt'), '');
   fs.writeFileSync(path.join(dir, 'bom.txt'), Buffer.from([0xEF, 0xBB, 0xBF, 0x68, 0x69]));

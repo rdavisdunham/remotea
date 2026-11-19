@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { loadUserConfig, resetConfigWarnings } from '../../src/main/user-config';
 
 function writeTmp(contents: string): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-cfg-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-cfg-'));
   const p = path.join(dir, 'config.toml');
   fs.writeFileSync(p, contents, 'utf-8');
   return p;
@@ -396,7 +396,7 @@ describe('loadUserConfig diagnostics', () => {
   });
 
   it('reports the file afresh after resetConfigWarnings', () => {
-    // What `wmux reload-config` calls: the user is iterating on the file and
+    // What `remotea reload-config` calls: the user is iterating on the file and
     // needs to see whether their edit fixed it.
     tmpPath = writeTmp('[terminal\n');
     loadUserConfig(tmpPath);
@@ -430,7 +430,7 @@ describe('[terminal] osc-title-tabs (issue #221)', () => {
   });
 
   function write(body: string): string {
-    const p = path.join(os.tmpdir(), `wmux-osc-title-${Date.now()}-${randomUUID()}.toml`);
+    const p = path.join(os.tmpdir(), `remotea-osc-title-${Date.now()}-${randomUUID()}.toml`);
     fs.writeFileSync(p, body, 'utf8');
     return p;
   }
@@ -476,7 +476,7 @@ describe('[appearance] inactive-pane-dim', () => {
   });
 
   function write(body: string): string {
-    const p = path.join(os.tmpdir(), `wmux-pane-dim-${Date.now()}-${randomUUID()}.toml`);
+    const p = path.join(os.tmpdir(), `remotea-pane-dim-${Date.now()}-${randomUUID()}.toml`);
     fs.writeFileSync(p, body, 'utf8');
     return p;
   }
@@ -554,7 +554,7 @@ describe('[sidebar] wrap-titles', () => {
   });
 
   function write(body: string): string {
-    const p = path.join(os.tmpdir(), `wmux-sidebar-${Date.now()}-${randomUUID()}.toml`);
+    const p = path.join(os.tmpdir(), `remotea-sidebar-${Date.now()}-${randomUUID()}.toml`);
     fs.writeFileSync(p, body, 'utf8');
     return p;
   }

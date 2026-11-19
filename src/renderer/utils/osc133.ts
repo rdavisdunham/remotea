@@ -7,10 +7,10 @@
  * prompt start, where does their input end, and where does the output begin.
  *
  * Pure on purpose. The sequence arrives from a PTY — i.e. from whatever the
- * user ran, including things wmux did not install — so the parser is the piece
+ * user ran, including things remotea did not install — so the parser is the piece
  * most worth testing without a terminal, a shell or an Electron window. It also
  * makes the ONE place that decides what a payload means testable against the
- * real spellings other emitters use, rather than only against wmux's own
+ * real spellings other emitters use, rather than only against remotea's own
  * scripts.
  *
  * Grammar (all forms seen in the wild):

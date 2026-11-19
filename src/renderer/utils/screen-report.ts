@@ -1,5 +1,5 @@
 /**
- * What `wmux read-screen` (surface.read_text) answers about a terminal.
+ * What `remotea read-screen` (surface.read_text) answers about a terminal.
  *
  * It used to answer the text and nothing else, and that was not enough to
  * diagnose a fullscreen TUI whose frame went wrong under it: a Claude Code pane

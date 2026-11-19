@@ -17,7 +17,7 @@ let repo: string;
 let savedAppData: string | undefined;
 
 beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-open-'));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-open-'));
   repo = path.join(tmp, 'repo');
   fs.mkdirSync(path.join(repo, 'apps', 'api'), { recursive: true });
   savedAppData = process.env.APPDATA;
@@ -150,7 +150,7 @@ describe('trust (#284)', () => {
     expect(second.delivered).toEqual([]);
   });
 
-  it('the trust store lives in wmux\'s data dir, never next to the manifest', async () => {
+  it('the trust store lives in remotea\'s data dir, never next to the manifest', async () => {
     writeManifest(BASIC);
     const f = fake('run');
     await openManifest({ path: repo }, f.deps);

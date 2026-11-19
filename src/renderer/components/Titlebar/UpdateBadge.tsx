@@ -4,7 +4,7 @@ import { useUpdate } from '../../hooks/useUpdate';
 
 /**
  * The badge is the whole update UI. It used to be a link to the GitHub release
- * page, so on Windows "update" meant: download an installer, close wmux, run it
+ * page, so on Windows "update" meant: download an installer, close remotea, run it
  * (issue #125). It now drives the in-app updater in place — one click downloads,
  * a second one (or the confirmation dialog) restarts into the new version.
  * Zip extracts (the README install) take a dedicated swap path; NSIS installs
@@ -41,7 +41,7 @@ export default function UpdateBadge() {
       title = `${t('titlebar.updateReady', 'Update ready')}: v${version}\n${t('titlebar.updateRestartHint', 'Click to restart into the new version')}`;
       // Say it on the badge as well as in the dialog. A user who cannot grant
       // admin rights should find that out before committing to a restart,
-      // rather than at a UAC prompt after wmux has quit (issue #167).
+      // rather than at a UAC prompt after remotea has quit (issue #167).
       if (state.needsElevation) {
         title += `\n${t('titlebar.updateNeedsAdmin', 'Requires administrator rights')}`;
       }

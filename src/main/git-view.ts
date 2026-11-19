@@ -313,7 +313,7 @@ class GitError extends Error {
 /**
  * Candidate git executables, most specific first: every PATH directory (the
  * git the user runs), then Git for Windows' default install roots — an
- * Explorer-launched wmux inherits the registry PATH, which can lack the
+ * Explorer-launched remotea inherits the registry PATH, which can lack the
  * per-user install entirely. Pure, so the order is testable without Git.
  */
 export function gitCandidates(env: Record<string, string | undefined>, platform = process.platform): string[] {
@@ -371,7 +371,7 @@ export function wslPathToWindows(distro: string, posix: string): string {
   return `\\\\wsl.localhost\\${distro}${posix.replace(/\//g, '\\')}`;
 }
 
-/** A path git printed for a command run in `cwd`, as the Windows path wmux uses. */
+/** A path git printed for a command run in `cwd`, as the Windows path remotea uses. */
 export function fromGitPath(cwd: string, p: string): string {
   const wsl = parseWslUnc(cwd);
   return wsl && p.startsWith('/') ? wslPathToWindows(wsl.distro, p) : p;

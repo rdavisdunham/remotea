@@ -23,7 +23,7 @@ import type { RemoteScope } from '../../src/shared/remote-console-protocol';
 let root: string;
 
 beforeAll(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-rc-server-'));
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-rc-server-'));
   fs.mkdirSync(path.join(root, 'remote'));
   fs.mkdirSync(path.join(root, 'assets'));
   fs.writeFileSync(path.join(root, 'remote', 'index.html'), '<!doctype html><script type="module" src="../assets/remote-P.js"></script>');
@@ -361,7 +361,7 @@ describe('remote-console server: HTTP', () => {
   });
 
   it('no manifest: 503 and ui-not-built', async () => {
-    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-rc-empty-'));
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-rc-empty-'));
     try {
       const r = await rig({ staticRoot: empty });
       const res = await request(r, 'GET', '/');

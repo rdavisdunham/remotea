@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { wheelForward } from '../../src/renderer/utils/wheel-forward';
 
 // Issue #245. One wheel detent over a mouse-tracking pane moved ~5x what the
-// same detent moves in any other terminal, because wmux emitted one SGR report
+// same detent moves in any other terminal, because remotea emitted one SGR report
 // per LINE and the app then applied its own per-report multiplier on top.
 //
 // The unit of the mouse-report branch is a STEP; the unit of the arrow branch
@@ -40,7 +40,7 @@ describe('wheelForward', () => {
 
   describe('a touch pan keeps one report per LINE of finger travel', () => {
     // A finger is a position, not a detent: the gesture has to track the skin.
-    // wmux cannot know the app's per-report multiplier, so one report per cell
+    // remotea cannot know the app's per-report multiplier, so one report per cell
     // crossed is the closest it can get, and it is exact wherever that
     // multiplier is 1.
     it('emits one report per line', () => {
@@ -54,7 +54,7 @@ describe('wheelForward', () => {
 
   describe('the arrow-key branch stays one arrow per LINE, for both sources', () => {
     // A deliberate divergence from xterm, which sends ONE arrow per wheel
-    // event. wmux's own scrollback branch moves `lines` rows per event, and an
+    // event. remotea's own scrollback branch moves `lines` rows per event, and an
     // arrow in less/vim moves exactly one row with no app-side multiplier — so
     // per-line is what makes a non-mouse pager scroll at the same speed as the
     // scrollback right beside it. The multiplier, not the loop, was #245.

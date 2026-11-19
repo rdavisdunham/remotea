@@ -14,7 +14,7 @@
 //   - A command may not contain a line break. Multi-line text would type as
 //     several commands, and a preview shows a line break poorly.
 //   - `waitFor` probes only loopback: it exists to wait for the services this
-//     manifest starts, and must not turn wmux into a port scanner for a file
+//     manifest starts, and must not turn remotea into a port scanner for a file
 //     somebody else wrote.
 
 import * as crypto from 'crypto';
@@ -463,7 +463,7 @@ export function diffCommandLines(before: string[], after: string[]): { added: st
   return { added: after.filter((l) => !was.has(l)), removed: before.filter((l) => !now.has(l)) };
 }
 
-// ─── Writing one from a live workspace (`wmux workspace save`) ─────────────
+// ─── Writing one from a live workspace (`remotea workspace save`) ─────────────
 
 export interface LiveWorkspaceDescription {
   title?: string;

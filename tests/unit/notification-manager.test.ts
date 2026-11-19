@@ -27,8 +27,8 @@ it('retains successive toasts until their click callbacks run', () => {
   const manager = new NotificationManager();
   const first = vi.fn();
   const second = vi.fn();
-  manager.showToast('wmux', 'First', first);
-  manager.showToast('wmux', 'Second', second);
+  manager.showToast('remotea', 'First', first);
+  manager.showToast('remotea', 'Second', second);
   const retained = (manager as any).activeToasts as Set<EventEmitter>;
   expect([...retained]).toEqual(created);
   created[0].emit('click');
@@ -42,7 +42,7 @@ it('retains successive toasts until their click callbacks run', () => {
 it.each(['close', 'failed'])('releases a toast on %s without invoking its click callback', (event) => {
   const manager = new NotificationManager();
   const onClick = vi.fn();
-  manager.showToast('wmux', 'Done', onClick);
+  manager.showToast('remotea', 'Done', onClick);
   created[0].emit(event, { reason: 'dismissed' });
   expect((manager as any).activeToasts.size).toBe(0);
   expect(onClick).not.toHaveBeenCalled();
@@ -52,6 +52,6 @@ it('releases a toast if showing it throws', () => {
   const manager = new NotificationManager();
   const error = new Error('Toast unavailable');
   show.mockImplementationOnce(() => { throw error; });
-  expect(() => manager.showToast('wmux', 'Done')).toThrow(error);
+  expect(() => manager.showToast('remotea', 'Done')).toThrow(error);
   expect((manager as any).activeToasts.size).toBe(0);
 });

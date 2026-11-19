@@ -8,11 +8,11 @@ import ConfirmWorktreeCloseDialog from '../../src/renderer/components/ConfirmWor
 import { createWorkspaceSlice, WorkspaceSlice } from '../../src/renderer/store/workspace-slice';
 
 const sampleWorktree: WorktreeMetadata = {
-  repoRoot: 'C:\\projects\\wmux',
+  repoRoot: 'C:\\projects\\remotea',
   branch: 'feat/wt-feature',
   baseBranch: 'main',
   baseSha: '0123456789abcdef0123456789abcdef01234567',
-  worktreePath: 'C:\\Users\\u\\AppData\\Local\\wmux\\wt\\wmux\\feat-wt-feature-12345678',
+  worktreePath: 'C:\\Users\\u\\AppData\\Local\\remotea\\wt\\remotea\\feat-wt-feature-12345678',
 };
 
 const sampleWs: WorkspaceInfo = {

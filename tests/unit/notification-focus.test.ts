@@ -30,7 +30,7 @@ vi.mock('electron', () => ({
 
 vi.mock('../../src/shared/instance', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getAppDataDir: () => path.join(os.tmpdir(), 'wmux-notification-focus-test'),
+  getAppDataDir: () => path.join(os.tmpdir(), 'remotea-notification-focus-test'),
 }));
 vi.mock('../../src/main/settings-store', () => ({ loadSettings: () => ({}), saveSetting: vi.fn() }));
 vi.mock('../../src/main/notification-manager', () => ({

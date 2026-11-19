@@ -5,7 +5,7 @@ import {
   UI_MODE_DEFAULT_REV,
 } from '../../src/renderer/store/settings-slice';
 
-// The agent office is off by default in remotea (HUB_DEFAULT_REV 2). wmux
+// The agent office is off by default in remotea (HUB_DEFAULT_REV 2). remotea
 // turned it on for everyone in 2.3.0 (rev 1); remotea switches every profile
 // off once, including profiles that had it on, through the same promotion that
 // TRACE used in 1.5.0. The two promotions must not interfere.

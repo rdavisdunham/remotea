@@ -342,7 +342,7 @@ export default function WorkspaceSettings() {
         />
       </div>
       <p className="settings-hint">
-        {t('settings.workspacePanel.restoreOpencodeSessionsHint', "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode integration (the server plugin, or the TUI plugin installed with `wmux opencode-tui` for OpenCode 2). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 on a remote or shared server is captured by the TUI plugin; re-run `wmux opencode-tui` in that environment after a remotea update.")}
+        {t('settings.workspacePanel.restoreOpencodeSessionsHint', "Reopens each restored tab's OpenCode session with `opencode -s`, in the directory it was in. Needs the remotea OpenCode integration (the server plugin, or the TUI plugin installed with `remotea opencode-tui` for OpenCode 2). An OpenCode you quit normally is not reopened. If a session was deleted since, OpenCode starts a new one instead. OpenCode 2 on a remote or shared server is captured by the TUI plugin; re-run `remotea opencode-tui` in that environment after a remotea update.")}
       </p>
 
       <div className="settings-row">
@@ -396,7 +396,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint">
         {t(
           'settings.workspacePanel.detectAgentScreensHint',
-          'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `wmux detect explain` to see which rule fired.',
+          'For agents that do not report state themselves (Codex, Gemini, Aider…), match their on-screen UI against bundled rules to tell blocked from working. Runs entirely on this machine and never overrides what an agent declares — it only refines a declared idle into a question still on screen, and panes whose agent reports working or blocked are not read at all. Override the rules in %APPDATA%\\remotea\\agent-detection, and use `remotea detect explain` to see which rule fired.',
         )}
       </p>
 
@@ -447,7 +447,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint">
         {t(
           'settings.workspacePanel.keepAwakeHint',
-          'Prevents Windows from sleeping while coding agents are working. Smart mode only engages for agents that report a working state through hooks — Claude Code, Qwen Code, Grok, the OpenCode plugin, or `wmux report-agent` — and releases it when they are idle or waiting on you. A working claim not renewed for 15 minutes stops counting.',
+          'Prevents Windows from sleeping while coding agents are working. Smart mode only engages for agents that report a working state through hooks — Claude Code, Qwen Code, Grok, the OpenCode plugin, or `remotea report-agent` — and releases it when they are idle or waiting on you. A working claim not renewed for 15 minutes stops counting.',
         )}
       </p>
 
@@ -498,7 +498,7 @@ export default function WorkspaceSettings() {
       <p className="settings-hint settings-hint--lead">
         {t(
           'settings.workspacePanel.newWorkspaceHint',
-          'What a new workspace opens with — the sidebar "+", Ctrl+N, first launch and wmux new-workspace all use this. A saved layout marked Default below wins over it.',
+          'What a new workspace opens with — the sidebar "+", Ctrl+N, first launch and remotea new-workspace all use this. A saved layout marked Default below wins over it.',
         )}
       </p>
       <div className="settings-row">

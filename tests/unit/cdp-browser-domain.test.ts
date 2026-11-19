@@ -16,10 +16,10 @@ import {
   targetInfo,
 } from '../../src/main/cdp-browser-domain';
 
-const SESSION = 'wmux-page-1';
+const SESSION = 'remotea-page-1';
 
 const ctx = (over: Partial<BrowserDomainContext> = {}): BrowserDomainContext => ({
-  page: { title: 'wmux panel', url: 'https://example.com' },
+  page: { title: 'remotea panel', url: 'https://example.com' },
   chromeVersion: '150.0.7871.46',
   v8Version: '15.0',
   userAgent: 'Mozilla/5.0 … Chrome/150.0.0.0 Safari/537.36',
@@ -173,7 +173,7 @@ describe('what forwards and what does not', () => {
 
   it('never forwards an unknown Target.* to the page debugger', () => {
     // Electron answers browser-level Target.* with "Not allowed", which reads to
-    // the client as wmux's page being broken rather than as a command wmux does
+    // the client as remotea's page being broken rather than as a command remotea does
     // not implement.
     const { action } = browserCmd('Target.somethingNewInChrome199');
     expect(action).toMatchObject({ type: 'error', code: -32601 });

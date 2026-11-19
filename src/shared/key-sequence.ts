@@ -17,7 +17,7 @@
  *
  * Both the chord (left) and the sequence (right) accept vim-ish `<...>` names;
  * the chord additionally accepts the `ctrl+shift+key` spelling used everywhere
- * else in wmux's settings, so users don't have to learn a second notation.
+ * else in remotea's settings, so users don't have to learn a second notation.
  */
 
 export interface KeyChord {

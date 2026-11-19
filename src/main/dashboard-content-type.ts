@@ -1,6 +1,6 @@
 // The agent-browser dashboard's page served as a download (#269).
 //
-// wmux deep-links an agent-mode pane at `http://127.0.0.1:4848/?port=<stream>`
+// remotea deep-links an agent-mode pane at `http://127.0.0.1:4848/?port=<stream>`
 // (agent-browser-session.ts) — the query is how the dashboard SPA picks the
 // session to show. agent-browser's embedded file server (0.38.x) takes the
 // Content-Type from the RAW request target, so `/?port=9301` has no extension,

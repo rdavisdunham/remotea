@@ -5,7 +5,7 @@
  * `WorkspaceInfo.shellState` used to be written straight from every
  * `report_shell_state`, so it was a last-writer-wins field shared by every pane
  * in the workspace. A long command in one pane — an agent TUI like omp, which
- * has no hooks and is visible to wmux only as "the shell is running" — was
+ * has no hooks and is visible to remotea only as "the shell is running" — was
  * overwritten the moment ANY other pane reached its prompt, or exited, and the
  * row read "Idle" while the agent was visibly generating.
  *

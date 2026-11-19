@@ -87,7 +87,7 @@ describe('the fling is its own source, so the gain cannot shorten the glide (#26
 
 describe('config.toml: [terminal] touch-pan-gain (#267)', () => {
   const load = (toml: string) => {
-    const file = path.join(os.tmpdir(), `wmux-touch-gain-${process.pid}-${Date.now()}.toml`);
+    const file = path.join(os.tmpdir(), `remotea-touch-gain-${process.pid}-${Date.now()}.toml`);
     fs.writeFileSync(file, toml);
     try {
       clearUserConfigCache();

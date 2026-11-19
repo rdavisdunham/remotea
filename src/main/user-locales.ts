@@ -1,7 +1,7 @@
 /**
  * user-locales.ts — Community-provided UI translations (issue #147).
  *
- * Anyone can add or correct a language without waiting for a wmux release by
+ * Anyone can add or correct a language without waiting for a remotea release by
  * dropping a JSON file into `~/.remotea/locales/`, next to `config.toml`:
  *
  *   ~/.remotea/locales/tt.json      → adds Tatar to the language dropdown

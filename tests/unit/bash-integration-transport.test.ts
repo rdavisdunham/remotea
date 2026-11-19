@@ -11,8 +11,8 @@ import { WSL_ENV_PASSTHROUGH } from '../../src/main/pane-browser-env';
 /**
  * Issues #427 and #428: the bash integration reported nothing from Git Bash or
  * WSL. Nothing loaded it in Git Bash, its native transport appended to a temp
- * file no part of wmux reads, Git Bash's cwd came out as `/c/...` (POSIX to
- * wmux, so never restored), WSL's bash could not source the CRLF copy the
+ * file no part of remotea reads, Git Bash's cwd came out as `/c/...` (POSIX to
+ * remotea, so never restored), WSL's bash could not source the CRLF copy the
  * release shipped, and WSLENV's /u kept the pipe and token away from the
  * Windows helpers a WSL pane starts.
  */
@@ -39,11 +39,11 @@ describe('shell scripts ship with LF (#428)', () => {
 });
 
 describe('Git Bash loads the integration (#427)', () => {
-  const script = 'C:\\wmux\\resources\\shell-integration\\remotea-bash-integration.sh';
+  const script = 'C:\\remotea\\resources\\shell-integration\\remotea-bash-integration.sh';
 
   it('a login "Git Bash" pane trades --login for --init-file and asks the script for the login files', () => {
     expect(gitBashIntegrationArgs(GIT_BASH, GIT_BASH_LOGIN_ARGS, script)).toEqual({
-      args: ['--init-file', 'C:/wmux/resources/shell-integration/remotea-bash-integration.sh', '-i'],
+      args: ['--init-file', 'C:/remotea/resources/shell-integration/remotea-bash-integration.sh', '-i'],
       login: true,
     });
   });
@@ -72,12 +72,12 @@ describe('Git Bash loads the integration (#427)', () => {
 
   it('starts bash as asked when the script is missing, rather than skipping ~/.bashrc', () => {
     const env: Record<string, string> = {};
-    expect(gitBashArgs(GIT_BASH, GIT_BASH_LOGIN_ARGS, path.join(os.tmpdir(), 'wmux-no-such-dir-427'), env)).toBeNull();
+    expect(gitBashArgs(GIT_BASH, GIT_BASH_LOGIN_ARGS, path.join(os.tmpdir(), 'remotea-no-such-dir-427'), env)).toBeNull();
     expect(env).toEqual({});
   });
 });
 
-describe('WSLENV lets a Windows helper started in the pane reach wmux (#428)', () => {
+describe('WSLENV lets a Windows helper started in the pane reach remotea (#428)', () => {
   const flags = new Map(WSL_ENV_PASSTHROUGH.split(':').map((entry) => {
     const [name, flag = ''] = entry.split('/');
     return [name, flag] as const;
@@ -136,24 +136,24 @@ describe.skipIf(!hasGitBash)('transport resolution', () => {
   const node = process.execPath;
 
   it('Git Bash runs REMOTEA_CLI with REMOTEA_NODE', () => {
-    const out = resolvedTransport([`export REMOTEA_NODE='${node}' REMOTEA_CLI='C:\\wmux\\remotea.js'`]);
-    expect(out).toBe(`1|${node}|C:\\wmux\\remotea.js`);
+    const out = resolvedTransport([`export REMOTEA_NODE='${node}' REMOTEA_CLI='C:\\remotea\\remotea.js'`]);
+    expect(out).toBe(`1|${node}|C:\\remotea\\remotea.js`);
   });
 
   it('WSL runs the Windows-spelled CLI with REMOTEA_WSL_NODE', () => {
     const out = resolvedTransport([
       'OSTYPE=linux-gnu',
-      `export WSL_DISTRO_NAME=Ubuntu REMOTEA_WSL_NODE='${node}' REMOTEA_CLI=/mnt/c/wmux/remotea.js`,
+      `export WSL_DISTRO_NAME=Ubuntu REMOTEA_WSL_NODE='${node}' REMOTEA_CLI=/mnt/c/remotea/remotea.js`,
       // %s, not the format string: printf would read the `\\r` of `\\remotea` as a carriage return.
-      'wslpath() { [ "$1" = -w ] && printf "%s\\n" "C:\\\\wmux\\\\remotea.js"; }',
+      'wslpath() { [ "$1" = -w ] && printf "%s\\n" "C:\\\\remotea\\\\remotea.js"; }',
     ]);
-    expect(out).toBe(`|${node}|C:\\wmux\\remotea.js`);
+    expect(out).toBe(`|${node}|C:\\remotea\\remotea.js`);
   });
 
   it('WSL without a Windows runtime stays silent rather than guessing', () => {
     const out = resolvedTransport([
       'OSTYPE=linux-gnu',
-      'export WSL_DISTRO_NAME=Ubuntu REMOTEA_CLI=/mnt/c/wmux/remotea.js',
+      'export WSL_DISTRO_NAME=Ubuntu REMOTEA_CLI=/mnt/c/remotea/remotea.js',
       'unset REMOTEA_WSL_NODE',
     ]);
     expect(out).toBe('||');
@@ -162,17 +162,17 @@ describe.skipIf(!hasGitBash)('transport resolution', () => {
 
 /**
  * End to end: Git's launcher started the way pty-manager starts it, a fake
- * wmux pipe, and the real CLI carrying the reports. What arrives is what main
+ * remotea pipe, and the real CLI carrying the reports. What arrives is what main
  * would get.
  */
 async function gitBashSession(login: boolean, commands: string[]): Promise<{ output: string; lines: string[] }> {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-gitbash-home-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-gitbash-home-'));
   // The long-name spelling: a CI runner's tmpdir is 8.3 (RUNNER~1), and the
   // shell reports the directory under its long name.
-  const target = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-gitbash-cd-')));
+  const target = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-gitbash-cd-')));
   fs.writeFileSync(path.join(home, '.bashrc'), 'echo "RC=bashrc"\n');
   fs.writeFileSync(path.join(home, '.bash_profile'), 'echo "RC=profile"\n');
-  const pipe = `\\\\.\\pipe\\wmux-gitbash-${process.pid}-${login ? 'l' : 'n'}`;
+  const pipe = `\\\\.\\pipe\\remotea-gitbash-${process.pid}-${login ? 'l' : 'n'}`;
   const lines: string[] = [];
   const server = net.createServer((socket) => {
     let buf = '';
@@ -220,7 +220,7 @@ async function gitBashSession(login: boolean, commands: string[]): Promise<{ out
   }
 }
 
-describe.skipIf(!hasGitBash)('a Git Bash pane reports a cwd wmux can restore (#427)', () => {
+describe.skipIf(!hasGitBash)('a Git Bash pane reports a cwd remotea can restore (#427)', () => {
   it('reports the cwd after `cd` as a Windows path, through the pipe', async () => {
     const { lines } = await gitBashSession(true, []);
     expect(lines).toContain('report_pwd surf-gitbash <target>');

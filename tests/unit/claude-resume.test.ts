@@ -105,7 +105,7 @@ describe('stampClaudeSessionIds', () => {
 
   // SessionEnd calls releaseAgent, so a cleanly-exited Claude looks up to
   // nothing. If a previously stamped id survived that, quitting Claude and
-  // restarting wmux would resume the conversation the user just closed.
+  // restarting remotea would resume the conversation the user just closed.
   it('REMOVES a stale id when the pane no longer hosts a session', () => {
     const tree = leaf([terminal('surf-1', { claudeSessionId: ID_A })]);
     const out = stampClaudeSessionIds(tree, () => null);
@@ -144,7 +144,7 @@ describe('stampClaudeSessionIds', () => {
 
 describe('listKnownTranscriptIds', () => {
   it('collects ids across every project directory', () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-claude-'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-claude-'));
     const projects = path.join(home, '.claude', 'projects');
     fs.mkdirSync(path.join(projects, 'proj-a'), { recursive: true });
     fs.mkdirSync(path.join(projects, 'proj-b'), { recursive: true });
@@ -158,9 +158,9 @@ describe('listKnownTranscriptIds', () => {
   });
 
   // "Cannot tell" must not read as "none exist" — pruning on an unreadable
-  // directory would throw away every id the first time wmux ran without Claude.
+  // directory would throw away every id the first time remotea ran without Claude.
   it('returns null when there is no projects directory at all', () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-claude-'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-claude-'));
     expect(listKnownTranscriptIds(home)).toBeNull();
   });
 });

@@ -343,7 +343,7 @@
 
 /* The pinned row's own button is a pressed toggle, not a hover state: clicking
    it again unpins, and at 0.35 opacity the 📌 was indistinguishable from the
-   thirty other rows offering to pin. Accent-tinted so it reads as chrome wmux
+   thirty other rows offering to pin. Accent-tinted so it reads as chrome remotea
    put there, and it must beat the hover rule above — hence the extra
    [data-pinned] on the button, which raises specificity on its own. */
 .prompt-outline__pin[data-pinned='true'],

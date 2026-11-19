@@ -74,7 +74,7 @@ const surfaceId = process.env.REMOTEA_SURFACE_ID || '';
 /**
  * Whether this hook fired in a pane of ANOTHER terminal multiplexer (#282).
  *
- * openwong2kim/wmux — a different app with the same name — also exports
+ * openwong2kim/wmux — a different app with remotea's old name — also exports
  * `REMOTEA_SURFACE_ID` into its panes, and Claude Code runs this hook from the
  * global ~/.claude/settings.json in every session on the machine. With both
  * installed, every tool call in one of ITS panes was reported to this remotea,
@@ -97,7 +97,7 @@ if (isForeignPane(process.env)) process.exit(0);
  * TCP transport for a hook firing where the pipe does not exist (issue #19).
  *
  * Inside a devcontainer, Claude Code runs on Linux while remotea runs on the
- * Windows host: `\\.\pipe\wmux` is unreachable, so every hook failed silently
+ * Windows host: `\\.\pipe\remotea` is unreachable, so every hook failed silently
  * and the sidebar never left "Running". REMOTEA_REMOTE points at a `remotea bridge`
  * (issue #78) instead — same JSON-RPC frame, same auth, different socket. The
  * env-var form is deliberate: Claude Code owns this process's argv, so there is

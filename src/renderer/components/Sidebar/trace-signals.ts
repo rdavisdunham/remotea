@@ -1,5 +1,5 @@
 // ─── TRACE mode signal derivation ────────────────────────────────────────────
-// Pure functions mapping real wmux signals onto the visual vocabulary of the
+// Pure functions mapping real remotea signals onto the visual vocabulary of the
 // TRACE sidebar mode. No React, no store, no DOM — so the rules that decide
 // "is this agent working, stuck, or lying to me" are unit-testable on their own.
 //
@@ -137,7 +137,7 @@ export function traceState(input: TraceInput): TraceState {
   const { working, tool, toolCount, lastSeen, prev, blockedSince, now } = input;
 
   // Never any hook traffic for this session. Rendering a confident "idle" here
-  // would be a lie: wmux shipped a build where the hook script was missing from
+  // would be a lie: remotea shipped a build where the hook script was missing from
   // the package entirely (issue #81), and a broken install looked exactly like
   // a quiet one. This state is drawn dashed, not solid.
   const noTelemetry = toolCount === 0 && !lastSeen;

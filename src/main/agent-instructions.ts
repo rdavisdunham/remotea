@@ -1,5 +1,5 @@
 /**
- * The wmux block that gets spliced into every agent's global context file.
+ * The remotea block that gets spliced into every agent's global context file.
  *
  * One source (`resources/claude-instructions.md`), read by three writers —
  * claude-context.ts, opencode-context.ts and kiro-context.ts — each of which
@@ -19,18 +19,18 @@ import { desktopOwnershipContext } from './ownership-context';
  *
  * ## Why the block needs it (issue #158)
  *
- * The block loads GLOBALLY, so it reaches sessions wmux did not spawn — the
+ * The block loads GLOBALLY, so it reaches sessions remotea did not spawn — the
  * Claude Code desktop app, a plain terminal, an SSH session, a scheduled run,
- * anything that was already open before wmux started. wmux only ever puts
- * `wmux` on PATH for PTYs it spawns itself (pty-manager prepends the shim dirs
+ * anything that was already open before remotea started. remotea only ever puts
+ * `remotea` on PATH for PTYs it spawns itself (pty-manager prepends the shim dirs
  * to that process's environment; nothing is persisted to the user's PATH). So
- * for most of the population the block is written for, `wmux` is NOT on PATH.
+ * for most of the population the block is written for, `remotea` is NOT on PATH.
  *
  * That made the probe ambiguous in the one direction that matters. The block
- * told the reader that "command not found, no reply, or an error" all mean wmux
- * is absent — but "command not found" says nothing about whether wmux is
+ * told the reader that "command not found, no reply, or an error" all mean remotea
+ * is absent — but "command not found" says nothing about whether remotea is
  * running, only that this session cannot reach the CLI. Every agent on a
- * machine with a perfectly healthy wmux concluded it was gone.
+ * machine with a perfectly healthy remotea concluded it was gone.
  *
  * ## Why interpolating a path here is sound, when #152 wasn't
  *
@@ -44,7 +44,7 @@ import { desktopOwnershipContext } from './ownership-context';
  */
 export const CLI_BIN_PLACEHOLDER = '{{REMOTEA_CLI_BIN}}';
 
-/** Absolute path to the `wmux` entry point a session off PATH should call. */
+/** Absolute path to the `remotea` entry point a session off PATH should call. */
 export function getCliBinDirForInstructions(): string {
   return getCliBinPath();
 }
@@ -53,12 +53,12 @@ const START_MARKER = '<!-- remotea:start';
 const END_MARKER = '<!-- remotea:end -->';
 
 /**
- * Splice the wmux block into a context file the user also writes in.
+ * Splice the remotea block into a context file the user also writes in.
  *
  * Shared by every agent whose context file is a single shared document
  * (Claude Code's CLAUDE.md, OpenCode's AGENTS.md, omp's AGENTS.md, and whichever
  * of pi's candidate names pi will actually read — see pi-context.ts). Kiro is
- * the exception: it gets a file of wmux's own, so it has nothing to splice.
+ * the exception: it gets a file of remotea's own, so it has nothing to splice.
  *
  * `trimEnd()` on the block is load-bearing and not cosmetic. The block ends
  * with a newline and so does the text following the old END_MARKER, so keeping

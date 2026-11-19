@@ -53,7 +53,7 @@ const marks = new Map<string, Map<string, MarkRecord>>();
  *
  * Asymmetric, because the two directions mean different things. BACK covers the
  * normal case: an agent TUI has already drawn the prompt above its input box,
- * and the hook — a separate node process talking over a pipe — reaches wmux
+ * and the hook — a separate node process talking over a pipe — reaches remotea
  * some tens of milliseconds later, by which time output has pushed it up.
  * FORWARD covers a TUI that commits the prompt into scrollback only after
  * submission. Both are bounded so the scan stays a few dozen `getLine` calls,
@@ -145,7 +145,7 @@ function needleRow(
 /**
  * Read an inclusive absolute line range back out of the buffer.
  *
- * This is how a SHELL-sourced prompt learns its text: wmux's integration marks
+ * This is how a SHELL-sourced prompt learns its text: remotea's integration marks
  * the boundary with OSC 133 but deliberately does not send the command line
  * over the pipe. Main already refuses to broadcast `report_command` to a
  * renderer for exactly that reason — a command line is the one place a
@@ -784,7 +784,7 @@ function blendOverBackground(color: string, background: string): string | null {
  * same thing as anchoring it to content: the row a command was typed on is
  * never rewritten again. An agent TUI breaks that equivalence. It repaints its
  * input box and its status row over the same lines several times a second, and
- * the submit-time cursor — the only line wmux has when the `UserPromptSubmit`
+ * the submit-time cursor — the only line remotea has when the `UserPromptSubmit`
  * hook arrives — sits right inside that region. `refineMark` gets out of it by
  * finding the row the prompt was echoed on, but it can MISS: a prompt shorter
  * than `MIN_NEEDLE`, or one the TUI reflowed beyond recognition, leaves the

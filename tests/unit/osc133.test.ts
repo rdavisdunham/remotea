@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parsePromptMark } from '../../src/renderer/utils/osc133';
 
 // The payloads here are the ones real emitters produce, not the ones the
-// grammar suggests. wmux is on the receiving end of whatever the user runs —
+// grammar suggests. remotea is on the receiving end of whatever the user runs —
 // bash-preexec, Starship, oh-my-posh, iTerm2's own shell integration — and each
 // spells the same mark slightly differently (issue #207).
 

@@ -190,7 +190,7 @@ describe('git-view: a repository with a linked worktree', () => {
   let wtPath: string;
 
   beforeAll(() => {
-    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-gitview-')));
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-gitview-')));
     // A long name with a space, so Windows gives it a different 8.3 short
     // name — the spelling the GitHub runner's own temp dir arrives in.
     repo = path.join(tmp, 'repository with a long name');

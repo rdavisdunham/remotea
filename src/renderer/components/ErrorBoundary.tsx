@@ -7,7 +7,7 @@ import { translate, isLanguage } from '../i18n';
  *
  * React unmounts the entire tree when a render throws and nothing catches it.
  * In an Electron app that means a blank window painted in the background
- * colour — indistinguishable from a hang, and only a restart clears it. wmux
+ * colour — indistinguishable from a hang, and only a restart clears it. remotea
  * renders data it does not own (session snapshots, agent metadata, host
  * reports), so a malformed payload must degrade to a broken panel, never a
  * dead app.

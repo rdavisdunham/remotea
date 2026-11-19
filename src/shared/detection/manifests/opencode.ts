@@ -1,7 +1,7 @@
 /**
  * OpenCode.
  *
- * Authored from a live `opencode` 1.17 pane in wmux
+ * Authored from a live `opencode` 1.17 pane in remotea
  * (tests/fixtures/detection/opencode-idle.txt).
  *
  * Same caveat as codex.ts: the capture session's configured provider (a local
@@ -10,7 +10,7 @@
  * encoded; a running turn reads as `unknown` rather than as a guess.
  *
  * OpenCode is also one of the three agents that DOES report declared state, via
- * the wmux plugin — so for most users this manifest never decides anything.
+ * the remotea plugin — so for most users this manifest never decides anything.
  * Detection sits strictly below the declared layer; this exists for the pane
  * where the plugin is not installed.
  */

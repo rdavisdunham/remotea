@@ -1,19 +1,19 @@
 /**
- * `remotea hooks install|remove|status`: register wmux's hook helper with the
+ * `remotea hooks install|remove|status`: register remotea's hook helper with the
  * agents that run in this WSL, so their status reaches the apps through the
  * hook bridge (see hook-bridge.ts).
  *
  * - Claude Code: ~/.claude/settings.json, the exact entries the Windows app
  *   writes there (src/shared/claude-hooks.ts).
  * - Codex CLI: ~/.codex/hooks.json, the same helper with `--provider codex`.
- * - OpenCode, pi and omp: wmux's plugin for each (~/.config/opencode/plugin,
+ * - OpenCode, pi and omp: remotea's plugin for each (~/.config/opencode/plugin,
  *   ~/.pi/agent/extensions, ~/.omp/agent/extensions). They report through the
- *   wmux CLI (`node $REMOTEA_CLI …`), which sessions are told about in hookEnv,
+ *   remotea CLI (`node $REMOTEA_CLI …`), which sessions are told about in hookEnv,
  *   and do nothing outside a remotea pane.
- * - Grok: ~/.grok/hooks/remotea.json, a file of wmux's own (Claude's hooks plus
+ * - Grok: ~/.grok/hooks/remotea.json, a file of remotea's own (Claude's hooks plus
  *   Grok's two extra turn endings).
- * - Qwen Code: ~/.qwen/settings.json, wmux's Qwen entries (`--provider qwen`).
- * - Antigravity (agy): wmux's plugin directory, ~/.gemini/config/plugins/remotea.
+ * - Qwen Code: ~/.qwen/settings.json, remotea's Qwen entries (`--provider qwen`).
+ * - Antigravity (agy): remotea's plugin directory, ~/.gemini/config/plugins/remotea.
  *
  * The same files the Windows app writes for its own agents, built by the same
  * code (src/main/*-context.ts), pointed at this machine's copy of the helper.
@@ -192,7 +192,7 @@ function writeJson(file: string, value: Json): void {
   fs.renameSync(tmp, file);
 }
 
-/** The hook helper and the wmux CLI with the modules it loads (resources/cli), copied together. */
+/** The hook helper and the remotea CLI with the modules it loads (resources/cli), copied together. */
 function copyHelper(p: HookPaths): string {
   fs.mkdirSync(p.cliDir, { recursive: true });
   for (const f of ['remotea-hook.js', 'transport-deadline.js', 'remotea.js']) {
@@ -212,13 +212,13 @@ function readText(file: string): string | null {
   }
 }
 
-/** A file wmux installed: the OpenCode plugin by its export, the others by their version marker. */
+/** A file remotea installed: the OpenCode plugin by its export, the others by their version marker. */
 function isOurPluginFile(file: string): boolean {
   const text = readText(file);
   return text !== null && (text.includes('RemoteaPlugin') || text.includes(LEGACY_OPENCODE_PLUGIN_EXPORT) || isRemoteaPluginFile(text));
 }
 
-/** Grok's hooks file is wmux's own; ours only while every command in it is the helper. */
+/** Grok's hooks file is remotea's own; ours only while every command in it is the helper. */
 function isOurGrokFile(file: string): boolean {
   let parsed: Json | null;
   try {
@@ -243,7 +243,7 @@ export interface HookTarget {
 type Target =
   /** Our entries merged into the agent's own settings file. */
   | { agent: HookAgent; dir: string; file: string; kind: 'settings'; apply: (c: Json, script: string) => Json; remove: (c: Json) => Json }
-  /** A file of wmux's own, copied from resources/. */
+  /** A file of remotea's own, copied from resources/. */
   | { agent: HookAgent; dir: string; file: string; kind: 'plugin'; source: string }
   | { agent: HookAgent; dir: string; file: string; kind: 'grok' | 'agy' };
 

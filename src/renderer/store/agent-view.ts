@@ -11,7 +11,7 @@ export interface WorkspaceAgent {
   name: string;
   detail: string;
   done: boolean;
-  /** Set only for wmux-spawned agents that own a pane — makes the line clickable. */
+  /** Set only for remotea-spawned agents that own a pane — makes the line clickable. */
   paneId?: PaneId;
   /** Tool-use count of an observer-parsed agent — feeds the "+N more" summary. */
   toolUses?: number;
@@ -149,7 +149,7 @@ export interface WorkspaceAgentsView {
 }
 
 /**
- * Merge observer-parsed subagents and wmux-spawned agents of one workspace
+ * Merge observer-parsed subagents and remotea-spawned agents of one workspace
  * into a single display list, running first, capped at MAX_LINES (3 agents +
  * one "+N more" summary when overflowing). `total`/`running` count the full
  * merged list so callers can report real numbers despite the cap.

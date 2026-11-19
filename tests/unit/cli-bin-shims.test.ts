@@ -5,22 +5,22 @@ import * as os from 'os';
 import * as path from 'path';
 
 /**
- * The `wmux` / `remotea.cmd` shims on PATH inside every pane.
+ * The `remotea` / `remotea.cmd` shims on PATH inside every pane.
  *
  * Both run `<a JS runtime> $REMOTEA_CLI "$@"`. Until #187 that runtime was the
  * bare name `node`, which assumes node is installed AND on the PATH the caller
  * inherited — neither guaranteed. They now prefer `$REMOTEA_NODE`, the runtime
- * wmux resolved in its own process.
+ * remotea resolved in its own process.
  */
 const ROOT = path.join(__dirname, '..', '..');
 const BIN = path.join(ROOT, 'src', 'cli-bin');
 const IS_WIN = process.platform === 'win32';
-/** Absolute, like every other cmd.exe/tar.exe call in wmux — never off PATH. */
+/** Absolute, like every other cmd.exe/tar.exe call in remotea — never off PATH. */
 const CMD_EXE = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe');
 
 /** A stand-in for remotea.js that reports what actually reached it. */
 function probe(): string {
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-shim-')), 'probe.js');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-shim-')), 'probe.js');
   fs.writeFileSync(file, 'console.log(JSON.stringify({exe: process.execPath, argv: process.argv.slice(2)}));');
   return file;
 }
@@ -61,13 +61,13 @@ describe('remotea.cmd line endings', () => {
 describe.runIf(IS_WIN)('remotea.cmd runtime selection (#187)', () => {
   const cli = probe();
 
-  it('falls back to bare `node` when wmux declared nothing', () => {
-    // An older wmux, or a shell wmux did not spawn. Must keep working.
+  it('falls back to bare `node` when remotea declared nothing', () => {
+    // An older remotea, or a shell remotea did not spawn. Must keep working.
     const r = runCmdShim({ REMOTEA_CLI: cli, REMOTEA_NODE: undefined, REMOTEA_NODE_ELECTRON: undefined }, ['ping']);
     expect(path.basename(r.exe).toLowerCase()).toBe('node.exe');
   });
 
-  it('uses $REMOTEA_NODE when wmux declared one', () => {
+  it('uses $REMOTEA_NODE when remotea declared one', () => {
     const r = runCmdShim({ REMOTEA_CLI: cli, REMOTEA_NODE: process.execPath }, ['ping']);
     expect(r.exe).toBe(process.execPath);
   });

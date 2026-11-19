@@ -1,6 +1,6 @@
 // Path- and shell-namespace helpers shared by main and renderer.
 //
-// A wmux workspace can hold panes living in two different filesystems at once:
+// A remotea workspace can hold panes living in two different filesystems at once:
 // Win32 (pwsh/cmd) and POSIX (wsl, and devcontainer shells reached through it).
 // Both report their directory over the same `report_pwd`, so anything that
 // stores or consumes a workspace-level cwd has to know which namespace a path
@@ -23,10 +23,10 @@ export function isPosixPath(p: string): boolean {
 /**
  * A path as a HUMAN typed it, turned into one the OS can open (issue #205).
  *
- * Every other cwd wmux handles was produced by a machine — session.json, a
+ * Every other cwd remotea handles was produced by a machine — session.json, a
  * `report_pwd`, `--cwd` from a script, a split inheriting its parent — and is
  * already absolute. The default-starting-path setting is the one place a person
- * types a directory into wmux, and people type `~` and `%USERPROFILE%\dev`.
+ * types a directory into remotea, and people type `~` and `%USERPROFILE%\dev`.
  * Neither is a thing CreateProcess understands: unexpanded, both die in
  * resolveSpawnCwd's stat and silently land the pane in %USERPROFILE%.
  *
@@ -36,7 +36,7 @@ export function isPosixPath(p: string): boolean {
  * name, so a global replace would corrupt real paths.
  *
  * An UNSET %VAR% is deliberately left literal rather than collapsed to nothing.
- * `%PROJECTS%\wmux` with PROJECTS unset would otherwise become `\wmux` — a real
+ * `%PROJECTS%\remotea` with PROJECTS unset would otherwise become `\remotea` — a real
  * directory on the current drive — and the pane would open somewhere plausible
  * and wrong. Left as-is it fails the stat downstream, which falls back to the
  * home directory AND logs the path it could not use.

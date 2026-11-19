@@ -159,7 +159,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
 
     // Category: Commands — one-off actions not bound to a shortcut.
     // "Open Markdown File…" picks a file via a native dialog and renders it in a
-    // new markdown view (issue #54) — the manual counterpart to `wmux markdown <file>`.
+    // new markdown view (issue #54) — the manual counterpart to `remotea markdown <file>`.
     items.push({
       id: 'command:open-markdown-file',
       label: t('palette.openMarkdown'),

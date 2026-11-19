@@ -123,7 +123,7 @@ export default function GitPane({ surfaceId, cwd, surface, onPatch }: Readonly<P
   const mode: GitMode = surface.gitMode ?? 'working';
 
   // Pin the repository on first success when the tab was opened without one
-  // (`wmux new-surface --type git`): the workspace cwd it fell back to is
+  // (`remotea new-surface --type git`): the workspace cwd it fell back to is
   // last-reporter-wins and would otherwise move the view on its own.
   useEffect(() => {
     if (repo && !surface.cwd) onPatch({ cwd: repo.root });
