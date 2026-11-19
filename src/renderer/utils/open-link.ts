@@ -1,4 +1,4 @@
-import { openInWmuxBrowser } from './open-in-browser';
+import { openInRemoteaBrowser } from './open-in-browser';
 
 /**
  * The one protocol gate for a URL arriving from outside the renderer.
@@ -20,12 +20,12 @@ export function isHttpUrl(value: unknown): value is string {
 /**
  * `link.open` from main, i.e. a URL an agent or CLI asked wmux to open.
  *
- * It deliberately goes through `openInWmuxBrowser` and NOT `wmux browser open`:
+ * It deliberately goes through `openInRemoteaBrowser` and NOT `wmux browser open`:
  * this is a human-facing link click, so it follows `openLinksExternally` and
  * lands in the workspace's panel, not the caller's agent-bound browser (#62).
  */
 export function openLinkFromBridge(url: unknown): boolean {
   if (!isHttpUrl(url)) return false;
-  openInWmuxBrowser(url);
+  openInRemoteaBrowser(url);
   return true;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { openInWmuxBrowser } from '../../utils/open-in-browser';
+import { openInRemoteaBrowser } from '../../utils/open-in-browser';
 import { useT, type TranslationKey } from '../../i18n';
 import {
   SOURCE_VIRTUALIZE_THRESHOLD,
@@ -501,7 +501,7 @@ export default function MarkdownPane({
     const anchor = target?.closest?.('a') as HTMLAnchorElement | null;
     if (!anchor?.href) return;
     event.preventDefault();
-    openInWmuxBrowser(anchor.href, { invert: event.ctrlKey || event.metaKey });
+    openInRemoteaBrowser(anchor.href, { invert: event.ctrlKey || event.metaKey });
   }, [writeClipboard]);
 
   // ─── File actions ───────────────────────────────────────────────────────────

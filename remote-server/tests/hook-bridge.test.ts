@@ -344,7 +344,7 @@ describe('hooks install', () => {
     const rows = installHooks(paths);
     const plugin = path.join(home, '.config', 'opencode', 'plugin', 'remotea.js');
     expect(rows.find((r) => r.agent === 'opencode')).toMatchObject({ present: true, entries: 1 });
-    expect(fs.readFileSync(plugin, 'utf8')).toContain('WmuxPlugin');
+    expect(fs.readFileSync(plugin, 'utf8')).toContain('RemoteaPlugin');
     expect(fs.existsSync(path.join(paths.cliDir, 'remotea.js'))).toBe(true);
     expect(fs.existsSync(path.join(paths.cliDir, 'wsl-network.js'))).toBe(true);
     removeHooks(paths);
@@ -354,6 +354,24 @@ describe('hooks install', () => {
     expect(fs.readFileSync(plugin, 'utf8')).toBe('export const SomeoneElse = 1;\n');
     removeHooks(paths);
     expect(fs.existsSync(plugin)).toBe(true);
+  });
+
+  it('OpenCode: replaces and removes a plugin installed before its export was renamed', () => {
+    const { home, paths } = tempHome();
+    const plugin = path.join(home, '.config', 'opencode', 'plugin', 'remotea.js');
+    fs.mkdirSync(path.dirname(plugin), { recursive: true });
+    // The old export alone, and the old export under the last pre-rename version marker.
+    for (const old of [
+      'export const WmuxPlugin = async () => ({});\n',
+      '// remotea-plugin-version: 10\nexport const WmuxPlugin = async () => ({});\n',
+    ]) {
+      fs.writeFileSync(plugin, old);
+      installHooks(paths);
+      expect(fs.readFileSync(plugin, 'utf8')).toContain('RemoteaPlugin');
+      fs.writeFileSync(plugin, old);
+      removeHooks(paths);
+      expect(fs.existsSync(plugin)).toBe(false);
+    }
   });
 
   it('pi, omp, Grok, Qwen and agy: each gets wmux\'s own file or entries, and loses only those', () => {

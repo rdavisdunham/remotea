@@ -11,7 +11,7 @@ import { reportIntegrationFailure } from './integration-failures';
  *
  * ── Hooks: $GROK_HOME/hooks/remotea.json ────────────────────────────────────────
  *
- * The same entries `applyWmuxHooks` writes for Claude Code, byte for byte, plus
+ * The same entries `applyRemoteaHooks` writes for Claude Code, byte for byte, plus
  * the two turn endings only Grok has. `StopCancelled` runs INSTEAD of `Stop`
  * when a turn ends without completing (Ctrl+C, a declined permission, the turn
  * limit) and `StopFailure` instead of it on an API error; without them an
@@ -42,10 +42,10 @@ import { isLegacyRemoteaBlockFile, isLegacyRemoteaGrokHooksFile } from '../share
 import { LEGACY_PLUGIN_FILES } from '../shared/legacy-names';
 import { desktopOwnershipContext } from './ownership-context';
 import {
-  applyWmuxHooks,
+  applyRemoteaHooks,
   getClaudeMdPath,
   getHookScriptPath,
-  wmuxEventHookCommand,
+  remoteaEventHookCommand,
 } from './claude-context';
 
 const START_MARKER = '<!-- remotea:start';
@@ -161,9 +161,9 @@ export function grokReadsClaudeContext(): boolean {
 
 /** Pure: the whole hooks file, given the absolute path to remotea-hook.js. */
 export function buildGrokHooks(hookScript: string): { hooks: Record<string, unknown[]> } {
-  const hooks: Record<string, unknown[]> = { ...applyWmuxHooks({}, hookScript).hooks };
+  const hooks: Record<string, unknown[]> = { ...applyRemoteaHooks({}, hookScript).hooks };
   for (const event of GROK_ONLY_EVENTS) {
-    hooks[event] = [{ hooks: [{ type: 'command', command: wmuxEventHookCommand(hookScript, event) }] }];
+    hooks[event] = [{ hooks: [{ type: 'command', command: remoteaEventHookCommand(hookScript, event) }] }];
   }
   return { hooks };
 }
@@ -205,7 +205,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 /** `node "<anything>remotea-hook.js" <arg>` — the only command shape wmux registers. */
 const REMOTEA_HOOK_COMMAND_RE = /^node "[^"]*remotea-hook\.js" \S/;
 
-function isWmuxHandler(handler: unknown): boolean {
+function isRemoteaHandler(handler: unknown): boolean {
   return isRecord(handler)
     && handler.type === 'command'
     && typeof handler.command === 'string'
@@ -236,7 +236,7 @@ function handlersOf(groups: unknown): unknown[] | null {
  * It matches the command SHAPE rather than this install's path, so a file
  * written before the install moved is still recognised and refreshed.
  */
-export function isWmuxHooksFile(content: string): boolean {
+export function isRemoteaHooksFile(content: string): boolean {
   let parsed: unknown;
   try { parsed = JSON.parse(content); } catch { return false; }
   if (!isRecord(parsed) || !isRecord(parsed.hooks)) return false;
@@ -244,7 +244,7 @@ export function isWmuxHooksFile(content: string): boolean {
   let count = 0;
   for (const groups of Object.values(parsed.hooks)) {
     const handlers = handlersOf(groups);
-    if (!handlers?.every(isWmuxHandler)) return false;
+    if (!handlers?.every(isRemoteaHandler)) return false;
     count += handlers.length;
   }
   return count > 0;
@@ -284,7 +284,7 @@ export function ensureGrokHooks(): void {
   try {
     const content = JSON.stringify(buildGrokHooks(getHookScriptPath()), null, 2) + '\n';
     removeOldHooks(getGrokHome());
-    writeOwnedFile(getGrokHooksPath(), content, isWmuxHooksFile);
+    writeOwnedFile(getGrokHooksPath(), content, isRemoteaHooksFile);
   } catch (err) {
     reportIntegrationFailure('Grok', 'write', err);
     console.warn('[remotea] Failed to update Grok hooks:', err);
@@ -293,7 +293,7 @@ export function ensureGrokHooks(): void {
 
 export function removeGrokHooks(): void {
   try {
-    for (const home of grokHomes()) removeOwnedFile(hooksPathIn(home), isWmuxHooksFile);
+    for (const home of grokHomes()) removeOwnedFile(hooksPathIn(home), isRemoteaHooksFile);
   } catch (err) {
     reportIntegrationFailure('Grok', 'remove', err);
     console.warn('[remotea] Failed to remove Grok hooks:', err);

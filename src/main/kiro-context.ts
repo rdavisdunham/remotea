@@ -11,7 +11,7 @@ import { reportIntegrationFailure } from './integration-failures';
  * Claude Code and OpenCode each read a single global context file
  * (~/.claude/CLAUDE.md, ~/.config/opencode/AGENTS.md). wmux does not own those
  * files, so it splices its section between markers and leaves everything else
- * alone — that is what `injectWmuxBlock` / `stripWmuxBlock` exist for.
+ * alone — that is what `injectRemoteaBlock` / `stripRemoteaBlock` exist for.
  *
  * Kiro instead reads *every* markdown file in ~/.kiro/steering/ and concatenates
  * them, and its own guidance is "keep files focused — one domain per file". So
@@ -59,7 +59,7 @@ export function getKiroSteeringPath(): string {
 }
 
 /** Pure: is this file ours to manage? Everything else is the user's. */
-export function isWmuxManaged(content: string): boolean {
+export function isRemoteaManaged(content: string): boolean {
   return content.includes(START_MARKER);
 }
 
@@ -83,7 +83,7 @@ export function ensureKiroContext(): void {
     // it would be the same class of mistake as clobbering their CLAUDE.md.
     if (fs.existsSync(steeringPath)) {
       const current = fs.readFileSync(steeringPath, 'utf-8');
-      if (!isWmuxManaged(current)) {
+      if (!isRemoteaManaged(current)) {
         console.warn('[remotea] ~/.kiro/steering/remotea.md exists and is not remotea\'s — leaving it alone');
         return;
       }
@@ -110,7 +110,7 @@ export function removeKiroContext(): void {
   try {
     const steeringPath = getKiroSteeringPath();
     if (!fs.existsSync(steeringPath)) return;
-    if (!isWmuxManaged(fs.readFileSync(steeringPath, 'utf-8'))) return;
+    if (!isRemoteaManaged(fs.readFileSync(steeringPath, 'utf-8'))) return;
     fs.unlinkSync(steeringPath);
     console.log('[remotea] Removed remotea steering from ~/.kiro/steering/remotea.md');
   } catch (err) {

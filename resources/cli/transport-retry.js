@@ -10,15 +10,15 @@
  * duplicated, so callers opt in rather than every sendV2 retrying.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WmuxBusyError = void 0;
-exports.isTransientWmuxError = isTransientWmuxError;
+exports.RemoteaBusyError = void 0;
+exports.isTransientRemoteaError = isTransientRemoteaError;
 exports.retryTransient = retryTransient;
 /** remotea is there but did not answer in time, or dropped the connection. */
-class WmuxBusyError extends Error {
+class RemoteaBusyError extends Error {
 }
-exports.WmuxBusyError = WmuxBusyError;
-function isTransientWmuxError(error) {
-    if (error instanceof WmuxBusyError)
+exports.RemoteaBusyError = RemoteaBusyError;
+function isTransientRemoteaError(error) {
+    if (error instanceof RemoteaBusyError)
         return true;
     const code = error?.code;
     if (code === 'EBUSY' || code === 'ECONNRESET' || code === 'EPIPE' || code === 'ETIMEDOUT')
@@ -42,7 +42,7 @@ async function retryTransient(attempt, patience, now = Date.now, sleep = (ms) =>
         }
         catch (error) {
             const pause = Math.min(250 * (tries + 1), 1000);
-            if (!isTransientWmuxError(error) || now() + pause >= deadline)
+            if (!isTransientRemoteaError(error) || now() + pause >= deadline)
                 throw error;
             if (tries === 0)
                 patience.onWait?.();

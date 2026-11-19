@@ -6,9 +6,9 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 import type { CodexRelay, CodexRelayOptions } from './codex-relay';
-import { WmuxBusyError, isTransientWmuxError, retryTransient, type Patience } from './transport-retry';
+import { RemoteaBusyError, isTransientRemoteaError, retryTransient, type Patience } from './transport-retry';
 
-export { isTransientWmuxError };
+export { isTransientRemoteaError };
 export type { Patience };
 
 const NON_INTERACTIVE = new Set([
@@ -119,19 +119,19 @@ export function resumeTarget(clientArgs: string[]): string | undefined {
   return undefined;
 }
 
-export type WmuxRequest = (method: string, params: Record<string, unknown>, timeoutMs: number) => Promise<any>;
+export type RemoteaRequest = (method: string, params: Record<string, unknown>, timeoutMs: number) => Promise<any>;
 /** true / false, or null when `codex --help` gave no answer in time. */
 export type RemoteProbe = (executable: string, env: NodeJS.ProcessEnv) => Promise<boolean | null>;
 
 /** Authenticated local pipe only; never send environment variables or transcripts. */
-const wmuxRequest: WmuxRequest = (method, params, timeoutMs) => {
+const remoteaRequest: RemoteaRequest = (method, params, timeoutMs) => {
   return new Promise((resolve, reject) => {
     const pipe = process.env.REMOTEA_PIPE;
     const token = process.env.REMOTEA_PIPE_TOKEN;
     if (!pipe || !token) { reject(new Error('Outside remotea')); return; }
     const socket = net.connect(pipe);
     let data = '';
-    const timer = setTimeout(() => finish(new WmuxBusyError('remotea did not respond')), timeoutMs);
+    const timer = setTimeout(() => finish(new RemoteaBusyError('remotea did not respond')), timeoutMs);
     const finish = (error?: Error, result?: unknown) => {
       clearTimeout(timer);
       socket.destroy();
@@ -150,7 +150,7 @@ const wmuxRequest: WmuxRequest = (method, params, timeoutMs) => {
       } catch { finish(new Error('Invalid remotea response')); }
     });
     socket.on('error', error => finish(error));
-    socket.on('end', () => finish(new WmuxBusyError('remotea disconnected')));
+    socket.on('end', () => finish(new RemoteaBusyError('remotea disconnected')));
   });
 };
 
@@ -160,11 +160,11 @@ const wmuxRequest: WmuxRequest = (method, params, timeoutMs) => {
  * timed out and started without session capture, so remotea lost track of
  * them — a `/new` or a quit there was never recorded.
  */
-export async function wmuxRequestPatiently(
+export async function remoteaRequestPatiently(
   method: string,
   params: Record<string, unknown>,
   patience: Patience,
-  request: WmuxRequest = wmuxRequest,
+  request: RemoteaRequest = remoteaRequest,
   now: () => number = Date.now,
 ): Promise<any> {
   return retryTransient((timeoutMs) => request(method, params, timeoutMs), patience, now);
@@ -271,7 +271,7 @@ async function startRelay(options: CodexRelayOptions): Promise<CodexRelay | null
   }
 }
 
-export async function runWmuxCodex(args = process.argv.slice(2)): Promise<number> {
+export async function runRemoteaCodex(args = process.argv.slice(2)): Promise<number> {
   const executable = process.env.REMOTEA_CODEX_EXE;
   if (!executable || !path.isAbsolute(executable)) throw new Error('remotea could not locate the native Codex executable');
   const env = { ...process.env };
@@ -281,14 +281,14 @@ export async function runWmuxCodex(args = process.argv.slice(2)): Promise<number
   if (!plan.interactive || !surfaceId) return runCli(executable, args, env);
   let enabled = false;
   try {
-    enabled = (await wmuxRequestPatiently('pane.codex_restore_config', { surfaceId }, {
+    enabled = (await remoteaRequestPatiently('pane.codex_restore_config', { surfaceId }, {
       ...CONFIG_PATIENCE,
       onWait: () => console.error('[remotea] remotea is busy; waiting for it before starting Codex with session restore...'),
     })).enabled === true;
   } catch (error) {
     // An older/offline remotea leaves the CLI usable. Say so when remotea was there
     // but never answered: that pane is about to run without session capture.
-    if (isTransientWmuxError(error)) console.error('[remotea] remotea did not answer; starting Codex without session restore.');
+    if (isTransientRemoteaError(error)) console.error('[remotea] remotea did not answer; starting Codex without session restore.');
   }
   if (!enabled) return runCli(executable, args, env);
   const remote = await supportsRemote(executable, env);
@@ -302,7 +302,7 @@ export async function runWmuxCodex(args = process.argv.slice(2)): Promise<number
   let reports = Promise.resolve();
   const report = (method: string, sessionId: string): void => {
     reports = reports.then(async () => {
-      try { await wmuxRequestPatiently(method, { surfaceId, sessionId }, REPORT_PATIENCE); }
+      try { await remoteaRequestPatiently(method, { surfaceId, sessionId }, REPORT_PATIENCE); }
       catch { /* A crashed remotea cannot receive a report; Codex still owns its history. */ }
     });
   };
@@ -327,7 +327,7 @@ export async function runWmuxCodex(args = process.argv.slice(2)): Promise<number
   if (exitCode === 0 && relay.sessionId) {
     // Only an orderly CLI exit forgets the handle. A crash, socket failure or
     // remotea shutdown retains it. Main also guards this RPC while quitting.
-    try { await wmuxRequestPatiently('pane.release_codex_session', { surfaceId, sessionId: relay.sessionId }, RELEASE_PATIENCE); }
+    try { await remoteaRequestPatiently('pane.release_codex_session', { surfaceId, sessionId: relay.sessionId }, RELEASE_PATIENCE); }
     catch { /* remotea has already closed */ }
     console.log(`To resume later: codex resume ${relay.sessionId}`);
   }
@@ -335,7 +335,7 @@ export async function runWmuxCodex(args = process.argv.slice(2)): Promise<number
 }
 
 if (require.main === module) {
-  runWmuxCodex().then(code => { process.exitCode = code; }).catch(error => {
+  runRemoteaCodex().then(code => { process.exitCode = code; }).catch(error => {
     console.error('[remotea] Could not launch Codex:', error.message);
     process.exitCode = 1;
   });

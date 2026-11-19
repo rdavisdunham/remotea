@@ -45,21 +45,21 @@ export function useUpdate() {
   const [upToDate, setUpToDate] = useState(false);
 
   useEffect(() => {
-    const wmux = (window as any).remotea;
-    if (!wmux?.update) return;
+    const remotea = (window as any).remotea;
+    if (!remotea?.update) return;
 
-    wmux.update.getLatest().then((info: UpdateInfo | null) => {
+    remotea.update.getLatest().then((info: UpdateInfo | null) => {
       if (info) setUpdate(info);
     }).catch(() => {});
-    wmux.update.getState?.().then((s: UpdateState | null) => {
+    remotea.update.getState?.().then((s: UpdateState | null) => {
       if (s) setState(s);
     }).catch(() => {});
 
-    const offAvailable = wmux.update.onAvailable((info: UpdateInfo) => {
+    const offAvailable = remotea.update.onAvailable((info: UpdateInfo) => {
       setUpdate(info);
       setUpToDate(false);
     });
-    const offState = wmux.update.onState?.((s: UpdateState) => {
+    const offState = remotea.update.onState?.((s: UpdateState) => {
       setState(s);
       if (s.phase === 'downloading' || s.phase === 'checking' || s.phase === 'ready') {
         setUpToDate(false);

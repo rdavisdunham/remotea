@@ -32,8 +32,8 @@ Add to `~/.zshrc`:
 ```zsh
 # remotea: let the explorer follow this shell's directory
 if [[ -n "$WSL_DISTRO_NAME" ]]; then
-  _wmux_osc7() { printf '\e]7;file://localhost/%s\e\\' "$(wslpath -w "$PWD")" }
-  precmd_functions+=(_wmux_osc7)
+  _remotea_osc7() { printf '\e]7;file://localhost/%s\e\\' "$(wslpath -w "$PWD")" }
+  precmd_functions+=(_remotea_osc7)
 fi
 ```
 

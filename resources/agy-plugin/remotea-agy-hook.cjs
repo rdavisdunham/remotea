@@ -1,4 +1,4 @@
-// remotea-plugin-version: 2
+// remotea-plugin-version: 3
 // wmux plugin for the Antigravity CLI (agy) — tells wmux which conversation
 // each pane holds, so a restored tab can reopen it with `agy --conversation`.
 // Auto-installed by wmux to ~/.gemini/config/plugins/remotea/. Does nothing outside
@@ -42,7 +42,7 @@ function finish() {
  * surface id. Another app also named wmux sets a surface id and neither of
  * those (#282), and agy started anywhere else has no surface id at all.
  */
-function inWmuxPane(e) {
+function inRemoteaPane(e) {
   return !!e.REMOTEA_SURFACE_ID && (e.REMOTEA === '1' || !!e.REMOTEA_PIPE);
 }
 
@@ -91,7 +91,7 @@ function report(conversationId) {
 }
 
 if (require.main === module) {
-  if (!inWmuxPane(env) || (event !== 'SessionStart' && event !== 'PreInvocation')) {
+  if (!inRemoteaPane(env) || (event !== 'SessionStart' && event !== 'PreInvocation')) {
     finish();
   } else {
     let raw = '';
@@ -112,4 +112,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { conversationToReport, inWmuxPane, endpoint };
+module.exports = { conversationToReport, inRemoteaPane, endpoint };

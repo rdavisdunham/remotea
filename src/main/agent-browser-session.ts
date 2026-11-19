@@ -132,7 +132,7 @@ export function sessionNameFor(surfaceId: SurfaceId, env?: NodeJS.ProcessEnv): s
  * `wmux-` prefixed", which is the correct direction to err: leaking a session
  * is recoverable at the next launch, closing a stranger's browser is not.
  */
-export function isWmuxSessionName(name: unknown, env?: NodeJS.ProcessEnv): boolean {
+export function isRemoteaSessionName(name: unknown, env?: NodeJS.ProcessEnv): boolean {
   const prefix = sessionPrefix(env);
   if (typeof name !== 'string' || !name.startsWith(prefix)) return false;
   return SURFACE_ID_RE.test(name.slice(prefix.length));
@@ -140,7 +140,7 @@ export function isWmuxSessionName(name: unknown, env?: NodeJS.ProcessEnv): boole
 
 /** The surface a wmux session name belongs to, or undefined if it is not one. */
 export function surfaceIdFromSessionName(name: string, env?: NodeJS.ProcessEnv): SurfaceId | undefined {
-  return isWmuxSessionName(name, env) ? (name.slice(sessionPrefix(env).length) as SurfaceId) : undefined;
+  return isRemoteaSessionName(name, env) ? (name.slice(sessionPrefix(env).length) as SurfaceId) : undefined;
 }
 
 /**

@@ -353,9 +353,9 @@ describe('#231 pi extension: the copied runtime resolver', () => {
     // config directory, so there is nowhere shared to import from and the
     // duplication is forced. A duplicate with no enforcement is a time bomb
     // (#137, #168) — so it is pinned here instead.
-    const piResolve = (await load()).default.__wmuxInternals.resolveNodeRuntime;
+    const piResolve = (await load()).default.__remoteaInternals.resolveNodeRuntime;
     const ocResolve = (await import(/* @vite-ignore */ OPENCODE_PLUGIN))
-      .WmuxPlugin.__wmuxInternals.resolveNodeRuntime;
+      .RemoteaPlugin.__remoteaInternals.resolveNodeRuntime;
 
     const cases: Array<[Record<string, string>, string, NodeJS.Platform]> = [
       [{ REMOTEA_NODE: process.execPath }, '/opt/pi/pi', 'linux'],

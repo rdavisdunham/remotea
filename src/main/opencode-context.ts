@@ -2,9 +2,9 @@ import { reportIntegrationFailure } from './integration-failures';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { stripWmuxBlock, stripLegacyBlocks } from './claude-context';
-import { injectWmuxBlock as spliceBlock, readRenderedInstructions } from './agent-instructions';
-import { isWmuxPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
+import { stripRemoteaBlock, stripLegacyBlocks } from './claude-context';
+import { injectRemoteaBlock as spliceBlock, readRenderedInstructions } from './agent-instructions';
+import { isRemoteaPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
 
 /**
  * Re-exported rather than moved, because the tests target it here and because
@@ -24,8 +24,8 @@ export { pluginNeedsUpdate };
  * omp had already lost the `trimEnd()` this one depends on, appending one blank
  * line per launch to a file the agent reads every session.
  */
-export function injectWmuxBlock(rawExisting: string, wmuxBlock: string): string {
-  return spliceBlock(rawExisting, wmuxBlock, stripLegacyBlocks);
+export function injectRemoteaBlock(rawExisting: string, remoteaBlock: string): string {
+  return spliceBlock(rawExisting, remoteaBlock, stripLegacyBlocks);
 }
 
 function getAgentsMdPath(): string {
@@ -36,13 +36,13 @@ function getAgentsMdPath(): string {
 export function ensureOpencodeContext(): void {
   try {
     // Rendered, not read: carries this install's absolute CLI path (#158).
-    const wmuxBlock = readRenderedInstructions();
-    if (wmuxBlock === null) return;
+    const remoteaBlock = readRenderedInstructions();
+    if (remoteaBlock === null) return;
     const agentsPath = getAgentsMdPath();
     const dir = path.dirname(agentsPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const existing = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, 'utf-8') : '';
-    const next = injectWmuxBlock(existing, wmuxBlock);
+    const next = injectRemoteaBlock(existing, remoteaBlock);
     if (next !== existing) {
       fs.writeFileSync(agentsPath, next, 'utf-8');
       console.log('[remotea] Updated remotea context in ~/.config/opencode/AGENTS.md');
@@ -98,7 +98,7 @@ export function removeOpencodeContext(): void {
   try {
     const agentsPath = getAgentsMdPath();
     if (!fs.existsSync(agentsPath)) return;
-    const stripped = stripWmuxBlock(fs.readFileSync(agentsPath, 'utf-8'));
+    const stripped = stripRemoteaBlock(fs.readFileSync(agentsPath, 'utf-8'));
     if (stripped === null) return;
     if (stripped === '') fs.unlinkSync(agentsPath);
     else fs.writeFileSync(agentsPath, stripped, 'utf-8');
@@ -120,7 +120,7 @@ export function removeOpencodePlugin(): void {
   try {
     const dest = path.join(os.homedir(), '.config', 'opencode', 'plugin', 'remotea.js');
     if (!fs.existsSync(dest)) return;
-    if (!isWmuxPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
+    if (!isRemoteaPluginFile(fs.readFileSync(dest, 'utf-8'))) return;
     fs.unlinkSync(dest);
     console.log('[remotea] Removed the remotea OpenCode plugin from', dest);
   } catch (err) {

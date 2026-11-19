@@ -61,7 +61,7 @@ async function filled(): Promise<Terminal> {
   return t;
 }
 
-function resizeLikeWmux(t: Terminal, cols: number, rows: number): void {
+function resizeLikeRemotea(t: Terminal, cols: number, rows: number): void {
   const reflows = cols !== t.cols;
   const top = reflows ? captureViewportTop(t) : undefined;
   const cursorLine = reflows ? captureCursorLine(t) : undefined;
@@ -88,7 +88,7 @@ describe('re-anchoring to ConPTY after a column change', () => {
     const top = viewport(t)[0];
     const before = t.buffer.active.cursorY;
 
-    resizeLikeWmux(t, 40, ROWS);
+    resizeLikeRemotea(t, 40, ROWS);
 
     const rows = viewport(t);
     expect(rows[0]).toBe(top);
@@ -103,8 +103,8 @@ describe('re-anchoring to ConPTY after a column change', () => {
     const original = viewport(t);
     const before = t.buffer.active.cursorY;
 
-    resizeLikeWmux(t, 40, ROWS);
-    resizeLikeWmux(t, COLS, ROWS);
+    resizeLikeRemotea(t, 40, ROWS);
+    resizeLikeRemotea(t, COLS, ROWS);
 
     expect(t.buffer.active.cursorY).toBe(before);
     expect(viewport(t)).toEqual(original);
@@ -120,10 +120,10 @@ describe('re-anchoring to ConPTY after a column change', () => {
       return parts.join('');
     };
     const text = all();
-    resizeLikeWmux(t, 40, ROWS);
-    resizeLikeWmux(t, 12, ROWS);
-    resizeLikeWmux(t, 60, ROWS);
-    resizeLikeWmux(t, COLS, ROWS);
+    resizeLikeRemotea(t, 40, ROWS);
+    resizeLikeRemotea(t, 12, ROWS);
+    resizeLikeRemotea(t, 60, ROWS);
+    resizeLikeRemotea(t, COLS, ROWS);
     expect(all()).toBe(text);
     t.dispose();
   });
@@ -186,7 +186,7 @@ describe('the line the cursor is on (#273)', () => {
   it("is left at its old width by xterm's default — the bug (premise)", async () => {
     const t = makeTerminal(45, 24, false);
     await write(t, PROMPT);
-    resizeLikeWmux(t, 100, 24);
+    resizeLikeRemotea(t, 100, 24);
     expect(rows(t)).toHaveLength(3);
     t.dispose();
   });
@@ -194,7 +194,7 @@ describe('the line the cursor is on (#273)', () => {
   it('a widen rejoins the prompt and puts the cursor at its end', async () => {
     const t = makeTerminal(45, 24);
     await write(t, PROMPT);
-    resizeLikeWmux(t, 100, 24);
+    resizeLikeRemotea(t, 100, 24);
     expect(rows(t)).toEqual([PROMPT.slice(0, 100), PROMPT.slice(100)]);
     expect(cursor(t)).toEqual([PROMPT.length - 100, 1]);
     t.dispose();
@@ -203,7 +203,7 @@ describe('the line the cursor is on (#273)', () => {
   it('what is typed next lands right after the prompt', async () => {
     const t = makeTerminal(45, 24);
     await write(t, PROMPT);
-    resizeLikeWmux(t, 100, 24);
+    resizeLikeRemotea(t, 100, 24);
     await write(t, 'Z');
     expect(rows(t)[1]).toBe(PROMPT.slice(100) + 'Z');
     t.dispose();
@@ -212,7 +212,7 @@ describe('the line the cursor is on (#273)', () => {
   it('a narrow re-wraps the prompt and keeps the cursor at its end', async () => {
     const t = makeTerminal(100, 24);
     await write(t, PROMPT);
-    resizeLikeWmux(t, 45, 24);
+    resizeLikeRemotea(t, 45, 24);
     expect(rows(t)).toEqual([PROMPT.slice(0, 45), PROMPT.slice(45, 90), PROMPT.slice(90)]);
     expect(cursor(t)).toEqual([PROMPT.length - 90, 2]);
     t.dispose();
@@ -223,9 +223,9 @@ describe('the line the cursor is on (#273)', () => {
     // Cursor back onto the 'h' of "hello", the way an arrow key would leave it.
     await write(t, PROMPT + 'echo hello\x1b[5D');
     const at = PROMPT.length + 'echo '.length;
-    resizeLikeWmux(t, 100, 24);
+    resizeLikeRemotea(t, 100, 24);
     expect(cursor(t)).toEqual([at - 100, 1]);
-    resizeLikeWmux(t, 45, 24);
+    resizeLikeRemotea(t, 45, 24);
     expect(cursor(t)).toEqual([at - 90, 2]);
     t.dispose();
   });
@@ -233,7 +233,7 @@ describe('the line the cursor is on (#273)', () => {
   it('a cursor at the exact end of a full row stays in the wrap-pending column', async () => {
     const t = makeTerminal(30, 24);
     await write(t, 'x'.repeat(40));
-    resizeLikeWmux(t, 40, 24);
+    resizeLikeRemotea(t, 40, 24);
     expect(cursor(t)).toEqual([40, 0]);
     await write(t, 'Y');
     expect(rows(t)).toEqual(['x'.repeat(40), 'Y']);

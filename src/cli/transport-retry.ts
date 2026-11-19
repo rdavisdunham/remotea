@@ -10,10 +10,10 @@
  */
 
 /** remotea is there but did not answer in time, or dropped the connection. */
-export class WmuxBusyError extends Error {}
+export class RemoteaBusyError extends Error {}
 
-export function isTransientWmuxError(error: unknown): boolean {
-  if (error instanceof WmuxBusyError) return true;
+export function isTransientRemoteaError(error: unknown): boolean {
+  if (error instanceof RemoteaBusyError) return true;
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
   if (code === 'EBUSY' || code === 'ECONNRESET' || code === 'EPIPE' || code === 'ETIMEDOUT') return true;
   // npiperelay reports the native pipe error on stderr and exits non-zero; the
@@ -51,7 +51,7 @@ export async function retryTransient<T>(
       return await attempt(Math.max(1, Math.min(attemptMs, deadline - now())));
     } catch (error) {
       const pause = Math.min(250 * (tries + 1), 1000);
-      if (!isTransientWmuxError(error) || now() + pause >= deadline) throw error;
+      if (!isTransientRemoteaError(error) || now() + pause >= deadline) throw error;
       if (tries === 0) patience.onWait?.();
       await sleep(pause);
       attemptMs *= 2;

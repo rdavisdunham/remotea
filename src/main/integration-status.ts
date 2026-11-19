@@ -6,8 +6,8 @@ import type { IntegrationFileState, IntegrationFileStatus, IntegrationStatus } f
 import { integrationErrorCode, integrationFailures } from './integration-failures';
 import { readRenderedInstructions } from './agent-instructions';
 import {
-  applyWmuxHooks,
-  removeWmuxHooks,
+  applyRemoteaHooks,
+  removeRemoteaHooks,
   getClaudeMdPath,
   getHookScriptPath,
   buildChromeDevtoolsMcpServer,
@@ -94,7 +94,7 @@ export function readIntegrationStatus(): IntegrationStatus {
       provider: 'Claude Code',
       feature: 'hooks',
       path: path.join(home, '.claude/settings.json'),
-      inspect: hooksState(applyWmuxHooks, removeWmuxHooks),
+      inspect: hooksState(applyRemoteaHooks, removeRemoteaHooks),
     },
     {
       provider: 'Claude Code',

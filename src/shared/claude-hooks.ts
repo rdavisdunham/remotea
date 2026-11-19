@@ -14,7 +14,7 @@ const HOOK_MARKER = 'remotea-hook.js';
 const TRACKED_TOOLS = ['Bash', 'PowerShell', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'Agent', 'WebSearch', 'WebFetch', 'Skill'];
 
 /** Drop any wmux entry from one hook array, preserving the user's own hooks. */
-const stripWmux = (entries: any): any[] =>
+const stripRemotea = (entries: any): any[] =>
   (Array.isArray(entries) ? entries : []).filter((e: any) => {
     if (!Array.isArray(e.hooks)) return true;
     return !e.hooks.some((h: any) => h.command?.includes(HOOK_MARKER));
@@ -28,7 +28,7 @@ const stripWmux = (entries: any): any[] =>
  * wmux ever heard was work ending, so a turn spent thinking, or one spent inside
  * a single long command, read as `idle` from start to finish.
  *
- * Anything added here must also be added to removeWmuxHooks' reach — which is
+ * Anything added here must also be added to removeRemoteaHooks' reach — which is
  * this same list — or declining the integration would leave orphans behind
  * (issue #132).
  */
@@ -39,7 +39,7 @@ export const REMOTEA_HOOK_EVENTS = [
 ] as const;
 
 /**
- * Inverse of {@link applyWmuxHooks}: returns a settings object with every wmux
+ * Inverse of {@link applyRemoteaHooks}: returns a settings object with every wmux
  * hook entry removed and every user hook left alone (issue #132).
  *
  * A hook array that ends up empty is deleted rather than left as `[]`, and a
@@ -47,13 +47,13 @@ export const REMOTEA_HOOK_EVENTS = [
  * integration restores the file to something indistinguishable from one wmux
  * had never touched, instead of leaving its footprints behind as empty shells.
  */
-export function removeWmuxHooks(settings: any): any {
+export function removeRemoteaHooks(settings: any): any {
   const next = { ...(settings || {}) };
   if (!next.hooks || typeof next.hooks !== 'object') return next;
   const hooks = { ...next.hooks };
   for (const event of REMOTEA_HOOK_EVENTS) {
     if (!(event in hooks)) continue;
-    const kept = stripWmux(hooks[event]);
+    const kept = stripRemotea(hooks[event]);
     if (kept.length > 0) hooks[event] = kept;
     else delete hooks[event];
   }
@@ -70,7 +70,7 @@ export function removeWmuxHooks(settings: any): any {
  * preserved. Extracted so the merge logic is unit-testable without touching
  * the fs (issue #53).
  */
-export interface WmuxHookOptions {
+export interface RemoteaHookOptions {
   /**
    * Hold AskUserQuestion for Eridani (remotea stage C): a SYNCHRONOUS
    * PreToolUse entry matched on that tool, whose helper may wait for a remote
@@ -95,7 +95,7 @@ export const HOOK_TIMEOUTS_S = {
   question: 600,
 } as const;
 
-export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHookOptions = {}): any {
+export function applyRemoteaHooks(settings: any, hookScript: string, opts: RemoteaHookOptions = {}): any {
   const next = { ...(settings || {}) };
   next.hooks = { ...(next.hooks || {}) };
 
@@ -111,7 +111,7 @@ export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHook
   // may still use Git Bash, so a PowerShell-only spelling (`2>$null`) is
   // equally wrong. No redirect is valid in bash, cmd and pwsh.
   const makeToolCmd = (tool: string) => `node "${hookScript}" ${tool}`;
-  const makeEventCmd = (event: string) => wmuxEventHookCommand(hookScript, event);
+  const makeEventCmd = (event: string) => remoteaEventHookCommand(hookScript, event);
 
   // The per-tool-call hooks run in the BACKGROUND. Every wmux hook is a pure
   // observer: it reports to the pipe and never blocks a tool or injects
@@ -131,7 +131,7 @@ export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHook
 
   // PostToolUse — one entry per tracked tool for specific sidebar tracking.
   next.hooks.PostToolUse = [
-    ...stripWmux(next.hooks.PostToolUse),
+    ...stripRemotea(next.hooks.PostToolUse),
     ...TRACKED_TOOLS.map(tool => ({
       matcher: tool,
       hooks: [{ type: 'command', command: makeToolCmd(tool), ...ASYNC }],
@@ -144,19 +144,19 @@ export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHook
 
   // Notification — Claude Code is asking for input/permission (waiting on you).
   next.hooks.Notification = [
-    ...stripWmux(next.hooks.Notification),
+    ...stripRemotea(next.hooks.Notification),
     { hooks: [{ type: 'command', command: makeEventCmd('Notification'), ...SYNC }] },
   ];
 
   // Stop — Claude Code finished its turn and is back at the prompt.
   next.hooks.Stop = [
-    ...stripWmux(next.hooks.Stop),
+    ...stripRemotea(next.hooks.Stop),
     { hooks: [{ type: 'command', command: makeEventCmd('Stop'), ...SYNC }] },
   ];
 
   // SubagentStop — one parallel subagent finished (drives sidebar agent lines).
   next.hooks.SubagentStop = [
-    ...stripWmux(next.hooks.SubagentStop),
+    ...stripRemotea(next.hooks.SubagentStop),
     { hooks: [{ type: 'command', command: makeEventCmd('SubagentStop'), ...SYNC }] },
   ];
 
@@ -165,7 +165,7 @@ export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHook
   // Stop, and end exactly that line on its own SubagentStop. Async: the line is
   // display only, and a subagent launch should not wait on node booting.
   next.hooks.SubagentStart = [
-    ...stripWmux(next.hooks.SubagentStart),
+    ...stripRemotea(next.hooks.SubagentStart),
     { hooks: [{ type: 'command', command: makeEventCmd('SubagentStart'), ...ASYNC }] },
   ];
 
@@ -179,14 +179,14 @@ export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHook
   // "Idle" instead of borrowing the shell's "Running" (claude is a foreground
   // command, so the shell says running for the session's whole life).
   next.hooks.SessionStart = [
-    ...stripWmux(next.hooks.SessionStart),
+    ...stripRemotea(next.hooks.SessionStart),
     { hooks: [{ type: 'command', command: makeEventCmd('SessionStart'), timeout: HOOK_TIMEOUTS_S.sessionStart }] },
   ];
 
   // UserPromptSubmit — the human just sent a message: the turn is in flight, and
   // anything the pane was waiting to be told, it has now been told.
   next.hooks.UserPromptSubmit = [
-    ...stripWmux(next.hooks.UserPromptSubmit),
+    ...stripRemotea(next.hooks.UserPromptSubmit),
     { hooks: [{ type: 'command', command: makeEventCmd('UserPromptSubmit'), ...ASYNC }] },
   ];
 
@@ -196,7 +196,7 @@ export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHook
   // one drives "is anything happening at all", and a turn spent entirely in
   // untracked tools is still a turn. The helper reads the tool name off stdin.
   next.hooks.PreToolUse = [
-    ...stripWmux(next.hooks.PreToolUse),
+    ...stripRemotea(next.hooks.PreToolUse),
     { hooks: [{ type: 'command', command: makeEventCmd('PreToolUse'), ...ASYNC }] },
     ...(opts.questions
       ? [{ matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: makeEventCmd('AskUserQuestion'), timeout: HOOK_TIMEOUTS_S.question }] }]
@@ -207,7 +207,7 @@ export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHook
   // it stops claiming any agent state at all, rather than freezing on whatever
   // it last said.
   next.hooks.SessionEnd = [
-    ...stripWmux(next.hooks.SessionEnd),
+    ...stripRemotea(next.hooks.SessionEnd),
     { hooks: [{ type: 'command', command: makeEventCmd('SessionEnd'), ...SYNC }] },
   ];
 
@@ -220,6 +220,6 @@ export function applyWmuxHooks(settings: any, hookScript: string, opts: WmuxHook
  * in both ~/.grok/hooks and ~/.claude/settings.json only when the command
  * strings are identical.
  */
-export function wmuxEventHookCommand(hookScript: string, event: string): string {
+export function remoteaEventHookCommand(hookScript: string, event: string): string {
   return `node "${hookScript}" --event ${event}`;
 }

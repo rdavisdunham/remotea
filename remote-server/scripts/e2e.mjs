@@ -650,11 +650,11 @@ async function stageE() {
 }
 
 async function realQuestion() {
-  const { applyWmuxHooks } = await import(path.join(root, 'dist/src/shared/claude-hooks.js'));
+  const { applyRemoteaHooks } = await import(path.join(root, 'dist/src/shared/claude-hooks.js'));
   const base = process.env.E2E_REAL_ROOT || '/home/davin/remotea/spike-stage-a/testrepo';
   const at = fs.mkdtempSync(path.join(base, 'stagec-e2e-'));
   try {
-    const repo = throwawayRepo(path.join(at, 'repo'), applyWmuxHooks({}, HOOK_JS, { questions: true }));
+    const repo = throwawayRepo(path.join(at, 'repo'), applyRemoteaHooks({}, HOOK_JS, { questions: true }));
     cli('eridani', 'targets', 'add', '--json', JSON.stringify({ id: 'real', repo, worktreeRoot: path.join(at, 'wt'), base: 'main', launch: { claude: {} }, verify: [] }));
     const prompt = 'Use the AskUserQuestion tool exactly once to ask me "Which colour should we use?" with the options Red and Blue (single choice). After I answer, reply with only the colour I chose, then stop.';
     const sp = sendCommand({ t: 'spawn', op_id: 'op-real-1', run_id: 'run-real-1', generation: 1, attempt: 1, harness: 'claude', model: 'sonnet', target: { id: 'real', branch: 'eri/real-1' }, prompt });

@@ -15,9 +15,9 @@ import { INTEGRATION_CONSENT_DETAIL } from '../../src/main/agent-integration';
 
 const SCRIPT = path.join(__dirname, '../../resources/agy-plugin/remotea-agy-hook.cjs');
 const require = createRequire(import.meta.url);
-const { conversationToReport, inWmuxPane } = require(SCRIPT) as {
+const { conversationToReport, inRemoteaPane } = require(SCRIPT) as {
   conversationToReport: (raw: string, event: string) => string | null;
-  inWmuxPane: (env: NodeJS.ProcessEnv) => boolean;
+  inRemoteaPane: (env: NodeJS.ProcessEnv) => boolean;
 };
 const ID = '46b139cc-e5cf-4c37-887b-188e6274d14a';
 
@@ -89,9 +89,9 @@ describe('agy hook script', () => {
   });
 
   it('only acts in a pane of this wmux (#282)', () => {
-    expect(inWmuxPane({ REMOTEA: '1', REMOTEA_SURFACE_ID: 'surf-1' })).toBe(true);
-    expect(inWmuxPane({ REMOTEA_SURFACE_ID: 'surf-1' })).toBe(false);
-    expect(inWmuxPane({ REMOTEA: '1' })).toBe(false);
+    expect(inRemoteaPane({ REMOTEA: '1', REMOTEA_SURFACE_ID: 'surf-1' })).toBe(true);
+    expect(inRemoteaPane({ REMOTEA_SURFACE_ID: 'surf-1' })).toBe(false);
+    expect(inRemoteaPane({ REMOTEA: '1' })).toBe(false);
   });
 
   /** Run the script the way agy does, against a stand-in for wmux's pipe. */

@@ -59,7 +59,7 @@ describe.runIf(hasGit)('git-worktree integration with real git', { timeout: 60_0
   let tempBase: string;
   let mainRepo: string;
   let savedLocalAppData: string | undefined;
-  let savedWmuxInstance: string | undefined;
+  let savedRemoteaInstance: string | undefined;
 
   async function make(branch: string, base?: string): Promise<string> {
     const res = await createWorktree({ repoRoot: mainRepo, branch, base });
@@ -69,7 +69,7 @@ describe.runIf(hasGit)('git-worktree integration with real git', { timeout: 60_0
 
   beforeAll(() => {
     savedLocalAppData = process.env.LOCALAPPDATA;
-    savedWmuxInstance = process.env.REMOTEA_INSTANCE;
+    savedRemoteaInstance = process.env.REMOTEA_INSTANCE;
 
     tempBase = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-wt-git-'));
     process.env.LOCALAPPDATA = tempBase;
@@ -99,7 +99,7 @@ describe.runIf(hasGit)('git-worktree integration with real git', { timeout: 60_0
   afterAll(async () => {
     if (savedLocalAppData !== undefined) process.env.LOCALAPPDATA = savedLocalAppData;
     else delete process.env.LOCALAPPDATA;
-    if (savedWmuxInstance !== undefined) process.env.REMOTEA_INSTANCE = savedWmuxInstance;
+    if (savedRemoteaInstance !== undefined) process.env.REMOTEA_INSTANCE = savedRemoteaInstance;
     else delete process.env.REMOTEA_INSTANCE;
     if (tempBase && fs.existsSync(tempBase)) {
       try {

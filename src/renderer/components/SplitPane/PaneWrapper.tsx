@@ -332,7 +332,7 @@ export default function PaneWrapper({
               //
               // No vendor filtering here, unlike the panel — see
               // utils/browser-start-page.ts. A tab's url is written directly by
-              // openInWmuxBrowser when the user clicks a link, so filtering it
+              // openInRemoteaBrowser when the user clicks a link, so filtering it
               // would blank a pane opened on wmux's own issue tracker on purpose.
               {...(surface.url || browserPrefs.defaultUrl
                 ? { initialUrl: surface.url || browserPrefs.defaultUrl }

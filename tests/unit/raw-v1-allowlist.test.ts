@@ -26,7 +26,7 @@ describe('raw-v1 allowlist', () => {
     // Read from the script rather than restating the list: the allowlist and the
     // integration drifting apart is the one failure that breaks reporting in a
     // container, and it would otherwise be invisible until someone ran one.
-    const emitted = [...fs.readFileSync(INTEGRATION, 'utf8').matchAll(/_wmux_report "([a-z_]+)/g)].map((m) => m[1]);
+    const emitted = [...fs.readFileSync(INTEGRATION, 'utf8').matchAll(/_remotea_report "([a-z_]+)/g)].map((m) => m[1]);
     expect(emitted.length).toBeGreaterThan(0);
     for (const verb of new Set(emitted)) {
       expect(rawV1Error(verb), `${verb} is emitted by the integration but not allowlisted`).toBeNull();
@@ -159,7 +159,7 @@ describe('raw-v1 argv parsing', () => {
     // The drift guard above proves the verbs are allowlisted. This proves they
     // survive the transport the integration uses to send them — the half that
     // was broken. Built from the script so a new report cannot skip the check.
-    const emitted = [...fs.readFileSync(INTEGRATION, 'utf8').matchAll(/_wmux_report "([a-z_]+)/g)].map((m) => m[1]);
+    const emitted = [...fs.readFileSync(INTEGRATION, 'utf8').matchAll(/_remotea_report "([a-z_]+)/g)].map((m) => m[1]);
     expect(emitted.length).toBeGreaterThan(0);
 
     for (const emittedVerb of new Set(emitted)) {
@@ -173,25 +173,25 @@ describe('ssh lifecycle report ordering', () => {
   it('gives every Bash ssh command and shell-state report a shared sequence marker', () => {
     const script = fs.readFileSync(INTEGRATION, 'utf8');
     const lifecycleReports = [...script.matchAll(
-      /_wmux_report "(report_(?:command|shell_state)) ([^"]+)"/g
+      /_remotea_report "(report_(?:command|shell_state)) ([^"]+)"/g
     )];
 
     expect(lifecycleReports.length).toBe(4);
     for (const [, verb, payload] of lifecycleReports) {
       expect(payload, `${verb} must carry the ordering marker`).toContain(
-        'seq=${_wmux_ssh_event_seq}'
+        'seq=${_remotea_ssh_event_seq}'
       );
     }
-    expect(script).toContain('_wmux_ssh_event_seq=$((_wmux_ssh_event_seq + 1))');
+    expect(script).toContain('_remotea_ssh_event_seq=$((_remotea_ssh_event_seq + 1))');
   });
 
   it('uses the same sequence wire shape in PowerShell', () => {
     const script = fs.readFileSync(POWERSHELL_INTEGRATION, 'utf8');
 
-    expect(script).toContain('$script:WmuxSshEventSequence++');
-    expect(script).toContain('return "seq=$($script:WmuxSshEventSequence)"');
-    expect(script).toContain('Send-WmuxMessage "report_shell_state $surfaceId $sequence $State"');
-    expect(script).toContain('Send-WmuxMessage "report_command $surfaceId $sequence $flat"');
+    expect(script).toContain('$script:RemoteaSshEventSequence++');
+    expect(script).toContain('return "seq=$($script:RemoteaSshEventSequence)"');
+    expect(script).toContain('Send-RemoteaMessage "report_shell_state $surfaceId $sequence $State"');
+    expect(script).toContain('Send-RemoteaMessage "report_command $surfaceId $sequence $flat"');
   });
 
   it('recognizes exact PowerShell ssh executable tokens in every supported path form', () => {

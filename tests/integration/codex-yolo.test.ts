@@ -85,7 +85,7 @@ trust_level = "trusted"
 
   const pipe = `\\\\.\\pipe\\remotea-codex-yolo-test-${process.pid}-${Date.now()}`;
   const calls: Array<{ method: string; params: any }> = [];
-  const wmux = net.createServer(socket => {
+  const remotea = net.createServer(socket => {
     let buffer = '';
     socket.on('data', chunk => {
       buffer += chunk.toString();
@@ -96,8 +96,8 @@ trust_level = "trusted"
       socket.write(JSON.stringify({ id: request.id, result: { enabled: true } }) + '\n', () => socket.destroy());
     });
   });
-  await new Promise<void>(resolve => wmux.listen(pipe, resolve));
-  cleanup.push(() => new Promise<void>(resolve => wmux.close(() => resolve())));
+  await new Promise<void>(resolve => remotea.listen(pipe, resolve));
+  cleanup.push(() => new Promise<void>(resolve => remotea.close(() => resolve())));
   const tui = spawn(process.execPath, [path.resolve('dist/cli/remotea-codex.js'), 'resume', threadId, '--yolo'], {
     name: 'xterm-256color', cols: 100, rows: 30, cwd: dir,
     env: { ...env, REMOTEA_CODEX_EXE: executable!, REMOTEA_PIPE: pipe, REMOTEA_PIPE_TOKEN: 'test-only', REMOTEA_SURFACE_ID: 'surf-yolo-test' },

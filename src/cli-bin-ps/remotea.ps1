@@ -17,7 +17,7 @@
 # Runs the Node pipe client via the $REMOTEA_CLI path remotea injects, falling back to
 # the copy shipped next to this shim — same contract as remotea.cmd and the bash
 # shim, so all three stay interchangeable.
-$wmuxCli = if ($env:REMOTEA_CLI) { $env:REMOTEA_CLI } else { Join-Path $PSScriptRoot '..\cli\remotea.js' }
+$remoteaCli = if ($env:REMOTEA_CLI) { $env:REMOTEA_CLI } else { Join-Path $PSScriptRoot '..\cli\remotea.js' }
 
 # Issue #247: "natively" is only true from PowerShell 7.3 on. Before that (and
 # under $PSNativeCommandArgumentPassing = 'Legacy'), PowerShell builds node's
@@ -46,11 +46,11 @@ $argPassing = Get-Variable -Name PSNativeCommandArgumentPassing -ValueOnly -Erro
 if ($argPassing -and "$argPassing" -ne 'Legacy') { $legacyArgPassing = $false }
 
 if (-not $legacyArgPassing) {
-    & node $wmuxCli @args
+    & node $remoteaCli @args
     exit $LASTEXITCODE
 }
 
-function ConvertTo-WmuxNativeArg([string]$Value) {
+function ConvertTo-RemoteaNativeArg([string]$Value) {
     # Nothing to protect: pass as-is (an EMPTY argument still needs "" or it
     # vanishes from argv altogether).
     if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') { return $Value }
@@ -62,7 +62,7 @@ function ConvertTo-WmuxNativeArg([string]$Value) {
     return '"' + $escaped + '"'
 }
 
-$line = (@($wmuxCli) + @($args) | ForEach-Object { ConvertTo-WmuxNativeArg ([string]$_) }) -join ' '
+$line = (@($remoteaCli) + @($args) | ForEach-Object { ConvertTo-RemoteaNativeArg ([string]$_) }) -join ' '
 # A `%NAME%` inside an argument would be expanded by `--%` too, and the value
 # reaches this line only through such a reference — so it is expanded exactly
 # once, from here, and never re-scanned.

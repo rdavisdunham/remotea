@@ -33,7 +33,7 @@ export function tuiNeedsUpdate(src: string, target: string | null): boolean {
 }
 
 /** Is this file one remotea installed? The guard on the uninstall path. */
-export function isWmuxTuiFile(contents: string): boolean {
+export function isRemoteaTuiFile(contents: string): boolean {
   return TUI_PLUGIN_VERSION_RE.test(contents);
 }
 
@@ -119,7 +119,7 @@ export function removeOpencodeTui(opts: { configDir: string }): TuiRemoveResult 
   const dir = path.join(opts.configDir, 'plugins', 'remotea-cli');
   const entryPath = path.join(dir, ENTRY_DST);
   if (!fs.existsSync(entryPath)) return { status: 'absent', dir };
-  if (!isWmuxTuiFile(fs.readFileSync(entryPath, 'utf-8'))) return { status: 'foreign', dir };
+  if (!isRemoteaTuiFile(fs.readFileSync(entryPath, 'utf-8'))) return { status: 'foreign', dir };
 
   fs.unlinkSync(entryPath);
   const corePath = path.join(dir, CORE_DST);

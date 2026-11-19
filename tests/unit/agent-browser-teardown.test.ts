@@ -45,7 +45,7 @@ import {
   type AgentBrowserTeardownDeps,
 } from '../../src/main/agent-browser-runtime';
 import {
-  isWmuxSessionName,
+  isRemoteaSessionName,
   MAX_PORT_PROBES,
   SessionRegistry,
   sessionNameFor,
@@ -327,15 +327,15 @@ describe('parseSessionList', () => {
   });
 });
 
-describe('isWmuxSessionName', () => {
+describe('isRemoteaSessionName', () => {
   it('accepts exactly what sessionNameFor mints', () => {
-    expect(isWmuxSessionName(`wmux-${A}`)).toBe(true);
+    expect(isRemoteaSessionName(`wmux-${A}`)).toBe(true);
     expect(surfaceIdFromSessionName(`wmux-${A}`)).toBe(A);
   });
 
   it('rejects anything without the prefix', () => {
     for (const name of ['mine', 'surf-abc', 'agent-browser', '', 'WMUX-surf-a']) {
-      expect(isWmuxSessionName(name)).toBe(false);
+      expect(isRemoteaSessionName(name)).toBe(false);
     }
   });
 
@@ -347,13 +347,13 @@ describe('isWmuxSessionName', () => {
    */
   it('rejects a prefixed name that is not a surface id', () => {
     for (const name of ['wmux-', 'wmux- --all', 'wmux-;calc', 'wmux-../evil', 'wmux-surf a']) {
-      expect(isWmuxSessionName(name)).toBe(false);
+      expect(isRemoteaSessionName(name)).toBe(false);
     }
   });
 
   it('rejects a non-string', () => {
-    expect(isWmuxSessionName(undefined)).toBe(false);
-    expect(isWmuxSessionName(42)).toBe(false);
+    expect(isRemoteaSessionName(undefined)).toBe(false);
+    expect(isRemoteaSessionName(42)).toBe(false);
   });
 });
 
@@ -783,9 +783,9 @@ describe('sessionPrefix', () => {
    */
   it('never claims the other instance sessions', () => {
     const dev = { REMOTEA_INSTANCE: 'dev' };
-    expect(isWmuxSessionName(`wmux-dev-${A}`, {})).toBe(false);
-    expect(isWmuxSessionName(`wmux-${A}`, dev)).toBe(false);
-    expect(isWmuxSessionName(`wmux-dev-${A}`, dev)).toBe(true);
+    expect(isRemoteaSessionName(`wmux-dev-${A}`, {})).toBe(false);
+    expect(isRemoteaSessionName(`wmux-${A}`, dev)).toBe(false);
+    expect(isRemoteaSessionName(`wmux-dev-${A}`, dev)).toBe(true);
     expect(surfaceIdFromSessionName(`wmux-dev-${A}`, dev)).toBe(A);
   });
 });

@@ -134,7 +134,7 @@ describe('#232 what the panel remembers', () => {
   /**
    * The blast radius is the panel and nothing else, and this is why.
    *
-   * A browser TAB's url is written directly by openInWmuxBrowser when the user
+   * A browser TAB's url is written directly by openInRemoteaBrowser when the user
    * clicks a link. Filtering there would blank a pane deliberately opened on
    * wmux's own issue tracker — turning a fix for an unwanted page into a bug
    * that swallows a wanted one.

@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TUI_PLUGIN_VERSION_RE = void 0;
 exports.tuiNeedsUpdate = tuiNeedsUpdate;
-exports.isWmuxTuiFile = isWmuxTuiFile;
+exports.isRemoteaTuiFile = isRemoteaTuiFile;
 exports.opencodeConfigDir = opencodeConfigDir;
 exports.opencodePluginSourceDir = opencodePluginSourceDir;
 exports.installOpencodeTui = installOpencodeTui;
@@ -44,7 +44,7 @@ function tuiNeedsUpdate(src, target) {
     return s !== t;
 }
 /** Is this file one remotea installed? The guard on the uninstall path. */
-function isWmuxTuiFile(contents) {
+function isRemoteaTuiFile(contents) {
     return exports.TUI_PLUGIN_VERSION_RE.test(contents);
 }
 /**
@@ -111,7 +111,7 @@ function removeOpencodeTui(opts) {
     const entryPath = path_1.default.join(dir, ENTRY_DST);
     if (!fs_1.default.existsSync(entryPath))
         return { status: 'absent', dir };
-    if (!isWmuxTuiFile(fs_1.default.readFileSync(entryPath, 'utf-8')))
+    if (!isRemoteaTuiFile(fs_1.default.readFileSync(entryPath, 'utf-8')))
         return { status: 'foreign', dir };
     fs_1.default.unlinkSync(entryPath);
     const corePath = path_1.default.join(dir, CORE_DST);

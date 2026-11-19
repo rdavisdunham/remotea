@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { openInWmuxBrowser } = vi.hoisted(() => ({
-  openInWmuxBrowser: vi.fn(),
+const { openInRemoteaBrowser } = vi.hoisted(() => ({
+  openInRemoteaBrowser: vi.fn(),
 }));
 
 vi.mock('../../src/renderer/utils/open-in-browser', () => ({
-  openInWmuxBrowser,
+  openInRemoteaBrowser,
 }));
 
 import {
@@ -118,7 +118,7 @@ describe('createFileLinkProvider', () => {
 
 describe('file link activation', () => {
   beforeEach(() => {
-    openInWmuxBrowser.mockReset();
+    openInRemoteaBrowser.mockReset();
   });
 
   it('opens the path on Ctrl+click and Cmd+click only', () => {
@@ -131,13 +131,13 @@ describe('file link activation', () => {
     links.fileLinkHandlers.activate(click({ ctrlKey: true }), `${FILE_LINK_PREFIX}docs/a.md`);
     links.fileLinkHandlers.activate(click({ metaKey: true }), `${FILE_LINK_PREFIX}docs/b.md`);
     expect(openFile.mock.calls).toEqual([['docs/a.md'], ['docs/b.md']]);
-    expect(openInWmuxBrowser).not.toHaveBeenCalled();
+    expect(openInRemoteaBrowser).not.toHaveBeenCalled();
   });
 
   it('does nothing when the terminal has no surface to resolve against', () => {
     const links = createTerminalLinkActivation(() => 'none');
     expect(() => links.activate(click({ ctrlKey: true }), `${FILE_LINK_PREFIX}docs/a.md`)).not.toThrow();
-    expect(openInWmuxBrowser).not.toHaveBeenCalled();
+    expect(openInRemoteaBrowser).not.toHaveBeenCalled();
   });
 
   it('claims a Ctrl+click on a file link from a mouse-tracking app', () => {

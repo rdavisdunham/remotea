@@ -35,7 +35,7 @@
  * The blast radius is deliberately `workspace.browserUrl` and nothing else,
  * because that is the only URL wmux opens WITHOUT being asked. A browser surface
  * in the split tree exists because somebody made it, and its `surface.url` is
- * written directly by `openInWmuxBrowser` when a user clicks a link — so
+ * written directly by `openInRemoteaBrowser` when a user clicks a link — so
  * applying this filter there would break the perfectly ordinary case of clicking
  * a link to wmux's own issue tracker and getting a blank pane.
  *

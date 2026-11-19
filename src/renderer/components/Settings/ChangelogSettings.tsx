@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { renderMarkdown } from '../Markdown/markdown-utils';
-import { openInWmuxBrowser } from '../../utils/open-in-browser';
+import { openInRemoteaBrowser } from '../../utils/open-in-browser';
 
 /**
  * The Changelog tab (issue #211) — "a small dedicated menu to preview recent
@@ -128,7 +128,7 @@ export default function ChangelogSettings() {
               <>
                 <div className="changelog__notes-head">
                   <h4>{active.name}</h4>
-                  <button className="settings-button" onClick={() => openInWmuxBrowser(active.url)}>
+                  <button className="settings-button" onClick={() => openInRemoteaBrowser(active.url)}>
                     {t('settings.changelog.openOnGithub', 'Open on GitHub')}
                   </button>
                 </div>

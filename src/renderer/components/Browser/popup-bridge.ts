@@ -25,8 +25,8 @@
  * reference anything from module scope.
  */
 export function installPopupBridge(scope: any): void {
-  if (scope.__wmuxPopupBridge) return;
-  scope.__wmuxPopupBridge = true;
+  if (scope.__remoteaPopupBridge) return;
+  scope.__remoteaPopupBridge = true;
 
   // Only http(s) is routed. javascript:, data:, blob: and custom schemes stay
   // with the default (blocked) behaviour — turning one of those into a

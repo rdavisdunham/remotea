@@ -10,7 +10,7 @@ import {
   ensureOmpExtension,
   removeOmpExtension,
 } from '../../src/main/omp-context';
-import { CLI_BIN_PLACEHOLDER, injectWmuxBlock } from '../../src/main/agent-instructions';
+import { CLI_BIN_PLACEHOLDER, injectRemoteaBlock } from '../../src/main/agent-instructions';
 
 
 /**
@@ -128,15 +128,15 @@ describe('#165 omp context', () => {
     // Markers are what make the block re-findable, so the fixture needs them —
     // and the trailing newline is the whole point of the test.
     const block = '<!-- remotea:start -->\nhi\n<!-- remotea:end -->\n';
-    const once = injectWmuxBlock('# Mine\n', block, s => s);
-    const twice = injectWmuxBlock(once, block, s => s);
+    const once = injectRemoteaBlock('# Mine\n', block, s => s);
+    const twice = injectRemoteaBlock(once, block, s => s);
     expect(twice).toBe(once);
-    expect(injectWmuxBlock(twice, block, s => s)).toBe(once);
+    expect(injectRemoteaBlock(twice, block, s => s)).toBe(once);
   });
 
   it('appends when there is no block yet', () => {
-    expect(injectWmuxBlock('', 'BLOCK', s => s)).toBe('BLOCK');
-    expect(injectWmuxBlock('user text\n', 'BLOCK', s => s)).toBe('user text\n\nBLOCK');
+    expect(injectRemoteaBlock('', 'BLOCK', s => s)).toBe('BLOCK');
+    expect(injectRemoteaBlock('user text\n', 'BLOCK', s => s)).toBe('user text\n\nBLOCK');
   });
   it('installs and removes only its own status extension', () => {
     const extension = path.join(tmp, '.omp', 'agent', 'extensions', 'remotea.js');

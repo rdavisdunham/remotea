@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { stripLegacyBlocks, stripWmuxBlock } from '../../src/main/claude-context';
-import { injectWmuxBlock } from '../../src/main/opencode-context';
+import { stripLegacyBlocks, stripRemoteaBlock } from '../../src/main/claude-context';
+import { injectRemoteaBlock } from '../../src/main/opencode-context';
 
 const BLOCK = fs.readFileSync(
   path.join(__dirname, '..', '..', 'resources', 'claude-instructions.md'),
@@ -149,7 +149,7 @@ describe('legacy marker-less copies (issue #152)', () => {
   });
 
   it('cleans up on the OpenCode path too, where the same block is written', () => {
-    const out = injectWmuxBlock(`# Setup\n\nmine\n\n${legacy}`, BLOCK);
+    const out = injectRemoteaBlock(`# Setup\n\nmine\n\n${legacy}`, BLOCK);
     expect(out).toContain('mine');
     expect(out.match(/<!-- remotea:start/g)).toHaveLength(1);
     expect(out).not.toContain('You are running inside wmux');
@@ -199,7 +199,7 @@ describe('stale MARKED duplicates of the block', () => {
   });
 
   it('uninstall removes the duplicates too, not only the first block', () => {
-    const out = stripWmuxBlock(`# Mine\n\n${BLOCK}\n${stale}\n${stale}\ntail\n`);
+    const out = stripRemoteaBlock(`# Mine\n\n${BLOCK}\n${stale}\n${stale}\ntail\n`);
     expect(out).not.toContain('remotea:start');
     expect(out).toContain('# Mine');
     expect(out).toContain('tail');

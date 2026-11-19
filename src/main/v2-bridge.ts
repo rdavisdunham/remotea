@@ -193,7 +193,7 @@ const SPECS: Record<string, BridgeSpec> = {
    * A URL an agent or CLI asked wmux to open (`wmux open`).
    *
    * Deliberately not `callerScoped`: the window is resolved from the caller,
-   * but `openInWmuxBrowser` uses that window's active workspace, exactly like a
+   * but `openInRemoteaBrowser` uses that window's active workspace, exactly like a
    * terminal link click. `requireResult` catches an old renderer with no bridge
    * instead of silently answering ok.
    */

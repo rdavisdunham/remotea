@@ -37,7 +37,7 @@ describe('linkOpensExternally', () => {
   });
 
   it('treats a missing modifier flag as no inversion', () => {
-    // openInWmuxBrowser is called with no opts from callers that have no mouse
+    // openInRemoteaBrowser is called with no opts from callers that have no mouse
     // event at all; `undefined` must not read as "invert".
     expect(linkOpensExternally(false, undefined)).toBe(false);
     expect(linkOpensExternally(true, undefined)).toBe(true);
@@ -49,7 +49,7 @@ describe('linkOpensExternally', () => {
  * every link goes to the system browser: there is no panel for Ctrl+click to
  * invert to.
  */
-describe('openInWmuxBrowser with the in-app browser off', () => {
+describe('openInRemoteaBrowser with the in-app browser off', () => {
   it('defaults the in-app browser to off', async () => {
     const { DEFAULT_BROWSER_PREFS } = await import('../../src/renderer/store/settings-slice');
     expect(DEFAULT_BROWSER_PREFS.inAppBrowser).toBe(false);
@@ -60,11 +60,11 @@ describe('openInWmuxBrowser with the in-app browser off', () => {
     (globalThis as { window?: unknown }).window = { remotea: { system: { openExternal: (u: string) => opened.push(u) } } };
     try {
       const { useStore } = await import('../../src/renderer/store');
-      const { openInWmuxBrowser } = await import('../../src/renderer/utils/open-in-browser');
+      const { openInRemoteaBrowser } = await import('../../src/renderer/utils/open-in-browser');
       const prefs = useStore.getState().browserPrefs;
       useStore.setState({ browserPrefs: { ...prefs, inAppBrowser: false, openLinksExternally: false } });
-      openInWmuxBrowser('https://example.com/a');
-      openInWmuxBrowser('https://example.com/b', { invert: true });
+      openInRemoteaBrowser('https://example.com/a');
+      openInRemoteaBrowser('https://example.com/b', { invert: true });
       expect(opened).toEqual(['https://example.com/a', 'https://example.com/b']);
     } finally {
       delete (globalThis as { window?: unknown }).window;

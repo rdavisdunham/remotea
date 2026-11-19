@@ -1,6 +1,6 @@
 import type { ILinkHandler } from '@xterm/xterm';
 import type { ILinkProviderOptions } from '@xterm/addon-web-links';
-import { openInWmuxBrowser } from './open-in-browser';
+import { openInRemoteaBrowser } from './open-in-browser';
 import { isHttpUrl } from './open-link';
 
 export const FILE_LINK_PREFIX = 'wmux-file:';
@@ -57,10 +57,10 @@ export function activateTerminalLink(event: MouseEvent, uri: string, mouseTracki
 
   // Report only whether to invert. Whether that means "panel" or "system
   // browser" depends on browserPrefs.openLinksExternally, and that rule lives
-  // in openInWmuxBrowser (issue #201).
+  // in openInRemoteaBrowser (issue #201).
   const target = linkClickTarget(!!event?.ctrlKey || !!event?.metaKey, mouseTracking);
   if (!target) return;
-  openInWmuxBrowser(uri, target);
+  openInRemoteaBrowser(uri, target);
 }
 
 /**
