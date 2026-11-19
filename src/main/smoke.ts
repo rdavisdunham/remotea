@@ -80,7 +80,7 @@ export interface SmokeStep {
 export interface RendererProbe {
   /** `window.remotea` exists with its pty API — the (sandboxed) preload ran. */
   bridge: boolean;
-  /** `window.__wmux_readScreen` exists — the renderer app booted. */
+  /** `window.__remotea_readScreen` exists — the renderer app booted. */
   readScreen: boolean;
   /** The preload reports `process.sandboxed` — the window really is sandboxed. */
   sandboxed: boolean;

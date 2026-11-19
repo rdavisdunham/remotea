@@ -1,5 +1,5 @@
 /**
- * pipe-bridge.ts — Exposes Zustand store operations as window.__wmux_* globals
+ * pipe-bridge.ts — Exposes Zustand store operations as window.__remotea_* globals
  * so the main process can call them via executeJavaScript from V2 pipe handlers.
  */
 import { useStore } from './store';
@@ -25,7 +25,7 @@ import { isPosixPath } from '../shared/paths';
 const bridgeT = (key: TranslationKey, fallback?: string): string =>
   translate(useStore.getState().language, key, fallback);
 
-/** Notices main may ask for by key (`__wmux_paneNoticeKey`). */
+/** Notices main may ask for by key (`__remotea_paneNoticeKey`). */
 const PANE_NOTICE_KEYS = ['worktree.restoreMissing'] as const;
 
 const WIRE_LAYOUTS: readonly WorkspaceLayout[] = ['grid', 'columns', 'rows', 'left', 'down'];
@@ -110,7 +110,7 @@ export function initPipeBridge(): void {
 
   // ─── Workspace ──────────────────────────────────────────────────────────────
 
-  w.__wmux_createWorkspace = async (params?: {
+  w.__remotea_createWorkspace = async (params?: {
     title?: string; shell?: string; cwd?: string; panes?: number; layout?: string;
     worktree?: string; base?: string;
   }) => {
@@ -150,19 +150,19 @@ export function initPipeBridge(): void {
     return { workspaceId: id };
   };
 
-  w.__wmux_closeWorkspace = (id: string) => {
+  w.__remotea_closeWorkspace = (id: string) => {
     useStore.getState().closeWorkspace(id as WorkspaceId);
   };
 
-  w.__wmux_selectWorkspace = (id: string) => {
+  w.__remotea_selectWorkspace = (id: string) => {
     useStore.getState().selectWorkspace(id as WorkspaceId);
   };
 
-  w.__wmux_renameWorkspace = (id: string, title: string) => {
+  w.__remotea_renameWorkspace = (id: string, title: string) => {
     useStore.getState().renameWorkspace(id as WorkspaceId, title);
   };
 
-  w.__wmux_listWorkspaces = () => {
+  w.__remotea_listWorkspaces = () => {
     const store = useStore.getState();
     return store.workspaces.map(ws => ({
       id: ws.id,
@@ -176,7 +176,7 @@ export function initPipeBridge(): void {
   // Which workspace owns a given surface? Used by main to route browser commands
   // to a browser pane in the *caller agent's* workspace (issue #62). Returns the
   // active workspace id as a fallback when the surface isn't found.
-  w.__wmux_getWorkspaceIdForSurface = (surfaceId: string) => {
+  w.__remotea_getWorkspaceIdForSurface = (surfaceId: string) => {
     const store = useStore.getState();
     for (const ws of store.workspaces) {
       for (const paneId of getAllPaneIds(ws.splitTree)) {
@@ -193,7 +193,7 @@ export function initPipeBridge(): void {
   // background pane has to be able to tell "I don't know" from "it's this one",
   // and the active workspace would answer the second when it only knows the
   // first.
-  w.__wmux_currentWorkspace = (workspaceId: string, surfaceId: string) => {
+  w.__remotea_currentWorkspace = (workspaceId: string, surfaceId: string) => {
     if (!workspaceId) return null;
     const ws = useStore.getState().workspaces.find(x => x.id === workspaceId);
     if (!ws) return null;
@@ -202,7 +202,7 @@ export function initPipeBridge(): void {
 
   // All browser surface ids in a workspace. Main adopts an unbound one for a
   // caller (or creates a fresh pane) so each agent gets its own browser (#62).
-  w.__wmux_listBrowserSurfaces = (workspaceId: string) => {
+  w.__remotea_listBrowserSurfaces = (workspaceId: string) => {
     const store = useStore.getState();
     const ws = store.workspaces.find(x => x.id === workspaceId);
     if (!ws) return [];
@@ -231,7 +231,7 @@ export function initPipeBridge(): void {
    * off the raw field so a corrupt persisted value (the session file is
    * user-editable) degrades identically here and in main.
    */
-  w.__wmux_getBrowserEngine = (surfaceId: string): BrowserEngine => {
+  w.__remotea_getBrowserEngine = (surfaceId: string): BrowserEngine => {
     const store = useStore.getState();
     for (const ws of store.workspaces) {
       for (const paneId of getAllPaneIds(ws.splitTree)) {
@@ -252,7 +252,7 @@ export function initPipeBridge(): void {
    * mutation that "succeeds" while changing nothing, which is the #143 failure
    * mode.
    */
-  w.__wmux_setBrowserEngine = (surfaceId: string, engine: BrowserEngine): boolean => {
+  w.__remotea_setBrowserEngine = (surfaceId: string, engine: BrowserEngine): boolean => {
     const store = useStore.getState();
     for (const ws of store.workspaces) {
       for (const paneId of getAllPaneIds(ws.splitTree)) {
@@ -273,14 +273,14 @@ export function initPipeBridge(): void {
    * knows the lease was taken; any id is accepted, because the browser panel's
    * `browser-<workspace>` surfaces are not in the split tree.
    */
-  w.__wmux_keepBrowserRendering = (surfaceId: string, ms: number): boolean => {
+  w.__remotea_keepBrowserRendering = (surfaceId: string, ms: number): boolean => {
     grantKeepRendering(surfaceId, ms);
     return true;
   };
 
   // ─── Pane ───────────────────────────────────────────────────────────────────
 
-  w.__wmux_splitPane = (params?: { direction?: string; type?: string; workspaceId?: string; colorScheme?: string; startupCommands?: string[] }) => {
+  w.__remotea_splitPane = (params?: { direction?: string; type?: string; workspaceId?: string; colorScheme?: string; startupCommands?: string[] }) => {
     const store = useStore.getState();
     const wsId = (params?.workspaceId || store.activeWorkspaceId) as WorkspaceId;
     if (!wsId) return null;
@@ -318,7 +318,7 @@ export function initPipeBridge(): void {
     return { paneId: newPaneId, surfaceId };
   };
 
-  w.__wmux_closePane = (paneId: string, workspaceId?: string) => {
+  w.__remotea_closePane = (paneId: string, workspaceId?: string) => {
     const store = useStore.getState();
     // Without an explicit workspace, find the pane wherever it is rather than
     // assuming it is in the active one (issue #143) — pane ids are uuids, so
@@ -335,7 +335,7 @@ export function initPipeBridge(): void {
     store.closePane(ws.id, paneId as PaneId);
   };
 
-  w.__wmux_layoutGrid = (params: { count: number; type?: string; anchorSurfaceId?: string; anchorPaneId?: string; workspaceId?: string }) => {
+  w.__remotea_layoutGrid = (params: { count: number; type?: string; anchorSurfaceId?: string; anchorPaneId?: string; workspaceId?: string }) => {
     const store = useStore.getState();
     const wsId = (params?.workspaceId || store.activeWorkspaceId) as WorkspaceId;
     if (!wsId) return null;
@@ -379,7 +379,7 @@ export function initPipeBridge(): void {
     return { newPaneIds, newPanes, anchorPaneId, cols: Math.ceil(Math.sqrt(count)), rows: Math.ceil(count / Math.ceil(Math.sqrt(count))) };
   };
 
-  w.__wmux_layoutAgents = (params: { count: number; type?: string; coordinatorRatio?: number; anchorSurfaceId?: string; anchorPaneId?: string; workspaceId?: string }) => {
+  w.__remotea_layoutAgents = (params: { count: number; type?: string; coordinatorRatio?: number; anchorSurfaceId?: string; anchorPaneId?: string; workspaceId?: string }) => {
     const store = useStore.getState();
     const candidates = params.workspaceId
       ? store.workspaces.filter(w => w.id === params.workspaceId)
@@ -413,7 +413,7 @@ export function initPipeBridge(): void {
     return null;
   };
 
-  w.__wmux_listPanes = (workspaceId?: string) => {
+  w.__remotea_listPanes = (workspaceId?: string) => {
     const store = useStore.getState();
     const wsId = (workspaceId || store.activeWorkspaceId) as WorkspaceId;
     const ws = store.workspaces.find(w => w.id === wsId);
@@ -433,7 +433,7 @@ export function initPipeBridge(): void {
 
   // ─── Surface ────────────────────────────────────────────────────────────────
 
-  w.__wmux_createSurface = (params?: { type?: string; paneId?: string; workspaceId?: string; colorScheme?: string }) => {
+  w.__remotea_createSurface = (params?: { type?: string; paneId?: string; workspaceId?: string; colorScheme?: string }) => {
     const store = useStore.getState();
     const wsId = (params?.workspaceId || store.activeWorkspaceId) as WorkspaceId;
     if (!wsId) return null;
@@ -457,7 +457,7 @@ export function initPipeBridge(): void {
    * Update an existing surface's color scheme. Lets users switch a running
    * pane to "prod" mid-session via `wmux surface set-color-scheme <id> prod`.
    */
-  w.__wmux_setSurfaceColorScheme = (surfaceId: string, colorScheme: string | null) => {
+  w.__remotea_setSurfaceColorScheme = (surfaceId: string, colorScheme: string | null) => {
     const store = useStore.getState();
     for (const ws of store.workspaces) {
       const paneIds = getAllPaneIds(ws.splitTree);
@@ -491,7 +491,7 @@ export function initPipeBridge(): void {
     return ws ? [ws] : [];
   };
 
-  w.__wmux_closeSurface = (surfaceId: string, workspaceId?: string) => {
+  w.__remotea_closeSurface = (surfaceId: string, workspaceId?: string) => {
     const store = useStore.getState();
     for (const ws of searchScope(workspaceId)) {
       for (const pid of getAllPaneIds(ws.splitTree)) {
@@ -504,7 +504,7 @@ export function initPipeBridge(): void {
     }
   };
 
-  w.__wmux_renameSurface = (surfaceId: string, title: string, workspaceId?: string) => {
+  w.__remotea_renameSurface = (surfaceId: string, title: string, workspaceId?: string) => {
     const store = useStore.getState();
     for (const ws of searchScope(workspaceId)) {
       for (const pid of getAllPaneIds(ws.splitTree)) {
@@ -518,7 +518,7 @@ export function initPipeBridge(): void {
     return { ok: false, error: 'Surface not found' };
   };
 
-  w.__wmux_focusSurface = (surfaceId: string, workspaceId?: string, highlight = false) => {
+  w.__remotea_focusSurface = (surfaceId: string, workspaceId?: string, highlight = false) => {
     const store = useStore.getState();
     for (const ws of searchScope(workspaceId)) {
       for (const pid of getAllPaneIds(ws.splitTree)) {
@@ -536,7 +536,7 @@ export function initPipeBridge(): void {
     }
   };
 
-  w.__wmux_listSurfaces = (workspaceId?: string, paneId?: string) => {
+  w.__remotea_listSurfaces = (workspaceId?: string, paneId?: string) => {
     const store = useStore.getState();
     const wsId = (workspaceId || store.activeWorkspaceId) as WorkspaceId;
     const ws = store.workspaces.find(w => w.id === wsId);
@@ -575,7 +575,7 @@ export function initPipeBridge(): void {
    * The window was right and the workspace was wrong, so `tree` reliably
    * described panes the caller had never seen.
    */
-  w.__wmux_locateSurface = (surfaceId: string) => {
+  w.__remotea_locateSurface = (surfaceId: string) => {
     if (!surfaceId) return null;
     for (const ws of useStore.getState().workspaces) {
       for (const pid of getAllPaneIds(ws.splitTree)) {
@@ -594,14 +594,14 @@ export function initPipeBridge(): void {
    * Goes through the same destination rule as a terminal link click, so
    * `browserPrefs.openLinksExternally` still owns panel-vs-system.
    */
-  w.__wmux_openLink = openLinkFromBridge;
+  w.__remotea_openLink = openLinkFromBridge;
 
   // ─── Workspace manifests (#284) ─────────────────────────────────────────────
   // Main owns the whole open flow (parse, trust, ordering, typing commands);
   // these only touch the store. No startupCommands cross this boundary — see
   // store/manifest-tree.ts for why a manifest pane carries none.
 
-  w.__wmux_openManifestWorkspace = (spec: ManifestWorkspaceSpec) => {
+  w.__remotea_openManifestWorkspace = (spec: ManifestWorkspaceSpec) => {
     const store = useStore.getState();
     const { tree, surfaces } = buildManifestTree(spec);
     const id = store.createWorkspace({ title: spec.title, cwd: spec.cwd, splitTree: tree }, bridgeT);
@@ -610,7 +610,7 @@ export function initPipeBridge(): void {
   };
 
   /** Focus a workspace a manifest opened earlier; false once it is gone. */
-  w.__wmux_focusWorkspaceIfOpen = (id: string) => {
+  w.__remotea_focusWorkspaceIfOpen = (id: string) => {
     const store = useStore.getState();
     if (!store.workspaces.some((ws) => ws.id === id)) return false;
     store.selectWorkspace(id as WorkspaceId);
@@ -623,8 +623,8 @@ export function initPipeBridge(): void {
    * PTY: it is wmux talking, not input. False when this window has no such
    * terminal, so main can ask every window.
    */
-  w.__wmux_paneNotice = (surfaceId: string, text: string) => {
-    if (!w.__wmux_locateSurface(surfaceId)) return false;
+  w.__remotea_paneNotice = (surfaceId: string, text: string) => {
+    if (!w.__remotea_locateSurface(surfaceId)) return false;
     showPaneNotice(surfaceId, String(text).slice(0, 500));
     return true;
   };
@@ -634,15 +634,15 @@ export function initPipeBridge(): void {
    * pane (#366: a restored worktree workspace whose folder is gone). Only the
    * keys listed here are accepted; anything else is refused, not echoed.
    */
-  w.__wmux_paneNoticeKey = (surfaceId: string, key: string) => {
+  w.__remotea_paneNoticeKey = (surfaceId: string, key: string) => {
     if (!(PANE_NOTICE_KEYS as readonly string[]).includes(key)) return false;
-    return w.__wmux_paneNotice(surfaceId, bridgeT(key as TranslationKey));
+    return w.__remotea_paneNotice(surfaceId, bridgeT(key as TranslationKey));
   };
 
   /** The caller's workspace as `wmux workspace save` writes it; null if not here. */
-  w.__wmux_describeWorkspace = (params: { caller?: string; workspaceId?: string }) => {
+  w.__remotea_describeWorkspace = (params: { caller?: string; workspaceId?: string }) => {
     const store = useStore.getState();
-    const located = params?.caller ? w.__wmux_locateSurface(params.caller) : null;
+    const located = params?.caller ? w.__remotea_locateSurface(params.caller) : null;
     const wsId = params?.workspaceId ?? located?.workspaceId;
     const ws = store.workspaces.find((x) => x.id === wsId);
     if (!ws) return null;
@@ -650,7 +650,7 @@ export function initPipeBridge(): void {
     return { title: ws.title, cwd: ws.cwd, ...described };
   };
 
-  w.__wmux_getActiveSurfaceId = () => {
+  w.__remotea_getActiveSurfaceId = () => {
     const store = useStore.getState();
     const wsId = store.activeWorkspaceId;
     if (!wsId) return null;
@@ -668,8 +668,8 @@ export function initPipeBridge(): void {
   // ACTIVE buffer plus which buffer it is, its size and the cursor, and with
   // `events` the surface's recent buffer switches and resizes. See
   // utils/screen-report.ts.
-  w.__wmux_readScreen = (surfaceId?: string, lines?: number, events?: boolean) => {
-    const id = surfaceId || w.__wmux_getActiveSurfaceId?.();
+  w.__remotea_readScreen = (surfaceId?: string, lines?: number, events?: boolean) => {
+    const id = surfaceId || w.__remotea_getActiveSurfaceId?.();
     if (!id) return { error: 'No active surface' };
     const terminal = surfaceTerminalRegistry.get(id);
     if (!terminal) {
@@ -682,7 +682,7 @@ export function initPipeBridge(): void {
    * The prompt log a surface has recorded (issue #207) — backs `wmux prompts`.
    *
    * This is the only way an agent can ask what its own pane was asked to do.
-   * `__wmux_readScreen` cannot answer it: an agent TUI repaints over its own
+   * `__remotea_readScreen` cannot answer it: an agent TUI repaints over its own
    * scrollback, and once it has, the prompt text is gone from the buffer for
    * good — which is exactly why the log records the text at the boundary rather
    * than scraping it back later.
@@ -699,7 +699,7 @@ export function initPipeBridge(): void {
    * surface with nothing recorded has no key at all, and that is an empty log,
    * not an error.
    */
-  w.__wmux_listPrompts = (surfaceId?: string) => {
+  w.__remotea_listPrompts = (surfaceId?: string) => {
     const { prompts } = useStore.getState();
     if (surfaceId) return (prompts[surfaceId] ?? []).map(publicPrompt);
     const all: Record<string, PublicPrompt[]> = {};
@@ -709,7 +709,7 @@ export function initPipeBridge(): void {
 
   // ─── Markdown ───────────────────────────────────────────────────────────────
 
-  w.__wmux_setMarkdownContent = (surfaceId: string, markdown: string, fileName?: string, filePath?: string, mtimeMs?: number) => {
+  w.__remotea_setMarkdownContent = (surfaceId: string, markdown: string, fileName?: string, filePath?: string, mtimeMs?: number) => {
     // Persist into the store so MarkdownPane (re)renders the content. The old
     // `wmux:markdown-update` CustomEvent had no listener, so content never
     // displayed (issue #54). `fileName`, when the content came from a file, is
@@ -723,9 +723,9 @@ export function initPipeBridge(): void {
   };
 
   // Read a markdown surface's buffer back out (issue #116). Mirrors
-  // __wmux_readScreen for terminals — an agent that pushed content has no other
+  // __remotea_readScreen for terminals — an agent that pushed content has no other
   // way to check what actually landed.
-  w.__wmux_getMarkdownContent = (surfaceId: string) => {
+  w.__remotea_getMarkdownContent = (surfaceId: string) => {
     const state = useStore.getState();
     for (const ws of state.workspaces) {
       for (const paneId of getAllPaneIds(ws.splitTree)) {
@@ -746,21 +746,21 @@ export function initPipeBridge(): void {
 
   // ─── Notifications ──────────────────────────────────────────────────────────
 
-  w.__wmux_listNotifications = () => {
+  w.__remotea_listNotifications = () => {
     return useStore.getState().notifications || [];
   };
 
-  w.__wmux_clearNotification = (id: string) => {
+  w.__remotea_clearNotification = (id: string) => {
     useStore.getState().clearNotification(id);
   };
 
-  w.__wmux_clearAllNotifications = () => {
+  w.__remotea_clearAllNotifications = () => {
     useStore.getState().clearAll();
   };
 
   // ─── Tree ───────────────────────────────────────────────────────────────────
 
-  w.__wmux_getTree = (workspaceId?: string) => {
+  w.__remotea_getTree = (workspaceId?: string) => {
     const store = useStore.getState();
     const wsId = (workspaceId || store.activeWorkspaceId) as WorkspaceId;
     if (!wsId) return null;
@@ -777,7 +777,7 @@ export function initPipeBridge(): void {
   // subscribes to the store for it. Workspaces carry the sidebar's labels, so
   // the phone names them as the desktop does (#343); the CLI's answers above
   // keep the stored title.
-  w.__wmux_remoteRoster = () => {
+  w.__remotea_remoteRoster = () => {
     const s = useStore.getState();
     return rollupAgents(
       s.workspaces, s.agentStates, Date.now(), s.agentIdentities, s.agentDetections,

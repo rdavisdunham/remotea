@@ -4,7 +4,7 @@
  * Two halves, both of which ship before the UI that drives them, so the tests
  * are the only thing holding them to their contract:
  *
- *  - `__wmux_getBrowserEngine` / `__wmux_setBrowserEngine` in the renderer.
+ *  - `__remotea_getBrowserEngine` / `__remotea_setBrowserEngine` in the renderer.
  *    Main asks the first of these before routing EVERY `browser.*` verb
  *    (`engineForSurface` in v2-browser.ts), so its degradation rule — unknown
  *    surface, corrupt value, non-browser surface all answer `web` — is what
@@ -101,30 +101,30 @@ function seed(surfaces: SurfaceRef[]): void {
 }
 
 const bridge = () => globalThis.window as unknown as {
-  __wmux_getBrowserEngine: (id: string) => string;
-  __wmux_setBrowserEngine: (id: string, engine: string) => boolean;
+  __remotea_getBrowserEngine: (id: string) => string;
+  __remotea_setBrowserEngine: (id: string, engine: string) => boolean;
 };
 
 const surface = (id: string, extra: Partial<SurfaceRef> = {}): SurfaceRef =>
   ({ id: id as SurfaceId, type: 'browser', ...extra }) as SurfaceRef;
 
-describe('__wmux_getBrowserEngine', () => {
+describe('__remotea_getBrowserEngine', () => {
   // The load-bearing one. Main runs `?? 'web'` on this answer for every browser
   // command, so an id it cannot place must not become an exception or an
   // engine that needs a binary nobody installed.
   it('answers web for a surface that does not exist', () => {
     seed([surface('surf-a')]);
-    expect(bridge().__wmux_getBrowserEngine('surf-nope')).toBe('web');
+    expect(bridge().__remotea_getBrowserEngine('surf-nope')).toBe('web');
   });
 
   it('answers agent for an agent-mode browser surface', () => {
     seed([surface('surf-a', { browserEngine: 'agent' })]);
-    expect(bridge().__wmux_getBrowserEngine('surf-a')).toBe('agent');
+    expect(bridge().__remotea_getBrowserEngine('surf-a')).toBe('agent');
   });
 
   it('answers web for a browser surface with no engine recorded', () => {
     seed([surface('surf-a')]);
-    expect(bridge().__wmux_getBrowserEngine('surf-a')).toBe('web');
+    expect(bridge().__remotea_getBrowserEngine('surf-a')).toBe('web');
   });
 
   // The session file is user-editable, so this is a real input, not a
@@ -132,33 +132,33 @@ describe('__wmux_getBrowserEngine', () => {
   // and in main rather than each side inventing its own rule.
   it('answers web for a corrupt persisted engine value', () => {
     seed([surface('surf-a', { browserEngine: 'evil' as never })]);
-    expect(bridge().__wmux_getBrowserEngine('surf-a')).toBe('web');
+    expect(bridge().__remotea_getBrowserEngine('surf-a')).toBe('web');
   });
 
   it('answers web for a terminal surface even when it carries an engine', () => {
     seed([surface('surf-t', { type: 'terminal', browserEngine: 'agent' })]);
-    expect(bridge().__wmux_getBrowserEngine('surf-t')).toBe('web');
+    expect(bridge().__remotea_getBrowserEngine('surf-t')).toBe('web');
   });
 });
 
-describe('__wmux_setBrowserEngine', () => {
+describe('__remotea_setBrowserEngine', () => {
   it('sets the engine on a browser surface', () => {
     seed([surface('surf-a')]);
-    expect(bridge().__wmux_setBrowserEngine('surf-a', 'agent')).toBe(true);
-    expect(bridge().__wmux_getBrowserEngine('surf-a')).toBe('agent');
+    expect(bridge().__remotea_setBrowserEngine('surf-a', 'agent')).toBe(true);
+    expect(bridge().__remotea_getBrowserEngine('surf-a')).toBe('agent');
   });
 
   // Writing the field anyway would persist a value engineOf ignores forever —
   // a mutation that reports success and changes nothing (#143).
   it('refuses a non-browser surface and leaves it alone', () => {
     seed([surface('surf-t', { type: 'terminal' })]);
-    expect(bridge().__wmux_setBrowserEngine('surf-t', 'agent')).toBe(false);
-    expect(bridge().__wmux_getBrowserEngine('surf-t')).toBe('web');
+    expect(bridge().__remotea_setBrowserEngine('surf-t', 'agent')).toBe(false);
+    expect(bridge().__remotea_getBrowserEngine('surf-t')).toBe('web');
   });
 
   it('refuses a surface it cannot find', () => {
     seed([surface('surf-a')]);
-    expect(bridge().__wmux_setBrowserEngine('surf-nope', 'agent')).toBe(false);
+    expect(bridge().__remotea_setBrowserEngine('surf-nope', 'agent')).toBe(false);
   });
 });
 

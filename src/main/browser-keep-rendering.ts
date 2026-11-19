@@ -106,7 +106,7 @@ export class KeepRenderingLeases {
  * an unused map entry that expires on its own.
  */
 async function grantInRenderers(surfaceId: string, ms: number): Promise<boolean> {
-  const script = `window.__wmux_keepBrowserRendering?.(${JSON.stringify(surfaceId)}, ${ms}) ?? false`;
+  const script = `window.__remotea_keepBrowserRendering?.(${JSON.stringify(surfaceId)}, ${ms}) ?? false`;
   const answers = await Promise.all(
     BrowserWindow.getAllWindows()
       .filter((win) => !win.isDestroyed())

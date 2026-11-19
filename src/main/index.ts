@@ -132,8 +132,8 @@ type CallerBrowserResolution =
  * a private module-level map in a file this change does not touch. So this
  * does NOT read or write that map; it re-derives an answer from the same
  * renderer bridge globals v2-browser.ts's `resolveBrowserWcId` uses
- * (`__wmux_getWorkspaceIdForSurface`, `__wmux_listBrowserSurfaces`,
- * `__wmux_splitPane`) — the ones that actually own the split-tree state.
+ * (`__remotea_getWorkspaceIdForSurface`, `__remotea_listBrowserSurfaces`,
+ * `__remotea_splitPane`) — the ones that actually own the split-tree state.
  *
  * That is safe, not just convenient: a surface this creates is never added to
  * v2-browser.ts's private `boundBrowserSurfaces` set either, so it is still
@@ -149,11 +149,11 @@ async function resolveCallerBrowserSurface(caller: string): Promise<CallerBrowse
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue;
     const workspaceId: string | null = await win.webContents.executeJavaScript(
-      `window.__wmux_getWorkspaceIdForSurface?.(${JSON.stringify(caller)}) ?? null`,
+      `window.__remotea_getWorkspaceIdForSurface?.(${JSON.stringify(caller)}) ?? null`,
     );
     if (!workspaceId) continue;
     const existing: string[] = await win.webContents.executeJavaScript(
-      `window.__wmux_listBrowserSurfaces?.(${JSON.stringify(workspaceId)}) ?? []`,
+      `window.__remotea_listBrowserSurfaces?.(${JSON.stringify(workspaceId)}) ?? []`,
     );
     const picked = pickBrowserSurface(caller, existing);
     if (picked.kind !== 'none') return picked;
@@ -167,7 +167,7 @@ async function readBrowserEngine(surfaceId: string): Promise<BrowserEngine> {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue;
     const engine = await win.webContents.executeJavaScript(
-      `window.__wmux_getBrowserEngine?.(${JSON.stringify(surfaceId)}) ?? 'web'`,
+      `window.__remotea_getBrowserEngine?.(${JSON.stringify(surfaceId)}) ?? 'web'`,
     );
     if (engine === 'agent') return 'agent';
   }
@@ -179,7 +179,7 @@ async function writeBrowserEngine(surfaceId: string, engine: BrowserEngine): Pro
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue;
     const ok = await win.webContents.executeJavaScript(
-      `window.__wmux_setBrowserEngine?.(${JSON.stringify(surfaceId)}, ${JSON.stringify(engine)}) ?? false`,
+      `window.__remotea_setBrowserEngine?.(${JSON.stringify(surfaceId)}, ${JSON.stringify(engine)}) ?? false`,
     );
     if (ok) return true;
   }
@@ -261,7 +261,7 @@ async function handleSetEngine(
       surfaceId = resolution.surfaceId;
     } else if (resolution.kind === 'none') {
       const created = await resolution.win.webContents.executeJavaScript(
-        `window.__wmux_splitPane?.({ direction: 'horizontal', type: 'browser', workspaceId: ${JSON.stringify(resolution.workspaceId)} }) ?? null`,
+        `window.__remotea_splitPane?.({ direction: 'horizontal', type: 'browser', workspaceId: ${JSON.stringify(resolution.workspaceId)} }) ?? null`,
       );
       if (!created?.surfaceId) {
         respondError(-32000, `browser.set_engine: could not create a browser pane for surface ${caller}`);
@@ -382,20 +382,20 @@ const spawnTargetLookups: SpawnTargetLookups = {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win.isDestroyed()) continue;
       const owner = await win.webContents
-        .executeJavaScript(`window.__wmux_getWorkspaceIdForPane?.(${JSON.stringify(paneId)}) ?? null`)
+        .executeJavaScript(`window.__remotea_getWorkspaceIdForPane?.(${JSON.stringify(paneId)}) ?? null`)
         .catch(() => null);
       if (owner) return owner as string;
     }
     return null;
   },
-  // The caller's own workspace (#246), through the same `__wmux_locateSurface`
+  // The caller's own workspace (#246), through the same `__remotea_locateSurface`
   // resolveCallerTarget uses for layout/pane verbs, so "the caller's workspace"
   // cannot mean two different things depending on which verb asked.
   async workspaceForSurface(surfaceId: string): Promise<string | null> {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win.isDestroyed()) continue;
       const found = await win.webContents
-        .executeJavaScript(`window.__wmux_locateSurface?.(${JSON.stringify(surfaceId)})?.workspaceId ?? null`)
+        .executeJavaScript(`window.__remotea_locateSurface?.(${JSON.stringify(surfaceId)})?.workspaceId ?? null`)
         .catch(() => null);
       if (found) return found as string;
     }
@@ -405,14 +405,14 @@ const spawnTargetLookups: SpawnTargetLookups = {
     const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
     if (!win) return null;
     return await win.webContents
-      .executeJavaScript('window.__wmux_getActiveWorkspaceId?.() ?? null')
+      .executeJavaScript('window.__remotea_getActiveWorkspaceId?.() ?? null')
       .catch(() => null);
   },
   async paneLoads(workspaceId: string): Promise<PaneLoadInfo[]> {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win.isDestroyed()) continue;
       const loads = await win.webContents
-        .executeJavaScript(`window.__wmux_getPaneLoads?.(${JSON.stringify(workspaceId)}) ?? []`)
+        .executeJavaScript(`window.__remotea_getPaneLoads?.(${JSON.stringify(workspaceId)}) ?? []`)
         .catch(() => []);
       if (Array.isArray(loads) && loads.length > 0) return loads as PaneLoadInfo[];
     }
@@ -645,7 +645,7 @@ async function resolvePtySurface(
     if (!win || win.isDestroyed()) return { ok: false, error: 'No window' };
     try {
       surfaceId = await win.webContents.executeJavaScript(
-        `window.__wmux_getActiveSurfaceId?.()`
+        `window.__remotea_getActiveSurfaceId?.()`
       );
     } catch (err: any) {
       return { ok: false, error: `Could not resolve active surface: ${err.message}` };
@@ -750,7 +750,7 @@ function liveWindows(): BrowserWindow[] {
  * down (see the case handler). Returning `[]` here is what collapsed them.
  */
 async function promptsForSurface(surfaceId: string, limit: number): Promise<{ prompts: any[]; truncated: boolean } | null> {
-  const script = `window.__wmux_listPrompts?.(${JSON.stringify(surfaceId)})`;
+  const script = `window.__remotea_listPrompts?.(${JSON.stringify(surfaceId)})`;
   for (const win of liveWindows()) {
     const answer = await win.webContents.executeJavaScript(script);
     if (Array.isArray(answer) && answer.length > 0) {
@@ -771,12 +771,12 @@ async function promptsForSurface(surfaceId: string, limit: number): Promise<{ pr
  * prompts is answered from its prompts, even if it is being torn down as we
  * ask, rather than being declared missing.
  *
- * `__wmux_locateSurface` and not the prompt store: a closed surface's log is
+ * `__remotea_locateSurface` and not the prompt store: a closed surface's log is
  * deleted with it, so "no entry in the log" and "no such surface" have to be
  * distinguished by something that outlives neither — the split tree.
  */
 async function surfaceExists(surfaceId: string): Promise<boolean> {
-  const script = `!!window.__wmux_locateSurface?.(${JSON.stringify(surfaceId)})`;
+  const script = `!!window.__remotea_locateSurface?.(${JSON.stringify(surfaceId)})`;
   for (const win of liveWindows()) {
     if (await win.webContents.executeJavaScript(script) === true) return true;
   }
@@ -797,7 +797,7 @@ async function promptsForAllSurfaces(limit: number): Promise<{ surfaces: Record<
   const surfaces: Record<string, any[]> = {};
   let truncated = false;
   for (const win of liveWindows()) {
-    const answer = await win.webContents.executeJavaScript('window.__wmux_listPrompts?.()');
+    const answer = await win.webContents.executeJavaScript('window.__remotea_listPrompts?.()');
     for (const [id, list] of Object.entries(answer ?? {})) {
       if (!Array.isArray(list) || list.length === 0) continue;
       const tail = tailOf(list, limit);
@@ -878,7 +878,7 @@ function lanIpv4Addresses(): string[] {
 const REMOTE_ROSTER_WINDOW_MS = 1500;
 
 /**
- * `__wmux_remoteRoster()` in EVERY window, one array per window (#143: window ≠
+ * `__remotea_remoteRoster()` in EVERY window, one array per window (#143: window ≠
  * workspace — an agent in window 2 is no less an agent). A window that rejects,
  * or predates the global, contributes an empty list rather than failing the
  * whole roster; the runtime merges and dedupes.
@@ -888,7 +888,7 @@ function listRemoteRosters(): Promise<unknown[][]> {
   return Promise.all(windows.map(win =>
     withDeadline(
       win.webContents
-        .executeJavaScript('window.__wmux_remoteRoster ? window.__wmux_remoteRoster() : []')
+        .executeJavaScript('window.__remotea_remoteRoster ? window.__remotea_remoteRoster() : []')
         .then((list: unknown) => (Array.isArray(list) ? list : []))
         .catch(() => [] as unknown[]),
       REMOTE_ROSTER_WINDOW_MS,
@@ -1024,7 +1024,7 @@ if (moveRun) void runMoveMode(gotInstanceLock);
  * ("Open in wmux" — see shell-context-menu.ts, which registers
  * `"wmux.exe" "%V"`).
  *
- * Routed through the same `__wmux_createWorkspace` bridge the CLI's
+ * Routed through the same `__remotea_createWorkspace` bridge the CLI's
  * `new-workspace --cwd` uses, so Explorer, the CLI and the UI all land on one
  * store action rather than a fourth way to make a workspace.
  */
@@ -1033,7 +1033,7 @@ async function openDirectoryAsWorkspace(dirPath: string): Promise<void> {
   if (!win || win.isDestroyed()) return;
   try {
     await win.webContents.executeJavaScript(
-      `window.__wmux_createWorkspace?.(${JSON.stringify({ title: path.basename(dirPath) || dirPath, cwd: dirPath })})`,
+      `window.__remotea_createWorkspace?.(${JSON.stringify({ title: path.basename(dirPath) || dirPath, cwd: dirPath })})`,
     );
   } catch {
     // Renderer not ready or bridge missing — the window is still up, which is
@@ -1272,16 +1272,16 @@ async function runSmokeMode(opts: SmokeOptions): Promise<void> {
       if (loadFailure) throw new Error(loadFailure);
       const r = await wc.executeJavaScript(
         `({ bridge: typeof window.remotea === 'object' && typeof window.remotea?.pty?.create === 'function',
-            readScreen: typeof window.__wmux_readScreen === 'function',
+            readScreen: typeof window.__remotea_readScreen === 'function',
             sandboxed: window.remotea?.system?.sandboxed === true,
-            activeSurfaceId: window.__wmux_getActiveSurfaceId?.() ?? null })`,
+            activeSurfaceId: window.__remotea_getActiveSurfaceId?.() ?? null })`,
       );
       return { bridge: !!r?.bridge, readScreen: !!r?.readScreen, sandboxed: r?.sandboxed === true, activeSurfaceId: typeof r?.activeSurfaceId === 'string' ? r.activeSurfaceId : null };
     },
     hasPty: (id) => ptyManager.has(id as SurfaceId),
     writePty: (id, data) => { log(`write ${JSON.stringify(data)} -> ${id}`); ptyManager.write(id as SurfaceId, data); },
     readScreen: async (id) => {
-      const r = await wc.executeJavaScript(`window.__wmux_readScreen?.(${JSON.stringify(id)}, 200)`);
+      const r = await wc.executeJavaScript(`window.__remotea_readScreen?.(${JSON.stringify(id)}, 200)`);
       return typeof r?.text === 'string' ? r.text : null;
     },
   }, { timeoutMs: opts.timeoutMs });
@@ -1566,7 +1566,7 @@ function pruneRestoredQwenSessions(windows: SavedWindow[]): void {
  * window is still loading so startup notices are not lost.
  */
 function deliverPaneNotice(surfaceId: string, key: string): void {
-  const script = `window.__wmux_paneNoticeKey?.(${JSON.stringify(surfaceId)}, ${JSON.stringify(key)}) === true`;
+  const script = `window.__remotea_paneNoticeKey?.(${JSON.stringify(surfaceId)}, ${JSON.stringify(key)}) === true`;
   const deliverToWindow = (win: BrowserWindow) => {
     if (win.isDestroyed()) return;
     if (win.webContents.isLoading()) {
@@ -1738,7 +1738,7 @@ app.whenReady().then(() => {
     win.show();
     win.focus();
     if (windowIds.length) {
-      win.webContents.executeJavaScript(`window.__wmux_focusSurface?.(${JSON.stringify(surfaceId)}, undefined, ${highlight === true})`).catch(() => {});
+      win.webContents.executeJavaScript(`window.__remotea_focusSurface?.(${JSON.stringify(surfaceId)}, undefined, ${highlight === true})`).catch(() => {});
     }
   });
   remoteHosts.start();
@@ -1840,7 +1840,7 @@ app.whenReady().then(() => {
 
   // Cold launch from the Explorer verb: no instance was running, so there is no
   // second-instance event — the folder is in our own argv. Wait for the renderer
-  // to finish loading, otherwise the __wmux_* bridge is not defined yet and the
+  // to finish loading, otherwise the __remotea_* bridge is not defined yet and the
   // folder is silently dropped.
   const launchDir = directoryFromArgv(process.argv, isDirectory);
   if (launchDir) {
@@ -2075,12 +2075,12 @@ app.whenReady().then(() => {
             if (!win || win.isDestroyed()) { respondError(-32000, 'No window'); return; }
             // Get pane's first surface and focus it
             const panes = await win.webContents.executeJavaScript(
-              `window.__wmux_listPanes?.(${JSON.stringify(request.params?.workspaceId)})`
+              `window.__remotea_listPanes?.(${JSON.stringify(request.params?.workspaceId)})`
             );
             const pane = (panes || []).find((p: any) => p.paneId === (request.params?.id || request.params?.paneId));
             if (pane && pane.surfaces.length > 0) {
               await win.webContents.executeJavaScript(
-                `window.__wmux_focusSurface?.(${JSON.stringify(pane.surfaces[0].id)})`
+                `window.__remotea_focusSurface?.(${JSON.stringify(pane.surfaces[0].id)})`
               );
             }
             respond({ ok: true });
@@ -2105,7 +2105,7 @@ app.whenReady().then(() => {
             const scheme = request.params?.colorScheme ?? request.params?.scheme ?? null;
             if (!surfaceId) { respondError(-32602, 'surfaceId required'); return; }
             const result = await win.webContents.executeJavaScript(
-              `window.__wmux_setSurfaceColorScheme?.(${JSON.stringify(surfaceId)}, ${JSON.stringify(scheme)})`
+              `window.__remotea_setSurfaceColorScheme?.(${JSON.stringify(surfaceId)}, ${JSON.stringify(scheme)})`
             );
             respond(result || { ok: true });
           } catch (err: any) { respondError(-32000, err.message); }
@@ -2227,7 +2227,7 @@ app.whenReady().then(() => {
       }
       case 'surface.read_text': {
         // Screen content lives in the renderer (xterm owns the buffer), so
-        // delegate to the __wmux_readScreen bridge global. It reads the ACTIVE
+        // delegate to the __remotea_readScreen bridge global. It reads the ACTIVE
         // buffer — alt buffer included — so full-screen TUIs return what is
         // actually visible, as plain text (no ANSI escapes).
         (async () => {
@@ -2245,7 +2245,7 @@ app.whenReady().then(() => {
             for (const win of BrowserWindow.getAllWindows()) {
               if (win.isDestroyed()) continue;
               const r = await win.webContents.executeJavaScript(
-                `window.__wmux_readScreen?.(${JSON.stringify(surfaceId.id)}, ${lines}, ${events})`
+                `window.__remotea_readScreen?.(${JSON.stringify(surfaceId.id)}, ${lines}, ${events})`
               );
               if (r && !r.error) { result = r; break; }
               if (r && !result) result = r;
@@ -2349,7 +2349,7 @@ app.whenReady().then(() => {
             // a native dialog, and enough to allow editing it back (F3).
             grantFilePath(win.webContents.id, filePath);
             await win.webContents.executeJavaScript(
-              `window.__wmux_setMarkdownContent?.(${JSON.stringify(request.params?.surfaceId || '')}, ${JSON.stringify(read.content)}, ${JSON.stringify(path.basename(filePath))}, ${JSON.stringify(filePath)}, ${JSON.stringify(read.mtimeMs)})`
+              `window.__remotea_setMarkdownContent?.(${JSON.stringify(request.params?.surfaceId || '')}, ${JSON.stringify(read.content)}, ${JSON.stringify(path.basename(filePath))}, ${JSON.stringify(filePath)}, ${JSON.stringify(read.mtimeMs)})`
             );
             respond({ ok: true, length: read.content.length, filePath });
           } catch (err: any) { respondError(-32000, err.message); }
@@ -2366,11 +2366,11 @@ app.whenReady().then(() => {
             if (!win || win.isDestroyed()) { respondError(-32000, 'No window'); return; }
             if (request.params?.all) {
               await win.webContents.executeJavaScript(
-                `window.__wmux_clearAllNotifications?.()`
+                `window.__remotea_clearAllNotifications?.()`
               );
             } else {
               await win.webContents.executeJavaScript(
-                `window.__wmux_clearNotification?.(${JSON.stringify(request.params?.id || '')})`
+                `window.__remotea_clearNotification?.(${JSON.stringify(request.params?.id || '')})`
               );
             }
             respond({ ok: true });
@@ -2445,7 +2445,7 @@ app.whenReady().then(() => {
             const win = BrowserWindow.getAllWindows()[0];
             if (!win || win.isDestroyed()) { respond({ state: null }); return; }
             const workspaces = await win.webContents.executeJavaScript(
-              `window.__wmux_listWorkspaces?.()`
+              `window.__remotea_listWorkspaces?.()`
             );
             respond({ workspaces: workspaces || [] });
           } catch (err: any) { respondError(-32000, err.message); }

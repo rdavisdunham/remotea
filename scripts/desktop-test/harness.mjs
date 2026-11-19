@@ -221,7 +221,7 @@ async function appStart() {
   const deadline = Date.now() + 90_000;
   for (;;) {
     try {
-      if (await evaluate(await waitForPage(60_000), 'typeof window.__wmux_listWorkspaces === "function"')) break;
+      if (await evaluate(await waitForPage(60_000), 'typeof window.__remotea_listWorkspaces === "function"')) break;
     } catch (err) {
       if (Date.now() > deadline) throw err;
     }
@@ -347,7 +347,7 @@ try {
       const page = await waitForPage();
       const at = await evaluate(page, `(async () => {
         // Terminals carry no surface id in the DOM: focus it, then use the one holding focus.
-        window.__wmux_focusSurface(${JSON.stringify(surf)});
+        window.__remotea_focusSurface(${JSON.stringify(surf)});
         await new Promise((r) => setTimeout(r, 300));
         const visible = [...document.querySelectorAll('.xterm-screen')]
           .map((e) => ({ e, r: e.getBoundingClientRect() }))
@@ -368,7 +368,7 @@ try {
     }
     case 'screen': {
       const id = rest[0] ? JSON.stringify(rest[0]) : 'undefined';
-      const r = await evaluate(await waitForPage(), `window.__wmux_readScreen(${id}, 40)`);
+      const r = await evaluate(await waitForPage(), `window.__remotea_readScreen(${id}, 40)`);
       console.log(typeof r === 'string' ? r : JSON.stringify(r, null, 2));
       break;
     }

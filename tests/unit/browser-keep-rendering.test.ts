@@ -135,7 +135,7 @@ describe('keepRenderingLeases → renderers', () => {
     env.windows = [win];
     await keepRenderingLeases.touch(101, 'browser-ws"1');
     expect(win.scripts).toEqual([
-      `window.__wmux_keepBrowserRendering?.(${JSON.stringify('browser-ws"1')}, ${KEEP_RENDERING_MS}) ?? false`,
+      `window.__remotea_keepBrowserRendering?.(${JSON.stringify('browser-ws"1')}, ${KEEP_RENDERING_MS}) ?? false`,
     ]);
   });
 
@@ -152,8 +152,8 @@ describe('keepRenderingLeases → renderers', () => {
   });
 
   it('the renderer defines the global main calls', () => {
-    expect(read('renderer/pipe-bridge.ts')).toMatch(/w\.__wmux_keepBrowserRendering\s*=/);
-    expect(read('main/browser-keep-rendering.ts')).toContain('window.__wmux_keepBrowserRendering?.(');
+    expect(read('renderer/pipe-bridge.ts')).toMatch(/w\.__remotea_keepBrowserRendering\s*=/);
+    expect(read('main/browser-keep-rendering.ts')).toContain('window.__remotea_keepBrowserRendering?.(');
   });
 });
 

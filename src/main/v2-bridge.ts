@@ -1,6 +1,6 @@
 /**
  * v2-bridge.ts — Table-driven V2 pipe handlers that simply forward to a renderer
- * `window.__wmux_*` bridge call and shape the reply. Extracted from index.ts's
+ * `window.__remotea_*` bridge call and shape the reply. Extracted from index.ts's
  * dispatch switch so the switch stays maintainable; the behaviour (the exact JS
  * expression and response shape) is preserved verbatim per method.
  */
@@ -107,7 +107,7 @@ const S = (v: any) => JSON.stringify(v);
  * A non-string becomes `""`, which `openLinkFromBridge` refuses.
  */
 export function linkOpenJs(url: unknown): string {
-  return `window.__wmux_openLink?.(${S(typeof url === 'string' ? url : '')})`;
+  return `window.__remotea_openLink?.(${S(typeof url === 'string' ? url : '')})`;
 }
 
 /**
@@ -183,7 +183,7 @@ function targetForCaller(caller: unknown): Promise<CallerTarget<BrowserWindow> |
     focused: () => BrowserWindow.getFocusedWindow(),
     keyOf: (w) => w.id,
     locate: (w, surfaceId) =>
-      w.webContents.executeJavaScript(`window.__wmux_locateSurface?.(${S(surfaceId)})`),
+      w.webContents.executeJavaScript(`window.__remotea_locateSurface?.(${S(surfaceId)})`),
     cache: callerWindows,
   });
 }
@@ -204,20 +204,20 @@ const SPECS: Record<string, BridgeSpec> = {
   'workspace.create': {
     validate: validateWorkspaceCreateParams,
     prepare: prepareWorkspaceCreateParams,
-    js: (p) => `window.__wmux_createWorkspace?.(${S(p || {})})`,
+    js: (p) => `window.__remotea_createWorkspace?.(${S(p || {})})`,
     shape: (r) => r || { ok: true },
   },
   'workspace.close': {
-    js: (p) => `window.__wmux_closeWorkspace?.(${S(p?.id || p?.workspaceId)})`,
+    js: (p) => `window.__remotea_closeWorkspace?.(${S(p?.id || p?.workspaceId)})`,
   },
   'workspace.select': {
-    js: (p) => `window.__wmux_selectWorkspace?.(${S(p?.id || p?.workspaceId)})`,
+    js: (p) => `window.__remotea_selectWorkspace?.(${S(p?.id || p?.workspaceId)})`,
   },
   'workspace.rename': {
-    js: (p) => `window.__wmux_renameWorkspace?.(${S(p?.id || p?.workspaceId)}, ${S(p?.title || '')})`,
+    js: (p) => `window.__remotea_renameWorkspace?.(${S(p?.id || p?.workspaceId)}, ${S(p?.title || '')})`,
   },
   'workspace.list': {
-    js: () => `window.__wmux_listWorkspaces?.()`,
+    js: () => `window.__remotea_listWorkspaces?.()`,
     shape: (r) => ({ workspaces: r || [] }),
     emptyOnNoWindow: { workspaces: [] },
   },
@@ -228,58 +228,58 @@ const SPECS: Record<string, BridgeSpec> = {
   // explicit miss rather than the focused workspace, so a caller can tell
   // "I don't know" from "it's this one".
   'workspace.current': {
-    js: (p) => `window.__wmux_currentWorkspace?.(${S(p?.workspaceId)}, ${S(p?.caller)})`,
+    js: (p) => `window.__remotea_currentWorkspace?.(${S(p?.workspaceId)}, ${S(p?.caller)})`,
     requireResult: 'surface not found',
     callerScoped: true,
   },
   'pane.split': {
-    js: (p) => `window.__wmux_splitPane?.(${S(p || {})})`,
+    js: (p) => `window.__remotea_splitPane?.(${S(p || {})})`,
     requireResult: 'No active workspace or panes',
     callerScoped: true,
   },
   'pane.close': {
-    js: (p) => `window.__wmux_closePane?.(${S(p?.id || p?.paneId)}, ${S(p?.workspaceId)})`,
+    js: (p) => `window.__remotea_closePane?.(${S(p?.id || p?.paneId)}, ${S(p?.workspaceId)})`,
   },
   'pane.list': {
-    js: (p) => `window.__wmux_listPanes?.(${S(p?.workspaceId)})`,
+    js: (p) => `window.__remotea_listPanes?.(${S(p?.workspaceId)})`,
     shape: (r) => ({ panes: r || [] }),
     emptyOnNoWindow: { panes: [] },
     callerScoped: true,
   },
   'layout.grid': {
-    js: (p) => `window.__wmux_layoutGrid?.(${S(p || {})})`,
+    js: (p) => `window.__remotea_layoutGrid?.(${S(p || {})})`,
     requireResult: 'No active workspace or invalid anchor',
     callerScoped: true,
   },
   // `validate` runs first, so the renderer can assume `params` is an object.
   'layout.agents': {
-    js: (p) => `window.__wmux_layoutAgents?.(${S(p)})`,
+    js: (p) => `window.__remotea_layoutAgents?.(${S(p)})`,
     requireResult: 'No active workspace or invalid anchor',
     callerScoped: true,
     validate: validateLayoutAgentsParams,
   },
   'system.tree': {
-    js: (p) => `window.__wmux_getTree?.(${S(p?.workspaceId)})`,
+    js: (p) => `window.__remotea_getTree?.(${S(p?.workspaceId)})`,
     shape: (r) => ({ tree: r || null }),
     emptyOnNoWindow: { tree: null },
     callerScoped: true,
   },
   'surface.create': {
-    js: (p) => `window.__wmux_createSurface?.(${S(p || {})})`,
+    js: (p) => `window.__remotea_createSurface?.(${S(p || {})})`,
     requireResult: 'No active workspace or panes',
     callerScoped: true,
   },
   'surface.close': {
-    js: (p) => `window.__wmux_closeSurface?.(${S(p?.id || p?.surfaceId)}, ${S(p?.workspaceId)})`,
+    js: (p) => `window.__remotea_closeSurface?.(${S(p?.id || p?.surfaceId)}, ${S(p?.workspaceId)})`,
   },
   'surface.focus': {
-    js: (p) => `window.__wmux_focusSurface?.(${S(p?.id || p?.surfaceId)}, ${S(p?.workspaceId)})`,
+    js: (p) => `window.__remotea_focusSurface?.(${S(p?.id || p?.surfaceId)}, ${S(p?.workspaceId)})`,
   },
   'surface.rename': {
-    js: (p) => `window.__wmux_renameSurface?.(${S(p?.id || p?.surfaceId)}, ${S(p?.title || '')}, ${S(p?.workspaceId)})`,
+    js: (p) => `window.__remotea_renameSurface?.(${S(p?.id || p?.surfaceId)}, ${S(p?.title || '')}, ${S(p?.workspaceId)})`,
   },
   'surface.list': {
-    js: (p) => `window.__wmux_listSurfaces?.(${S(p?.workspaceId)}, ${S(p?.paneId)})`,
+    js: (p) => `window.__remotea_listSurfaces?.(${S(p?.workspaceId)}, ${S(p?.paneId)})`,
     shape: (r) => ({ surfaces: r || [] }),
     emptyOnNoWindow: { surfaces: [] },
     callerScoped: true,
@@ -289,17 +289,17 @@ const SPECS: Record<string, BridgeSpec> = {
     // CLI-pushed surface was labelled "Markdown", so several agent-pushed docs
     // in one pane were indistinguishable (issue #116). It does NOT make the
     // surface file-backed — pushed content stays pathless by design.
-    js: (p) => `window.__wmux_setMarkdownContent?.(${S(p?.surfaceId || '')}, ${S(p?.markdown || '')}, ${S(p?.title || '')})`,
+    js: (p) => `window.__remotea_setMarkdownContent?.(${S(p?.surfaceId || '')}, ${S(p?.markdown || '')}, ${S(p?.title || '')})`,
   },
   'markdown.get_content': {
     // Read the buffer back out, mirroring `read-screen` for terminals: it lets
     // an agent verify what it actually pushed, which is the only way to debug a
     // producer that emitted an escaped newline or an unclosed fence (#116).
-    js: (p) => `window.__wmux_getMarkdownContent?.(${S(p?.surfaceId || '')})`,
+    js: (p) => `window.__remotea_getMarkdownContent?.(${S(p?.surfaceId || '')})`,
     shape: (r) => r ?? { error: 'surface not found' },
   },
   'notification.list': {
-    js: () => `window.__wmux_listNotifications?.()`,
+    js: () => `window.__remotea_listNotifications?.()`,
     shape: (r) => ({ notifications: r || [] }),
     emptyOnNoWindow: { notifications: [] },
   },

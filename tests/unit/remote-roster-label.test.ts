@@ -3,7 +3,7 @@ import type { PaneId, SurfaceId, WorkspaceId, WorkspaceInfo } from '../../src/sh
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The phone's Remote Console names a workspace the way the desktop does (#343):
-// `__wmux_remoteRoster` carries the derived label. The CLI's answers do not —
+// `__remotea_remoteRoster` carries the derived label. The CLI's answers do not —
 // `list-workspaces` and `current-workspace` keep the stored title, which is what
 // a script renames and matches on.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,9 +25,9 @@ const workspace: WorkspaceInfo = {
 };
 
 interface Bridge {
-  __wmux_remoteRoster: () => Array<{ workspaceTitle: string }>;
-  __wmux_listWorkspaces: () => Array<{ title: string }>;
-  __wmux_currentWorkspace: (workspaceId: string, surfaceId: string) => { title: string } | null;
+  __remotea_remoteRoster: () => Array<{ workspaceTitle: string }>;
+  __remotea_listWorkspaces: () => Array<{ title: string }>;
+  __remotea_currentWorkspace: (workspaceId: string, surfaceId: string) => { title: string } | null;
 }
 const bridge = () => globalThis.window as unknown as Bridge;
 
@@ -48,7 +48,7 @@ beforeEach(() => {
 describe('workspace names over the pipe bridge', () => {
   it('gives the phone the name the desktop shows', () => {
     announce('✳ Fix login bug');
-    expect(bridge().__wmux_remoteRoster().map((e) => e.workspaceTitle)).toEqual(['Fix login bug']);
+    expect(bridge().__remotea_remoteRoster().map((e) => e.workspaceTitle)).toEqual(['Fix login bug']);
   });
 
   it('gives the phone the same name on every spinner frame', () => {
@@ -56,14 +56,14 @@ describe('workspace names over the pipe bridge', () => {
     // key includes workspaceTitle.
     const names = ['◐', '◑', '◒', '◓', '⠋', '✳'].map((glyph) => {
       announce(`${glyph} Fix login bug`);
-      return bridge().__wmux_remoteRoster()[0]?.workspaceTitle;
+      return bridge().__remotea_remoteRoster()[0]?.workspaceTitle;
     });
     expect(new Set(names)).toEqual(new Set(['Fix login bug']));
   });
 
   it('keeps the stored title in the CLI\'s answers', () => {
     announce('✳ Fix login bug');
-    expect(bridge().__wmux_listWorkspaces().map((w) => w.title)).toEqual(['Workspace 3']);
-    expect(bridge().__wmux_currentWorkspace(WS, AGENT)?.title).toBe('Workspace 3');
+    expect(bridge().__remotea_listWorkspaces().map((w) => w.title)).toEqual(['Workspace 3']);
+    expect(bridge().__remotea_currentWorkspace(WS, AGENT)?.title).toBe('Workspace 3');
   });
 });

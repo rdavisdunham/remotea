@@ -31,13 +31,13 @@ class FakeWindow {
   webContents = {
     executeJavaScript: async (js: string) => {
       this.evaluated.push(js);
-      const locate = /__wmux_locateSurface\?\.\((.*)\)$/.exec(js);
+      const locate = /__remotea_locateSurface\?\.\((.*)\)$/.exec(js);
       if (locate) {
         const surfaceId = JSON.parse(locate[1]);
         const workspaceId = this.surfaces[surfaceId];
         return workspaceId ? { workspaceId, paneId: 'pane-x' } : null;
       }
-      const current = /__wmux_currentWorkspace\?\.\((.*), (.*)\)$/.exec(js);
+      const current = /__remotea_currentWorkspace\?\.\((.*), (.*)\)$/.exec(js);
       if (current) {
         // Mirrors pipe-bridge's implementation: no workspace id (or an unknown
         // one) means null — deliberately no fall back to the active workspace.

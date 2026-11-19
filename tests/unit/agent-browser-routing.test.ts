@@ -477,7 +477,7 @@ describe('the two engines are indistinguishable to a caller', () => {
 // ── target resolution ──────────────────────────────────────────────────────
 
 /**
- * A renderer window that answers the four `window.__wmux_*` globals
+ * A renderer window that answers the four `window.__remotea_*` globals
  * `resolveBrowserTarget` reaches for. Dispatch is on the global's name and the
  * first quoted argument, because that string of JS is genuinely how main talks
  * to the store.
@@ -497,10 +497,10 @@ function fakeWindow(opts: {
       executeJavaScript: async (js: string) => {
         calls.push(js);
         const arg = /"([^"]+)"/.exec(js)?.[1] ?? '';
-        if (js.includes('__wmux_getBrowserEngine')) return opts.engines?.[arg] ?? 'web';
-        if (js.includes('__wmux_getWorkspaceIdForSurface')) return opts.workspaceOf?.[arg] ?? null;
-        if (js.includes('__wmux_listBrowserSurfaces')) return opts.browsersIn?.[arg] ?? [];
-        if (js.includes('__wmux_splitPane')) return opts.created ? { surfaceId: opts.created } : null;
+        if (js.includes('__remotea_getBrowserEngine')) return opts.engines?.[arg] ?? 'web';
+        if (js.includes('__remotea_getWorkspaceIdForSurface')) return opts.workspaceOf?.[arg] ?? null;
+        if (js.includes('__remotea_listBrowserSurfaces')) return opts.browsersIn?.[arg] ?? [];
+        if (js.includes('__remotea_splitPane')) return opts.created ? { surfaceId: opts.created } : null;
         return null;
       },
     },
@@ -642,7 +642,7 @@ describe('resolveBrowserTarget — which engine a command lands on', () => {
     });
     const inner = win.webContents.executeJavaScript;
     win.webContents.executeJavaScript = async (js: string) => {
-      if (js.includes('__wmux_getBrowserEngine')) throw new Error('renderer went away');
+      if (js.includes('__remotea_getBrowserEngine')) throw new Error('renderer went away');
       return inner(js);
     };
     env.windows = [win];
@@ -674,7 +674,7 @@ describe('resolveBrowserTarget — which engine a command lands on', () => {
     expect(await resolveBrowserTarget('surf-named')).toEqual({ kind: 'web', wcId: 21 });
     expect(await resolveBrowserTarget('surf-named')).toEqual({ kind: 'web', wcId: 21 });
 
-    expect(win.calls.some((js) => js.includes('__wmux_splitPane'))).toBe(false);
+    expect(win.calls.some((js) => js.includes('__remotea_splitPane'))).toBe(false);
   });
 
   it('routes a named agent-mode browser surface to the agent engine', async () => {
@@ -704,7 +704,7 @@ describe('resolveBrowserTarget — which engine a command lands on', () => {
 
     await resolveBrowserTarget('surf-shared');
     expect(await resolveBrowserTarget(terminal)).toEqual({ kind: 'web', wcId: 31 });
-    expect(win.calls.some((js) => js.includes('__wmux_splitPane'))).toBe(false);
+    expect(win.calls.some((js) => js.includes('__remotea_splitPane'))).toBe(false);
   });
 });
 

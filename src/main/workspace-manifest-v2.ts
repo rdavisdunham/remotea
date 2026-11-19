@@ -40,7 +40,7 @@ async function targetWindow(caller: unknown): Promise<BrowserWindow | null> {
   const windows = liveWindows();
   if (typeof caller === 'string' && caller) {
     for (const win of windows) {
-      if (await evalIn(win, `window.__wmux_locateSurface?.(${JSON.stringify(caller)}) ?? null`)) return win;
+      if (await evalIn(win, `window.__remotea_locateSurface?.(${JSON.stringify(caller)}) ?? null`)) return win;
     }
   }
   return BrowserWindow.getFocusedWindow() ?? windows[0] ?? null;
@@ -93,11 +93,11 @@ function openDeps(host: ManifestHostDeps, caller: unknown): OpenDeps {
     createWorkspace: async (spec: ManifestWorkspaceSpec) => {
       target = target ?? await targetWindow(caller);
       if (!target) return null;
-      return evalIn(target, `window.__wmux_openManifestWorkspace?.(${JSON.stringify(spec)}) ?? null`);
+      return evalIn(target, `window.__remotea_openManifestWorkspace?.(${JSON.stringify(spec)}) ?? null`);
     },
     focusWorkspace: async (workspaceId) => {
       for (const win of liveWindows()) {
-        if (await evalIn(win, `window.__wmux_focusWorkspaceIfOpen?.(${JSON.stringify(workspaceId)}) === true`)) {
+        if (await evalIn(win, `window.__remotea_focusWorkspaceIfOpen?.(${JSON.stringify(workspaceId)}) === true`)) {
           win.focus();
           return true;
         }
@@ -109,7 +109,7 @@ function openDeps(host: ManifestHostDeps, caller: unknown): OpenDeps {
       wait: waitFor,
       sleep,
       notice: (surfaceId, text) => {
-        const script = `window.__wmux_paneNotice?.(${JSON.stringify(surfaceId)}, ${JSON.stringify(text)}) === true`;
+        const script = `window.__remotea_paneNotice?.(${JSON.stringify(surfaceId)}, ${JSON.stringify(text)}) === true`;
         void (async () => {
           for (const win of liveWindows()) if (await evalIn(win, script)) return;
         })();
@@ -163,7 +163,7 @@ function handleExport(params: any, respond: (result: any) => void, respondError:
   if (typeof to !== 'string' || !path.isAbsolute(to)) { respondError(-32602, 'to: the absolute folder the manifest will live in'); return; }
   (async () => {
     for (const win of liveWindows()) {
-      const desc = await evalIn<LiveWorkspaceDescription>(win, `window.__wmux_describeWorkspace?.(${JSON.stringify({ caller: params?.caller, workspaceId: params?.workspaceId })}) ?? null`);
+      const desc = await evalIn<LiveWorkspaceDescription>(win, `window.__remotea_describeWorkspace?.(${JSON.stringify({ caller: params?.caller, workspaceId: params?.workspaceId })}) ?? null`);
       if (desc) return desc;
     }
     return null;

@@ -353,7 +353,7 @@ None of these call `pty.kill`.
 
 ### Reconcile
 
-`reconcile.ts` is pure; it runs on (re)connect and for each incremental event. Its inputs are the registry mirror, the device id, the local remote surfaces in every window (via `__wmux_remoteLayoutIndex`), and probe results.
+`reconcile.ts` is pure; it runs on (re)connect and for each incremental event. Its inputs are the registry mirror, the device id, the local remote surfaces in every window (via `__remotea_remoteLayoutIndex`), and probe results.
 
 **For each local remote surface:**
 
