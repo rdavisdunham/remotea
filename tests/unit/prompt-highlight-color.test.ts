@@ -79,8 +79,8 @@ describe('applyHighlight paints the configured colour', () => {
     decorations[0].render();
 
     const el = decorations[0].element;
-    expect(el.classList.contains('wmux-prompt-mark')).toBe(true);
-    expect(el.style.getPropertyValue('--wmux-prompt-color')).toBe('#ff2d55');
+    expect(el.classList.contains('remotea-prompt-mark')).toBe(true);
+    expect(el.style.getPropertyValue('--remotea-prompt-color')).toBe('#ff2d55');
   });
 
   /**
@@ -133,7 +133,7 @@ describe('applyHighlight paints the configured colour', () => {
     unparseable.decorations[0].render();
 
     expect(unparseable.decorations[0].options.backgroundColor).toBeUndefined();
-    expect(unparseable.decorations[0].element.classList.contains('wmux-prompt-mark--css-tint')).toBe(true);
+    expect(unparseable.decorations[0].element.classList.contains('remotea-prompt-mark--css-tint')).toBe(true);
 
     forgetSurface(SURFACE);
     const normal = fakeTerminal('#1e1e1e');
@@ -141,7 +141,7 @@ describe('applyHighlight paints the configured colour', () => {
     applyHighlight(normal.term, SURFACE, 'e2', { color: '#ff2d55', rows: 1, ruler: false });
     normal.decorations[0].render();
 
-    expect(normal.decorations[0].element.classList.contains('wmux-prompt-mark--css-tint')).toBe(false);
+    expect(normal.decorations[0].element.classList.contains('remotea-prompt-mark--css-tint')).toBe(false);
   });
 
   it('carries the colour to the overview ruler tick', () => {
@@ -170,6 +170,6 @@ describe('applyHighlight paints the configured colour', () => {
     decorations[1].render();
 
     expect(decorations[0].disposed).toBe(true);
-    expect(decorations[1].element.style.getPropertyValue('--wmux-prompt-color')).toBe('#ff2d55');
+    expect(decorations[1].element.style.getPropertyValue('--remotea-prompt-color')).toBe('#ff2d55');
   });
 });

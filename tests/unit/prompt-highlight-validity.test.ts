@@ -267,6 +267,6 @@ describe('a band that stops carrying its prompt lets go', () => {
     vi.runAllTimers();
     expect(decorations).toHaveLength(1);
     expect(first.disposed).toBe(false);
-    expect(first.element.classList.contains('wmux-prompt-mark')).toBe(true);
+    expect(first.element.classList.contains('remotea-prompt-mark')).toBe(true);
   });
 });

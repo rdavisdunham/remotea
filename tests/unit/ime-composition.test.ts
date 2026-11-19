@@ -70,8 +70,8 @@ describe('installCompositionClauses (#301)', () => {
     textarea.setSelectionRange(1, 1);
     textarea.dispatchEvent(new Event('input'));
     expect(view.textContent).toBe('你好嗎');
-    expect(view.querySelector('.wmux-ime__caret')).not.toBeNull();
-    expect(view.querySelector('.wmux-ime__text')?.textContent).toBe('你');
+    expect(view.querySelector('.remotea-ime__caret')).not.toBeNull();
+    expect(view.querySelector('.remotea-ime__text')?.textContent).toBe('你');
     expect(view.style.background).toBe('rgb(17, 17, 17)');
   });
 
@@ -83,7 +83,7 @@ describe('installCompositionClauses (#301)', () => {
     textarea.setSelectionRange(0, 0);
     textarea.dispatchEvent(new Event('keyup'));
     expect(view.firstChild?.textContent).toBe('');
-    expect(view.children[1].className).toBe('wmux-ime__caret');
+    expect(view.children[1].className).toBe('remotea-ime__caret');
   });
 
   it('touches nothing when xterm is not composing', () => {

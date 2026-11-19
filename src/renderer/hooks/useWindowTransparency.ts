@@ -9,7 +9,7 @@ import { backdropCaps } from '../utils/backdrop-caps';
  *
  *  - Main process — a zero-alpha window `backgroundColor`, plus either
  *    `transparent: true` (plain alpha) or a Win11 backdrop material (blurred).
- *  - Renderer — the `wmux-transparent` class, which stops <html>/<body>/#root
+ *  - Renderer — the `remotea-transparent` class, which stops <html>/<body>/#root
  *    painting so the now-transparent window is actually visible through them.
  *
  * The main process reads the same pref off settings.json when it CREATES a
@@ -51,7 +51,7 @@ export function useWindowTransparency(): void {
       // then would just expose its backgroundColor — a flat slab where the
       // terminal used to be, which reads as a bug rather than as "pending".
       const pending = result?.needsRestart === true;
-      document.documentElement.classList.toggle('wmux-transparent', on && !pending);
+      document.documentElement.classList.toggle('remotea-transparent', on && !pending);
       setNeedsRestart(pending);
     })();
 

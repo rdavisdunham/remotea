@@ -383,7 +383,7 @@ export default function SurfaceTabBar({
         const savedInsertIndex = insertIndex;
         setInsertIndex(null);
         setDraggingSurfaceId(null);
-        document.body.classList.remove('wmux-dragging');
+        document.body.classList.remove('remotea-dragging');
         const data = e.dataTransfer.getData('application/wmux-surface');
         if (!data) {
           onSurfaceDragEnd?.();
@@ -484,13 +484,13 @@ export default function SurfaceTabBar({
                 e.dataTransfer.effectAllowed = 'move';
                 setDraggingSurfaceId(surface.id);
                 onSurfaceDragStart?.(surface.id);
-                document.body.classList.add('wmux-dragging');
+                document.body.classList.add('remotea-dragging');
               }}
               onDragEnd={() => {
                 setDraggingSurfaceId(null);
                 setInsertIndex(null);
                 onSurfaceDragEnd?.();
-                document.body.classList.remove('wmux-dragging');
+                document.body.classList.remove('remotea-dragging');
               }}
               onDragOver={(e) => {
                 e.preventDefault();

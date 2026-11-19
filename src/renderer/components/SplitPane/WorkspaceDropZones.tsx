@@ -41,7 +41,7 @@ export default function WorkspaceDropZones({ workspace, drag, onEnd, onClearPrev
             if (result) { store.updateSplitTree(workspace.id, result.tree); onCommit(); }
           }
           setEdge(null); onEnd();
-          document.body.classList.remove('wmux-dragging');
+          document.body.classList.remove('remotea-dragging');
         }}
       ><span>{t('splitPreview.workspaceEdge', 'Workspace edge')}</span></div>
     ))}

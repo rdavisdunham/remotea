@@ -61,10 +61,10 @@ export interface KeepAliveOptions<P> {
 type Listener = () => void;
 
 function defaultParkingRoot(): HTMLElement {
-  const existing = document.getElementById('wmux-terminal-parking');
+  const existing = document.getElementById('remotea-terminal-parking');
   if (existing) return existing;
   const root = document.createElement('div');
-  root.id = 'wmux-terminal-parking';
+  root.id = 'remotea-terminal-parking';
   root.setAttribute('aria-hidden', 'true');
   // Laid out (so the parked terminal keeps its size) but never seen or hit.
   root.style.cssText = 'position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none;';

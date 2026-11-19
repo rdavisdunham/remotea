@@ -44,25 +44,25 @@
  * It must not take pointer events: the decoration covers whole rows, and a
  * hit-testable overlay there would swallow the drag that selects them.
  */
-.wmux-prompt-mark {
+.remotea-prompt-mark {
   pointer-events: none;
-  box-shadow: inset 4px 0 0 0 var(--wmux-prompt-color, var(--ui-accent));
+  box-shadow: inset 4px 0 0 0 var(--remotea-prompt-color, var(--ui-accent));
 }
 
 /* The fallback, and ONLY the fallback: an unparseable terminal background means
    `applyHighlight` could not pre-blend a tint, so the old over-the-glyphs
    version comes back. Kept deliberately weak — it sits on top of the text — and
    never applied alongside the renderer tint, which would double it. */
-.wmux-prompt-mark--css-tint::before {
+.remotea-prompt-mark--css-tint::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--wmux-prompt-color, var(--ui-accent));
+  background: var(--remotea-prompt-color, var(--ui-accent));
   opacity: 0.12;
 }
 
 /* A light terminal background swallows the same alpha, so it gets a little more. */
-:root[data-ui-theme='light'] .wmux-prompt-mark--css-tint::before {
+:root[data-ui-theme='light'] .remotea-prompt-mark--css-tint::before {
   opacity: 0.16;
 }
 
@@ -146,8 +146,8 @@
   min-width: 0;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: var(--wmux-pin-lines, 2);
-  line-clamp: var(--wmux-pin-lines, 2);
+  -webkit-line-clamp: var(--remotea-pin-lines, 2);
+  line-clamp: var(--remotea-pin-lines, 2);
   overflow: hidden;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

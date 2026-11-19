@@ -846,12 +846,12 @@ export function applyHighlight(
         // onRender fires again every time the row is re-laid-out (resize, scroll
         // back into view), so this must be idempotent: classList and a custom
         // property both are.
-        element.classList.add('wmux-prompt-mark');
-        element.style.setProperty('--wmux-prompt-color', options.color);
+        element.classList.add('remotea-prompt-mark');
+        element.style.setProperty('--remotea-prompt-color', options.color);
         // Only when the blend could not be computed — an unparseable theme
         // background — does the old over-the-glyphs tint come back, because a
         // washed-out hint still beats a rail with nothing beside it.
-        element.classList.toggle('wmux-prompt-mark--css-tint', !tint);
+        element.classList.toggle('remotea-prompt-mark--css-tint', !tint);
         // Nothing to re-check when the tint rests on the caller's word rather
         // than on the row's text.
         if (stillOnTheRow(terminal, record, options.text ? null : { needle, found })) return;

@@ -23,9 +23,9 @@ html, body, #root {
    Terminal arrangement, and it keeps chrome text readable over an arbitrary
    desktop instead of leaving it to fight the wallpaper. The terminal's own
    translucency is a separate knob (terminalBgOpacity → bgAlpha). */
-html.wmux-transparent,
-html.wmux-transparent body,
-html.wmux-transparent #root {
+html.remotea-transparent,
+html.remotea-transparent body,
+html.remotea-transparent #root {
   background: transparent;
 }
 
