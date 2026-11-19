@@ -26,7 +26,7 @@ export const LEGACY_CLI_FILES = {
 } as const;
 
 /** The helper files a host copied into `~/.local/share/remotea/cli`. */
-export const LEGACY_HOST_HELPER_FILES = ['wmux-hook.js', 'wmux.js'] as const;
+export const LEGACY_HOST_HELPER_FILES = ['wmux-hook.js', 'wmux.js', 'wmux-codex.js'] as const;
 
 /** Substring every old hook command contained. Never proof of ownership. */
 export const LEGACY_HOOK_MARKER = 'wmux-hook';

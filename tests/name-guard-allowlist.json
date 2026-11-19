@@ -1,0 +1,246 @@
+{
+  "files": [
+    {
+      "path": "LICENSE",
+      "reason": "wmux's MIT copyright notice is kept"
+    },
+    {
+      "path": "CREDITS.md",
+      "reason": "credits wmux, the app remotea is built on"
+    },
+    {
+      "path": "README.md",
+      "reason": "attribution, and notes on running beside a stock wmux install"
+    },
+    {
+      "path": "AGENTS.md",
+      "reason": "explains the hard fork from wmux and how to take a wmux fix"
+    },
+    {
+      "path": "docs/upstream/**",
+      "reason": "wmux's original README, kept as provenance"
+    },
+    {
+      "path": "docs/assets/wmux*",
+      "reason": "upstream screenshots and logo that docs/upstream shows"
+    },
+    {
+      "path": "docs/remotea/upstream-ledger.md",
+      "reason": "the record of which wmux changes remotea took"
+    },
+    {
+      "path": "docs/remotea/orchestrator-architecture.md",
+      "reason": "describes the removed wmux orchestrator, kept as provenance"
+    },
+    {
+      "path": "docs/remotea/e2e-test-list.md",
+      "reason": "tells the owner to test the move from the old names and hooks beside a wmux install"
+    },
+    {
+      "path": "docs/plans/**",
+      "reason": "plans describe the wmux cleanup itself"
+    },
+    {
+      "path": "docs/ideation/**",
+      "reason": "ideation describes the wmux cleanup itself"
+    },
+    {
+      "path": "docs/config.md",
+      "reason": "its move section names the old config folder, keys and project files"
+    },
+    {
+      "path": "src/shared/legacy-names.ts",
+      "reason": "the one list of old names the move command migrates"
+    },
+    {
+      "path": "src/shared/legacy-cleanup.ts",
+      "reason": "recognises remotea's own pre-rename hook entries and blocks"
+    },
+    {
+      "path": "src/shared/artifact-ownership.ts",
+      "reason": "tells remotea's old artifacts from a separate wmux install's"
+    },
+    {
+      "path": "src/main/rename-move.ts",
+      "reason": "the move command: reads the old names it migrates"
+    },
+    {
+      "path": "src/main/old-state-notice.ts",
+      "reason": "notices state left under the old names"
+    },
+    {
+      "path": "src/main/move-mode.ts",
+      "reason": "the move command's app-side flow"
+    },
+    {
+      "path": "remote-server/src/move.ts",
+      "reason": "the host's move command"
+    },
+    {
+      "path": "tests/unit/legacy-cleanup.test.ts",
+      "reason": "old-name hook and block fixtures, and a wmux install's"
+    },
+    {
+      "path": "tests/unit/agent-context-block.test.ts",
+      "reason": "old-block fixtures"
+    },
+    {
+      "path": "tests/unit/artifact-ownership.test.ts",
+      "reason": "a separate wmux install's artifacts"
+    },
+    {
+      "path": "tests/unit/rename-move.test.ts",
+      "reason": "old-name state the move migrates"
+    },
+    {
+      "path": "tests/unit/old-state-notice.test.ts",
+      "reason": "old-name state the notice finds"
+    },
+    {
+      "path": "remote-server/tests/move.test.ts",
+      "reason": "old-name state the host move migrates"
+    },
+    {
+      "path": "src/renderer/utils/browser-start-page.ts",
+      "reason": "recognises the upstream repository page the browser panel used to open (#232)"
+    },
+    {
+      "path": "tests/unit/browser-start-page.test.ts",
+      "reason": "variants of the upstream repository URL the start page must recognise"
+    },
+    {
+      "path": "resources/icons/icon.svg",
+      "reason": "notes which parts of the mark come from wmux's"
+    },
+    {
+      "path": "tests/name-guard-allowlist.json",
+      "reason": "this file"
+    },
+    {
+      "path": "tests/name-guard.ts",
+      "reason": "the guard: matches the old name"
+    },
+    {
+      "path": "tests/unit/name-guard.test.ts",
+      "reason": "the guard's tests: feed it the old name"
+    },
+    {
+      "path": "remote-server/tests/name-guard.test.ts",
+      "reason": "runs the guard in the Linux job"
+    }
+  ],
+  "lines": [
+    {
+      "path": "docs/remotea/alignment.md",
+      "contains": "carries the old `wmux-*` keys and `~/.wmux` over once",
+      "reason": "names what the move command migrates"
+    },
+    {
+      "path": "docs/remotea/architecture.md",
+      "contains": "The old root, `%APPDATA%\\wmux`, was also",
+      "reason": "the old userData root that collided with another app (#282)"
+    },
+    {
+      "path": "remote-server/src/cli.ts",
+      "contains": "whether remotea or a wmux install wrote them",
+      "reason": "old plugin files may belong to a separate wmux install"
+    },
+    {
+      "path": "remote-server/src/hooks-install.ts",
+      "contains": "A wmux install's entries never match.",
+      "reason": "ownership is never inferred from a separate wmux install's entries"
+    },
+    {
+      "path": "remote-server/src/pty-spawn.ts",
+      "contains": "WMUX_ variables",
+      "reason": "a separate wmux install's variables must not leak into host sessions"
+    },
+    {
+      "path": "remote-server/tests/hook-bridge.test.ts",
+      "contains": "byte-identical (AE5)",
+      "reason": "AE5: a separate wmux install's hook entries are left alone"
+    },
+    {
+      "path": "remote-server/tests/hook-bridge.test.ts",
+      "contains": "wmuxCheckout",
+      "reason": "AE5: a separate wmux checkout"
+    },
+    {
+      "path": "remote-server/tests/hook-bridge.test.ts",
+      "contains": "${paths.cliDir}/wmux-hook.js",
+      "reason": "AE5: remotea's own pre-rename hook entry"
+    },
+    {
+      "path": "resources/agy-plugin/remotea-agy-hook.cjs",
+      "contains": "Another app also named wmux",
+      "reason": "the foreign-pane guard against openwong2kim/wmux"
+    },
+    {
+      "path": "resources/cli/remotea.js",
+      "contains": "was being reported as a wmux crash",
+      "reason": "history of the crash-report substring bug; built from src/cli/remotea.ts"
+    },
+    {
+      "path": "src/cli/remotea.ts",
+      "contains": "was being reported as a wmux crash",
+      "reason": "history of the crash-report substring bug"
+    },
+    {
+      "path": "src/main/chromium-profile.ts",
+      "contains": "Electron's userData was `%APPDATA%\\wmux`",
+      "reason": "the old userData root (#282)"
+    },
+    {
+      "path": "src/main/chromium-profile.ts",
+      "contains": "productName of \"wmux\"",
+      "reason": "the old product name (#282)"
+    },
+    {
+      "path": "src/main/grok-context.ts",
+      "contains": "A wmux install writes the same file names.",
+      "reason": "a separate wmux install writes the same file"
+    },
+    {
+      "path": "src/main/index.ts",
+      "contains": "which was `%APPDATA%\\wmux`",
+      "reason": "the old userData root (#282)"
+    },
+    {
+      "path": "src/main/kiro-context.ts",
+      "contains": "a wmux install writes the same name.",
+      "reason": "a separate wmux install writes the same file"
+    },
+    {
+      "path": "src/renderer/components/Settings/settings-search-index.ts",
+      "contains": "Credits — built on wmux",
+      "reason": "generated from the credits line in en.ts"
+    },
+    {
+      "path": "src/shared/instance.ts",
+      "contains": "from a stock wmux install running",
+      "reason": "the identity exists to run beside a stock wmux install"
+    },
+    {
+      "path": "tests/unit/chromium-profile.test.ts",
+      "contains": "userData was %APPDATA%\\wmux",
+      "reason": "the old userData root (#282)"
+    }
+  ],
+  "spans": [
+    {
+      "text": "amirlehmam/wmux",
+      "reason": "the upstream repository: issue links, release URLs, the start page it must never open"
+    },
+    {
+      "text": "openwong2kim/wmux",
+      "reason": "a different app that shares the old name (#282)"
+    }
+  ],
+  "keys": [
+    {
+      "key": "settings.help.credits",
+      "paths": "src/renderer/i18n/locales/*.ts",
+      "reason": "the credits line names wmux"
+    }
+  ]
+}

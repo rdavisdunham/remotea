@@ -2073,7 +2073,7 @@ export const SETTINGS_SEARCH_TERMS = {
     },
     {
       "key": "settings.help.credits",
-      "label": "Credits — built on remotea and inspired by herdr"
+      "label": "Credits — built on wmux and inspired by herdr"
     },
     {
       "key": "settings.help.tasks",
