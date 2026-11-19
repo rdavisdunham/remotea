@@ -3,7 +3,7 @@
  * injected as a <meta> by vite.config.ts at BUILD time only — the dev server
  * needs an inline React-refresh preamble that `script-src 'self'` would block.
  *
- * The renderer holds the preload bridge (`window.wmux`, which can write into
+ * The renderer holds the preload bridge (`window.remotea`, which can write into
  * any PTY), and renders untrusted markdown through DOMPurify. This policy is
  * the second wall behind DOMPurify: no inline script, no inline event
  * handlers, no eval, no plugins, no <base> hijack — so markup that slips past

@@ -35,7 +35,7 @@ export default function ManagedControl({ surfaceId, hostId, active, onTakenOver 
     busy.current = true;
     setHandoff('busy');
     try {
-      const result = await window.wmux.remoteSessions.takeover(hostId, surfaceId);
+      const result = await window.remotea.remoteSessions.takeover(hostId, surfaceId);
       // Registry confirmation, not this response, removes the read-only gate.
       awaitingRegistry.current = useRemoteRegistry.getState().views?.find(view => view.hostId === hostId);
       setHandoff(result.ok || result.uncertain ? 'awaiting' : 'error');

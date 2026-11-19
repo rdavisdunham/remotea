@@ -79,7 +79,7 @@ import '@xterm/xterm/css/xterm.css';
 
 declare global {
   interface Window {
-    wmux: any;
+    remotea: any;
   }
 }
 
@@ -260,7 +260,7 @@ function applyInsertion(
   result: InsertionResult,
 ): void {
   if (result.failure) {
-    window.wmux?.notification?.fire({
+    window.remotea?.notification?.fire({
       surfaceId: surfaceId ?? '',
       // Composed here rather than in main so it can be translated: main hands
       // back the host and the transport's own complaint, and only the renderer
@@ -838,7 +838,7 @@ function writeWheelToPty(
   }
   const write = wheelForward({ lines, mouseTracking, source, col, row });
   if (!write) return;
-  for (let i = 0; i < write.repeats; i++) window.wmux.pty.write(ptyId, write.seq);
+  for (let i = 0; i < write.repeats; i++) window.remotea.pty.write(ptyId, write.seq);
 }
 
 // Capture-phase wheel handler. We always take ownership (xterm's own forwarding
@@ -895,7 +895,7 @@ function scheduleInitialResize(
   fit();
   const dims = fitAddon.proposeDimensions();
   if (dims) {
-    window.wmux.pty.resize(ptyId, dims.cols, dims.rows);
+    window.remotea.pty.resize(ptyId, dims.cols, dims.rows);
   } else if (attempt < 8) {
     requestAnimationFrame(() => {
       if (ptyIdRef.current === ptyId) scheduleInitialResize(ptyId, fit, fitAddon, ptyIdRef, replayHold, attempt + 1);
@@ -924,7 +924,7 @@ export async function fetchTheme(name: string): Promise<ThemeConfig> {
   const cached = themeCache.get(name);
   if (cached) return cached;
   try {
-    const theme: ThemeConfig = await (window as any).wmux.config.getTheme(name);
+    const theme: ThemeConfig = await (window as any).remotea.config.getTheme(name);
     themeCache.set(name, theme);
     return theme;
   } catch {
@@ -1159,7 +1159,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // window resized) leaves xterm and ConPTY disagreeing about which row the
       // cursor is on, and the prompt strands itself in the middle of old output.
       // See utils/windows-pty.ts for the mechanism.
-      windowsPty: remoteSpec ? undefined : windowsPtyCompat(window.wmux?.system?.osRelease ?? ''),
+      windowsPty: remoteSpec ? undefined : windowsPtyCompat(window.remotea?.system?.osRelease ?? ''),
       // ConPTY reflows the cursor's line on a column change and sends nothing
       // after it; xterm's default leaves that line at the width it was drawn
       // at, so a prompt first drawn in a narrower pane stayed broken there
@@ -1310,7 +1310,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           fit();
           const dims = fitAddonRef.current?.proposeDimensions();
           if (dims && ptyIdRef.current && (dims.cols !== snapshot.cols || dims.rows !== snapshot.rows)) {
-            window.wmux.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
+            window.remotea.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
           }
         });
       }
@@ -1367,7 +1367,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         fit();
         const dims = fitAddonRef.current?.proposeDimensions();
         if (dims && ptyIdRef.current && (dims.cols !== snapshot.cols || dims.rows !== snapshot.rows)) {
-          window.wmux.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
+          window.remotea.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
         }
       });
     };
@@ -1594,7 +1594,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // not free as a paste modifier (cmux scopes it to drop for the same
       // reason).
       finishInsertion(
-        window.wmux.remote.resolveDrop(surfaceId ?? '', Array.from(files), ev.shiftKey),
+        window.remotea.remote.resolveDrop(surfaceId ?? '', Array.from(files), ev.shiftKey),
       );
     };
     // Right-click: copy the selection or paste (#336) — see
@@ -1624,7 +1624,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       }
       // The SAME resolver as Ctrl+V, so a right-click means exactly what it
       // does: bracketed paste, image/file paste, scp for an ssh pane (#195).
-      if (!managedInputBlocked(latestRemoteViews(), surfaceId)) finishInsertion(window.wmux.remote.resolvePaste(surfaceId ?? ''));
+      if (!managedInputBlocked(latestRemoteViews(), surfaceId)) finishInsertion(window.remotea.remote.resolvePaste(surfaceId ?? ''));
     };
     dropHost.addEventListener('dragover', onDragOver);
     dropHost.addEventListener('drop', onDrop);
@@ -1792,7 +1792,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           // multi-byte chars (em dash E2 80 94) become mojibake (â€").
           const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
           const text = new TextDecoder('utf-8').decode(bytes);
-          if (text) window.wmux?.clipboard?.writeText?.(text);
+          if (text) window.remotea?.clipboard?.writeText?.(text);
         } catch { /* best effort */ }
       }
       return true;
@@ -1853,7 +1853,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         // One round trip. An image, a copied file and plain text are all the
         // same question — 'what should this paste type?' — and only main can
         // answer it, because only main can upload the first two.
-        finishInsertion(window.wmux.remote.resolvePaste(surfaceId ?? ''));
+        finishInsertion(window.remotea.remote.resolvePaste(surfaceId ?? ''));
         return false; // Prevent default — we handle paste ourselves
       }
       // Shift+Enter → newline for TUI apps (Claude Code, etc). See
@@ -1904,7 +1904,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       ptyIdRef.current = id;
 
       // Wire PTY data → xterm
-      const unsubData = window.wmux.pty.onData(id, (data: string) => {
+      const unsubData = window.remotea.pty.onData(id, (data: string) => {
         if (disposed) return;
         // Fold every DEC private mouse mode change in this chunk into the
         // surface's state, so the wheel handler can tell tmux from a plain
@@ -1933,7 +1933,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
 
       // Wire PTY exit → inform user; also auto-heal a stuck "Running" badge
       // (see clearStuckRunningState).
-      const unsubExit = window.wmux.pty.onExit(id, (_code: number, info?: PtyExitInfo) => {
+      const unsubExit = window.remotea.pty.onExit(id, (_code: number, info?: PtyExitInfo) => {
         // Undo whatever the dead application left set BEFORE announcing the
         // exit, so the announcement itself lands on the normal buffer in
         // default colours rather than inside the corpse of an alt screen
@@ -1976,7 +1976,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       });
 
       // remotea: a remote terminal that missed too much while disconnected gets a fresh screen.
-      const unsubResync = remoteRef.current ? window.wmux.pty.onResync(id, resyncFromServer) : () => {};
+      const unsubResync = remoteRef.current ? window.remotea.pty.onResync(id, resyncFromServer) : () => {};
 
       // remotea: who sets this remote terminal's size. Owning it, fit the pane as
       // usual (and make sure the server has this pane's size); viewing another
@@ -1989,11 +1989,11 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         fit();
         if (size.owner && wasViewing) {
           const dims = fitAddonRef.current?.proposeDimensions();
-          if (dims && (dims.cols !== size.cols || dims.rows !== size.rows)) window.wmux.pty.resize(id, dims.cols, dims.rows);
+          if (dims && (dims.cols !== size.cols || dims.rows !== size.rows)) window.remotea.pty.resize(id, dims.cols, dims.rows);
         }
       };
-      const unsubSize = remoteRef.current ? window.wmux.pty.onRemoteSize(id, onRemoteSize) : () => {};
-      if (remoteRef.current) void window.wmux.pty.remoteSize(id).then(onRemoteSize);
+      const unsubSize = remoteRef.current ? window.remotea.pty.onRemoteSize(id, onRemoteSize) : () => {};
+      if (remoteRef.current) void window.remotea.pty.remoteSize(id).then(onRemoteSize);
       const forgetView = () => {
         remoteViewRef.current = null;
         if (surfaceId) setRemoteView(surfaceId, null);
@@ -2001,11 +2001,11 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
 
       cleanupFnsRef.current.push(unsubData, unsubExit, unsubResync, unsubSize, forgetView);
       // The pane the user is looking at takes control of the remote terminal's size.
-      if (remoteRef.current && focusedRef.current && document.hasFocus()) window.wmux.pty.focus(id);
+      if (remoteRef.current && focusedRef.current && document.hasFocus()) window.remotea.pty.focus(id);
 
       // Flush any resize that arrived before this PTY was ready
       if (pendingResizeDims && !replayHold.isHolding) {
-        window.wmux.pty.resize(id, pendingResizeDims.cols, pendingResizeDims.rows);
+        window.remotea.pty.resize(id, pendingResizeDims.cols, pendingResizeDims.rows);
         pendingResizeDims = null;
       } else {
         // Initial resize, retried until the renderer has laid out (see helper).
@@ -2057,8 +2057,8 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     const { cols: initialCols, rows: initialRows } = proposeInitialDims(fitAddon);
 
     // If surfaceId is given AND a PTY already exists for it (agent spawn or re-mount), attach to it
-    if (surfaceId && window.wmux.pty.has) {
-      window.wmux.pty.has(surfaceId).then((exists: boolean) => {
+    if (surfaceId && window.remotea.pty.has) {
+      window.remotea.pty.has(surfaceId).then((exists: boolean) => {
         // Torn down while has() was in flight (#385): attaching now would add
         // PTY listeners after the cleanup that removes them already ran, and
         // they would hold this disposed terminal for the life of the window.
@@ -2069,7 +2069,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           // remotea: a remote terminal's screen lives on the server, and this
           // renderer may have none of it (a window reload drops the local
           // cache). Ask for the server's; it arrives through onResync.
-          if (remoteSpec) window.wmux.pty.requestResync?.(surfaceId!);
+          if (remoteSpec) window.remotea.pty.requestResync?.(surfaceId!);
         } else {
           // No existing PTY — create a new one, passing surfaceId so PTY ID = Surface ID
           const spawnCommands = withClaudeResume({
@@ -2091,7 +2091,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           });
           // remotea: a remote session is filed under this workspace's shared group (created on first use).
           const remoteGroup = remoteSpec ? ensureRemoteGroup(surfaceId, remoteSpec.hostId) : null;
-          window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, surfaceId, startupCommands: spawnCommands, cols: initialCols, rows: initialRows, ...(remoteGroup ? { remote: remoteGroup } : {}) })
+          window.remotea.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, surfaceId, startupCommands: spawnCommands, cols: initialCols, rows: initialRows, ...(remoteGroup ? { remote: remoteGroup } : {}) })
             .then((created: { id: string; shell: string; launchShell?: string; reused: boolean; shellFallbackFrom?: string; snapshot?: TerminalSnapshot; unavailable?: PtyExitInfo; remote?: boolean }) => {
               // PTY persists (keep-alive); a remount re-attaches via pty.has.
               if (disposed) return;
@@ -2112,7 +2112,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       });
     } else {
       // No surfaceId hint — always create new PTY
-      window.wmux.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, startupCommands: startupCommandsRef.current, cols: initialCols, rows: initialRows })
+      window.remotea.pty.create({ shell: effectiveShell, cwd: effectiveCwd, env: envRef.current ?? {}, startupCommands: startupCommandsRef.current, cols: initialCols, rows: initialRows })
         .then((created: { id: string; shell: string; launchShell?: string; reused: boolean; shellFallbackFrom?: string }) => {
           if (disposed) return;
           setResolvedShellForSurface(surfaceId, created.shell, created.launchShell);
@@ -2133,11 +2133,11 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       if (st.broadcastInputActive && surfaceId) {
         const ws = st.workspaces.find((w) => treeHasSurface(w.splitTree, surfaceId));
         if (ws) {
-          forwardTerminalInput(surfaceId, collectActiveTerminalSurfaceIds(ws.splitTree), data, window.wmux.pty.write);
+          forwardTerminalInput(surfaceId, collectActiveTerminalSurfaceIds(ws.splitTree), data, window.remotea.pty.write);
           return;
         }
       }
-      forwardTerminalInput(surfaceId, [ptyIdRef.current], data, window.wmux.pty.write);
+      forwardTerminalInput(surfaceId, [ptyIdRef.current], data, window.remotea.pty.write);
     });
 
     // ResizeObserver to auto-fit and relay size to PTY (debounced to prevent IPC spam)
@@ -2150,7 +2150,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         const dims = replayHoldRef.current.isHolding ? null : fitAddon.proposeDimensions();
         if (dims) {
           if (ptyIdRef.current) {
-            window.wmux.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
+            window.remotea.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
           } else {
             // PTY not attached yet — stash so attachToPty can flush it
             pendingResizeDims = { cols: dims.cols, rows: dims.rows };
@@ -2274,7 +2274,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       const detail = (e as CustomEvent).detail;
       if (detail?.surfaceId !== surfaceId) return;
       if (!xtermRef.current || !ptyIdRef.current || managedInputBlocked(latestRemoteViews(), surfaceId)) return;
-      finishInsertion(window.wmux.remote.resolvePaste(surfaceId ?? ''));
+      finishInsertion(window.remotea.remote.resolvePaste(surfaceId ?? ''));
     };
     document.addEventListener('wmux:paste-terminal', handler);
     return () => document.removeEventListener('wmux:paste-terminal', handler);
@@ -2288,7 +2288,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       if (!term || replayHoldRef.current.isHolding) return;
       // The prompt list stays; its markers and anchor go, a prompt in progress
       // is re-based, and ConPTY is cleared before xterm (utils/terminal-clear.ts).
-      clearTerminalBuffer(term, surfaceId, ptyIdRef.current, window.wmux?.pty?.clear);
+      clearTerminalBuffer(term, surfaceId, ptyIdRef.current, window.remotea?.pty?.clear);
     };
     document.addEventListener('wmux:clear-terminal-buffer', handler);
     return () => document.removeEventListener('wmux:clear-terminal-buffer', handler);
@@ -2420,7 +2420,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
         fit();
         const dims = replayHoldRef.current.isHolding ? null : fitAddonRef.current?.proposeDimensions();
         if (dims && ptyIdRef.current) {
-          window.wmux.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
+          window.remotea.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
         }
         try { xtermRef.current.refresh(0, xtermRef.current.rows - 1); } catch { /* no-op */ }
       });
@@ -2468,7 +2468,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
           fit();
           const dims = replayHoldRef.current.isHolding ? null : fitAddonRef.current?.proposeDimensions();
           if (dims && ptyIdRef.current) {
-            window.wmux.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
+            window.remotea.pty.resize(ptyIdRef.current, dims.cols, dims.rows);
           }
           try { term.refresh(0, term.rows - 1); } catch { /* no-op */ }
           // Refocusing the pane must not take the caret away from an overlay
@@ -2503,7 +2503,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
   useEffect(() => {
     if (!visible || !focused) return;
     const claim = () => {
-      if (remoteRef.current && ptyIdRef.current && document.hasFocus()) window.wmux.pty.focus(ptyIdRef.current);
+      if (remoteRef.current && ptyIdRef.current && document.hasFocus()) window.remotea.pty.focus(ptyIdRef.current);
     };
     claim();
     window.addEventListener('focus', claim);

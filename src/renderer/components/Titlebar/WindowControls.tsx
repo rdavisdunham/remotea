@@ -18,7 +18,7 @@ export function useIsFramelessWindow(): boolean {
   const [frameless, setFrameless] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    window.wmux?.window?.isFrameless?.()
+    window.remotea?.window?.isFrameless?.()
       .then((v: boolean) => { if (!cancelled) setFrameless(v === true); })
       .catch(() => { /* older preload — a native frame is the safe assumption */ });
     return () => { cancelled = true; };
@@ -40,7 +40,7 @@ export default function WindowControls() {
     let cancelled = false;
     let queued = 0;
     const sync = async () => {
-      const value = await window.wmux?.window?.isMaximized?.();
+      const value = await window.remotea?.window?.isMaximized?.();
       if (!cancelled) setMaximized(value === true);
     };
     // Coalesced: a drag-resize fires this continuously, and the answer only
@@ -62,7 +62,7 @@ export default function WindowControls() {
     <div className="titlebar__window-controls">
       <button
         className="titlebar__wc"
-        onClick={() => window.wmux?.window?.minimize?.()}
+        onClick={() => window.remotea?.window?.minimize?.()}
         title={t('titlebar.minimize', 'Minimize')}
         aria-label={t('titlebar.minimize', 'Minimize')}
       >
@@ -72,7 +72,7 @@ export default function WindowControls() {
       </button>
       <button
         className="titlebar__wc"
-        onClick={() => window.wmux?.window?.maximize?.()}
+        onClick={() => window.remotea?.window?.maximize?.()}
         title={maximized ? t('titlebar.restore', 'Restore') : t('titlebar.maximize', 'Maximize')}
         aria-label={maximized ? t('titlebar.restore', 'Restore') : t('titlebar.maximize', 'Maximize')}
       >
@@ -89,7 +89,7 @@ export default function WindowControls() {
       </button>
       <button
         className="titlebar__wc titlebar__wc--close"
-        onClick={() => window.wmux?.window?.closeSelf?.()}
+        onClick={() => window.remotea?.window?.closeSelf?.()}
         title={t('titlebar.close', 'Close')}
         aria-label={t('titlebar.close', 'Close')}
       >

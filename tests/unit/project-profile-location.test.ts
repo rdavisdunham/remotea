@@ -20,12 +20,12 @@ function Preview({ value }: { value: WorkspaceInfo }) {
 describe('desktop project profile ownership', () => {
   let root: Root;
   let container: HTMLDivElement;
-  let original: typeof window.wmux;
+  let original: typeof window.remotea;
   const lookup = vi.fn();
   beforeEach(() => {
-    original = window.wmux;
+    original = window.remotea;
     lookup.mockReset().mockResolvedValue([profile]);
-    window.wmux = { config: { getProjectProfiles: lookup } } as unknown as typeof window.wmux;
+    window.remotea = { config: { getProjectProfiles: lookup } } as unknown as typeof window.remotea;
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -33,7 +33,7 @@ describe('desktop project profile ownership', () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
-    window.wmux = original;
+    window.remotea = original;
   });
   const render = async (value: WorkspaceInfo) => act(async () => root.render(createElement(Preview, { value })));
 

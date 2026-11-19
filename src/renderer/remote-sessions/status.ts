@@ -24,7 +24,7 @@ type Bridge = {
 };
 
 function bridge(): Bridge | null {
-  return (globalThis as { window?: { wmux?: { remoteHosts?: Bridge } } }).window?.wmux?.remoteHosts ?? null;
+  return (globalThis as { window?: { remotea?: { remoteHosts?: Bridge } } }).window?.remotea?.remoteHosts ?? null;
 }
 
 let started = false;

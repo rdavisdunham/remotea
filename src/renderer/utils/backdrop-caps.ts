@@ -21,7 +21,7 @@ let cached: Promise<BackdropCaps> | null = null;
 
 export function backdropCaps(): Promise<BackdropCaps> {
   if (!cached) {
-    cached = Promise.resolve(window.wmux?.window?.supportsBackdrop?.())
+    cached = Promise.resolve(window.remotea?.window?.supportsBackdrop?.())
       .then((caps) => ({
         transparency: caps?.transparency === true,
         materials: caps?.materials === true,

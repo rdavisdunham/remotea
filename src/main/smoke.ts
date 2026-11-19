@@ -78,7 +78,7 @@ export interface SmokeStep {
 }
 
 export interface RendererProbe {
-  /** `window.wmux` exists with its pty API — the (sandboxed) preload ran. */
+  /** `window.remotea` exists with its pty API — the (sandboxed) preload ran. */
   bridge: boolean;
   /** `window.__wmux_readScreen` exists — the renderer app booted. */
   readScreen: boolean;

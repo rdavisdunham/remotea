@@ -43,7 +43,7 @@ export function killSurfacePty(surface: Pick<SurfaceRef, 'id' | 'type'> & { shel
   try {
     // A remote session's spec lets main close it on its server even when this
     // tab was never mounted (so main never wired it up). Local closes are unchanged.
-    const kill = (globalThis as { window?: { wmux?: { pty?: { kill?: (id: string, shellSpec?: string) => void } } } }).window?.wmux?.pty?.kill;
+    const kill = (globalThis as { window?: { remotea?: { pty?: { kill?: (id: string, shellSpec?: string) => void } } } }).window?.remotea?.pty?.kill;
     if (isRemoteShellSpec(surface.shell)) kill?.(surface.id, surface.shell);
     else kill?.(surface.id);
   } catch {
@@ -129,7 +129,7 @@ type RemoteSessionsBridge = { groupClose?: (hostId: string, groupId: string) => 
 
 function remoteSessions(): RemoteSessionsBridge | undefined {
   try {
-    return (globalThis as { window?: { wmux?: { remoteSessions?: RemoteSessionsBridge } } }).window?.wmux?.remoteSessions;
+    return (globalThis as { window?: { remotea?: { remoteSessions?: RemoteSessionsBridge } } }).window?.remotea?.remoteSessions;
   } catch {
     return undefined;
   }

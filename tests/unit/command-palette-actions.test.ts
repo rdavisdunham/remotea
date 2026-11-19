@@ -36,7 +36,7 @@ beforeEach(() => {
     sidebarVisible: true,
     shortcuts: { ...initial.shortcuts, toggleSidebar: { key: 'F8', alt: true } },
   });
-  Object.defineProperty(window, 'wmux', {
+  Object.defineProperty(window, 'remotea', {
     configurable: true,
     value: { config: { getThemeList: vi.fn().mockResolvedValue(['Solarized', 'Dracula']) } },
   });
@@ -54,7 +54,7 @@ afterEach(() => {
   useStore.setState(initial, true);
   vi.restoreAllMocks();
   delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
-  delete (window as unknown as { wmux?: unknown }).wmux;
+  delete (window as unknown as { remotea?: unknown }).remotea;
 });
 
 function input(): HTMLInputElement {

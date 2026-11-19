@@ -65,7 +65,7 @@ function mountSettings(s: RemoteConsoleStatus): void {
     dismissRejectedOrigin: vi.fn(async () => undefined),
     pairStart: vi.fn(), pairCancel: vi.fn(), onRendererRequest: vi.fn(), replyRenderer: vi.fn(),
   };
-  (window as unknown as { wmux: unknown }).wmux = { remoteConsole: bridge };
+  (window as unknown as { remotea: unknown }).remotea = { remoteConsole: bridge };
 }
 
 async function settle(): Promise<void> {

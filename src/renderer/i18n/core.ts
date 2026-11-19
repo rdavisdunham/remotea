@@ -258,7 +258,7 @@ function toSupported(tag: unknown): Language | undefined {
  */
 export function detectDefaultLanguage(): Language {
   try {
-    const preferred: unknown = (globalThis as any).window?.wmux?.settings?.getPreferredLanguagesSync?.();
+    const preferred: unknown = (globalThis as any).window?.remotea?.settings?.getPreferredLanguagesSync?.();
     if (Array.isArray(preferred) && preferred.length) {
       // The OS list is authoritative when present — match the display language
       // (entry 0), not "any supported language anywhere in the list", so a
@@ -286,7 +286,7 @@ export function detectDefaultLanguage(): Language {
 export function loadUserLocalesFromBridge(): void {
   let payload: unknown;
   try {
-    payload = (globalThis as any).window?.wmux?.settings?.getUserLocalesSync?.();
+    payload = (globalThis as any).window?.remotea?.settings?.getUserLocalesSync?.();
   } catch {
     payload = undefined; /* preload bridge unavailable (tests) */
   }

@@ -16,7 +16,7 @@ const onSelect = vi.fn();
 beforeEach(() => {
   writeText.mockReset().mockResolvedValue(undefined);
   onSelect.mockReset();
-  Object.assign(window, { wmux: { clipboard: { writeText } } });
+  Object.assign(window, { remotea: { clipboard: { writeText } } });
   useStore.setState({ language: 'en' });
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -26,7 +26,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
-  delete (window as { wmux?: unknown }).wmux;
+  delete (window as { remotea?: unknown }).remotea;
 });
 
 function openMenu(surface: Partial<SurfaceRef>): HTMLElement | undefined {

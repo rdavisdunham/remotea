@@ -45,7 +45,7 @@ export function useUpdate() {
   const [upToDate, setUpToDate] = useState(false);
 
   useEffect(() => {
-    const wmux = (window as any).wmux;
+    const wmux = (window as any).remotea;
     if (!wmux?.update) return;
 
     wmux.update.getLatest().then((info: UpdateInfo | null) => {
@@ -72,7 +72,7 @@ export function useUpdate() {
   }, []);
 
   const trigger = useCallback(async (): Promise<UpdateTriggerResult> => {
-    const api = (window as any).wmux?.update;
+    const api = (window as any).remotea?.update;
     if (!api) return { handled: false, reason: 'not_supported' };
     const openRelease = (result?: UpdateTriggerResult) => {
       const url = fallbackReleaseUrl(result, update);

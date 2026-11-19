@@ -177,10 +177,10 @@ function applyUserConfigWorkspace(state: any, workspace: any): void {
   // Keep-awake is MAIN's state (issue #363): pushed there, never into the
   // store. Main persists it and tells every window.
   if (workspace.keepAwake?.mode) {
-    (window as any).wmux?.awake?.setMode?.(workspace.keepAwake.mode);
+    (window as any).remotea?.awake?.setMode?.(workspace.keepAwake.mode);
   }
   if (typeof workspace.keepAwake?.preventDisplaySleep === 'boolean') {
-    (window as any).wmux?.awake?.setPreventDisplaySleep?.(workspace.keepAwake.preventDisplaySleep);
+    (window as any).remotea?.awake?.setPreventDisplaySleep?.(workspace.keepAwake.preventDisplaySleep);
   }
   if (Object.keys(patch).length) state.setWorkspacePrefs(patch);
 }
@@ -208,7 +208,7 @@ type SetWidth = (width: number) => void;
  */
 async function restoreAutoSaved(t: T, setWidth: SetWidth): Promise<'restored' | 'fresh' | 'none'> {
   try {
-    const autoSaved = await window.wmux?.session?.loadAuto?.();
+    const autoSaved = await window.remotea?.session?.loadAuto?.();
     if (autoSaved && Array.isArray(autoSaved.workspaces) && autoSaved.workspaces.length > 0) {
       useStore.getState().replaceAllWorkspaces(autoSaved.workspaces, autoSaved.activeIndex, t);
       if (autoSaved.sidebarWidth) setWidth(autoSaved.sidebarWidth);
@@ -231,10 +231,10 @@ async function restoreAutoSaved(t: T, setWidth: SetWidth): Promise<'restored' | 
  */
 async function restoreNamedSession(t: T, setWidth: SetWidth): Promise<boolean> {
   try {
-    const sessions = await window.wmux?.session?.list();
+    const sessions = await window.remotea?.session?.list();
     const name = sessions?.[0]?.name;
     if (!name) return false;
-    const session = await window.wmux?.session?.load(name);
+    const session = await window.remotea?.session?.load(name);
     if (!session) return false;
     useStore.getState().replaceAllWorkspaces(session.workspaces, undefined, t);
     if (session.sidebarWidth) setWidth(session.sidebarWidth);
@@ -322,7 +322,7 @@ function handlePortsUpdate(cmd: any, updateWorkspaceMetadata: StoreAction): void
       const { autoOpenDevServer, inAppBrowser } = useStore.getState().browserPrefs;
       const autoOpenDevPort = inAppBrowser && autoOpenDevServer;
       if (autoOpenDevPort && currentWs && newPort !== undefined) {
-        window.wmux?.browser?.navigate?.(`browser-${currentWs}`, `http://localhost:${newPort}`);
+        window.remotea?.browser?.navigate?.(`browser-${currentWs}`, `http://localhost:${newPort}`);
       }
     }
     for (const ws of useStore.getState().workspaces) {
@@ -532,7 +532,7 @@ export function tryReplaceTabSpawn(event: any, ws: WorkspaceInfo, setAgentMeta: 
   setAgentMeta(event.surfaceId, { agentId: event.agentId, label: event.label, status: 'running' });
   // Intentionally not pushed onto the reopen-closed stack — the replaced
   // surface is an idle default shell, not user work.
-  window.wmux?.pty?.kill(replacedSurfaceId);
+  window.remotea?.pty?.kill(replacedSurfaceId);
   // This kills the PTY directly instead of routing through closeSurface, so
   // it must run the same ownership-gated PR-badge clear closeSurface would
   // have run — otherwise a replaced tab that happened to hold the PR badge
@@ -623,7 +623,7 @@ export default function App() {
       const paneId = (paneIdAt(target) as PaneId | null) ?? focusedPaneId;
       if (paneId) adjustPaneZoom(paneId, deltaY);
     },
-    (deltaY) => window.wmux?.system?.zoom?.(deltaY),
+    (deltaY) => window.remotea?.system?.zoom?.(deltaY),
   ), [adjustPaneZoom, focusedPaneId]);
   const [zoomedPaneId, setZoomedPaneId] = useState<PaneId | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -668,7 +668,7 @@ export default function App() {
   // side do not both claim the keyboard. A class for the same reason as focus
   // mode: no pane re-renders, and which pane is focused does not change.
   useEffect(() => {
-    const api = window.wmux?.window;
+    const api = window.remotea?.window;
     if (!api?.onFocusChange) return;
     const apply = (focused: boolean) =>
       document.documentElement.classList.toggle('wmux-window-inactive', !focused);
@@ -916,7 +916,7 @@ export default function App() {
   // File-wins-at-startup, app-wins-at-runtime: file values are applied over
   // persisted Zustand state, then in-app edits take over until reload/restart.
   useEffect(() => {
-    const cfg = (window as any).wmux?.config;
+    const cfg = (window as any).remotea?.config;
     if (!cfg?.getUserConfig) return;
 
     const apply = (result: any) => {
@@ -956,7 +956,7 @@ export default function App() {
   // here, rather than pushed from main — main decided at startup, before this
   // page existed, and a push would have raced the listener.
   useEffect(() => {
-    const take = window.wmux?.system?.takeIconChangeNotice;
+    const take = window.remotea?.system?.takeIconChangeNotice;
     if (!take) return;
     let cancelled = false;
     take().then((due: boolean) => {
@@ -979,7 +979,7 @@ export default function App() {
   // the app runs on the new names regardless, so say why things look reset.
   // Shown each launch until the move writes its marker (old-state-notice.ts).
   useEffect(() => {
-    const ask = window.wmux?.system?.oldStateNotice;
+    const ask = window.remotea?.system?.oldStateNotice;
     if (!ask) return;
     let cancelled = false;
     ask().then((due: boolean) => {
@@ -1004,7 +1004,7 @@ export default function App() {
   // The renderer only reports; main decides on focus + OS idle time and
   // restarts the process. The bell notice is the one trace the user sees.
   useEffect(() => {
-    const gpu = window.wmux?.gpu;
+    const gpu = window.remotea?.gpu;
     if (!gpu?.reportStall) return;
     const stop = startGpuProbe({
       requestFrame: (cb) => { requestAnimationFrame(cb); },
@@ -1028,8 +1028,8 @@ export default function App() {
 
   // Listen for agent spawn events from main process
   useEffect(() => {
-    if (!window.wmux?.agent?.onUpdate) return;
-    const unsub = window.wmux.agent.onUpdate((event: any) => {
+    if (!window.remotea?.agent?.onUpdate) return;
+    const unsub = window.remotea.agent.onUpdate((event: any) => {
       if (event.type === 'exited') {
         // Flip the sidebar agent line to done; no-op for unknown surfaces.
         const existing = useStore.getState().agentMeta.get(event.surfaceId);
@@ -1064,9 +1064,9 @@ export default function App() {
 
   // Listen for real-time metadata updates from shell integration (pipe server → IPC → here)
   useEffect(() => {
-    if (!window.wmux?.metadata?.onUpdate) return;
+    if (!window.remotea?.metadata?.onUpdate) return;
     const deps: MetaDeps = { updateWorkspaceMetadata, addNotification, runningStartTimes, t };
-    const unsub = window.wmux.metadata.onUpdate((cmd: any) => {
+    const unsub = window.remotea.metadata.onUpdate((cmd: any) => {
       if (!cmd) return;
       // ports_update and notify have no (required) surfaceId — handle globally.
       if (cmd.command === 'ports_update') { handlePortsUpdate(cmd, updateWorkspaceMetadata); return; }
@@ -1138,8 +1138,8 @@ export default function App() {
   // Listen for Claude Code hook events — tie to active workspace
   // Also auto-create diff surface when Edit/Write tools fire
   useEffect(() => {
-    if (!window.wmux?.hook?.onEvent) return;
-    const unsub = window.wmux.hook.onEvent((event: any) => {
+    if (!window.remotea?.hook?.onEvent) return;
+    const unsub = window.remotea.hook.onEvent((event: any) => {
       // Agent lifecycle (issue #53): Notification = agent needs input/permission,
       // Stop = agent finished its turn. These have no `tool`, so handle first.
       // remotea: `replay` is a remote session's latest state, restated when this
@@ -1211,8 +1211,8 @@ export default function App() {
 
   // Listen for Claude Code activity parsed from terminal output
   useEffect(() => {
-    if (!window.wmux?.claudeActivity?.onUpdate) return;
-    const unsub = window.wmux.claudeActivity.onUpdate((data: any) => {
+    if (!window.remotea?.claudeActivity?.onUpdate) return;
+    const unsub = window.remotea.claudeActivity.onUpdate((data: any) => {
       if (!data?.surfaceId || !data?.activity) return;
       setClaudeActivity(prev => ({ ...prev, [data.surfaceId]: data.activity }));
     });
@@ -1231,18 +1231,18 @@ export default function App() {
   // snapshot: the listener is attached before the request goes out, and any
   // surface it touched is re-applied after.
   useEffect(() => {
-    if (!window.wmux?.agentState?.onUpdate) return;
+    if (!window.remotea?.agentState?.onUpdate) return;
     let seeded = false;
     const pending: any[] = [];
 
-    const unsub = window.wmux.agentState.onUpdate((data: any) => {
+    const unsub = window.remotea.agentState.onUpdate((data: any) => {
       if (!data?.surfaceId) return;
       if (!seeded) pending.push(data);
       useStore.getState().setAgentState(data);
     });
 
     void (async () => {
-      const states = await window.wmux?.agentState?.list?.();
+      const states = await window.remotea?.agentState?.list?.();
       if (Array.isArray(states)) useStore.getState().replaceAgentStates(states);
       seeded = true;
       for (const data of pending) useStore.getState().setAgentState(data);
@@ -1257,12 +1257,12 @@ export default function App() {
   // spec named an agent at create time never emits again, so a window opened
   // afterwards would never learn about it.
   useEffect(() => {
-    if (!window.wmux?.agentIdentity?.onUpdate) return;
-    const unsub = window.wmux.agentIdentity.onUpdate((data: any) => {
+    if (!window.remotea?.agentIdentity?.onUpdate) return;
+    const unsub = window.remotea.agentIdentity.onUpdate((data: any) => {
       if (data?.surfaceId) useStore.getState().setAgentIdentity(data);
     });
     void (async () => {
-      const list = await window.wmux?.agentIdentity?.list?.();
+      const list = await window.remotea?.agentIdentity?.list?.();
       if (Array.isArray(list) && list.length > 0) {
         // Merge, never replace: a delta may already have landed for a surface
         // the seed does not know about, and the seed is the older view.
@@ -1277,7 +1277,7 @@ export default function App() {
   // button — the same convention Windows Terminal follows for the sequence.
   const surfaceProgress = useStore((s) => s.surfaceProgress);
   useEffect(() => {
-    const api = window.wmux?.window;
+    const api = window.remotea?.window;
     if (!api?.setProgress) return;
     const agg = aggregateProgress(Object.values(surfaceProgress));
     if (!agg) {
@@ -1291,7 +1291,7 @@ export default function App() {
 
   // Respond to main process auto-save requests (30s timer + on quit)
   useEffect(() => {
-    if (!window.wmux?.session?.onAutoSaveRequest) return;
+    if (!window.remotea?.session?.onAutoSaveRequest) return;
     const pushNow = () => {
       const state = useStore.getState();
       const data = {
@@ -1330,9 +1330,9 @@ export default function App() {
           })),
         }],
       };
-      window.wmux.session.pushAutoSave(data);
+      window.remotea.session.pushAutoSave(data);
     };
-    const unsub = window.wmux.session.onAutoSaveRequest(pushNow);
+    const unsub = window.remotea.session.onAutoSaveRequest(pushNow);
     // An edit the user made on purpose — a startup command (#285) — is written
     // now rather than on the next 30 s tick, so not even a crash can lose it.
     window.addEventListener(SESSION_SAVE_NOW_EVENT, pushNow);
@@ -1530,14 +1530,14 @@ export default function App() {
       sidebarWidth: sidebarWidthRef.current,
       terminalPrefs: { ...state.terminalPrefs },
     };
-    await window.wmux?.session?.save(session);
-    window.wmux?.notification?.fire({ surfaceId: '', text: t('app.sessionSaved', 'Session "{name}" saved').replace('{name}', name), title: 'remotea' });
+    await window.remotea?.session?.save(session);
+    window.remotea?.notification?.fire({ surfaceId: '', text: t('app.sessionSaved', 'Session "{name}" saved').replace('{name}', name), title: 'remotea' });
     // sidebarWidth is read through sidebarWidthRef (PR #131), so it is
     // deliberately not a dependency — a drag must not rebuild this callback.
   }, [t]);
 
   const handleLoadSession = useCallback(async (name: string) => {
-    const session = await window.wmux?.session?.load(name);
+    const session = await window.remotea?.session?.load(name);
     if (!session) return;
     const { replaceAllWorkspaces, setTerminalPrefs } = useStore.getState();
     replaceAllWorkspaces(session.workspaces, undefined, t);
@@ -1807,7 +1807,7 @@ export default function App() {
         sidebarVisible={sidebarVisible}
         onToggleSidebar={toggleSidebar}
         onHelpClick={() => setTutorialOpen(true)}
-        onDevToolsClick={() => window.wmux?.system?.toggleDevTools?.()}
+        onDevToolsClick={() => window.remotea?.system?.toggleDevTools?.()}
         onSettingsClick={() => openSettings()}
         onHubClick={() => setHubOpen(true)}
         hubEnabled={hubEnabled}
@@ -2175,7 +2175,7 @@ export default function App() {
           <span>{t('app.transparencyRestartBanner', 'Transparency change needs a restart to take effect.')}</span>
           <button
             className="restart-banner__btn"
-            onClick={() => window.wmux?.window?.relaunch?.()}
+            onClick={() => window.remotea?.window?.relaunch?.()}
           >
             {t('app.restartNow', 'Restart now')}
           </button>

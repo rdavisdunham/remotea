@@ -28,8 +28,8 @@ beforeEach(() => {
     set: vi.fn().mockResolvedValue(consent),
     status: vi.fn().mockResolvedValue(observed),
   };
-  bridgeDescriptor = Object.getOwnPropertyDescriptor(window, 'wmux');
-  Object.defineProperty(window, 'wmux', { configurable: true, value: { integration: api } });
+  bridgeDescriptor = Object.getOwnPropertyDescriptor(window, 'remotea');
+  Object.defineProperty(window, 'remotea', { configurable: true, value: { integration: api } });
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -38,8 +38,8 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  if (bridgeDescriptor) Object.defineProperty(window, 'wmux', bridgeDescriptor);
-  else delete (window as unknown as { wmux?: unknown }).wmux;
+  if (bridgeDescriptor) Object.defineProperty(window, 'remotea', bridgeDescriptor);
+  else delete (window as unknown as { remotea?: unknown }).remotea;
 });
 
 async function mount() {

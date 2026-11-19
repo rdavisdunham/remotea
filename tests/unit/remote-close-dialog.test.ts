@@ -63,7 +63,7 @@ let calls: { groupClose: string[][]; hide: string[][]; close: string[][]; kill: 
 
 function installBridge(): void {
   calls = { groupClose: [], hide: [], close: [], kill: [] };
-  (window as unknown as { wmux: unknown }).wmux = {
+  (window as unknown as { remotea: unknown }).remotea = {
     pty: { kill: (id: string, spec?: string) => calls.kill.push([id, spec]) },
     remoteSessions: {
       groupClose: (h: string, g: string) => calls.groupClose.push([h, g]),
@@ -94,7 +94,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setLatestRemoteViews(null);
-  delete (window as unknown as { wmux?: unknown }).wmux;
+  delete (window as unknown as { remotea?: unknown }).remotea;
 });
 
 describe('ordinary close gestures on a remote workspace', () => {

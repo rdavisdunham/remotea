@@ -77,7 +77,7 @@ describe('NewWorktreeModal', () => {
     mockProbe = vi.fn();
     mockCreate = vi.fn();
 
-    (window as any).wmux = {
+    (window as any).remotea = {
       worktree: {
         probe: mockProbe,
         create: mockCreate,
@@ -99,7 +99,7 @@ describe('NewWorktreeModal', () => {
     act(() => root.unmount());
     host.remove();
     document.body.innerHTML = '';
-    delete (window as any).wmux;
+    delete (window as any).remotea;
   });
 
   it('refuses a remote workspace directory without probing the desktop filesystem', async () => {

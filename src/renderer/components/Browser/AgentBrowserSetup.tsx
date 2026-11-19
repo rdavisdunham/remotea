@@ -51,7 +51,7 @@ export default function AgentBrowserSetup({ reason, onInstalled, onRetry, onCanc
     setFailed(false);
     let started: boolean;
     try {
-      started = (await window.wmux?.agentBrowser?.install())?.started === true;
+      started = (await window.remotea?.agentBrowser?.install())?.started === true;
     } catch {
       started = false;
     }
@@ -66,7 +66,7 @@ export default function AgentBrowserSetup({ reason, onInstalled, onRetry, onCanc
     timerRef.current = setInterval(async () => {
       if (Date.now() > deadline) { stopPolling(); setInstalling(false); return; }
       try {
-        if ((await window.wmux?.agentBrowser?.status())?.installed) {
+        if ((await window.remotea?.agentBrowser?.status())?.installed) {
           stopPolling();
           setInstalling(false);
           onInstalledRef.current();

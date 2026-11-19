@@ -51,7 +51,7 @@ describe('notification-slice', () => {
   it('records focused-terminal notifications as read without transient unread state or external alerts', () => {
     vi.stubGlobal('document', { hasFocus: () => true });
     const fire = vi.fn();
-    vi.stubGlobal('window', { wmux: { notification: { fire } } });
+    vi.stubGlobal('window', { remotea: { notification: { fire } } });
     useStore.getState().setNotificationFocusedSurface(surfaceId);
     const seenUnread: boolean[] = [];
     const unsubscribe = useStore.subscribe(state => {
@@ -78,7 +78,7 @@ describe('notification-slice', () => {
   ])('preserves unread history and external alerts for $name', ({ focused, windowFocused, target }) => {
     vi.stubGlobal('document', { hasFocus: () => windowFocused });
     const fire = vi.fn();
-    vi.stubGlobal('window', { wmux: { notification: { fire } } });
+    vi.stubGlobal('window', { remotea: { notification: { fire } } });
     useStore.getState().setNotificationFocusedSurface(focused as SurfaceId | null);
 
     fireNotification(target, workspaceId, 'Needs you', useStore.getState().addNotification, 'Agent');
@@ -90,7 +90,7 @@ describe('notification-slice', () => {
 
   it('ignores a targeted broadcast in a window that does not own the surface', () => {
     const fire = vi.fn();
-    vi.stubGlobal('window', { wmux: { notification: { fire } } });
+    vi.stubGlobal('window', { remotea: { notification: { fire } } });
 
     fireNotification(surfaceId, null, 'Finished elsewhere', useStore.getState().addNotification);
 
@@ -100,7 +100,7 @@ describe('notification-slice', () => {
 
   it('still delivers untargeted notices without a workspace', () => {
     const fire = vi.fn();
-    vi.stubGlobal('window', { wmux: { notification: { fire } } });
+    vi.stubGlobal('window', { remotea: { notification: { fire } } });
 
     fireNotification('', null, 'Application notice', useStore.getState().addNotification);
 

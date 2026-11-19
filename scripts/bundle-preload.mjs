@@ -6,7 +6,7 @@
  * A sandboxed preload's `require` only knows `electron`, `events`, `timers` and
  * `url` — not a relative path — so tsc's per-file output (which requires
  * ../shared/types.js and ../shared/host-info.js) would fail with "module not
- * found" and leave the renderer without `window.wmux`. Runs after
+ * found" and leave the renderer without `window.remotea`. Runs after
  * `tsc -p tsconfig.node.json` (part of `npm run build:main`) and overwrites
  * tsc's dist/preload/index.js with the bundle.
  *

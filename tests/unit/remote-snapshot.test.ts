@@ -187,7 +187,7 @@ describe('installRemoteRendererHandler', () => {
 
   it('is a no-op with no window or no remoteConsole bridge', () => {
     expect(installRemoteRendererHandler()).toBeTypeOf('function');
-    g.window = { wmux: {} };
+    g.window = { remotea: {} };
     expect(() => installRemoteRendererHandler()()).not.toThrow();
   });
 
@@ -204,7 +204,7 @@ describe('installRemoteRendererHandler', () => {
       }),
       replyRenderer: vi.fn(),
     };
-    g.window = { wmux: { remoteConsole: bridge } };
+    g.window = { remotea: { remoteConsole: bridge } };
     const { term, lookups } = setup();
     term.modes.bracketedPasteMode = true;
 
@@ -226,7 +226,7 @@ describe('installRemoteRendererHandler', () => {
   it('never lets a throwing lookup escape into the IPC listener', () => {
     let listener: ((req: RemoteRendererRequest) => void) | undefined;
     g.window = {
-      wmux: {
+      remotea: {
         remoteConsole: {
           onRendererRequest: (cb: (req: RemoteRendererRequest) => void) => {
             listener = cb;

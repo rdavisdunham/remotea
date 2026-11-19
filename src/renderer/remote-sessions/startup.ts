@@ -10,7 +10,7 @@ import type { RemoteRegistryView } from '../../shared/remote-hosts-types';
 
 export async function remoteSessionsWillPopulate(timeoutMs = 4000): Promise<boolean> {
   const spec = parseRemoteShellSpec(useStore.getState().workspacePrefs.defaultShell);
-  const views = (window as unknown as { wmux?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).wmux?.remoteSessions?.views;
+  const views = (window as unknown as { remotea?: { remoteSessions?: { views(): Promise<RemoteRegistryView[]> } } }).remotea?.remoteSessions?.views;
   if (!spec || !views) return false;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {

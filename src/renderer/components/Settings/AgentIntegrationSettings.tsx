@@ -75,7 +75,7 @@ export default function AgentIntegrationSettings() {
     setReading(true);
     setError(null);
     try {
-      const api = window.wmux?.integration;
+      const api = window.remotea?.integration;
       if (!api?.get || !api?.status) throw new Error('Unavailable');
       const [configured, observed] = await Promise.all([api.get(), api.status()]);
       if (!configured || !isIntegrationStatus(observed)) {
@@ -103,7 +103,7 @@ export default function AgentIntegrationSettings() {
     setBusy(true);
     setError(null);
     try {
-      const api = window.wmux?.integration;
+      const api = window.remotea?.integration;
       if (!api?.set) throw new Error('Unavailable');
       const next = await api.set(partial);
       if (!next) throw new Error('Missing consent response');

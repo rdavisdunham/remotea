@@ -81,7 +81,7 @@ export function useExplorerDiff(
     const key = keyRef.current;
     let res: any;
     try {
-      res = await window.wmux.explorer.diffStats(surfaceId);
+      res = await window.remotea.explorer.diffStats(surfaceId);
     } catch {
       return;   // main is gone or the window is closing; leave the last numbers
     }
@@ -157,7 +157,7 @@ export function useExplorerDiff(
   useEffect(() => {
     if (!enabled || !absRoot) return;
     let debounce: number | null = null;
-    const off = window.wmux.hook.onEvent((params: any) => {
+    const off = window.remotea.hook.onEvent((params: any) => {
       if (!isEditingTool(params?.tool)) return;
       const rel = relativizeTouched(absRoot, String(params?.file ?? ''));
       // Outside this root — which is the COMMON case, since hooks fire for

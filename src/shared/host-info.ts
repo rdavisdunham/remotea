@@ -1,6 +1,6 @@
 /**
  * The two host facts the renderer needs synchronously at preload time
- * (`window.wmux.system.homeDir` / `.osRelease`), handed to a SANDBOXED preload.
+ * (`window.remotea.system.homeDir` / `.osRelease`), handed to a SANDBOXED preload.
  *
  * A sandboxed preload cannot `require('os')` (only `electron`, `events`,
  * `timers` and `url` are available there), so main reads them and passes them

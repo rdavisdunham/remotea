@@ -55,7 +55,7 @@ function makeStore() {
 function installPtySpy(): string[] {
   const killed: string[] = [];
   (globalThis as Record<string, unknown>).window = {
-    wmux: { pty: { kill: (id: string) => { killed.push(id); } } },
+    remotea: { pty: { kill: (id: string) => { killed.push(id); } } },
   };
   return killed;
 }

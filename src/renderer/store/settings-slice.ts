@@ -44,11 +44,11 @@ const STORAGE_KEYS = {
 } as const;
 
 // Read the whole settings file once at module load (synchronous IPC). The
-// preload runs before this module, so window.wmux is already available. In
+// preload runs before this module, so window.remotea is already available. In
 // non-Electron contexts (tests) this is absent and we fall back to localStorage.
 function readFileSnapshot(): Record<string, any> {
   try {
-    const snap = (globalThis as any).window?.wmux?.settings?.getAllSync?.();
+    const snap = (globalThis as any).window?.remotea?.settings?.getAllSync?.();
     return snap && typeof snap === 'object' ? snap : {};
   } catch {
     return {};
@@ -67,7 +67,7 @@ function loadPersisted<T>(key: string): Partial<T> {
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === 'object') {
-      try { (globalThis as any).window?.wmux?.settings?.set?.(key, parsed); } catch { /* no-op */ }
+      try { (globalThis as any).window?.remotea?.settings?.set?.(key, parsed); } catch { /* no-op */ }
       return parsed;
     }
     return {};
@@ -86,7 +86,7 @@ function loadPersistedArray<T>(key: string): T[] {
     if (ls) {
       const parsed = JSON.parse(ls);
       if (Array.isArray(parsed)) {
-        try { (globalThis as any).window?.wmux?.settings?.set?.(key, parsed); } catch { /* no-op */ }
+        try { (globalThis as any).window?.remotea?.settings?.set?.(key, parsed); } catch { /* no-op */ }
         return parsed as T[];
       }
     }
@@ -105,7 +105,7 @@ function loadPersistedLanguage(): Language {
       const ls = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.language) : null;
       if (ls) {
         candidate = ls;
-        try { (globalThis as any).window?.wmux?.settings?.set?.(STORAGE_KEYS.language, ls); } catch { /* no-op */ }
+        try { (globalThis as any).window?.remotea?.settings?.set?.(STORAGE_KEYS.language, ls); } catch { /* no-op */ }
       }
     } catch { /* localStorage unavailable */ }
   }
@@ -116,7 +116,7 @@ function loadPersistedLanguage(): Language {
 }
 
 function persist<T>(key: string, value: T): void {
-  try { (globalThis as any).window?.wmux?.settings?.set?.(key, value); } catch { /* no-op */ }
+  try { (globalThis as any).window?.remotea?.settings?.set?.(key, value); } catch { /* no-op */ }
   // Keep a localStorage mirror as a harmless dev/non-Electron fallback.
   try {
     if (typeof localStorage !== 'undefined') {

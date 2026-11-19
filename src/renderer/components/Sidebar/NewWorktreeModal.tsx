@@ -44,7 +44,7 @@ export default function NewWorktreeModal({ onClose, cwd }: NewWorktreeModalProps
 
   useEffect(() => {
     let cancelled = false;
-    const probe = window.wmux?.worktree?.probe;
+    const probe = window.remotea?.worktree?.probe;
     if (remoteSource || !probe || !targetCwd) {
       setIsRepo(false);
       return;
@@ -101,7 +101,7 @@ export default function NewWorktreeModal({ onClose, cwd }: NewWorktreeModalProps
     setCreating(true);
     setErrorMessage('');
     try {
-      const res = await window.wmux?.worktree?.create(repoRoot, branch.trim(), base.trim() || undefined, ...(source ? [source.id] : []));
+      const res = await window.remotea?.worktree?.create(repoRoot, branch.trim(), base.trim() || undefined, ...(source ? [source.id] : []));
       if (res?.ok && res.worktree) {
         const createWorkspace = useStore.getState().createWorkspace;
         const selectWorkspace = useStore.getState().selectWorkspace;

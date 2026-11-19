@@ -28,14 +28,14 @@ function phone(running: boolean, enabled = true): RemoteConsoleStatus {
 describe('HostActivityDialog mounted behavior', () => {
   let root: Root;
   let container: HTMLDivElement;
-  let previous: typeof window.wmux;
+  let previous: typeof window.remotea;
   let phoneListener: ((status: RemoteConsoleStatus) => void) | undefined;
   const unsubscribe = vi.fn();
   beforeEach(() => {
-    previous = window.wmux;
+    previous = window.remotea;
     phoneListener = undefined;
     vi.clearAllMocks();
-    window.wmux = { remoteConsole: { getState: vi.fn().mockRejectedValue(new Error('unavailable')), onState: vi.fn((listener) => { phoneListener = listener; return unsubscribe; }) } } as unknown as typeof window.wmux;
+    window.remotea = { remoteConsole: { getState: vi.fn().mockRejectedValue(new Error('unavailable')), onState: vi.fn((listener) => { phoneListener = listener; return unsubscribe; }) } } as unknown as typeof window.remotea;
     useStore.setState({ language: 'en' });
     useRemoteHosts.setState({ loaded: false, loadError: false, hosts: {}, status: {} });
     useRemoteRegistry.setState({ views: null });
@@ -46,7 +46,7 @@ describe('HostActivityDialog mounted behavior', () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
-    window.wmux = previous;
+    window.remotea = previous;
     useRemoteHosts.setState({ loaded: false, loadError: false, hosts: {}, status: {} });
     useRemoteRegistry.setState({ views: null });
   });

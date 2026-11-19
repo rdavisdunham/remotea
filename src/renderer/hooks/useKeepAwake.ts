@@ -28,7 +28,7 @@ export function useKeepAwake(): KeepAwakeControls {
     const accept = (st: KeepAwakeState | undefined): void => {
       if (!unmounted && st) setState(st);
     };
-    const api = window.wmux?.awake;
+    const api = window.remotea?.awake;
     api?.getState?.().then(accept).catch(() => {});
     const unsubscribe = api?.onStateChange?.(accept);
     return () => {
@@ -38,11 +38,11 @@ export function useKeepAwake(): KeepAwakeControls {
   }, []);
 
   const setMode = useCallback((mode: KeepAwakeMode) => {
-    window.wmux?.awake?.setMode?.(mode).then((st: KeepAwakeState) => st && setState(st)).catch(() => {});
+    window.remotea?.awake?.setMode?.(mode).then((st: KeepAwakeState) => st && setState(st)).catch(() => {});
   }, []);
 
   const setPreventDisplaySleep = useCallback((prevent: boolean) => {
-    window.wmux?.awake
+    window.remotea?.awake
       ?.setPreventDisplaySleep?.(prevent)
       .then((st: KeepAwakeState) => st && setState(st))
       .catch(() => {});

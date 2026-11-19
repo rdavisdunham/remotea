@@ -25,7 +25,7 @@ beforeEach(async () => {
   useStore.setState({ language: 'en' });
   pushState = null;
   setMode = vi.fn((mode) => Promise.resolve({ ...MAIN_STATE, mode }));
-  (window as any).wmux = {
+  (window as any).remotea = {
     awake: {
       getState: vi.fn(() => Promise.resolve(MAIN_STATE)),
       setMode,
@@ -47,7 +47,7 @@ beforeEach(async () => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
-  delete (window as any).wmux;
+  delete (window as any).remotea;
 });
 
 function modeSelect(): HTMLSelectElement {

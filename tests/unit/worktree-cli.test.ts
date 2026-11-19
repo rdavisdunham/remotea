@@ -68,7 +68,7 @@ describe('CLI worktree flags and parameter validation', () => {
       });
 
       (globalThis as any).window = {
-        wmux: {
+        remotea: {
           worktree: {
             probe: mockProbe,
             create: mockCreate,

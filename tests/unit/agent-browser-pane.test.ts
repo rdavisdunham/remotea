@@ -333,7 +333,7 @@ describe('AddressBar engine toggle', () => {
    * there is one place that knows which engine is in play.
    */
   it('knows nothing about agent-browser itself', () => {
-    expect(BAR).not.toMatch(/agentBrowser|window\.wmux/);
+    expect(BAR).not.toMatch(/agentBrowser|window\.remotea/);
   });
 
   it('hides the toggle entirely when the host cannot act on it', () => {

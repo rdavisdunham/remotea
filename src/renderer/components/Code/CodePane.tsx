@@ -122,7 +122,7 @@ export function CodePane({ surfaceId }: { surfaceId: SurfaceId }): React.JSX.Ele
     setLoading(true);
     setError(null);
     // No `void`: the two-argument `.then` below is the rejection handler.
-    window.wmux.code.readFile(rootSurfaceId, relPath).then(
+    window.remotea.code.readFile(rootSurfaceId, relPath).then(
       (res: any) => {
         if (cancelled) return;
         setLoading(false);
@@ -202,7 +202,7 @@ export function CodePane({ surfaceId }: { surfaceId: SurfaceId }): React.JSX.Ele
     setSaving(true);
     setSaveError(null);
     try {
-      const res: any = await window.wmux.code.writeFile(
+      const res: any = await window.remotea.code.writeFile(
         rootSurfaceId, relPath, draft, mtimeRef.current,
       );
       setSaving(false);
@@ -283,7 +283,7 @@ export function CodePane({ surfaceId }: { surfaceId: SurfaceId }): React.JSX.Ele
           onClick={() => {
             // Optional all the way down, so this can be `undefined` rather than
             // a promise — hence `?.catch`.
-            window.wmux?.clipboard?.writeText?.(filePath)?.catch(() => { /* ignore */ });
+            window.remotea?.clipboard?.writeText?.(filePath)?.catch(() => { /* ignore */ });
           }}
         >
           {t('explorer.copyPath', 'Copy path')}

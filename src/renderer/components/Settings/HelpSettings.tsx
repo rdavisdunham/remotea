@@ -19,7 +19,7 @@ export default function HelpSettings() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.resolve(window.wmux?.system?.getVersion?.())
+    Promise.resolve(window.remotea?.system?.getVersion?.())
       .then((v?: string) => {
         if (!cancelled && typeof v === 'string') setVersion(v);
       })
@@ -31,7 +31,7 @@ export default function HelpSettings() {
     };
   }, []);
 
-  const openExternal = (url: string) => window.wmux?.system?.openExternal?.(url);
+  const openExternal = (url: string) => window.remotea?.system?.openExternal?.(url);
 
   const busy = state.phase === 'downloading' || state.phase === 'checking';
   const availableVersion = state.version ?? update?.version ?? '';

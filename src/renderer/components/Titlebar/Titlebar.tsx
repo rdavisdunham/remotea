@@ -94,7 +94,7 @@ export default function Titlebar({
           className="titlebar__logo"
           draggable={false}
           style={{ cursor: 'pointer' }}
-          onClick={() => window.wmux?.system?.openExternal?.("https://github.com/rdavisdunham/remotea") }
+          onClick={() => window.remotea?.system?.openExternal?.("https://github.com/rdavisdunham/remotea") }
           title="remotea on GitHub"
         />
         <button

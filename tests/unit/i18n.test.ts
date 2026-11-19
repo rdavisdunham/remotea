@@ -122,7 +122,7 @@ describe('i18n: detectDefaultLanguage OS display language (issue #114)', () => {
   });
 
   function stubPreferred(langs: string[]): void {
-    g.window = { wmux: { settings: { getPreferredLanguagesSync: () => langs } } };
+    g.window = { remotea: { settings: { getPreferredLanguagesSync: () => langs } } };
   }
 
   it('uses the OS display language over navigator.language', () => {

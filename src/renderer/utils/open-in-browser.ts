@@ -39,19 +39,19 @@ export function openInWmuxBrowser(url: string, opts?: { invert?: boolean }): voi
 
   // With the in-app browser off there is no panel to invert to.
   if (!state.browserPrefs.inAppBrowser || linkOpensExternally(state.browserPrefs.openLinksExternally, opts?.invert)) {
-    window.wmux?.system?.openExternal?.(url);
+    window.remotea?.system?.openExternal?.(url);
     return;
   }
 
   const wsId = state.activeWorkspaceId as WorkspaceId;
   if (!wsId) {
-    window.wmux?.system?.openExternal?.(url);
+    window.remotea?.system?.openExternal?.(url);
     return;
   }
 
   const ws = state.workspaces.find(w => w.id === wsId);
   if (!ws) {
-    window.wmux?.system?.openExternal?.(url);
+    window.remotea?.system?.openExternal?.(url);
     return;
   }
 
@@ -69,7 +69,7 @@ export function openInWmuxBrowser(url: string, opts?: { invert?: boolean }): voi
   const paneIds = getAllPaneIds(ws.splitTree);
   const targetPaneId = paneIds[0];
   if (!targetPaneId) {
-    window.wmux?.system?.openExternal?.(url);
+    window.remotea?.system?.openExternal?.(url);
     return;
   }
 

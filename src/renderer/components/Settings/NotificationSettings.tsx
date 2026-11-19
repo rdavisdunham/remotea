@@ -11,7 +11,7 @@ export default function NotificationSettings() {
   const chooseCustomSound = async () => {
     setSoundError(null);
     try {
-      const result = await window.wmux?.notification?.pickSound?.();
+      const result = await window.remotea?.notification?.pickSound?.();
       if (!result || result.canceled) return;
       if (result.error) {
         setSoundError(result.error);

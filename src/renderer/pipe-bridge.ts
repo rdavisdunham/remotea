@@ -98,9 +98,9 @@ async function createWorktreeFor(
   base: string | undefined,
 ): Promise<WorktreeMetadata> {
   if (!dir) throw new Error('Cannot tell which repository to branch from: pass --cwd <dir>');
-  const probe = await window.wmux?.worktree?.probe(dir);
+  const probe = await window.remotea?.worktree?.probe(dir);
   if (!probe?.repoRoot) throw new Error(`Directory is not inside a git repository: ${dir}`);
-  const created = await window.wmux?.worktree?.create(probe.repoRoot, branch, base);
+  const created = await window.remotea?.worktree?.create(probe.repoRoot, branch, base);
   if (!created?.ok || !created.worktree) throw new Error(created?.error || 'Failed to create worktree');
   return created.worktree as WorktreeMetadata;
 }

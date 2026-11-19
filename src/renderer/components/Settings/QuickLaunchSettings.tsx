@@ -25,7 +25,7 @@ export default function QuickLaunchSettings() {
   const add = () => setProfiles([...profiles, blankProfile(t)]);
 
   const importFromWT = async () => {
-    const imported: QuickLaunchProfile[] = (await window.wmux?.config?.importWindowsTerminalProfiles?.()) || [];
+    const imported: QuickLaunchProfile[] = (await window.remotea?.config?.importWindowsTerminalProfiles?.()) || [];
     if (imported.length === 0) {
       setImportNote(t('settings.quickLaunch.noWTProfiles', 'No Windows Terminal profiles found.'));
       return;

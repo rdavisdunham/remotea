@@ -564,7 +564,7 @@ export default function HubView({ onClose, onFocusAgent }: {
     setAnswering(true);
     const entry = entryFor(surfaceId);
     try {
-      const res = await window.wmux?.agentState?.answer?.(surfaceId, choiceId);
+      const res = await window.remotea?.agentState?.answer?.(surfaceId, choiceId);
       if (!res?.ok && entry) jump(entry);
     } catch {
       if (entry) jump(entry);

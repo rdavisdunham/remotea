@@ -37,7 +37,7 @@ md.use({
  * This is a security boundary, not a formatting helper. Markdown reaches a
  * surface from CLI/pipe callers, from agents, and from files on disk — none of
  * it trusted — and the renderer it lands in holds the preload bridge, so an
- * injected script would inherit `window.wmux` and with it the ability to write
+ * injected script would inherit `window.remotea` and with it the ability to write
  * into any PTY. `marked` emits raw HTML by design, so DOMPurify is the only
  * thing between those two facts.
  *

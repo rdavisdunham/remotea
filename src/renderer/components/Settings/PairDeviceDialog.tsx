@@ -27,13 +27,13 @@ import { qrDataUri } from './remote-qr';
 // Shared with RemoteConsoleSettings, which imports this module and never the
 // reverse, so the two components do not import each other.
 //
-// `window.wmux` is typed `any`, so the bridge is cast to its contract here,
+// `window.remotea` is typed `any`, so the bridge is cast to its contract here,
 // once. The runtime is loaded lazily in main and may be absent from a build:
 // every answer is checked for `{error}` before use, because a Settings tab
 // that throws takes the whole settings window with it.
 
 export function remoteBridge(): RemoteConsoleBridge | undefined {
-  return window.wmux?.remoteConsole as RemoteConsoleBridge | undefined;
+  return window.remotea?.remoteConsole as RemoteConsoleBridge | undefined;
 }
 
 export function isBridgeError(value: unknown): value is RemoteBridgeError {
@@ -407,7 +407,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       className="settings-button"
       onClick={() => {
-        const write = window.wmux?.clipboard?.writeText as ((s: string) => Promise<unknown>) | undefined;
+        const write = window.remotea?.clipboard?.writeText as ((s: string) => Promise<unknown>) | undefined;
         write?.(text).then(() => setCopied(true), () => undefined);
       }}
     >

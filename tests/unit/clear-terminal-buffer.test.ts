@@ -83,7 +83,7 @@ afterEach(() => {
   host.remove();
   refs.clear();
   ptyRefs.clear();
-  Reflect.deleteProperty(window, 'wmux');
+  Reflect.deleteProperty(window, 'remotea');
   terminal.dispose();
   otherTerminal.dispose();
   vi.restoreAllMocks();
@@ -160,7 +160,7 @@ describe('Clear terminal buffer', () => {
   it("clears the pane's ConPTY before xterm, and only that pane's", () => {
     const seen: string[] = [];
     const clearPty = vi.fn(() => { seen.push(bufferText(terminal)); });
-    Object.defineProperty(window, 'wmux', { configurable: true, value: { pty: { clear: clearPty } } });
+    Object.defineProperty(window, 'remotea', { configurable: true, value: { pty: { clear: clearPty } } });
     ptyRefs.get(surfaceId)!.current = surfaceId;
     ptyRefs.get('surf-other')!.current = 'surf-other';
 
@@ -174,7 +174,7 @@ describe('Clear terminal buffer', () => {
   // #434 review F3: the alternate screen has no scrollback and belongs to the program on it.
   it('does nothing on the alternate screen', async () => {
     const clearPty = vi.fn();
-    Object.defineProperty(window, 'wmux', { configurable: true, value: { pty: { clear: clearPty } } });
+    Object.defineProperty(window, 'remotea', { configurable: true, value: { pty: { clear: clearPty } } });
     ptyRefs.get(surfaceId)!.current = surfaceId;
     await write(terminal, `${ESC}[?1049h${ESC}[HTUI TOP\r\nTUI MIDDLE\r\nTUI BOTTOM`);
 

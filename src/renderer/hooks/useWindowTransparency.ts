@@ -43,7 +43,7 @@ export function useWindowTransparency(): void {
       const available = material === 'clear' ? caps.transparency : caps.materials;
       const on = available && enabled;
 
-      const result = await window.wmux?.window?.setBackdrop?.(on, material);
+      const result = await window.remotea?.window?.setBackdrop?.(on, material);
       if (cancelled) return;
 
       // Class follows what the WINDOW actually is, not what the pref says. With

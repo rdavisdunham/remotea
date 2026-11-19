@@ -33,7 +33,7 @@ describe('KeepAwakeMenu', () => {
   async function mount(withApi: boolean): Promise<void> {
     if (withApi) {
       setMode = vi.fn((mode) => Promise.resolve({ ...SMART, mode }));
-      (window as any).wmux = {
+      (window as any).remotea = {
         awake: {
           getState: vi.fn(() => Promise.resolve(SMART)),
           setMode,
@@ -56,10 +56,10 @@ describe('KeepAwakeMenu', () => {
   afterEach(() => {
     act(() => root.unmount());
     host.remove();
-    delete (window as any).wmux;
+    delete (window as any).remotea;
   });
 
-  it('renders the trigger button with no window.wmux present', async () => {
+  it('renders the trigger button with no window.remotea present', async () => {
     await mount(false);
     const button = host.querySelector('button')!;
     expect(host.querySelector('.keep-awake-menu')).not.toBeNull();

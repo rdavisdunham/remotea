@@ -57,7 +57,7 @@ describe('openInWmuxBrowser with the in-app browser off', () => {
 
   it('sends plain and Ctrl+clicked links to the system browser', async () => {
     const opened: string[] = [];
-    (globalThis as { window?: unknown }).window = { wmux: { system: { openExternal: (u: string) => opened.push(u) } } };
+    (globalThis as { window?: unknown }).window = { remotea: { system: { openExternal: (u: string) => opened.push(u) } } };
     try {
       const { useStore } = await import('../../src/renderer/store');
       const { openInWmuxBrowser } = await import('../../src/renderer/utils/open-in-browser');

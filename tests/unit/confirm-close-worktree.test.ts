@@ -45,7 +45,7 @@ describe('ConfirmWorktreeCloseDialog (#366)', () => {
   beforeEach(() => {
     mockRemove = vi.fn().mockResolvedValue({ outcome: 'removed', branchDeleted: false });
     mockInspect = vi.fn().mockResolvedValue({ outcome: 'clean' });
-    (window as any).wmux = { worktree: { remove: mockRemove, inspect: mockInspect } };
+    (window as any).remotea = { worktree: { remove: mockRemove, inspect: mockInspect } };
 
     container = document.createElement('div');
     document.body.append(container);
@@ -57,7 +57,7 @@ describe('ConfirmWorktreeCloseDialog (#366)', () => {
     act(() => root?.unmount());
     container?.remove();
     document.body.innerHTML = '';
-    delete (window as any).wmux;
+    delete (window as any).remotea;
   });
 
   async function open() {

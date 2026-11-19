@@ -42,7 +42,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   onSelect.mockReset();
   chatAttention.mockReset().mockResolvedValue({ ok: true });
-  window.wmux = { remoteSessions: { chatAttention } } as unknown as typeof window.wmux;
+  window.remotea = { remoteSessions: { chatAttention } } as unknown as typeof window.remotea;
   useStore.setState({ workspaces: [], activeWorkspaceId: null, agentStates: {}, agentDetections: {}, agentIdentities: {}, agentMeta: new Map(), oscTitles: {}, sidebarPrefs: { ...DEFAULT_SIDEBAR_PREFS } });
   useLocalChatAttention.setState({ entries: {} });
   workspaceId = useStore.getState().createWorkspace({ title: 'Project', shell: 'remote:desk', splitTree: {
@@ -160,7 +160,7 @@ describe('workspace terminal dropdown', () => {
 
   it('keeps declared answer buttons with the matching terminal in the expanded list', async () => {
     const answer = vi.fn().mockResolvedValue({ ok: true });
-    window.wmux.agentState = { answer } as typeof window.wmux.agentState;
+    window.remotea.agentState = { answer } as typeof window.remotea.agentState;
     const declared = { 'surf-waiting': { state: 'blocked', blockedReason: 'Fixture approval', choices: [{ id: 'allow', label: 'Allow fixture' }] } };
     render({ agentStates: declared });
     expect(container.querySelector('.workspace-row__answer')).toBeNull();
@@ -176,7 +176,7 @@ describe('workspace terminal dropdown', () => {
 
   it('opens the exact inactive terminal when a sidebar answer needs recovery', async () => {
     const answer = vi.fn().mockResolvedValue({ ok: false });
-    window.wmux.agentState = { answer } as typeof window.wmux.agentState;
+    window.remotea.agentState = { answer } as typeof window.remotea.agentState;
     const focusPane = vi.fn();
     render({ agentStates: { 'surf-waiting': { state: 'blocked', choices: [{ id: 'allow', label: 'Allow fixture' }] } }, onFocusAgentPane: focusPane });
     toggle();

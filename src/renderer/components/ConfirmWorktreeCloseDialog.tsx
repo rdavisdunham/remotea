@@ -38,7 +38,7 @@ export default function ConfirmWorktreeCloseDialog() {
     setInspect(null);
     if (!worktreePath) return;
     let live = true;
-    Promise.resolve(window.wmux?.worktree?.inspect?.(worktreePath))
+    Promise.resolve(window.remotea?.worktree?.inspect?.(worktreePath))
       .then((res: WorktreeInspectResult | undefined) => {
         if (live) setInspect(res ?? { outcome: 'error', message: 'unavailable' });
       })
@@ -89,7 +89,7 @@ export default function ConfirmWorktreeCloseDialog() {
     closeWorkspace(pendingWs.id);
     cancelCloseWorktree();
     try {
-      const result = await window.wmux?.worktree?.remove?.(wt.worktreePath, mode);
+      const result = await window.remotea?.worktree?.remove?.(wt.worktreePath, mode);
       notify(worktreeCloseNotice(result, wt.branch, t));
     } catch (err) {
       notify(worktreeCloseNotice({ outcome: 'error', message: (err as Error)?.message }, wt.branch, t));

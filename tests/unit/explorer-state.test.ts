@@ -275,7 +275,7 @@ describe('code viewer wiring', () => {
       resolve(__dirname, '../../src/renderer/components/Explorer/open-preview.ts'), 'utf-8',
     );
     expect(src).toContain('targetTypeFor');
-    expect(src).toContain('window.wmux.code.readFile');
+    expect(src).toContain('window.remotea.code.readFile');
   });
 
   it('the renderer MARKDOWN_EXT list matches main ALLOWED_MD_EXT exactly', () => {

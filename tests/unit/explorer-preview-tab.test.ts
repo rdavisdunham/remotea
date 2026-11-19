@@ -11,7 +11,7 @@ const readFile = vi.fn();
 (globalThis as any).window = (globalThis as any).window ?? {};
 const readCode = vi.fn();
 const readMarkdownUnjailed = vi.fn();
-(window as any).wmux = {
+(window as any).remotea = {
   markdown: { readFile: readMarkdownUnjailed },
   explorer: { readMarkdown: readFile },
   code: { readFile: readCode },

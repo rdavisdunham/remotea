@@ -28,7 +28,7 @@ const render = async (active = true) => act(async () => root.render(createElemen
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T12:00:00Z'));
   chatAttention.mockReset().mockResolvedValue({ ok: true });
-  window.wmux = { remoteSessions: { chatAttention } } as unknown as typeof window.wmux;
+  window.remotea = { remoteSessions: { chatAttention } } as unknown as typeof window.remotea;
   useStore.setState({ agentStates: {}, agentDetections: {}, agentIdentities: {} });
   useLocalChatAttention.setState({ entries: {} });
   setLatestRemoteViews(view());

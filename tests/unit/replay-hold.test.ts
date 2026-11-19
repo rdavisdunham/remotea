@@ -94,7 +94,7 @@ describe('useTerminal replay wiring', () => {
   it('never resizes the PTY while the replay is held', () => {
     // A PTY resize that lands while xterm is pinned to the snapshot size puts
     // the two at different heights — the same divergence, from the other side.
-    for (const call of USE_TERMINAL.matchAll(/window\.wmux\.pty\.resize\(/g)) {
+    for (const call of USE_TERMINAL.matchAll(/window\.remotea\.pty\.resize\(/g)) {
       const line = USE_TERMINAL.lastIndexOf('\n', call.index);
       const context = USE_TERMINAL.slice(Math.max(0, line - 400), call.index);
       expect(context).toMatch(/replayHold|isHolding|dims/);

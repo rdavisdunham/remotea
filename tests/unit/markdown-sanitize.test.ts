@@ -10,7 +10,7 @@ import { renderMarkdown } from '../../src/renderer/components/Markdown/markdown-
  * agents, and from files on disk. None of that is trusted, `marked` emits raw
  * HTML by design, and the result goes through `dangerouslySetInnerHTML` into
  * the renderer that holds the preload bridge — so a surviving script inherits
- * `window.wmux` and with it the ability to write into any pane's PTY.
+ * `window.remotea` and with it the ability to write into any pane's PTY.
  *
  * These tests exist because the enforcement is a third-party library we bump
  * whenever an advisory lands (dompurify 3.4.11 -> 3.4.14 for GHSA-c2j3-45gr-mqc4
@@ -20,16 +20,16 @@ import { renderMarkdown } from '../../src/renderer/components/Markdown/markdown-
 
 describe('renderMarkdown strips what a renderer with IPC access must never run', () => {
   it('drops a script tag', () => {
-    const html = renderMarkdown('Hello\n\n<script>window.wmux.pty.write("x")</script>');
+    const html = renderMarkdown('Hello\n\n<script>window.remotea.pty.write("x")</script>');
     expect(html).not.toMatch(/<script/i);
-    expect(html).not.toContain('window.wmux');
+    expect(html).not.toContain('window.remotea');
     expect(html).toContain('Hello');
   });
 
   it('drops inline event handlers', () => {
-    const html = renderMarkdown('<img src="x" onerror="window.wmux.pty.write(1)">');
+    const html = renderMarkdown('<img src="x" onerror="window.remotea.pty.write(1)">');
     expect(html).not.toMatch(/onerror/i);
-    expect(html).not.toContain('window.wmux');
+    expect(html).not.toContain('window.remotea');
   });
 
   it('drops javascript: URIs while keeping ordinary links', () => {

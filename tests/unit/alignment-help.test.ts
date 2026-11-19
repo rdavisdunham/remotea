@@ -20,7 +20,7 @@ const openExternal = vi.fn();
 beforeEach(() => {
   useStore.setState({ language: 'en' });
   useRemoteHosts.setState({ loaded: true, hosts: { host: { id: 'host', name: 'Same-PC WSL', url: 'ws://localhost:7717', enabled: true, hasToken: true } }, status: {} });
-  (window as unknown as { wmux: unknown }).wmux = { system: { getVersion: () => Promise.resolve('0.1.0'), openExternal } };
+  (window as unknown as { remotea: unknown }).remotea = { system: { getVersion: () => Promise.resolve('0.1.0'), openExternal } };
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);

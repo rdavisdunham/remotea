@@ -20,7 +20,7 @@ import { mergeRecoveryItems, recoveryInventory, shouldShowRecovery, type Recover
 
 /** Close a remote session everywhere (the same bridge call sync.ts makes; imported directly to keep sync → here one-way). */
 function closeRemoteSession(hostId: string, surfaceId: string): void {
-  (globalThis as { window?: { wmux?: { remoteSessions?: { close?(h: string, s: string): void } } } }).window?.wmux?.remoteSessions?.close?.(hostId, surfaceId);
+  (globalThis as { window?: { remotea?: { remoteSessions?: { close?(h: string, s: string): void } } } }).window?.remotea?.remoteSessions?.close?.(hostId, surfaceId);
 }
 
 export const useRecovery = create<{ items: RecoveryItem[] }>(() => ({ items: [] }));
@@ -152,7 +152,7 @@ export function openRemoteTerminal(hostId: string, cwd: string | undefined, opts
 }
 
 async function copyText(text: string): Promise<boolean> {
-  const bridge = (globalThis as { window?: { wmux?: { clipboard?: { writeText?: (t: string) => unknown } } } }).window?.wmux?.clipboard;
+  const bridge = (globalThis as { window?: { remotea?: { clipboard?: { writeText?: (t: string) => unknown } } } }).window?.remotea?.clipboard;
   try {
     if (bridge?.writeText) {
       await bridge.writeText(text);
