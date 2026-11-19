@@ -1,8 +1,8 @@
 // remotea-plugin-version: 3
-// wmux plugin for the Antigravity CLI (agy) — tells wmux which conversation
+// remotea plugin for the Antigravity CLI (agy) — tells remotea which conversation
 // each pane holds, so a restored tab can reopen it with `agy --conversation`.
-// Auto-installed by wmux to ~/.gemini/config/plugins/remotea/. Does nothing outside
-// a wmux pane.
+// Auto-installed by remotea to ~/.gemini/config/plugins/remotea/. Does nothing outside
+// a remotea pane.
 //
 // agy runs it as `node remotea-agy-hook.cjs <Event>` from this directory (a hook's
 // working directory is the folder holding its hooks.json). The command carries
@@ -19,7 +19,7 @@
 
 const net = require('net');
 
-/** Mirrors AGY_CONVERSATION_ID_RE in wmux's src/main/agy-resume.ts. */
+/** Mirrors AGY_CONVERSATION_ID_RE in remotea's src/main/agy-resume.ts. */
 const CONVERSATION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** agy's payload is a few hundred bytes; anything past this is not one. */
 const MAX_STDIN = 1024 * 1024;
@@ -38,7 +38,7 @@ function finish() {
 }
 
 /**
- * Only a pane of THIS wmux: it always exports REMOTEA=1 and REMOTEA_PIPE beside the
+ * Only a pane of THIS remotea: it always exports REMOTEA=1 and REMOTEA_PIPE beside the
  * surface id. Another app also named wmux sets a surface id and neither of
  * those (#282), and agy started anywhere else has no surface id at all.
  */
@@ -61,7 +61,7 @@ function conversationToReport(raw, fired) {
 }
 
 /**
- * Where to send the report: wmux's named pipe, or — in a pane whose shell runs
+ * Where to send the report: remotea's named pipe, or — in a pane whose shell runs
  * elsewhere (a devcontainer, a remotea session in WSL) — the TCP endpoint in
  * REMOTEA_REMOTE, with its own token, the transport remotea-hook.js also speaks.
  */

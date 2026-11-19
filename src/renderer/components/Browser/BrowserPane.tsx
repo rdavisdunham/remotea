@@ -24,7 +24,7 @@ interface BrowserPaneProps {
    * Which backend drives this surface. `web` is the Electron <webview> this
    * pane has always been; `agent` points the SAME webview at agent-browser's
    * dashboard, deep-linked to this surface's session, while the actual pages
-   * are driven in a real Chrome outside wmux.
+   * are driven in a real Chrome outside remotea.
    */
   engine?: BrowserEngine;
   onEngineChange?: (engine: BrowserEngine) => void;
@@ -218,7 +218,7 @@ export function shouldPollAgentUrl(s: {
 /**
  * Is this element not being shown? Used to keep hidden tabs from polling.
  *
- * wmux's keep-alive tabs stay mounted and are hidden with `visibility`, which
+ * remotea's keep-alive tabs stay mounted and are hidden with `visibility`, which
  * `offsetParent` does NOT report — hence `checkVisibility`, which does, with
  * the older property as the fallback for environments that lack it (jsdom).
  * A missing element answers "not hidden": that is the first-render case, and
@@ -281,7 +281,7 @@ export function webviewHiding(s: {
 export default function BrowserPane({
   // Blank, not the project's own GitHub repo (#232). A browser surface nobody
   // has given a URL has nowhere to be, and shipping the vendor's page as that
-  // answer meant wmux opened its own repo on every launch — then persisted it
+  // answer meant remotea opened its own repo on every launch — then persisted it
   // as if the user had chosen it. See utils/browser-start-page.ts.
   initialUrl = BROWSER_BLANK_PAGE,
   surfaceId,
@@ -523,7 +523,7 @@ export default function BrowserPane({
   // workspace so main can route per-caller browser commands here (issues #27, #62).
   //
   // In agent mode the webview shows agent-browser's dashboard SPA, so claiming
-  // it would make `wmux browser click e2` aimed at this surface click on the
+  // it would make `remotea browser click e2` aimed at this surface click on the
   // DASHBOARD's DOM rather than the remote page. The guard lives here rather
   // than at the call sites so a fourth caller cannot reintroduce it.
   const claimCdp = useCallback(() => {
@@ -678,7 +678,7 @@ export default function BrowserPane({
 
   // ── keeping the address bar honest ────────────────────────────────────────
   //
-  // The agent drives a Chrome outside wmux, so the pane cannot observe its
+  // The agent drives a Chrome outside remotea, so the pane cannot observe its
   // navigation the way it observes the webview's. Without this the bar shows
   // the last URL the PANE asked for — which is a lie the moment the agent
   // clicks anything.

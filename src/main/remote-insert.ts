@@ -195,7 +195,7 @@ function captureImage(image: NativeImage, downscale: boolean): CapturedImage {
 }
 
 /**
- * Write a captured image to `%TEMP%/wmux` and answer with its path; anything
+ * Write a captured image to `%TEMP%/remotea` and answer with its path; anything
  * else passes through unchanged. Async end to end, so neither the encode nor
  * the write holds the main thread.
  */

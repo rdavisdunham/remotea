@@ -6,7 +6,7 @@
  * a stray click on the sidebar ×. Nothing protected the WINDOW: the caption's
  * × — or Alt+F4, or a mis-aimed click on a machine so loaded the pointer barely
  * moves, which is how #227 was reported — ends every PTY in it at once, and the
- * agents in them with it. Opt-in, like #90: most people quit wmux by closing
+ * agents in them with it. Opt-in, like #90: most people quit remotea by closing
  * the window and must not be asked every time.
  *
  * This module is the DECISION only. The effect — `event.preventDefault()` and
@@ -70,7 +70,7 @@ export type CloseGuardDecision = 'allow' | 'ask' | 'swallow' | 'hide';
 /**
  * Precedence, top down:
  * 1. `confirmed` and `bypass` win over everything: a programmatic close
- *    (`wmux close-window`, another window), "Quit remotea" in the tray, an update,
+ *    (`remotea close-window`, another window), "Quit remotea" in the tray, an update,
  *    a relaunch and Windows ending the session all really close. Tray quit runs
  *    `app.quit()`, so it reaches here as `bypass` exactly like an update does.
  * 2. Close to tray wins over the confirm dialog (#227): hiding ends nothing, so
@@ -94,7 +94,7 @@ export interface CloseDialogCopy {
 }
 
 /**
- * What the dialog says. Distinguishes the last window — which quits wmux and
+ * What the dialog says. Distinguishes the last window — which quits remotea and
  * ends every session — from one of several, which ends only its own.
  *
  * `ptyCount` is the app-wide live PTY count, which is exact for the last

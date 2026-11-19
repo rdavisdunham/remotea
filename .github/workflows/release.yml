@@ -106,7 +106,7 @@ jobs:
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           # The installer's name comes from electron-builder.json (nsis.artifactName,
           # remotea-<ver>-setup.exe), so a rename there cannot strand the steps below
-          # on a file that doesn't exist (they used to look for wmux-<ver>-setup.exe).
+          # on a file that doesn't exist (they used to look for remotea-<ver>-setup.exe).
           INSTALLER=$(node -p "require('./electron-builder.json').nsis.artifactName.replace('\${version}', '$VER').replace('\${ext}', 'exe')")
           test -f "release/$INSTALLER" || { echo "::error::release/$INSTALLER was not built"; ls release; exit 1; }
           echo "installer=$INSTALLER" >> "$GITHUB_OUTPUT"
@@ -122,7 +122,7 @@ jobs:
       # ── Icon + version metadata ────────────────────────────
       # electron-builder embeds win.icon and the package.json version into the
       # packaged exe during the NSIS build above, so the previous manual rcedit
-      # pass is no longer needed — it targeted release/win-unpacked/wmux.exe,
+      # pass is no longer needed — it targeted release/win-unpacked/remotea.exe,
       # which is already baked into the installer by the time a separate step
       # could run, so it had no effect on the shipped artifact.
 

@@ -3,7 +3,7 @@ setlocal
 REM remotea CLI shim. remotea prepends this dir (cli-bin) to PATH in every shell it
 REM spawns, so bare `remotea` resolves in cmd/PowerShell children too. Runs the
 REM Node pipe client via the $REMOTEA_CLI path remotea injects; falls back to the copy
-REM next to this shim. No wmux.exe in this dir, so no PATHEXT collision.
+REM next to this shim. No remotea.exe in this dir, so no PATHEXT collision.
 REM
 REM The runtime comes from $REMOTEA_NODE when remotea declared one (issue #187): bare
 REM `node` assumes node is installed AND on PATH, and remotea already resolved a

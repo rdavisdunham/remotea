@@ -97,7 +97,7 @@ function psBranchMessage(lines: string[], exitCode: number): string {
     `"[" + (Get-RemoteaGitBranchMessage -SurfaceId ${ps(SURFACE)} -Lines ${array} -ExitCode ${exitCode}) + "]"`,
     '',
   ].join('\n');
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-gitbranch-')), 'probe.ps1');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-gitbranch-')), 'probe.ps1');
   fs.writeFileSync(file, script, 'utf8');
   try {
     return execFileSync(host as string, ['-NoProfile', '-NonInteractive', '-File', file], { encoding: 'utf8' }).trim();
@@ -122,7 +122,7 @@ describe.skipIf(!host)('Get-RemoteaGitBranchMessage — one git spawn, the old w
  * state of its own — `$global:_remotea_pipe_name`, which Send-RemoteaMessage
  * connects to, did not exist there, so from 2.9.0 every worker report opened
  * a pipe named $null and was swallowed by the catch. Only the first prompt
- * (synchronous, before the runspace opens) ever reached wmux, so the sidebar
+ * (synchronous, before the runspace opens) ever reached remotea, so the sidebar
  * showed the branch a pane STARTED in and never followed a `cd`.
  *
  * So: a real named pipe, the real script dot-sourced, the worker path forced
@@ -172,7 +172,7 @@ async function workerReports(shell: string, cwd: string): Promise<{ taken: strin
   }
 }
 
-describe.skipIf(!host || process.platform !== 'win32')('the PowerShell git worker reaches wmux (#279)', () => {
+describe.skipIf(!host || process.platform !== 'win32')('the PowerShell git worker reaches remotea (#279)', () => {
   it('reports the branch from the worker runspace, not only from the synchronous path', async () => {
     const repoRoot = path.join(__dirname, '..', '..');
     const { taken, messages } = await workerReports(host as string, repoRoot);

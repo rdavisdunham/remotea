@@ -63,7 +63,7 @@ function useUiThemeTick(): number {
  * opaque tab bar below, and reads as a slot cut across the top of the pane.
  * There is no border-color that matches opaque chrome on one edge and a
  * translucent terminal on the others, so the ring stops trying: it is a focus
- * indicator, which is chrome, and chrome in wmux is opaque.
+ * indicator, which is chrome, and chrome in remotea is opaque.
  *
  * Mixed rather than plain accent so it stays the colour the design already
  * uses — 30% accent, the same ratio the opaque-mode rule composites to.

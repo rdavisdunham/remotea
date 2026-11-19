@@ -448,7 +448,7 @@ describe('a permission prompt the agent moved past (issue #399)', () => {
   });
 
   it('never retracts a block the agent declared itself', () => {
-    // `wmux report-agent --blocked`, run by the agent through its own Bash tool:
+    // `remotea report-agent --blocked`, run by the agent through its own Bash tool:
     // that call's PostToolUse lands after the declaration and must not undo it.
     applyHookToAgentState(surf, 'UserPromptSubmit', null, 1000);
     applyHookToAgentState(surf, 'PreToolUse', null, 2000, null, main('toolu_A'));

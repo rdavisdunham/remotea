@@ -7,10 +7,10 @@ import { reportIntegrationFailure } from './integration-failures';
  * Code's contract: the same event names, the same `{matcher, hooks:[{type:
  * 'command', command}]}` entries, the same snake_case stdin payload with
  * `session_id` on every event. Unlike Grok it does NOT read
- * ~/.claude/settings.json, so nothing wmux wrote for Claude reaches it — every
+ * ~/.claude/settings.json, so nothing remotea wrote for Claude reaches it — every
  * piece below is the Claude piece written again into Qwen's own files:
  *
- *   ~/.qwen/QWEN.md         the wmux block, between markers (instructions)
+ *   ~/.qwen/QWEN.md         the remotea block, between markers (instructions)
  *   ~/.qwen/settings.json   `hooks` — the Claude set plus StopFailure (hooks)
  *                           `mcpServers.chrome-devtools` (browserMcp)
  *
@@ -28,7 +28,7 @@ import { reportIntegrationFailure } from './integration-failures';
  *
  * Every write is gated on Qwen's home directory existing: creating ~/.qwen on a
  * machine that has never run Qwen would be the #132 mistake. `QWEN_HOME` is
- * honoured when wmux's own environment carries an ABSOLUTE value (Grok's rule —
+ * honoured when remotea's own environment carries an ABSOLUTE value (Grok's rule —
  * a relative one means something different in every pane), and removal sweeps
  * the default home too, so an uninstall reaches what an earlier launch wrote.
  */
@@ -58,7 +58,7 @@ export function getQwenHome(env: NodeJS.ProcessEnv = process.env): string {
   return override && path.isAbsolute(override) ? path.normalize(override) : defaultQwenHome();
 }
 
-/** Every home wmux may have written into: the current one and the default. */
+/** Every home remotea may have written into: the current one and the default. */
 function qwenHomes(): string[] {
   return [...new Set([getQwenHome(), defaultQwenHome()])];
 }
@@ -80,7 +80,7 @@ function isDirectory(p: string): boolean {
 
 // ─── Instructions: ~/.qwen/QWEN.md ───────────────────────────────────────────
 
-/** Ensures ~/.qwen/QWEN.md carries the wmux block. No-op when Qwen never ran here. */
+/** Ensures ~/.qwen/QWEN.md carries the remotea block. No-op when Qwen never ran here. */
 export function ensureQwenContext(): void {
   try {
     if (!isDirectory(getQwenHome())) return;
@@ -120,14 +120,14 @@ export function removeQwenContext(): void {
 
 // ─── Hooks: ~/.qwen/settings.json `hooks` ────────────────────────────────────
 
-/** Appended to every command wmux registers in Qwen's settings. */
+/** Appended to every command remotea registers in Qwen's settings. */
 export const QWEN_PROVIDER_ARG = '--provider qwen';
 
 /**
  * Tools tracked by a per-tool PostToolUse entry, in Claude's spelling. Qwen
  * accepts Claude tool names as exact matcher aliases (`Bash` matches
  * `run_shell_command`), so the matchers stay Claude's, and the helper's argv
- * carries the name every consumer in wmux already understands.
+ * carries the name every consumer in remotea already understands.
  */
 const QWEN_TRACKED_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'Agent', 'WebSearch', 'WebFetch', 'Skill'];
 
@@ -150,7 +150,7 @@ const QWEN_EVENT_HOOKS: ReadonlyArray<{ event: string; async: boolean }> = [
   { event: 'SessionEnd', async: false },
 ];
 
-/** Every hook array wmux writes into — and therefore the only ones it removes from. */
+/** Every hook array remotea writes into — and therefore the only ones it removes from. */
 export const QWEN_HOOK_EVENTS = ['PostToolUse', ...QWEN_EVENT_HOOKS.map(h => h.event)];
 
 /**
@@ -180,7 +180,7 @@ export function qwenEventHookCommand(hookScript: string, event: string): string 
 }
 
 /**
- * Every shape wmux has written: the quoted path to resources/cli/remotea-hook.js
+ * Every shape remotea has written: the quoted path to resources/cli/remotea-hook.js
  * (≤ 2.42.0) and the bare or quoted path to the stub in Qwen's home.
  */
 const REMOTEA_QWEN_COMMAND_RE = /^node (?:"[^"]*(?:remotea-hook\.js|remotea-qwen-hook\.cjs)"|\S*(?:remotea-hook\.js|remotea-qwen-hook\.cjs)) .*--provider qwen$/;
@@ -214,7 +214,7 @@ function ensureQwenHookStub(home: string, hookScript: string): string {
   return stubPath.split(path.sep).join('/');
 }
 
-/** Deletes the stub — only one wmux wrote, never a user's file of that name. */
+/** Deletes the stub — only one remotea wrote, never a user's file of that name. */
 function removeQwenHookStub(home: string): void {
   const stubPath = stubPathIn(home);
   try {
@@ -243,7 +243,7 @@ function isRecord(v: unknown): v is Record<string, any> {
 }
 
 /**
- * Pure: `settings` with wmux's Qwen hooks in place — any earlier wmux entry
+ * Pure: `settings` with remotea's Qwen hooks in place — any earlier remotea entry
  * replaced, every user hook and every other key kept. Returns a new object.
  */
 export function applyQwenHooks(settings: unknown, hookScript: string): Record<string, any> {
@@ -268,7 +268,7 @@ export function applyQwenHooks(settings: unknown, hookScript: string): Record<st
 /**
  * Pure inverse of {@link applyQwenHooks}. Arrays left empty are deleted, and a
  * `hooks` object left empty goes too — a declined integration leaves the file
- * indistinguishable from one wmux never touched.
+ * indistinguishable from one remotea never touched.
  */
 export function removeQwenHooksFrom(settings: unknown): Record<string, any> {
   const next: Record<string, any> = { ...(isRecord(settings) ? settings : {}) };
@@ -352,7 +352,7 @@ export function removeQwenHooks(): void {
 //
 // Qwen reads user-scope MCP servers from settings.json, in the same
 // `{command, args}` shape as Claude's ~/.claude.json — so the same entry, the
-// same "did wmux author this" test and the same inverse apply unchanged.
+// same "did remotea author this" test and the same inverse apply unchanged.
 
 export function ensureQwenMcp(): void {
   try {

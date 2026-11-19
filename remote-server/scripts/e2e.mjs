@@ -248,11 +248,11 @@ try {
   await A.waitText(S1, 'HOOK_0_DONE');
   const rpc = await A.wait((m) => m.t === 'rpc' && m.id === S1, 5000).catch(() => null);
   ok(rpc?.method === 'hook.event' && rpc.params.event === 'Stop' && rpc.params.surfaceId === S1, 'a hook inside the session reaches the app through the bridge');
-  // The wmux CLI, as the OpenCode plugin runs it (`node $REMOTEA_CLI report-agent …`).
+  // The remotea CLI, as the OpenCode plugin runs it (`node $REMOTEA_CLI report-agent …`).
   A.input(S1, `'${process.execPath}' '${CLI_JS}' report-agent --run-start; echo CLI_$?_DONE\r`);
   await A.waitText(S1, 'CLI_0_DONE');
   const cliRpc = await A.wait((m) => m.t === 'rpc' && m.id === S1 && m.method === 'pane.report_agent', 5000).catch(() => null);
-  ok(cliRpc?.params?.runDelta === 1 && cliRpc.params.surfaceId === S1, 'the wmux CLI inside the session reports through the bridge');
+  ok(cliRpc?.params?.runDelta === 1 && cliRpc.params.surfaceId === S1, 'the remotea CLI inside the session reports through the bridge');
   const metaAgent = await A.wait((m) => m.t === 'meta' && m.id === S1 && m.agent, 5000).catch(() => null);
   ok(metaAgent?.agent?.sessionId === '0f8fad5b-d9cb-469f-a165-70867728950e', 'the hook\'s session id becomes the session\'s agent');
 

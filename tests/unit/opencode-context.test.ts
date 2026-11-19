@@ -4,7 +4,7 @@ import { pluginNeedsUpdate } from '../../src/main/opencode-context';
 
 const START = '<!-- remotea:start';
 const END = '<!-- remotea:end -->';
-const BLOCK = `${START} v1 -->\nUse the wmux CLI.\n${END}`;
+const BLOCK = `${START} v1 -->\nUse the remotea CLI.\n${END}`;
 
 describe('injectRemoteaBlock', () => {
   it('returns the block alone when existing is empty', () => {

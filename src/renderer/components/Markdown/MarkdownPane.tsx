@@ -703,7 +703,7 @@ export default function MarkdownPane({
       <div className="markdown-pane__body">
         {!content && !editing && (
           <p className="markdown-pane__empty">
-            {t('markdown.empty', 'No content. Use wmux markdown set to add content, or drop a file here.')}
+            {t('markdown.empty', 'No content. Use remotea markdown set to add content, or drop a file here.')}
           </p>
         )}
         {editing && <MarkdownEditor content={content} onChange={handleEdit} onSave={save} />}

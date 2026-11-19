@@ -4,8 +4,8 @@
  * Sessions are EPHEMERAL by design — a session's process lifetime equals its
  * surface's lifetime, nothing is persisted — and that single decision is what
  * makes orphan handling correct by construction rather than by heuristic: there
- * is no such thing as a legitimately-surviving wmux-owned session, so any
- * `wmux-` session with no live surface is garbage. The invariant is only worth
+ * is no such thing as a legitimately-surviving remotea-owned session, so any
+ * `remotea-` session with no live surface is garbage. The invariant is only worth
  * anything if every exit path actually closes what it opened, which is what is
  * pinned here:
  *
@@ -18,7 +18,7 @@
  *                          Teardown that can hang is not teardown.
  *   • startup            — reconciles against the CLI, which is the only ground
  *                          truth after a crash, and never touches a session
- *                          without the `wmux-` prefix
+ *                          without the `remotea-` prefix
  *
  * Plus the stream-port gap the registry used to have: `nextPort()` knows only
  * what IT handed out, so it can hand a surface a port an orphan is squatting.
@@ -121,7 +121,7 @@ describe('closeSessionFor', () => {
 
     await closeSessionFor(A, h.deps);
 
-    expect(h.calls).toEqual([sessionCloseArgv(`wmux-${A}`)]);
+    expect(h.calls).toEqual([sessionCloseArgv(`remotea-${A}`)]);
     expect(h.registry.get(A)).toBeUndefined();
     expect(h.registry.get(B)).toBeDefined();
   });
@@ -163,7 +163,7 @@ describe('closeSessionFor', () => {
     const h = harness(async () => failRun());
     h.registry.ensure(A);
     expect(await closeSessionFor(A, h.deps)).toBe(false);
-    expect(h.warnings.join('\n')).toContain(`wmux-${A}`);
+    expect(h.warnings.join('\n')).toContain(`remotea-${A}`);
   });
 
   it('survives a run that rejects outright', async () => {
@@ -184,7 +184,7 @@ describe('teardownAgentBrowser', () => {
     await teardownAgentBrowser(h.deps);
 
     expect(h.calls).toHaveLength(2);
-    expect(h.calls.map((c) => c[1]).sort()).toEqual([`wmux-${A}`, `wmux-${B}`].sort());
+    expect(h.calls.map((c) => c[1]).sort()).toEqual([`remotea-${A}`, `remotea-${B}`].sort());
     expect(h.registry.size).toBe(0);
     expect(h.shutdowns).toBe(1);
   });
@@ -197,7 +197,7 @@ describe('teardownAgentBrowser', () => {
    */
   it('closes the rest, and still shuts down, when one close fails', async () => {
     const h = harness(async (argv) => {
-      if (argv[1] === `wmux-${A}`) throw new Error('this one is wedged');
+      if (argv[1] === `remotea-${A}`) throw new Error('this one is wedged');
       return okRun();
     });
     h.registry.ensure(A);
@@ -227,7 +227,7 @@ describe('teardownAgentBrowser', () => {
    * THE hang. Observed live: a session whose daemon was killed mid-start left
    * `close` blocking indefinitely while `session list` still listed it. Quit
    * runs after `will-quit` has already preventDefault()ed, so a teardown that
-   * never resolves is a wmux the user cannot quit.
+   * never resolves is a remotea the user cannot quit.
    */
   it('gives up on a close that never returns, and still shuts down', async () => {
     vi.useFakeTimers();
@@ -302,13 +302,13 @@ describe('withDeadline', () => {
 
 describe('parseSessionList', () => {
   it('reads the --json envelope', () => {
-    const res = okRun({ success: true, data: { sessions: ['wmux-surf-a', 'mine'] }, error: null });
-    expect(parseSessionList(res)).toEqual(['wmux-surf-a', 'mine']);
+    const res = okRun({ success: true, data: { sessions: ['remotea-surf-a', 'mine'] }, error: null });
+    expect(parseSessionList(res)).toEqual(['remotea-surf-a', 'mine']);
   });
 
   it('reads the bare text form, ignoring its heading', () => {
-    const res = okRun(null, 'Active sessions:\n  wmux-surf-a\n  mine\n');
-    expect(parseSessionList(res)).toEqual(['wmux-surf-a', 'mine']);
+    const res = okRun(null, 'Active sessions:\n  remotea-surf-a\n  mine\n');
+    expect(parseSessionList(res)).toEqual(['remotea-surf-a', 'mine']);
   });
 
   it('answers nothing for the empty bare form', () => {
@@ -322,31 +322,31 @@ describe('parseSessionList', () => {
   // The list is a machine-global namespace anything can write into, so a
   // non-string entry is a real input rather than a hypothetical one.
   it('drops non-string entries rather than passing them on', () => {
-    const res = okRun({ success: true, data: { sessions: ['wmux-surf-a', 42, null] } });
-    expect(parseSessionList(res)).toEqual(['wmux-surf-a']);
+    const res = okRun({ success: true, data: { sessions: ['remotea-surf-a', 42, null] } });
+    expect(parseSessionList(res)).toEqual(['remotea-surf-a']);
   });
 });
 
 describe('isRemoteaSessionName', () => {
   it('accepts exactly what sessionNameFor mints', () => {
-    expect(isRemoteaSessionName(`wmux-${A}`)).toBe(true);
-    expect(surfaceIdFromSessionName(`wmux-${A}`)).toBe(A);
+    expect(isRemoteaSessionName(`remotea-${A}`)).toBe(true);
+    expect(surfaceIdFromSessionName(`remotea-${A}`)).toBe(A);
   });
 
   it('rejects anything without the prefix', () => {
-    for (const name of ['mine', 'surf-abc', 'agent-browser', '', 'WMUX-surf-a']) {
+    for (const name of ['mine', 'surf-abc', 'agent-browser', '', 'REMOTEA-surf-a']) {
       expect(isRemoteaSessionName(name)).toBe(false);
     }
   });
 
   /**
    * The prefix alone is not enough. This value goes back onto a command line as
-   * `--session <name>`, so a name that merely STARTS with `wmux-` but continues
-   * into something wmux could never have minted is rejected: wmux only ever
-   * produces `wmux-surf-<uuid>`.
+   * `--session <name>`, so a name that merely STARTS with `remotea-` but continues
+   * into something remotea could never have minted is rejected: remotea only ever
+   * produces `remotea-surf-<uuid>`.
    */
   it('rejects a prefixed name that is not a surface id', () => {
-    for (const name of ['wmux-', 'wmux- --all', 'wmux-;calc', 'wmux-../evil', 'wmux-surf a']) {
+    for (const name of ['remotea-', 'remotea- --all', 'remotea-;calc', 'remotea-../evil', 'remotea-surf a']) {
       expect(isRemoteaSessionName(name)).toBe(false);
     }
   });
@@ -370,30 +370,30 @@ describe('reconcileOrphanSessions', () => {
   }
 
   it('asks the CLI, not the registry — the registry is empty after a crash', async () => {
-    const h = listing([`wmux-${A}`]);
+    const h = listing([`remotea-${A}`]);
     expect(h.registry.size).toBe(0);
 
     const closed = await reconcileOrphanSessions(h.deps);
 
     expect(h.calls[0]).toEqual(sessionListArgv());
-    expect(closed).toEqual([`wmux-${A}`]);
+    expect(closed).toEqual([`remotea-${A}`]);
   });
 
   /**
    * THE security boundary of this pass, stated as bluntly as it can be.
    *
-   * A session without the `wmux-` prefix is a human's or another tool's, and
-   * closing it kills a browser wmux never started. There is no severity of
+   * A session without the `remotea-` prefix is a human's or another tool's, and
+   * closing it kills a browser remotea never started. There is no severity of
    * orphan cleanup that justifies it, so this is asserted as "not one argv
    * mentions it" rather than as "the return value omits it".
    */
-  it('NEVER closes a session without the wmux- prefix', async () => {
-    const strangers = ['mine', 'default', 'research', 'wmux', 'surf-abc'];
-    const h = listing([...strangers, `wmux-${A}`]);
+  it('NEVER closes a session without the remotea- prefix', async () => {
+    const strangers = ['mine', 'default', 'research', 'remotea', 'surf-abc'];
+    const h = listing([...strangers, `remotea-${A}`]);
 
     const closed = await reconcileOrphanSessions(h.deps);
 
-    expect(closed).toEqual([`wmux-${A}`]);
+    expect(closed).toEqual([`remotea-${A}`]);
     const spawned = h.calls.flat().join(' ');
     for (const stranger of strangers) {
       expect(spawned.split(' ')).not.toContain(stranger);
@@ -402,10 +402,10 @@ describe('reconcileOrphanSessions', () => {
     expect(h.calls).toHaveLength(2);
   });
 
-  it('closes every wmux- session it finds, since none of them can be live', async () => {
-    const h = listing([`wmux-${A}`, `wmux-${B}`]);
+  it('closes every remotea- session it finds, since none of them can be live', async () => {
+    const h = listing([`remotea-${A}`, `remotea-${B}`]);
     const closed = await reconcileOrphanSessions(h.deps);
-    expect(closed).toEqual([`wmux-${A}`, `wmux-${B}`]);
+    expect(closed).toEqual([`remotea-${A}`, `remotea-${B}`]);
   });
 
   /**
@@ -415,17 +415,17 @@ describe('reconcileOrphanSessions', () => {
    * pass from closing a session THIS run just created.
    */
   it('skips a session this run currently owns', async () => {
-    const h = listing([`wmux-${A}`, `wmux-${B}`]);
+    const h = listing([`remotea-${A}`, `remotea-${B}`]);
     h.registry.ensure(A);
 
     const closed = await reconcileOrphanSessions(h.deps);
 
-    expect(closed).toEqual([`wmux-${B}`]);
+    expect(closed).toEqual([`remotea-${B}`]);
     expect(h.registry.get(A)).toBeDefined();
   });
 
   it('does nothing, and spawns nothing, with no binary installed', async () => {
-    const h = listing([`wmux-${A}`], { binary: () => null });
+    const h = listing([`remotea-${A}`], { binary: () => null });
     expect(await reconcileOrphanSessions(h.deps)).toEqual([]);
     expect(h.calls).toEqual([]);
   });
@@ -453,8 +453,8 @@ describe('reconcileOrphanSessions', () => {
 describe('closeSessionByName', () => {
   it('builds the session-scoped close argv', async () => {
     const h = harness();
-    await closeSessionByName('wmux-surf-x', h.deps);
-    expect(h.calls).toEqual([['--session', 'wmux-surf-x', 'close']]);
+    await closeSessionByName('remotea-surf-x', h.deps);
+    expect(h.calls).toEqual([['--session', 'remotea-surf-x', 'close']]);
   });
 });
 
@@ -473,7 +473,7 @@ describe('SessionRegistry.ensureBindable', () => {
 
   /**
    * The gap this closes: `nextPort()` tracks only what the registry itself
-   * handed out, so an orphan from a previous wmux — or an unrelated program —
+   * handed out, so an orphan from a previous remotea — or an unrelated program —
    * can hold a port it believes is free. The session then launches with
    * `AGENT_BROWSER_STREAM_PORT=<taken>`, its stream never binds, and the
    * dashboard deep-link points at nothing, silently.
@@ -651,7 +651,7 @@ describe('app quit wiring', () => {
 
   /**
    * Bounded twice: `teardownAgentBrowser` caps itself, and this caps IT. The
-   * one outcome worse than leaking a browser is a wmux the user cannot quit.
+   * one outcome worse than leaking a browser is a remotea the user cannot quit.
    */
   it('force-quits if the teardown itself never returns', () => {
     const body = willQuit();
@@ -745,36 +745,36 @@ describe('surface close wiring', () => {
   });
 });
 
-// ─── side-by-side wmux instances ───────────────────────────────────────────
+// ─── side-by-side remotea instances ───────────────────────────────────────────
 //
-// `REMOTEA_INSTANCE=<name>` runs a second wmux beside the first (the documented
+// `REMOTEA_INSTANCE=<name>` runs a second remotea beside the first (the documented
 // case is a dev build alongside an installed one). agent-browser's session
 // namespace is MACHINE-global with no such suffix, so without an instance
-// segment in the name, reconciliation — whose premise is "every wmux- session
+// segment in the name, reconciliation — whose premise is "every remotea- session
 // with no live surface is garbage" — would close the OTHER instance's live
-// browsers on startup. Another wmux is exactly as much "not us" as a human's
+// browsers on startup. Another remotea is exactly as much "not us" as a human's
 // hand-made session is.
 
 describe('sessionPrefix', () => {
   it('leaves the default instance exactly as it was', () => {
-    expect(sessionPrefix({})).toBe('wmux-');
-    expect(sessionPrefix({ REMOTEA_INSTANCE: '  ' })).toBe('wmux-');
-    expect(sessionNameFor(A, {})).toBe(`wmux-${A}`);
+    expect(sessionPrefix({})).toBe('remotea-');
+    expect(sessionPrefix({ REMOTEA_INSTANCE: '  ' })).toBe('remotea-');
+    expect(sessionNameFor(A, {})).toBe(`remotea-${A}`);
   });
 
   it('carves out its own namespace for a named instance', () => {
-    expect(sessionPrefix({ REMOTEA_INSTANCE: 'dev' })).toBe('wmux-dev-');
-    expect(sessionNameFor(A, { REMOTEA_INSTANCE: 'dev' })).toBe(`wmux-dev-${A}`);
+    expect(sessionPrefix({ REMOTEA_INSTANCE: 'dev' })).toBe('remotea-dev-');
+    expect(sessionNameFor(A, { REMOTEA_INSTANCE: 'dev' })).toBe(`remotea-dev-${A}`);
   });
 
   // REMOTEA_INSTANCE is user-supplied and this value reaches a command line, so
   // it is filtered rather than trusted — and bounded, because an unbounded
   // pattern is not a boundary.
   it('filters and bounds whatever the environment says', () => {
-    expect(sessionPrefix({ REMOTEA_INSTANCE: 'de v;--all' })).toBe('wmux-dev--all-');
-    expect(sessionPrefix({ REMOTEA_INSTANCE: '$(calc)' })).toBe('wmux-calc-');
-    expect(sessionPrefix({ REMOTEA_INSTANCE: '/\\.' })).toBe('wmux-');
-    expect(sessionPrefix({ REMOTEA_INSTANCE: 'x'.repeat(500) })).toBe(`wmux-${'x'.repeat(32)}-`);
+    expect(sessionPrefix({ REMOTEA_INSTANCE: 'de v;--all' })).toBe('remotea-dev--all-');
+    expect(sessionPrefix({ REMOTEA_INSTANCE: '$(calc)' })).toBe('remotea-calc-');
+    expect(sessionPrefix({ REMOTEA_INSTANCE: '/\\.' })).toBe('remotea-');
+    expect(sessionPrefix({ REMOTEA_INSTANCE: 'x'.repeat(500) })).toBe(`remotea-${'x'.repeat(32)}-`);
   });
 
   /**
@@ -783,9 +783,9 @@ describe('sessionPrefix', () => {
    */
   it('never claims the other instance sessions', () => {
     const dev = { REMOTEA_INSTANCE: 'dev' };
-    expect(isRemoteaSessionName(`wmux-dev-${A}`, {})).toBe(false);
-    expect(isRemoteaSessionName(`wmux-${A}`, dev)).toBe(false);
-    expect(isRemoteaSessionName(`wmux-dev-${A}`, dev)).toBe(true);
-    expect(surfaceIdFromSessionName(`wmux-dev-${A}`, dev)).toBe(A);
+    expect(isRemoteaSessionName(`remotea-dev-${A}`, {})).toBe(false);
+    expect(isRemoteaSessionName(`remotea-${A}`, dev)).toBe(false);
+    expect(isRemoteaSessionName(`remotea-dev-${A}`, dev)).toBe(true);
+    expect(surfaceIdFromSessionName(`remotea-dev-${A}`, dev)).toBe(A);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * The main-process half of the GPU watchdog (issue #229): the decision, and
- * the one effect — restarting wmux's own GPU process.
+ * the one effect — restarting remotea's own GPU process.
  *
  * ## Why main decides
  *
@@ -16,7 +16,7 @@
  *   - the user has touched the machine within the last 30 s
  *     (`powerMonitor.getSystemIdleTime`, the OS's own `GetLastInputInfo`).
  *
- * Together they mean: the user is at the keyboard, wmux is the foreground
+ * Together they mean: the user is at the keyboard, remotea is the foreground
  * window, and it has painted nothing for 15 s. That is the reporter's
  * situation exactly, and nothing else. It also means the heal happens the
  * moment the user notices — clicking into a frozen window is precisely what
@@ -36,7 +36,7 @@
  *
  * Chromium counts a killed GPU process as a crash, and after a few in a short
  * window it gives up on hardware acceleration for the rest of the session. A
- * false positive every few minutes would therefore turn a healthy wmux into a
+ * false positive every few minutes would therefore turn a healthy remotea into a
  * software-rendered one with no visible reason. Five minutes between restarts
  * bounds that damage even if every gate above is somehow fooled.
  *

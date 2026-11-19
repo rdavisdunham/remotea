@@ -162,7 +162,7 @@ contextBridge.exposeInMainWorld('remotea', {
     // changed the app icon — the renderer turns it into a bell notification.
     takeIconChangeNotice: (): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_TAKE_ICON_CHANGE_NOTICE),
-    // True while settings or ~/.wmux are still under the old names and the
+    // True while settings or the config folder are still under the old names and the
     // move has not run (old-state-notice.ts); the renderer shows one line.
     oldStateNotice: (): Promise<boolean> =>
       ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_OLD_STATE_NOTICE),
@@ -298,7 +298,7 @@ contextBridge.exposeInMainWorld('remotea', {
       }
     },
   },
-  // What wmux may write into ~/.claude and ~/.config/opencode (issue #132).
+  // What remotea may write into ~/.claude and ~/.config/opencode (issue #132).
   // Separate from `settings` because setting it has side effects on disk.
   integration: {
     status: (): Promise<IntegrationStatus> => ipcRenderer.invoke(IPC_CHANNELS.INTEGRATION_STATUS),

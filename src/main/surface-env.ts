@@ -2,7 +2,7 @@
 //
 // Workspace manifests are COMMITTED, so the issue's own guardrail is that a
 // secret must never be written into one: a value can instead name a variable
-// from the environment wmux itself was started with, `${env:NAME}`. That
+// from the environment remotea itself was started with, `${env:NAME}`. That
 // reference is what the manifest, the store and session.json all carry; it is
 // resolved here, at spawn, and nowhere earlier, so the resolved value exists
 // only in the shell's environment block.
@@ -14,7 +14,7 @@ export const ENV_KEY_RE = /^[A-Za-z_]\w{0,127}$/;
 const ENV_REF_RE = /\$\{env:([A-Za-z_]\w{0,127})\}/g;
 
 /**
- * Keys wmux owns in every pane. A surface setting one would detach the pane
+ * Keys remotea owns in every pane. A surface setting one would detach the pane
  * from its own identity (REMOTEA_SURFACE_ID), point hooks at another pipe
  * (REMOTEA_PIPE) or swap the CLI an agent runs (REMOTEA_CLI) — so they are dropped
  * rather than merged, even though PtyManager writes its own afterwards anyway.

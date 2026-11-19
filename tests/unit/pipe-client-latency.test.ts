@@ -6,20 +6,20 @@ import os from 'os';
 import path from 'path';
 
 /**
- * Every wmux pipe round trip used to carry ~60 ms of dead wait, and none of it
+ * Every remotea pipe round trip used to carry ~60 ms of dead wait, and none of it
  * was the server thinking.
  *
  * The clients (the CLI's sendV1/sendV2, the hook helper) wrote their one request
  * and then `socket.end()`ed — a half-close. On a Windows named pipe libuv answers
  * a half-close by arming a 50 ms `eof_timeout` (libuv src/win/pipe.c) before it
- * will report EOF to the reader, and since wmux's server never closed its side,
- * the client sat on that timer before it could exit: `wmux ping` measured 96 ms
+ * will report EOF to the reader, and since remotea's server never closed its side,
+ * the client sat on that timer before it could exit: `remotea ping` measured 96 ms
  * against a raw pipe that answers in 1 ms, a hook process 95 ms. With
  * destroy-on-reply: 36 ms and 37 ms.
  *
  * These tests pin the CLIENT half against a server that behaves like the OLD
- * wmux — answers, never closes — because that is what an installed wmux is until
- * it is upgraded, and the hook helper on disk is often older than the wmux it
+ * remotea — answers, never closes — because that is what an installed remotea is until
+ * it is upgraded, and the hook helper on disk is often older than the remotea it
  * talks to. The compiled scripts under resources/cli are exercised, not the
  * TypeScript: those are the bytes a hook actually runs.
  *
@@ -46,7 +46,7 @@ const LONG_BEFORE_DEADLINE_MS = 4000;
 
 let testCounter = 0;
 function uniquePipe(): string {
-  return `\\\\.\\pipe\\wmux-latency-${process.pid}-${++testCounter}`;
+  return `\\\\.\\pipe\\remotea-latency-${process.pid}-${++testCounter}`;
 }
 
 /**
@@ -67,7 +67,7 @@ function answerAndHold(socket: net.Socket, reply: (line: string) => string, onRe
   socket.on('error', () => {});
 }
 
-/** A wmux that answers and never closes — the pre-fix server, and every older install. */
+/** A remotea that answers and never closes — the pre-fix server, and every older install. */
 function neverClosingServer(pipePath: string, reply: (line: string) => string): Promise<{
   repliedAt: Promise<number>;
   close: () => Promise<void>;
@@ -84,7 +84,7 @@ function neverClosingServer(pipePath: string, reply: (line: string) => string): 
 interface ClientRun { exitedAt: number; code: number | null; stdout: string; trace: string[] }
 
 function runClient(script: string, args: string[], env: Record<string, string | undefined>, stdin = ''): Promise<ClientRun> {
-  const traceFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-socket-trace-')), 'trace.log');
+  const traceFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-socket-trace-')), 'trace.log');
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['--require', TRACER, script, ...args], {
       env: { ...env, REMOTEA_SOCKET_TRACE: traceFile } as NodeJS.ProcessEnv,
@@ -158,14 +158,14 @@ describe('pipe clients exit right behind the reply, against a server that never 
 
   it('remotea.js identify (sendV2) destroys its connection on the result', async () => {
     const pipe = uniquePipe();
-    const server = await neverClosingServer(pipe, () => JSON.stringify({ result: { app: 'wmux' }, id: 1 }));
+    const server = await neverClosingServer(pipe, () => JSON.stringify({ result: { app: 'remotea' }, id: 1 }));
     close = server.close;
 
     const run = runClient(CLI_SCRIPT, ['identify'], { ...process.env, REMOTEA_PIPE: pipe, REMOTEA_REMOTE: undefined });
     const repliedAt = await server.repliedAt;
     const { exitedAt, code, stdout, trace } = await run;
     expect(code).toBe(0);
-    expect(stdout).toContain('wmux');
+    expect(stdout).toContain('remotea');
     expectDestroyOnReply(trace);
     expect(exitedAt - repliedAt).toBeLessThan(LONG_BEFORE_DEADLINE_MS);
   });
@@ -175,7 +175,7 @@ describe('pipe clients exit right behind the reply, against a server that never 
     const pipe = uniquePipe();
     const server = await neverClosingServer(pipe, () => 'pong');
     close = server.close;
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-old-client-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-old-client-'));
     const oldClient = path.join(dir, 'old-client.js');
     fs.writeFileSync(oldClient, `const c=require('net').connect(process.env.REMOTEA_PIPE,()=>{c.write('ping\\n');c.end();});
       c.on('data',()=>{});c.on('close',()=>process.exit(0));`);

@@ -4,7 +4,7 @@
  */
 
 /**
- * The `$BROWSER` target wmux installs into WSL panes.
+ * The `$BROWSER` target remotea installs into WSL panes.
  *
  * Deliberately the bare name, not a path: BROWSER parsers split the value on
  * whitespace, and an install path can contain spaces ("OneDrive - Pulsa"). The

@@ -29,7 +29,7 @@ describe('bellAction', () => {
   describe('off-screen notifies, whatever the on-screen style', () => {
     const offScreen = [
       { name: 'background tab / inactive workspace', visible: false, windowFocused: true },
-      { name: 'wmux unfocused or minimised', visible: true, windowFocused: false },
+      { name: 'remotea unfocused or minimised', visible: true, windowFocused: false },
       { name: 'both', visible: false, windowFocused: false },
     ];
     for (const c of offScreen) {

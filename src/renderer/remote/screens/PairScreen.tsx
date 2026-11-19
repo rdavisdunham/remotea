@@ -4,7 +4,7 @@
  *
  * Pairing asks before it POSTs, with the device name editable, for the QR
  * phishing case (A2): a code somebody else generated and got the user to scan
- * would pair THIS browser to THEIR wmux, and everything typed afterwards would
+ * would pair THIS browser to THEIR remotea, and everything typed afterwards would
  * go to a machine the user does not own. One screen saying "only continue if
  * you just scanned this yourself" is the cheapest stop for that.
  */

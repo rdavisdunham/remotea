@@ -89,7 +89,7 @@ describe('layout.agents over the bridge', () => {
   });
 });
 
-describe('layoutAgentsParams (wmux layout agents flags)', () => {
+describe('layoutAgentsParams (remotea layout agents flags)', () => {
   const parse = (args: string[], caller?: string) => layoutAgentsParams(args, caller);
 
   it('maps every flag onto its pipe param', () => {

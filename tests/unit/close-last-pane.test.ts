@@ -31,7 +31,7 @@ function splitInStore(
 // `removeLeaf()` returns null when the pane being removed is the tree's only
 // leaf — a correct answer to "what is left after removing it": nothing. Every
 // caller read that null as "nothing to do" and skipped the state update, but
-// they had ALREADY killed the pane's PTYs. `wmux new-workspace` produces
+// they had ALREADY killed the pane's PTYs. `remotea new-workspace` produces
 // exactly a one-leaf tree, so this was the common case, not the exotic one:
 // every process in the pane died, the tree never changed, and each xterm just
 // printed "[process exited]" under a tab that was still there.

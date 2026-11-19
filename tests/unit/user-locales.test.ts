@@ -12,7 +12,7 @@ import { loadUserLocales, getLocalesDir } from '../../src/main/user-locales';
 let dir: string;
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-loc-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-loc-'));
 });
 
 afterEach(() => {

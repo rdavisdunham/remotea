@@ -47,6 +47,9 @@ export const LEGACY_PLUGIN_VERSION_TAG = 'wmux-plugin-version';
  */
 export const LEGACY_OPENCODE_PLUGIN_EXPORT = 'WmuxPlugin';
 
+/** The packaged exe before the rename. A portable install still running it is updated in kind. */
+export const LEGACY_APP_EXE = 'wmux.exe';
+
 /** Right-click verb under `HKCU\Software\Classes\{Directory,…}\shell\`. */
 export const LEGACY_REGISTRY_VERB = 'wmux';
 

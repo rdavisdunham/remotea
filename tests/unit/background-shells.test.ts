@@ -152,7 +152,7 @@ describe('remotea-hook.js background shells (#276)', () => {
     });
 
     beforeEach(() => {
-      dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-subagent-'));
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-subagent-'));
       parent = path.join(dir, 'sess.jsonl');
       child = path.join(dir, 'sess', 'subagents', 'agent-a1b2c3.jsonl');
       fs.mkdirSync(path.dirname(child), { recursive: true });

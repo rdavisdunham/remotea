@@ -1,11 +1,11 @@
 /**
  * An agent's turn, read off the OSC 9;4 progress it emits (issue #294).
  *
- * omp has no hooks wmux can install (they are per-project, see omp-context.ts)
+ * omp has no hooks remotea can install (they are per-project, see omp-context.ts)
  * and no detection manifest, so its pane said only "the shell is running" —
  * "Running" while it sat waiting for input. But omp emits `OSC 9;4;3` when a
  * turn starts and `OSC 9;4;0` when it ends (its "terminal progress" setting),
- * and wmux was already drawing that as the row's progress bar. The status text
+ * and remotea was already drawing that as the row's progress bar. The status text
  * and the bar disagreed because only the bar listened.
  *
  * The signal is only trusted where it can mean a turn:

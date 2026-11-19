@@ -21,7 +21,7 @@ export interface SessionData {
     workspaces: Array<{
       id: string;
       title: string;
-      // wmux picked the title, so it may follow the terminal's window title.
+      // remotea picked the title, so it may follow the terminal's window title.
       // Declared so the backup and snapshot copies below cannot drop it (#145).
       titleIsDefault?: boolean;
       customColor?: string;
@@ -47,7 +47,7 @@ export interface SessionData {
       explorerShowHidden?: boolean;
       remoteGroups?: Record<string, string>;
       eridaniTask?: EridaniTaskRef;
-      // Which wmux-created worktree this workspace is (#366). Carried through
+      // Which remotea-created worktree this workspace is (#366). Carried through
       // EVERY copy — auto-session, the version-change Auto-backup, named
       // sessions, snapshots — because a restore that drops it turns a live
       // checkout into an anonymous folder. Nothing sweeps on the strength of a

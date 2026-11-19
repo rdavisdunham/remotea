@@ -192,12 +192,12 @@ export const shellProbe = {
  * Negative results are cached as well, deliberately. A miss is the *expensive*
  * branch (two probes, and `where` scans the whole PATH before failing), and it
  * is what a user with an uninstalled or mistyped shell hits on every pane. The
- * cost is that installing a shell mid-session will not be noticed until wmux
+ * cost is that installing a shell mid-session will not be noticed until remotea
  * restarts — which is exactly how `cachedDefaultShell` and `cachedWsl` already
  * behave, so this adds no new surprise.
  *
  * A cached *hit* is re-validated with a cheap `existsSync` before being handed
- * back, so an exe that is uninstalled or moved while wmux runs re-probes
+ * back, so an exe that is uninstalled or moved while remotea runs re-probes
  * instead of feeding a dead path to `pty.spawn` — which would surface as node-
  * pty's opaque "File not found: ".
  */
@@ -262,7 +262,7 @@ function resolveExistingShellPathUncached(shell: string): string | undefined {
   const base = win32 ? path.basename(shell).toLowerCase().replace(/\.exe$/, '') : '';
 
   // Before PATH, and only for a bare name — an absolute path the user wrote
-  // already won above. `wmux ssh user@host` and a workspace shell set to
+  // already won above. `remotea ssh user@host` and a workspace shell set to
   // `ssh …` must get Windows' own ssh, not whichever build happens to be
   // first on PATH; see opensshPath for why the two are not interchangeable.
   //
@@ -275,7 +275,7 @@ function resolveExistingShellPathUncached(shell: string): string | undefined {
   }
 
   // A bare `bash` / `git-bash` — what Settings' "Git Bash" option stores
-  // (#252). wmux's own PATH cannot answer that on its own; see git-bash.ts.
+  // (#252). remotea's own PATH cannot answer that on its own; see git-bash.ts.
   const alias = win32 ? bashAlias(shell) : null;
   if (alias) return resolveBashAlias(shell, alias);
 
@@ -317,7 +317,7 @@ function resolveBashAlias(shell: string, alias: 'bash' | 'git-bash'): string | u
  * The "System default" shell, memoized like every other resolution (#176) and
  * re-validated the same way (#334). For a Store-only PowerShell the memoized
  * value is the VERSIONED exe behind the alias, and a Store update deletes that
- * directory while wmux runs: without this check every pane created after the
+ * directory while remotea runs: without this check every pane created after the
  * update died on node-pty's "File not found" until a restart. A miss re-runs
  * the candidates, whose own per-spec cache re-probes for the same reason. The
  * bare last-resort names are not paths, so they are never re-checked.
@@ -447,24 +447,24 @@ export function resolveShellForCwd(shell: string, cwd: string | undefined): stri
 // and the pane dies with an opaque "Cannot create process, error code: 267".
 //
 // NEVER returns undefined. That used to be the answer when nothing named a
-// directory, and it meant node-pty's default: inherit wmux.exe's OWN working
+// directory, and it meant node-pty's default: inherit remotea.exe's OWN working
 // directory. #205 already recorded what that is in practice — for a taskbar or
 // Start-menu launch, `C:\Windows\system32` — and treated it as the status quo
 // worth preserving. #214 is what preserving it cost. After a crash the OS
-// relaunches wmux with cwd `C:\Windows\system32`, every restored pane with no
+// relaunches remotea with cwd `C:\Windows\system32`, every restored pane with no
 // remembered directory of its own starts there, and Claude Code files its
 // session transcript under `system32` — so `claude --continue` from the project
 // folder answers "no saved sessions" and the history looks lost when it is only
 // misfiled. The user's report calls this the one that hurts most, and it is not
-// really a fallback at all: it hands the pane wherever wmux happened to be
+// really a fallback at all: it hands the pane wherever remotea happened to be
 // started from, which no user has ever chosen or can predict.
 //
 // %USERPROFILE% instead — the same fallback every other branch below already
 // uses for a cwd it cannot honour. Nothing that names a directory is affected:
-// a split inherits its parent's, "Open in wmux" and `--cwd` pass one outright,
+// a split inherits its parent's, "Open in remotea" and `--cwd` pass one outright,
 // a restored session carries the one it was frozen at, and `defaultCwd` (#205)
 // still wins over all of this. Only the case where the answer was previously
-// "wherever wmux.exe was launched from" changes.
+// "wherever remotea.exe was launched from" changes.
 //
 // This is also the single place a HUMAN-typed path lands (the default starting
 // path setting, issue #205), so `~` and `%VAR%` are expanded here rather than in
@@ -520,17 +520,17 @@ export function buildShellArgs(
     env.REMOTEA_INTEGRATION = '1';
     // Propagate REMOTEA_* vars into the WSL distro (issue #60). Without WSLENV, WSL
     // strips every Windows env var, so the notification framework, sidebar and
-    // `wmux` CLI inside WSL can't reach the host. /u = pass through, /up = pass
+    // `remotea` CLI inside WSL can't reach the host. /u = pass through, /up = pass
     // through AND translate the Windows path to a WSL mount (/mnt/c/...).
     // REMOTEA_REMOTE / REMOTEA_REMOTE_TOKEN ride along so a devcontainer launched from
-    // this WSL shell inherits them and its CLI can reach wmux over the bridge
+    // this WSL shell inherits them and its CLI can reach remotea over the bridge
     // (issue #19). Harmless when unset — WSLENV skips a variable with no value.
     env.WSLENV = env.WSLENV ? `${env.WSLENV}:${WSL_ENV_PASSTHROUGH}` : WSL_ENV_PASSTHROUGH;
     // What the bash integration needs inside the distro (#428): the Windows JS
     // runtime that can reach the pipe, under a name of its own (see
     // WSL_ENV_PASSTHROUGH), and the script, so the line a user adds to
-    // ~/.bashrc does not depend on where wmux is installed. Nothing loads it
-    // for them: wsl.exe starts the distro's own login shell, and wmux could
+    // ~/.bashrc does not depend on where remotea is installed. Nothing loads it
+    // for them: wsl.exe starts the distro's own login shell, and remotea could
     // only hand that an rc file by replacing the shell or writing to the
     // distro's home.
     if (env.REMOTEA_NODE) env.REMOTEA_WSL_NODE = env.REMOTEA_NODE;
@@ -548,7 +548,7 @@ export function buildShellArgs(
 }
 
 /**
- * Git Bash's arguments when it loads wmux's integration (#427, see
+ * Git Bash's arguments when it loads remotea's integration (#427, see
  * `gitBashIntegrationArgs`), or null to leave the shell alone. The script is
  * checked first, like PowerShell's: bash given an --init-file it cannot read
  * would skip the user's ~/.bashrc as well.
@@ -714,7 +714,7 @@ export class PtyManager {
    * tree-kill whatever this process left running if it dies without reaching
    * `killAll()` (issue #139). Optional rather than constructed internally
    * because tests spawn real PTYs: without an explicit ledger they must not
-   * touch — let alone overwrite — the ledger of the wmux instance the user has
+   * touch — let alone overwrite — the ledger of the remotea instance the user has
    * running on the same machine.
    */
   constructor(private readonly ledger: PtyLedger | null = null) {}
@@ -777,7 +777,7 @@ export class PtyManager {
     // runtime too — and the host process is not reliably one (issue #187:
     // OpenCode's `process.execPath` is the compiled `opencode.exe`, and node
     // can be installed yet absent from the PATH a given agent inherited).
-    // wmux resolves it once, in the process best placed to look, and declares
+    // remotea resolves it once, in the process best placed to look, and declares
     // the answer alongside the script it applies to.
     const nodeRuntime = getNodeRuntime();
     const env: { [key: string]: string } = {
@@ -791,23 +791,23 @@ export class PtyManager {
       REMOTEA_NODE: nodeRuntime.path,
     };
     // Only set when true. A consumer that spawns REMOTEA_NODE without honouring
-    // this opens a second wmux window instead of running a script, so the
+    // this opens a second remotea window instead of running a script, so the
     // variable's presence — not its value — is the signal, and an absent one
     // must never read as "yes".
     if (nodeRuntime.electron) env.REMOTEA_NODE_ELECTRON = '1';
 
-    // Make bare `wmux` resolvable in every spawned shell AND all its children
+    // Make bare `remotea` resolvable in every spawned shell AND all its children
     // (Claude Code's Bash tool, hook scripts, the orchestrator coordinator) by
     // prepending the cli-bin shim dir to PATH. PATH inherits down the process
     // tree regardless of shell/login/interactive state — which is exactly what
-    // the interactive `wmux` shell function cannot reach. Prepend (not append)
+    // the interactive `remotea` shell function cannot reach. Prepend (not append)
     // so this instance's shim wins; it is instance-scoped via $REMOTEA_CLI/$REMOTEA_PIPE
     // anyway. The Windows env key is `Path`, so match case-insensitively.
-    // The .ps1 shim dir goes AHEAD of cli-bin when — and only when — wmux has
+    // The .ps1 shim dir goes AHEAD of cli-bin when — and only when — remotea has
     // verified PowerShell will run it (issue #154). PowerShell prefers a .ps1
     // over every PATHEXT entry, so this is what takes cmd.exe's argument parser
     // out of the PowerShell path; unverified, it is left off entirely rather
-    // than risk a `wmux` that errors instead of merely mis-quoting. Order does
+    // than risk a `remotea` that errors instead of merely mis-quoting. Order does
     // not matter to any other shell: bash and cmd.exe ignore .ps1 files.
     const cliBinDir = getCliBinPath();
     const shimDirs = [powerShellShimDir(), cliBinDir].filter((d): d is string => d !== null);
@@ -816,7 +816,7 @@ export class PtyManager {
     const prefix = shimDirs.join(path.delimiter);
     env[pathKey] = env[pathKey] ? `${prefix}${path.delimiter}${env[pathKey]}` : prefix;
 
-    // Route CLI link-openers through wmux (WSL only). The shell's own rc may
+    // Route CLI link-openers through remotea (WSL only). The shell's own rc may
     // override this; Windows panes keep whatever BROWSER they had, because the
     // shim is a POSIX script and native tools like `gh` cannot run it.
     Object.assign(env, browserEnvFor(shellType));
@@ -948,7 +948,7 @@ export class PtyManager {
   /**
    * Deliver commands to a shell that is ALREADY running — a workspace manifest
    * pane whose `after`/`waitFor` held it back (#284). Same readiness gate as a
-   * cold start (#251), so there is still exactly one way wmux types into a
+   * cold start (#251), so there is still exactly one way remotea types into a
    * pane. False when there is no live PTY for the surface.
    */
   deliverCommands(id: SurfaceId, commands: string[]): boolean {

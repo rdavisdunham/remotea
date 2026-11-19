@@ -23,12 +23,12 @@ import {
 
 const REPORT_ID = '2920533c-0171-4a9e-8303-c23fe6832b6e';
 const OFFSET = '0000000003290be5';
-const HOME_PATH = 'C:\\Users\\a.real.name\\AppData\\Local\\Programs\\wmux\\wmux.exe';
+const HOME_PATH = 'C:\\Users\\a.real.name\\AppData\\Local\\Programs\\remotea\\remotea.exe';
 /** Windows records the PE file version, which is four-part. */
 const EXE_VERSION = [1, 1, 0, 0].join('.');
 
 const appError = (reportId = REPORT_ID) =>
-  ['AE', '2026-08-14T13:15:11.000Z', 'wmux.exe', EXE_VERSION, 'wmux.exe', 'c0000409', OFFSET, reportId].join('\t');
+  ['AE', '2026-08-14T13:15:11.000Z', 'remotea.exe', EXE_VERSION, 'remotea.exe', 'c0000409', OFFSET, reportId].join('\t');
 const werReport = (reportId = REPORT_ID) =>
   ['WER', '2026-08-14T13:15:12.000Z', 'BEX64', '0000000000000007', reportId].join('\t');
 
@@ -74,7 +74,7 @@ describe('parseEventRows', () => {
   });
 
   it('ignores a truncated row instead of emitting undefined fields', () => {
-    expect(parseEventRows('AE\t2026-08-14T13:15:11.000Z\twmux.exe')).toHaveLength(0);
+    expect(parseEventRows('AE\t2026-08-14T13:15:11.000Z\tremotea.exe')).toHaveLength(0);
   });
 });
 

@@ -10,7 +10,7 @@ import {
 let dir: string;
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-code-write-'));
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-code-write-'));
   resetFileGrants();
 });
 

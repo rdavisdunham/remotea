@@ -5,7 +5,7 @@ import path from 'path';
 /**
  * Issue #137: after an update that changes the artwork, the taskbar button, the
  * pinned shortcut and the Start-menu entry keep drawing the icon of the version
- * they replaced, because Windows caches shell icons per path and wmux installs
+ * they replaced, because Windows caches shell icons per path and remotea installs
  * to the same path every time.
  *
  * ## Why this test exists
@@ -34,7 +34,7 @@ describe('installer refreshes shell icons after an artwork change (issue #137)',
   const installerNsh = read('build/installer.nsh');
   const installSection = read('node_modules/app-builder-lib/templates/nsis/installSection.nsh');
 
-  describe('wmux side', () => {
+  describe('remotea side', () => {
     it('defines customInstall', () => {
       expect(installerNsh).toMatch(/!macro\s+customInstall\b/);
     });

@@ -7,7 +7,7 @@ import { execFileSync } from 'child_process';
  * REMOTEA_STARTUP_COMMANDS must not outlive the read that consumes it.
  *
  * The PowerShell integration runs a pane's startup commands during init
- * (quick-launch profiles, `wmux agent spawn`, restore's `claude --resume <id>`).
+ * (quick-launch profiles, `remotea agent spawn`, restore's `claude --resume <id>`).
  * It used to clear the variable AFTER the loop, so the command it had just
  * started inherited it — found while chasing #251: a baked
  * `cmd /c echo %REMOTEA_STARTUP_COMMANDS%` printed the variable, which means a
@@ -30,7 +30,7 @@ function startupBlock(): string {
 }
 
 // By absolute path, like win32-process.ts: a writeable PATH dir must not be
-// able to shadow the interpreter a test (or wmux) runs.
+// able to shadow the interpreter a test (or remotea) runs.
 const POWERSHELL = path.join(
   process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe',
 );

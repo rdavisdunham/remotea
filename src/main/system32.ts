@@ -20,7 +20,7 @@ export function powershellPath(): string {
 }
 
 /**
- * The Windows OpenSSH installation wmux should use for a bare managed spec.
+ * The Windows OpenSSH installation remotea should use for a bare managed spec.
  *
  * Microsoft's standalone upgrade is installed under Program Files and should
  * win over the older in-box copy when both exist. System32 is the stable

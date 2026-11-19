@@ -3,14 +3,14 @@
  *
  * ── The bug this exists to close ─────────────────────────────────────────────
  *
- * wmux shipped `https://github.com/amirlehmam/wmux` as `BrowserPane`'s default
+ * remotea shipped `https://github.com/amirlehmam/wmux` as `BrowserPane`'s default
  * parameter. With `openOnStartup` defaulting to true and no Start page
  * configured, that meant the browser panel opened on the project's own GitHub
  * repo on every launch, out of the box, for everybody.
  *
  * On its own that is merely rude. What made it a bug report is the second step:
  * the panel's `onUrlChange` fires for the INITIAL load too, and wrote whatever
- * loaded into `workspace.browserUrl`. So wmux laundered its own default into a
+ * loaded into `workspace.browserUrl`. So remotea laundered its own default into a
  * stored value indistinguishable from a user's choice — and from then on the
  * panel opened there regardless of settings, per workspace, forever. Verified on
  * a real install before writing this: two workspaces, both carrying
@@ -19,7 +19,7 @@
  *
  * The third step is the one that got reported. The repo page puts an "Issues"
  * tab one click away, so a single click rewrote the stored value to
- * `.../wmux/issues` — and wmux then opened its own issue tracker on every launch
+ * `.../wmux/issues` — and the app then opened wmux's issue tracker on every launch
  * and every workspace switch. #232: "wmux regularly opens its GitHub Issues page
  * in an internal browser tab… at seemingly random times."
  *
@@ -33,14 +33,14 @@
  * overwrites the stored value through the normal path — and cannot fire twice.
  *
  * The blast radius is deliberately `workspace.browserUrl` and nothing else,
- * because that is the only URL wmux opens WITHOUT being asked. A browser surface
+ * because that is the only URL remotea opens WITHOUT being asked. A browser surface
  * in the split tree exists because somebody made it, and its `surface.url` is
  * written directly by `openInRemoteaBrowser` when a user clicks a link — so
  * applying this filter there would break the perfectly ordinary case of clicking
- * a link to wmux's own issue tracker and getting a blank pane.
+ * a link to remotea's own issue tracker and getting a blank pane.
  *
  * It does mean the panel's rule never expires, and that is a real cost: someone
- * who genuinely wants wmux's repo as their panel's page will not have it
+ * who genuinely wants remotea's repo as their panel's page will not have it
  * REMEMBERED across launches. That is exactly the case the Start page setting
  * exists for, and `browserPrefs.defaultUrl` is deliberately NOT filtered — a
  * configured start page is a choice; a remembered one is an inference.
@@ -50,7 +50,7 @@
 export const BROWSER_BLANK_PAGE = 'about:blank';
 
 /**
- * The page wmux used to open by itself, and the prefix that catches wherever a
+ * The page remotea used to open by itself, and the prefix that catches wherever a
  * click from it lands (`/issues`, `/releases`, `/pulls`, …).
  *
  * Matched on host + path rather than by `startsWith` on the raw string, so

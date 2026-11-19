@@ -203,9 +203,9 @@ describe('install-root writability (issue #167)', () => {
   let root: string;
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-root-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-root-'));
     // getPath('exe') returns the executable; the root is its directory.
-    fakeApp.exePath = path.join(root, 'wmux.exe');
+    fakeApp.exePath = path.join(root, 'remotea.exe');
     fakeApp.isPackaged = true;
   });
 
@@ -221,7 +221,7 @@ describe('install-root writability (issue #167)', () => {
     const u = await freshUpdater();
     // A directory that does not exist stands in for one the process cannot
     // write: both make the write throw, which is the only signal that matters.
-    fakeApp.exePath = path.join(root, 'gone', 'wmux.exe');
+    fakeApp.exePath = path.join(root, 'gone', 'remotea.exe');
     expect(u.isInstallRootWritable()).toBe(false);
     expect(u.updateNeedsElevation()).toBe(true);
   });
@@ -234,7 +234,7 @@ describe('install-root writability (issue #167)', () => {
   it('never claims an unpackaged dev run needs elevation', async () => {
     const u = await freshUpdater();
     fakeApp.isPackaged = false;
-    fakeApp.exePath = path.join(root, 'gone', 'wmux.exe');
+    fakeApp.exePath = path.join(root, 'gone', 'remotea.exe');
     // There is no install root to speak of; canSelfUpdate already excludes it.
     expect(u.updateNeedsElevation()).toBe(false);
   });
@@ -244,7 +244,7 @@ describe('install-root writability (issue #167)', () => {
     expect(u.isInstallRootWritable()).toBe(true);
     // The process token is what the answer depends on, and that is fixed for
     // the life of the process. Moving the exe underneath it must not re-probe.
-    fakeApp.exePath = path.join(root, 'gone', 'wmux.exe');
+    fakeApp.exePath = path.join(root, 'gone', 'remotea.exe');
     expect(u.isInstallRootWritable()).toBe(true);
     u.resetInstallRootProbe();
     expect(u.isInstallRootWritable()).toBe(false);
@@ -255,7 +255,7 @@ describe('install-root writability (issue #167)', () => {
     // in place, via a UAC prompt — returning false here would take a working
     // path away from every such user. The fact is surfaced instead.
     const u = await freshUpdater();
-    fakeApp.exePath = path.join(root, 'gone', 'wmux.exe');
+    fakeApp.exePath = path.join(root, 'gone', 'remotea.exe');
     expect(u.canSelfUpdate()).toBe(true);
     expect(u.updateNeedsElevation()).toBe(true);
   });
@@ -268,7 +268,7 @@ describe('install-root writability (issue #167)', () => {
 });
 
 /**
- * Zip extracts (the README install) have wmux.exe and no NSIS uninstaller.
+ * Zip extracts (the README install) have remotea.exe and no NSIS uninstaller.
  * NsisUpdater cannot replace that layout (issue #96); the badge click has to
  * take the download-extract-swap path instead of checkForUpdates().
  */
@@ -276,9 +276,9 @@ describe('portable zip install', () => {
   let root: string;
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-portable-'));
-    fs.writeFileSync(path.join(root, 'wmux.exe'), '');
-    fakeApp.exePath = path.join(root, 'wmux.exe');
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-portable-'));
+    fs.writeFileSync(path.join(root, 'remotea.exe'), '');
+    fakeApp.exePath = path.join(root, 'remotea.exe');
     fakeApp.isPackaged = true;
     delete process.env.REMOTEA_DISABLE_UPDATER;
     zipMocks.resolvePortableZipTarget.mockReset();
@@ -289,7 +289,7 @@ describe('portable zip install', () => {
   it('does not ask NsisUpdater to download', async () => {
     zipMocks.resolvePortableZipTarget.mockResolvedValue({
       version: '9.9.9',
-      asset: { name: 'wmux-9.9.9-win-x64.zip', browser_download_url: 'https://example.test/x.zip', size: 10 },
+      asset: { name: 'remotea-9.9.9-win-x64.zip', browser_download_url: 'https://example.test/x.zip', size: 10 },
     });
     const u = await freshUpdater();
     await expect(u.requestUpdateNow()).resolves.toEqual({ handled: true });
@@ -328,24 +328,24 @@ describe('portable zip install', () => {
 /**
  * Issue #3: "Install and restart" used to quit unconditionally. A payload that
  * vanished while the update sat behind "Later", or a helper an antivirus would
- * not let start, left the user with wmux closed and nothing to restart it.
+ * not let start, left the user with remotea closed and nothing to restart it.
  * A failed install now stays in the app, says so, and the next click does the
  * one thing that can help.
  */
 describe('portable zip install that cannot run (#3)', () => {
   const target = {
     version: '9.9.9',
-    asset: { name: 'wmux-9.9.9-win-x64.zip', browser_download_url: 'https://example.test/x.zip', size: 10 },
+    asset: { name: 'remotea-9.9.9-win-x64.zip', browser_download_url: 'https://example.test/x.zip', size: 10 },
   };
-  const staged = { version: '9.9.9', extractDir: 'X:\\payload', installDir: 'X:\\wmux', exePath: 'X:\\wmux\\wmux.exe' };
+  const staged = { version: '9.9.9', extractDir: 'X:\\payload', installDir: 'X:\\remotea', exePath: 'X:\\remotea\\remotea.exe' };
   const payloadMissing = () =>
     Object.assign(new Error('the downloaded update is no longer on disk — download it again'), { code: 'PAYLOAD_MISSING' });
   const flush = () => new Promise((resolve) => setImmediate(resolve));
 
   beforeEach(() => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-portable-'));
-    fs.writeFileSync(path.join(root, 'wmux.exe'), '');
-    fakeApp.exePath = path.join(root, 'wmux.exe');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-portable-'));
+    fs.writeFileSync(path.join(root, 'remotea.exe'), '');
+    fakeApp.exePath = path.join(root, 'remotea.exe');
     fakeApp.isPackaged = true;
     delete process.env.REMOTEA_DISABLE_UPDATER;
     zipMocks.resolvePortableZipTarget.mockReset().mockResolvedValue(target);
@@ -387,7 +387,7 @@ describe('portable zip install that cannot run (#3)', () => {
     await vi.waitFor(() => expect(u.getUpdateState()).toMatchObject({ phase: 'error', message: 'spawn EPERM' }));
 
     // The error badge says "Click to try again", not "Restart": the retry asks
-    // before it quits wmux and every session in it.
+    // before it quits remotea and every session in it.
     zipMocks.applyStagedPortableUpdate.mockResolvedValueOnce(undefined);
     fakeDialog.showMessageBox.mockResolvedValueOnce({ response: 0 });
     await expect(u.requestUpdateNow()).resolves.toEqual({ handled: true });
@@ -417,9 +417,9 @@ describe('portable zip install that cannot run (#3)', () => {
 
   // The same bypass as above, one phase earlier and reached first: a finished
   // download sets `ready` and then asks. showMessageBox is called with no
-  // parent window, so it is not modal to wmux and the badge stays clickable
+  // parent window, so it is not modal to remotea and the badge stays clickable
   // underneath the open dialog — and that click used to schedule the helper
-  // directly, quitting wmux while the question was still unanswered.
+  // directly, quitting remotea while the question was still unanswered.
   it('does not install behind the dialog that the finished download opened', async () => {
     const u = await freshUpdater();
     fakeDialog.showMessageBox.mockReturnValueOnce(new Promise(() => {})); // still on screen
@@ -427,7 +427,7 @@ describe('portable zip install that cannot run (#3)', () => {
     await vi.waitFor(() => expect(u.getUpdateState().phase).toBe('ready'));
     await vi.waitFor(() => expect(fakeDialog.showMessageBox).toHaveBeenCalledTimes(1));
 
-    // A badge click while that dialog is unanswered must not quit wmux.
+    // A badge click while that dialog is unanswered must not quit remotea.
     await expect(u.requestUpdateNow()).resolves.toEqual({ handled: true });
     await flush();
     await flush();

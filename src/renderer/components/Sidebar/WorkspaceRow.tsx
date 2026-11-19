@@ -53,7 +53,7 @@ function sessionDetailText(session: ClaudeSessionView, t: T): string {
   // the one thing the user has to act on, so it must not read as "Idle" just
   // because no tool is running (issue #128).
   //
-  // "Sent…" is its own state rather than a cleared block: wmux relayed the
+  // "Sent…" is its own state rather than a cleared block: remotea relayed the
   // answer but the agent has not confirmed, and claiming the prompt is gone on
   // our own say-so is exactly the ghost this feature exists to avoid.
   if (session.answerPending) return t('workspaceRow.answerSent', 'Sent — waiting…');
@@ -78,7 +78,7 @@ function rowAccentStyle(customColor: string | undefined): React.CSSProperties {
   return style;
 }
 
-/** `[WT]` on a workspace that is a wmux-created git worktree (#366). */
+/** `[WT]` on a workspace that is a remotea-created git worktree (#366). */
 function WorktreeBadge({ worktree }: { worktree?: WorkspaceInfo['worktree'] }) {
   const t = useT();
   if (!worktree) return null;
@@ -149,7 +149,7 @@ export default function WorkspaceRow({
   const terminals = useMemo(() => terminalSurfaces(workspace.splitTree), [workspace.splitTree]);
   const terminalsId = `workspace-terminals-${workspace.id}`;
   // What the row shows: the stored title, or the program's window title while
-  // wmux picked the name. A rename starts from it, and counts as one only if
+  // remotea picked the name. A rename starts from it, and counts as one only if
   // the field differs from where it started: the label can change while the
   // field is open (a spinner in the title), and confirming an untouched field
   // must not freeze a followed title in place.
@@ -221,7 +221,7 @@ export default function WorkspaceRow({
   }));
   const wsProgress = useMemo(() => aggregateProgress(wsProgressEntries), [wsProgressEntries]);
 
-  // ── Unified agent list (observer subagents + wmux-spawned agents) ──
+  // ── Unified agent list (observer subagents + remotea-spawned agents) ──
   const agentMeta = useStore((state) => state.agentMeta);
   const doneAtRef = useRef<number | null>(null);
   const wsAgents = useMemo<WorkspaceAgentsView>(() => {
@@ -275,8 +275,8 @@ export default function WorkspaceRow({
    * Relay a declared answer to a blocked pane.
    *
    * On refusal — the pane stopped asking, the choice was already consumed, the
-   * agent declared a key wmux cannot translate — fall back to FOCUSING the
-   * pane. That is the honest outcome: wmux could not answer for you, so it puts
+   * agent declared a key remotea cannot translate — fall back to FOCUSING the
+   * pane. That is the honest outcome: remotea could not answer for you, so it puts
    * you where you can answer yourself, rather than silently swallowing a click
    * on a button that looked like it worked.
    */

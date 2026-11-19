@@ -5,7 +5,7 @@ import { useT } from '../i18n';
 /**
  * Unsaved-markdown guard (issue #116, F3): shown when a tab holding edits that
  * have not been written to disk is closed by a user gesture — the tab ×, or
- * Ctrl+W. Programmatic closes (`wmux close-surface`) bypass it entirely and
+ * Ctrl+W. Programmatic closes (`remotea close-surface`) bypass it entirely and
  * never reach this component, the same split ConfirmCloseDialog draws for
  * workspaces.
  */

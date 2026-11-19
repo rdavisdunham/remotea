@@ -73,7 +73,7 @@ describe('observer agent parsing', () => {
 describe('workflow panel parsing', () => {
   beforeEach(() => { sendMock.mockClear(); clearActivity(surf); });
 
-  // Real lines captured from the Workflow tool's TUI panel (wmux read-screen).
+  // Real lines captured from the Workflow tool's TUI panel (remotea read-screen).
   // Each box row carries TWO columns: "│ <phase list> │ <agent row> │".
   const RUNNING_ROW = ' │ > 1 Écrire   1/3 │  ● write:pilote             Opus 4.8 (1M context)                               82.9k tok · 17 tools │\n';
   const RUNNING_ROW2 = ' │   2 Vérifier 0/1 │  ● write:compliance         Opus 4.8 (1M context)                               81.1k tok · 10 tools │\n';

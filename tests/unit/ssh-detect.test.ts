@@ -11,7 +11,7 @@ import {
  * Detection precedence and process attribution.
  *
  * The precedence tests matter because the three sources routinely disagree: a
- * `wmux ssh` pane has a managed answer forever, while the probe may briefly see
+ * `remotea ssh` pane has a managed answer forever, while the probe may briefly see
  * nothing (sweep in flight) or something stale (ssh already exited). Whichever
  * source is most authoritative has to win regardless of arrival order.
  *
@@ -37,13 +37,13 @@ describe('SshDetector precedence', () => {
     expect(detector.detect('surf-1')).toBeNull();
   });
 
-  it('detects a wmux ssh surface from its shell string alone', () => {
+  it('detects a remotea ssh surface from its shell string alone', () => {
     const detector = new SshDetector(source({ 'surf-1': 100 }));
     detector.setSurfaceShell('surf-1', 'ssh fortuna@honoured-accident');
     expect(detector.detect('surf-1')?.destination).toBe('fortuna@honoured-accident');
   });
 
-  it('detects a wmux ssh surface launched by absolute path', () => {
+  it('detects a remotea ssh surface launched by absolute path', () => {
     const detector = new SshDetector(source({ 'surf-1': 100 }));
     detector.setSurfaceShell('surf-1', 'C:\\Windows\\System32\\OpenSSH\\ssh.exe fortuna@honoured-accident');
     expect(detector.detect('surf-1')).toMatchObject({
@@ -246,7 +246,7 @@ describe('attributeSshProcesses', () => {
   // The parent table is passed in rather than read from module state, so each
   // case states the whole process tree it is asserting against.
   it('attributes an ssh that IS the PTY root', () => {
-    // `wmux ssh user@host` spawns ssh as the pane's own shell, so the PTY root
+    // `remotea ssh user@host` spawns ssh as the pane's own shell, so the PTY root
     // pid is the ssh pid. Verified against a live dev instance: the pane's ssh
     // was parented directly to the Electron main process, with no shell in
     // between. A walk that started at the parent would never see it.
@@ -280,7 +280,7 @@ describe('attributeSshProcesses', () => {
 
   it('does not attribute an ssh belonging to no tracked pane', () => {
     // An ssh the user started from Explorer or another terminal must never make
-    // a wmux pane look remote.
+    // a remotea pane look remote.
     const found = attributeSshProcesses(
       [proc(300, 999, 'ssh stranger@elsewhere')],
       new Map([[300, 999]]),

@@ -5,4 +5,4 @@ contact_links:
     about: What a Windows minidump contains, and what to send instead of one.
   - name: Configuration reference
     url: https://github.com/rdavisdunham/remotea/blob/main/docs/config.md
-    about: ~/.wmux/config.toml — keys, shells, themes.
+    about: ~/.remotea/config.toml — keys, shells, themes.

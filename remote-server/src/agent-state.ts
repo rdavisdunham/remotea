@@ -189,7 +189,7 @@ export class AgentStateTracker {
     this.publish(surf, rec);
   }
 
-  /** The agent let go of the pane (SessionEnd, `wmux release-agent`). */
+  /** The agent let go of the pane (SessionEnd, `remotea release-agent`). */
   release(surf: string, reason: string): void {
     const rec = this.recs.get(surf);
     if (!rec || rec.exited) return;

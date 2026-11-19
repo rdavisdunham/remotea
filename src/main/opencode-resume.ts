@@ -1,8 +1,8 @@
 // ─── OpenCode resume, main side (#290) ───────────────────────────────────────
 //
 // The third provider beside Claude (#186) and Codex (#261). The handle comes
-// from wmux's own OpenCode plugin, which sees every session event and calls
-// `wmux report-session <id> --provider opencode`; restore types
+// from remotea's own OpenCode plugin, which sees every session event and calls
+// `remotea report-session <id> --provider opencode`; restore types
 // `opencode -s <id>`. Same shape as codex-resume.ts on purpose — one stamp per
 // provider, mutually exclusive through agent-session-persistence.ts.
 

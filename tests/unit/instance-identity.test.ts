@@ -2,7 +2,7 @@
 // The pipe and the APPDATA dir were already suffixed so a dev build can run
 // beside an installed one. The AppUserModelId was not, and that gap was not
 // cosmetic: Windows maps an AUMID to exactly one executable, so a dev build
-// sharing `com.wmux.app` repoints it at its own electron.exe and the INSTALLED
+// sharing `com.remotea.app` repoints it at its own electron.exe and the INSTALLED
 // app's taskbar button starts reading "Electron" with the dev binary's icon —
 // and the user's pinned button, which is keyed on that id, is orphaned. These
 // pin all three identities together so they cannot drift apart again.

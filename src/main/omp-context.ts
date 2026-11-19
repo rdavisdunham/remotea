@@ -2,10 +2,10 @@ import { reportIntegrationFailure } from './integration-failures';
 /**
  * omp (Oh My Pi) integration (issue #165).
  *
- * The fourth agent wmux teaches about itself, after Claude Code, OpenCode and
+ * The fourth agent remotea teaches about itself, after Claude Code, OpenCode and
  * Kiro. It is a Windows-native terminal coding agent, which makes it a closer
- * fit for wmux than most — the request in #165 was from a team that is "100%
- * omp on Windows 11" and read wmux as Claude-only.
+ * fit for remotea than most — the request in #165 was from a team that is "100%
+ * omp on Windows 11" and read remotea as Claude-only.
  *
  * ── Where the block goes ─────────────────────────────────────────────────────
  *
@@ -16,17 +16,17 @@ import { reportIntegrationFailure } from './integration-failures';
  *
  * Worth being explicit about a tempting shortcut that was rejected: omp also
  * ships `claude` and `agents-md` discovery providers, so on many machines it
- * would already pick up the block wmux writes to ~/.claude/CLAUDE.md and appear
+ * would already pick up the block remotea writes to ~/.claude/CLAUDE.md and appear
  * to work with no code at all. That is not something to rely on — it is true
  * only while the user has Claude Code installed AND has not put `claude` in
- * `disabledProviders`, and it makes wmux's behaviour on an omp-only machine
+ * `disabledProviders`, and it makes remotea's behaviour on an omp-only machine
  * depend on a competing tool being present. Writing the native file means omp
  * support does not quietly evaporate when someone uninstalls Claude Code.
  *
  * ── Why a whole file rather than a splice ────────────────────────────────────
  *
  * Same reasoning as kiro-context.ts, for a different reason. Kiro reads every
- * file in a steering directory, so wmux can own one. Here the file is a single
+ * file in a steering directory, so remotea can own one. Here the file is a single
  * shared AGENTS.md that the user may well have written in — so the block is
  * spliced between markers exactly as it is for Claude Code and OpenCode, and
  * everything outside the markers is left alone.
@@ -46,7 +46,7 @@ import { isRemoteaPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
 
 /**
  * The omp agent directory — `~/.omp/agent` unless the env overrides omp itself
- * honours are set in wmux's own environment:
+ * honours are set in remotea's own environment:
  *
  * - `PI_CODING_AGENT_DIR` replaces the whole agent directory (default profile
  *   only; a `~` prefix expands to home, otherwise the value is resolved).
@@ -55,7 +55,7 @@ import { isRemoteaPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
  *
  * `PI_CODING_AGENT_DIR` wins when both are set: it is the narrower override and
  * omp applies it to `getAgentDir()` itself, whereas `PI_CONFIG_DIR` only moves
- * the root the default is derived from. Values set per-shell after wmux
+ * the root the default is derived from. Values set per-shell after remotea
  * launched are unknowable from here and fall back to the default — a miss,
  * never a write to the wrong place.
  */
@@ -85,7 +85,7 @@ export function getOmpAgentsMdPath(agentDir = getOmpAgentDir()): string {
   return path.join(agentDir, 'AGENTS.md');
 }
 
-/** Ensures ~/.omp/agent/AGENTS.md contains the wmux block. */
+/** Ensures ~/.omp/agent/AGENTS.md contains the remotea block. */
 export function ensureOmpContext(): void {
   try {
     // Rendered, not read: carries this install's absolute CLI path (#158).
@@ -107,7 +107,7 @@ export function ensureOmpContext(): void {
 }
 
 /**
- * Remove the wmux block (issue #132's inverse requirement: every write wmux
+ * Remove the remotea block (issue #132's inverse requirement: every write remotea
  * makes outside its own directory must be undoable).
  *
  * Only the block between the markers goes. A file the user has written their
@@ -120,7 +120,7 @@ export function removeOmpContext(): void {
     const agentsPath = getOmpAgentsMdPath();
     if (!fs.existsSync(agentsPath)) return;
     const existing = fs.readFileSync(agentsPath, 'utf-8');
-    // null means there is no wmux block in there at all — a file the user
+    // null means there is no remotea block in there at all — a file the user
     // created themselves under this name, which is not ours to touch.
     const next = stripRemoteaBlock(existing);
     if (next === null || next === existing) return;
@@ -167,7 +167,7 @@ export function ensureOmpExtension(): void {
   }
 }
 
-/** The inverse of ensureOmpExtension, restricted to wmux-owned files. */
+/** The inverse of ensureOmpExtension, restricted to remotea-owned files. */
 export function removeOmpExtension(): void {
   try {
     const dest = getOmpExtensionPath();

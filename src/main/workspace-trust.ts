@@ -1,6 +1,6 @@
 // Which workspace manifests the user has said may run on this machine (#284).
 //
-// Kept in wmux's own data dir and NEVER beside the manifest: a repo must not
+// Kept in remotea's own data dir and NEVER beside the manifest: a repo must not
 // be able to ship its own "trusted" flag. Keyed on the manifest's absolute
 // path, holding the content hash that was trusted — any byte changed is a new
 // question — and the exact command lines that were shown, so the next prompt

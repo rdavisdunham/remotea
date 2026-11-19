@@ -9,7 +9,7 @@
  * to do. The renderer already HAS the grid: xterm parsed it once, for free,
  * because it has to draw it. Reading 40 lines out of that grid costs a loop
  * over 40 `translateToString` calls with no IPC at all — versus the ~0.6ms
- * `executeJavaScript` round trip `wmux read-screen` pays per surface, which is
+ * `executeJavaScript` round trip `remotea read-screen` pays per surface, which is
  * cheap for a CLI call and wasteful several times a second.
  *
  * Reading the grid rather than the bytes also sidesteps two problems main-side

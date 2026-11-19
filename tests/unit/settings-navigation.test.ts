@@ -77,7 +77,7 @@ describe('settings navigation compatibility and discovery', () => {
   });
   it('supports old names, translated control labels, AND queries and empty results', () => {
     expect(searchSettings('remote console')).toContain('Remote');
-    expect(searchSettings('wmux')).toContain('General');
+    expect(searchSettings('remotea')).toContain('General');
     expect(searchSettings('eridani integration')).toContain('Agents');
     expect(searchSettings('police géante', (key, fallback) => key === 'settings.terminalPanel.fontSize' ? 'Police géante' : fallback)).toContain('Terminal');
     expect(searchSettings('no-such-preference')).toEqual([]);

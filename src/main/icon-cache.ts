@@ -1,7 +1,7 @@
 /**
- * The Windows shell icon cache, and wmux's stale-icon story (issues #137, #226).
+ * The Windows shell icon cache, and remotea's stale-icon story (issues #137, #226).
  *
- * wmux installs to the same path on every update, and Explorer caches shell
+ * remotea installs to the same path on every update, and Explorer caches shell
  * icons per path in %LocalAppData%\Microsoft\Windows\Explorer\iconcache_*.db.
  * After an update that changed the artwork, the taskbar button, a pinned
  * shortcut and the Start-menu entry keep drawing the icon of the version they
@@ -22,14 +22,14 @@
  * Two pieces:
  *
  * 1. `iconNoticeDue` — did the shipped icon change since this machine last ran
- *    wmux? Decided from a fingerprint of the .ico stored under wmux's own
+ *    remotea? Decided from a fingerprint of the .ico stored under remotea's own
  *    APPDATA dir, so the user is told ONCE, after the update that changed it,
  *    that the taskbar may lag and where the button is. Reading a bug report
  *    two rebrands apart is the alternative.
  *
  * 2. `refreshShellIconCache` — the Explorer restart, behind a native confirm
  *    in ipc-handlers.ts. Absolute System32 paths throughout: a writeable PATH
- *    dir must not get to shadow `taskkill.exe` for a command wmux runs on the
+ *    dir must not get to shadow `taskkill.exe` for a command remotea runs on the
  *    user's behalf (the rule `win32-process.ts` and `system32.ts` already
  *    state).
  */
@@ -41,7 +41,7 @@ import { spawn } from 'child_process';
 import { getAppDataDir } from '../shared/instance';
 import { powershellPath } from './system32';
 
-/** Where the last-seen icon fingerprint lives: inside wmux's own dir (#132). */
+/** Where the last-seen icon fingerprint lives: inside remotea's own dir (#132). */
 export function iconRevisionFile(): string {
   return path.join(getAppDataDir(), 'icon-rev');
 }
@@ -128,7 +128,7 @@ export function iconCacheRefreshScript(): string {
 
 /**
  * Restart Explorer with the icon cache cleared. Detached and unref'd: the
- * refresh must not depend on wmux staying alive, and wmux must not wait on it.
+ * refresh must not depend on remotea staying alive, and remotea must not wait on it.
  * Only ever called after the user confirmed a dialog that spells out that File
  * Explorer windows will close.
  */

@@ -62,7 +62,7 @@ function Report-Cwd {
 #
 # Nor can the pipe, which is the obvious candidate and the one to rule out
 # explicitly. It runs one direction — shell to remotea — and the consumer here is
-# another *shell* process, not wmux. The prompt already sends this exact value
+# another *shell* process, not remotea. The prompt already sends this exact value
 # over as report_pwd; routing the hand-off through the pipe would mean adding
 # currentCwd to the surface listing, a V2 method and a CLI verb to read it back,
 # then spawning node on every 45s tick, so that the shell can ask remotea for
@@ -106,7 +106,7 @@ function Invoke-RemoteaExitCleanup {
 }
 
 # Hand-off files outlive panes that were killed rather than closed: a kill
-# runs no exit handler, so nothing removes theirs and `<temp>\wmux` grows one
+# runs no exit handler, so nothing removes theirs and `<temp>\remotea` grows one
 # small file per pane, forever.
 #
 # Age is what separates the two, and a live pane keeps its own file young from

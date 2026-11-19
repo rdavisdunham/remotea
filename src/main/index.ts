@@ -127,7 +127,7 @@ type CallerBrowserResolution =
  * Resolve which browser surface a terminal `caller` (e.g. $REMOTEA_SURFACE_ID) is
  * effectively bound to, for `browser.get_engine` / `browser.set_engine`.
  *
- * `wmux browser <verb>` already resolves a caller to ITS OWN browser surface
+ * `remotea browser <verb>` already resolves a caller to ITS OWN browser surface
  * (issue #62) — but that binding (`callerBrowserSurface` in v2-browser.ts) is
  * a private module-level map in a file this change does not touch. So this
  * does NOT read or write that map; it re-derives an answer from the same
@@ -349,8 +349,8 @@ function routeSpecialV2(
     respond({ enabled: !isQuitting && ptyManager.has(request.params?.surfaceId) && prefs?.restoreCodexSessions === true });
     return true;
   }
-  // The CLI exiting because wmux is shutting down must not erase recovery IDs.
-  // A quitting wmux kills every PTY, and an agent that exits because of it did
+  // The CLI exiting because remotea is shutting down must not erase recovery IDs.
+  // A quitting remotea kills every PTY, and an agent that exits because of it did
   // not choose to end its conversation — keep the handle for restore. Claude's
   // release is `pane.release_agent`, sent by its SessionEnd hook as the PTY
   // dies, and gets the same refusal.
@@ -465,7 +465,7 @@ const windowManager = new WindowManager();
 // Closing a window should forget its saved workspaces — otherwise the merged
 // session file keeps them and they reappear as a ghost window next launch
 // (issue #118). Two cases deliberately do NOT prune: shutdown, and closing the
-// *last* window, which is how most people quit wmux and must still persist
+// *last* window, which is how most people quit remotea and must still persist
 // everything for the next launch.
 windowManager.onWindowClosed = (id, webContentsId) => {
   clearFileGrants(webContentsId);
@@ -500,7 +500,7 @@ function handleWindowV2(
   switch (method) {
     case 'window.create':
       // Second OS window — lets users spread workspaces across monitors
-      // without a second wmux instance. Same code path as the Ctrl+Shift+N
+      // without a second remotea instance. Same code path as the Ctrl+Shift+N
       // shortcut, just reachable from the CLI/agents.
       respond({ windowId: windowManager.createWindow() });
       return true;
@@ -818,7 +818,7 @@ async function promptsForAllSurfaces(limit: number): Promise<{ surfaces: Record<
  * halves already live: the PTY manager, and the named-key table that
  * `surface.send_key` uses. Sharing that table is the point — a choice declaring
  * `key: "enter"` must reach the terminal as exactly the same bytes it would if
- * the user had asked wmux to send that key by hand, or the back-channel becomes
+ * the user had asked remotea to send that key by hand, or the back-channel becomes
  * a second, subtly different way to type.
  *
  * An unknown key name throws rather than falling back to writing the name as
@@ -910,7 +910,7 @@ const remoteConsoleOps: ConsoleOps = {
   noteHumanInput: (id, bytes) => { noteHumanInput(id as SurfaceId, bytes); },
   write: (id, bytes) => ptyManager.write(id as SurfaceId, bytes),
   deliverAnswer,
-  // The same METADATA_UPDATE path `wmux notify` takes (a V1 `notify` with no
+  // The same METADATA_UPDATE path `remotea notify` takes (a V1 `notify` with no
   // surface), which is the one bell notification that already works without a
   // pane to point at. NOTIFICATION_FIRE is not usable here: it needs a real
   // surfaceId. Facts, not a sentence: the renderer words it in the UI language.
@@ -992,8 +992,8 @@ app.setAppUserModelId(getAppUserModelId());
 // Auto-strip MOTW on startup so users never see security warnings or pinning failures
 stripMotw();
 
-// Single-instance lock (issue #32). Outside a wmux-spawned shell, `wmux` on PATH
-// resolves to the GUI exe rather than the CLI, so `wmux browser open <url>` (and
+// Single-instance lock (issue #32). Outside a remotea-spawned shell, `remotea` on PATH
+// resolves to the GUI exe rather than the CLI, so `remotea browser open <url>` (and
 // any stray re-launch) would otherwise spawn a SECOND window and ignore its args.
 // Holding the lock makes the second launch hand off to the running instance,
 // which just focuses its window.
@@ -1021,8 +1021,8 @@ if (moveRun) void runMoveMode(gotInstanceLock);
 
 /**
  * Open a folder as a new workspace, for the Explorer context-menu verb
- * ("Open in wmux" — see shell-context-menu.ts, which registers
- * `"wmux.exe" "%V"`).
+ * ("Open in remotea" — see shell-context-menu.ts, which registers
+ * `"remotea.exe" "%V"`).
  *
  * Routed through the same `__remotea_createWorkspace` bridge the CLI's
  * `new-workspace --cwd` uses, so Explorer, the CLI and the UI all land on one
@@ -1048,12 +1048,12 @@ if (moveRun) {
 } else if (!gotInstanceLock) {
   app.quit();
 } else {
-  // Explorer launches `wmux.exe "C:\folder"`. With the single-instance lock held
+  // Explorer launches `remotea.exe "C:\folder"`. With the single-instance lock held
   // that becomes a second-instance event on the RUNNING window, carrying the new
   // process's argv — so the folder has to be read from the event, not from our
   // own process.argv, which still holds the original launch.
   app.on('second-instance', (_event, argv) => {
-    // A window hidden to the tray (#442) comes back first; launching wmux
+    // A window hidden to the tray (#442) comes back first; launching remotea
     // again is how most people would look for it.
     const win = BrowserWindow.getAllWindows()[0];
     if (!windowManager.showHiddenWindows() && win && !win.isDestroyed()) {
@@ -1082,7 +1082,7 @@ function hardenWebContents(): void {
     if (type === 'webview') {
       installPageZoom(contents);
       // Electron's default menu would otherwise take keys the page leaves
-      // unhandled: Ctrl+W ran Window → Close and quit wmux. See
+      // unhandled: Ctrl+W ran Window → Close and quit remotea. See
       // webview-menu-shortcuts.ts.
       ignoreMenuShortcutsInGuest(contents);
       // ...and the desktop's tab-level shortcuts get them instead (Ctrl+W closes
@@ -1092,7 +1092,7 @@ function hardenWebContents(): void {
 
     // Enforce safe webview preferences regardless of attributes set in the DOM,
     // plus Chrome's autoplay rule (#287). The event fires on the HOST — the
-    // wmux window — so it must be registered there; see webview-prefs.ts.
+    // remotea window — so it must be registered there; see webview-prefs.ts.
     if (type === 'window' || type === 'webview') {
       contents.on('will-attach-webview', (_e, webPreferences, params) => {
         hardenWebviewPreferences(webPreferences as Record<string, unknown>, params as Record<string, unknown>);
@@ -1125,7 +1125,7 @@ function hardenWebContents(): void {
         return {
           action: 'allow',
           overrideBrowserWindowOptions: {
-            // A child of the wmux window: above it, minimised with it, and
+            // A child of the remotea window: above it, minimised with it, and
             // never a stray top-level window in the taskbar.
             ...(host ? { parent: host } : {}),
             autoHideMenuBar: true,
@@ -1166,7 +1166,7 @@ function hardenWebContents(): void {
     // The main app window (loads localhost in dev, file:// in prod) must never
     // be navigated to remote content. Webviews host their own contents and are
     // exempt — their navigation is the whole point — and so is a popup the
-    // panel opened (#281), which has an opener and no wmux UI in it. This
+    // panel opened (#281), which has an opener and no remotea UI in it. This
     // handles same-frame navigations only; new-window requests never reach it
     // (setWindowOpenHandler above owns those), so a single gesture is launched
     // by one path, never both.
@@ -1339,7 +1339,7 @@ function applyHookLifecycle(params: any): void {
  * `shell`, keyed `shell:<task id>`.
  *
  * Every signal is a hook, so this works wherever the hooks do — WSL, a
- * devcontainer through `wmux bridge` — with no process polling. The start is
+ * devcontainer through `remotea bridge` — with no process polling. The start is
  * the PostToolUse that carries `backgroundTaskId`; the end is the
  * `<task-notification>` Claude Code feeds its next turn (UserPromptSubmit,
  * which it fires mid-turn too), a `TaskStop`, or the session ending. A shell a
@@ -1366,7 +1366,7 @@ function applyBackgroundShells(sid: SurfaceId, params: any): void {
 }
 
 /**
- * `agent.subagent` — `wmux report-subagent` (#272). Any agent declares a
+ * `agent.subagent` — `remotea report-subagent` (#272). Any agent declares a
  * subagent of its own (a background task, a worker, a planner) and gets a line
  * under its pane in the sidebar. Display only: it never touches the declared
  * run state, so a subagent can make a row read "Orchestrating" but can neither
@@ -1386,8 +1386,8 @@ function handleSubagentReport(
     detail: typeof p.detail === 'string' ? p.detail : undefined,
     done,
   });
-  // A finish for a subagent wmux never saw start is not an error — the caller
-  // may well have started it before wmux did.
+  // A finish for a subagent remotea never saw start is not an error — the caller
+  // may well have started it before remotea did.
   if (!tracked && !done) { respondError(-32602, 'id required'); return; }
   respond({ ok: true, tracked });
 }
@@ -1421,7 +1421,7 @@ function handleHookEvent(params: any): void {
 
   // Same events, second consumer: declared agent run state (issue #128). This
   // is what makes "which pane is parked on me?" work for Claude Code with no
-  // plugin to install — wmux already registers these hooks.
+  // plugin to install — remotea already registers these hooks.
   // The event is resolved, not read straight off the payload: the per-tool
   // PostToolUse entries invoke the hook helper by bare tool name, so they arrive
   // with a `tool` and no `event` at all — and gating on `params.event` dropped
@@ -1442,7 +1442,7 @@ function handleHookEvent(params: any): void {
   }
 
   // Third consumer: the resumable session handle (issue #186). Every Claude
-  // Code hook payload carries session_id, and since wmux registers those hooks
+  // Code hook payload carries session_id, and since remotea registers those hooks
   // this arrives with no plugin to install and no extra process — the same
   // reason the declared-state path above works. reportAgentSession validates.
   //
@@ -1455,7 +1455,7 @@ function handleHookEvent(params: any): void {
   // session_id like every other hook, but `applyHookToAgentState` above has
   // just called `releaseAgent()` for it — recording here would re-create the
   // record microseconds later and hand the next restore a conversation the user
-  // deliberately quit. "Exit Claude, restart wmux, get a plain shell" is the
+  // deliberately quit. "Exit Claude, restart remotea, get a plain shell" is the
   // behaviour #186 asked to keep, and this ordering is the only thing enforcing it.
   //
   // Qwen Code runs the same hooks out of its own settings.json, registered with
@@ -1718,7 +1718,7 @@ app.whenReady().then(() => {
     if (meta.cwd) broadcastMetadataUpdate({ command: 'report_pwd', surfaceId, args: [meta.cwd] });
   });
   // Agent status from a remote session — the server's hook bridge relays
-  // what remotea-hook.js (and the wmux plugins) would have sent to the named pipe
+  // what remotea-hook.js (and the remotea plugins) would have sent to the named pipe
   // had the agent run here. The bridge authenticated it per session and the
   // WebSocket authenticated the server, so it goes to the same handlers the
   // pipe feeds, pinned to the session it came from. Only status methods.
@@ -1776,11 +1776,11 @@ app.whenReady().then(() => {
   // startup never blocks on it.
   reapOrphanedPtys();
 
-  // The agent-browser half of the same problem. A crashed wmux leaves its
+  // The agent-browser half of the same problem. A crashed remotea leaves its
   // sessions' Chromes resident for exactly the reason its PTY subtrees survive
   // above, and the in-memory SessionRegistry starts empty, so those survivors
   // are invisible to this process — ground truth is `agent-browser session
-  // list`. Sessions are ephemeral by design, so every `wmux-` session with no
+  // list`. Sessions are ephemeral by design, so every `remotea-` session with no
   // live surface is garbage; nothing without that prefix is ever touched.
   //
   // Unawaited, and it exits immediately when agent-browser is not installed, so
@@ -1879,7 +1879,7 @@ app.whenReady().then(() => {
           })
           // A code, never the message: the sweep walks %TEMP%, so an opendir
           // failure carries that path — and the path carries the Windows
-          // username. Same reason `wmux crash-report` never reads the Event Log
+          // username. Same reason `remotea crash-report` never reads the Event Log
           // properties that hold one (#174). `sweepUpdateLeftovers` spells its
           // per-entry failures the same way.
           .catch((err: unknown) =>
@@ -2013,7 +2013,7 @@ app.whenReady().then(() => {
       const cleared = agentIdentity.clearReported(surfaceId, sequenceFrom(rawSequence));
       broadcastAgentIdentity(surfaceId);
       // agy has no session-end hook: its shell coming back is its exit. A
-      // quitting wmux kills the shell rather than returning to it, but keep
+      // quitting remotea kills the shell rather than returning to it, but keep
       // the same refusal every other release has.
       if (cleared && !isQuitting) {
         releaseAgyAtPrompt(surfaceId as SurfaceId, ran?.source === 'command' && ran.kind === 'agy');
@@ -2060,7 +2060,7 @@ app.whenReady().then(() => {
 
     switch (request.method) {
       case 'system.identify':
-        respond({ name: 'wmux', version: app.getVersion(), platform: 'win32' });
+        respond({ name: 'remotea', version: app.getVersion(), platform: 'win32' });
         break;
       case 'system.capabilities':
         respond({ protocols: ['v1', 'v2'], features: ['workspaces', 'splits', 'notifications', 'windows', 'browser', 'markdown', 'agents', 'status'] });
@@ -2626,7 +2626,7 @@ app.on('before-quit', (event) => {
 // Killing here does not stop the callbacks; it makes them fire while the
 // environment is still healthy, instead of racing its teardown. That is a
 // narrower window, not a proof, and it is deliberately described that way:
-// the throw itself is upstream in node-pty and not something wmux can catch.
+// the throw itself is upstream in node-pty and not something remotea can catch.
 // `session-end` is a WINDOW event, not an app one, in current Electron — so it
 // is attached centrally here rather than at each creation site, and made
 // one-shot: the OS ends the session once, however many windows are open.
@@ -2764,7 +2764,7 @@ app.on('will-quit', (event) => {
   };
 
   // Bounded twice over. `teardownAgentBrowser` caps itself, and this timer caps
-  // IT — because the one outcome worse than leaking a browser is a wmux the
+  // IT — because the one outcome worse than leaking a browser is a remotea the
   // user cannot quit.
   const forceQuit = setTimeout(leave, QUIT_TEARDOWN_BUDGET_MS + 2_000);
   const finish = (): void => {

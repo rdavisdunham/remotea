@@ -135,7 +135,7 @@ describe('traceState', () => {
     expect(traceState({ ...base, working: false, blockedSince: 500 }).blocked).toBe(true);
   });
 
-  // wmux shipped a build where the hook script was missing from the package
+  // remotea shipped a build where the hook script was missing from the package
   // (issue #81). A broken install must not render as a confident idle session.
   it('flags a session that has never produced telemetry', () => {
     expect(traceState({ ...base, working: false, toolCount: 0, lastSeen: 0 }).noTelemetry).toBe(true);

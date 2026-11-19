@@ -56,7 +56,7 @@ describe('parseOsc7Cwd (#378)', () => {
 
   it('rejects device paths', () => {
     expect(parseOsc7Cwd('file://localhost/\\\\?\\C:\\x', HOST)).toBeNull();
-    expect(parseOsc7Cwd('file://localhost/\\\\.\\pipe\\wmux', HOST)).toBeNull();
+    expect(parseOsc7Cwd('file://localhost/\\\\.\\pipe\\remotea', HOST)).toBeNull();
   });
 
   it('rejects a .. segment rather than trusting normalization to keep it inside the root', () => {

@@ -90,7 +90,7 @@ afterEach(() => vi.restoreAllMocks());
 /**
  * The bug this pair exists to prevent: `v2-browser.ts` and `ipc-handlers.ts`
  * each kept their own Set of surfaces they held a dashboard reference for. A
- * pane enabled from the UI and then driven by `wmux browser open` took TWO
+ * pane enabled from the UI and then driven by `remotea browser open` took TWO
  * references and gave back one, so the refcount never reached zero and the
  * dashboard outlived every agent pane until app quit.
  */

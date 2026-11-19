@@ -14,9 +14,9 @@ import {
 /**
  * PowerShell callers lost their argument quoting through remotea.cmd (issue #154):
  * PowerShell strips the quotes when invoking a batch file, cmd.exe re-reads the
- * bare `>` / `|` / `&` as shell syntax, and `wmux browser eval
+ * bare `>` / `|` / `&` as shell syntax, and `remotea browser eval
  * "document.title.length>0"` silently redirected its own output into a file
- * named `0` — exit 0, no output, a junk file, and `wmux send` transmitting text
+ * named `0` — exit 0, no output, a junk file, and `remotea send` transmitting text
  * the user never wrote.
  *
  * The redirect is applied to cmd.exe's invocation line before remotea.cmd starts,
@@ -60,7 +60,7 @@ describe('PowerShell shim gate (issue #154)', () => {
   it('refuses when ANY installed host blocks scripts', async () => {
     // Restricted is the Windows PowerShell 5.1 default, and a user's panes and
     // their children do not all run the same host. One refusal is one place
-    // `wmux` would stop working entirely — worse than the quoting bug.
+    // `remotea` would stop working entirely — worse than the quoting bug.
     const ok = await probePowerShellShim(SHIM_DIR, deps({
       'powershell.exe': ran(''),
       'pwsh.exe': ran(`${SHIM_PROBE_MARKER}\n`),
@@ -116,7 +116,7 @@ const powershell = (() => {
 })();
 
 describe.skipIf(!powershell)('a shim invoked from PowerShell (issue #154)', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-shim-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-shim-'));
   // Stands in for the CLI: prints argv as JSON, so a mangled argument is visible.
   const echo = path.join(dir, 'echo.js');
   fs.writeFileSync(echo, 'console.log(JSON.stringify(process.argv.slice(2)));\n');
@@ -188,7 +188,7 @@ const ROUND_TRIPS: string[][] = [
 ];
 
 describe.skipIf(installedHosts.length === 0)('embedded quotes survive the shim (issue #247)', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-shim-247-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-shim-247-'));
   const echo = path.join(dir, 'echo.js');
   fs.writeFileSync(echo, 'console.log(JSON.stringify(process.argv.slice(2)));\n');
   fs.copyFileSync(path.join(SHIM_DIR, 'remotea.ps1'), path.join(dir, 'remotea.ps1'));

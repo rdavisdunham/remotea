@@ -1,7 +1,7 @@
 // ─── Antigravity CLI resume, main side ───────────────────────────────────────
 //
 // The fourth provider beside Claude (#186), Codex (#261) and OpenCode (#290).
-// The handle comes from wmux's own agy plugin (agy-context.ts), whose hooks
+// The handle comes from remotea's own agy plugin (agy-context.ts), whose hooks
 // read `conversationId` off agy's hook payload and report it with
 // `provider: 'agy'`; restore types `agy --conversation <id>`. Same shape as
 // opencode-resume.ts on purpose — one stamp per provider, mutually exclusive

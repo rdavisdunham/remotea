@@ -3,7 +3,7 @@
  * replacement xterm back into the mode the still-running TUI believes it is in
  * (issue #164).
  *
- * ## Why wmux has to track this at all
+ * ## Why remotea has to track this at all
  *
  * A split-tree restructure remounts the pane, which disposes the xterm instance
  * and builds a new one. The PTY survives, so the application on the other end
@@ -18,7 +18,7 @@
  * SGR. Clicks land in the wrong place or are dropped entirely; the application
  * is not going to re-send its DECSET, because from its side nothing happened.
  *
- * wmux's wheel handler survived this because it never used xterm's encoding —
+ * remotea's wheel handler survived this because it never used xterm's encoding —
  * it writes SGR reports itself — which is exactly why the bug presented as
  * "the wheel still works but clicking doesn't".
  *

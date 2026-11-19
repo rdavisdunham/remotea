@@ -61,7 +61,7 @@ function isWslHost(env, platform = process.platform) {
 /**
  * Whether the local hop goes through npiperelay.exe over WSL interop.
  *
- * A Windows pipe path (`\\.\pipe\wmux`, not something rooted at `/`) reached
+ * A Windows pipe path (`\\.\pipe\remotea`, not something rooted at `/`) reached
  * from inside a WSL distro cannot be dialled directly — npiperelay is what
  * bridges it, and spawning a Windows executable over interop is the slow part,
  * especially where AV scans the binary on each exec.

@@ -1,14 +1,14 @@
-// remotea-plugin-version: 3
-// wmux pi extension — bridges pi's lifecycle events to the wmux sidebar (#231).
-// Auto-installed by wmux to ~/.pi/agent/extensions/remotea.js.
-// No-ops entirely outside wmux (REMOTEA !== '1').
+// remotea-plugin-version: 4
+// remotea pi extension — bridges pi's lifecycle events to the remotea sidebar (#231).
+// Auto-installed by remotea to ~/.pi/agent/extensions/remotea.js.
+// No-ops entirely outside remotea (REMOTEA !== '1').
 //
 // ── Why this exists ──────────────────────────────────────────────────────────
 //
 // Without it a pi pane reads "Running" for as long as pi is open. That is the
 // shell integration telling the truth about a long-lived foreground process,
 // and it is useless for the one question the sidebar exists to answer: with ten
-// panes open, which one is waiting for me? wmux stopped GUESSING agent state in
+// panes open, which one is waiting for me? remotea stopped GUESSING agent state in
 // 0.39.0 (#128) — no screen scraping — so the only honest fix is for pi to
 // declare it, and pi's event surface maps onto the declared-state protocol
 // almost one for one.
@@ -18,7 +18,7 @@
 // 1. Depth is set ABSOLUTELY, never incremented.
 //
 //    The tempting mapping is agent_start -> `--run-start`, agent_end -> `--run-end`,
-//    reusing wmux's refcount. It leaks. pi's own docs are explicit that
+//    reusing remotea's refcount. It leaks. pi's own docs are explicit that
 //    `agent_end` "fires when that run ends, but Pi may still auto-retry,
 //    auto-compact and retry, or continue with queued follow-up messages", and
 //    tells status integrations to use `agent_settled` instead. So one settle
@@ -46,8 +46,8 @@
 //    a run is strictly inside that run's already-emitted agent_start.
 //
 // No `--choices` are declared. pi's ui_prompt_start carries a kind and a title,
-// never the options — and wmux's back-channel relays bytes the AGENT named
-// (agent-state.ts), so a choice wmux invented would be a button that sends the
+// never the options — and remotea's back-channel relays bytes the AGENT named
+// (agent-state.ts), so a choice remotea invented would be a button that sends the
 // wrong key. A blocked pane with no buttons is still the signal that matters.
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -92,10 +92,10 @@ const READ_ONLY_TOOLS = new Set(["read", "ls", "grep", "find"]);
  * pinned against each other by tests/unit/pi-extension.test.ts so the copy
  * cannot quietly drift.
  *
- * Order matters. `REMOTEA_NODE` comes first because wmux resolved it in its own
+ * Order matters. `REMOTEA_NODE` comes first because remotea resolved it in its own
  * process, where it could also fall back to its Electron binary — so it is the
  * only link in the chain that cannot come up empty. The rest covers a pi
- * launched from a shell wmux did not spawn. `process.execPath` is checked, not
+ * launched from a shell remotea did not spawn. `process.execPath` is checked, not
  * assumed: pi also ships as a compiled single-executable binary, where
  * execPath is `pi` and handing it a .js file prints pi's help and exits — the
  * silent failure #187 describes.
@@ -155,7 +155,7 @@ function firstExisting(dirs, names, exists) {
  * What to show while a pane is parked on a pi prompt.
  *
  * The title when there is one, because that is what the user is being asked;
- * the prompt KIND otherwise, because "wmux is waiting on a confirm" is still
+ * the prompt KIND otherwise, because "remotea is waiting on a confirm" is still
  * more than "Running". Capped, since this lands in a sidebar row.
  */
 function promptReason(event) {
@@ -204,11 +204,11 @@ function metadataArgs(ctx) {
 
 export default function remoteaExtension(pi) {
   const surface = process.env.REMOTEA_SURFACE_ID;
-  // Outside wmux this file is inert. pi loads global extensions for every
+  // Outside remotea this file is inert. pi loads global extensions for every
   // session on the machine, including ones started from a plain terminal.
   if (process.env.REMOTEA !== "1" || !surface) return;
 
-  // Pi cannot detect wmux's iTerm2 image support. Set this before its UI starts,
+  // Pi cannot detect remotea's iTerm2 image support. Set this before its UI starts,
   // without overriding an explicit choice. Pi disables iTerm2 images in
   // fullscreen mode; use --tui-mode regular to display them.
   process.env.PI_IMAGE_PROTOCOL ??= "iterm2";
@@ -216,29 +216,29 @@ export default function remoteaExtension(pi) {
   const runtime = resolveNodeRuntime();
 
   /**
-   * Run a wmux CLI verb. Fire-and-forget by default; never throws into pi.
+   * Run a remotea CLI verb. Fire-and-forget by default; never throws into pi.
    *
    * `wait: true` returns a promise that resolves when the call finishes or the
    * deadline passes, and is used only by session_shutdown — pi awaits that
    * handler, and without the wait the process can exit before the spawn lands,
    * leaving the pane declared "working" with nothing alive to correct it.
-   * Bounded, because a wedged wmux must not be able to hang pi's exit.
+   * Bounded, because a wedged remotea must not be able to hang pi's exit.
    */
   function remotea(args, { wait = false } = {}) {
     const cli = process.env.REMOTEA_CLI;
     const done = wait ? deferred() : null;
     try {
-      // REMOTEA_CLI is always set alongside REMOTEA=1 by any wmux that installed this
+      // REMOTEA_CLI is always set alongside REMOTEA=1 by any remotea that installed this
       // file. Without it the only PATH entry on Windows is `remotea.cmd`, which
       // execFile cannot spawn without a shell — and a shell is exactly what
       // #154 keeps out of this path.
       if (!cli) {
         if (process.platform === "win32") return settle(done);
-        return spawn("wmux", args, {}, done);
+        return spawn("remotea", args, {}, done);
       }
       const opts = { windowsHide: true };
-      // wmux's own Electron binary is Node only with this set; without it the
-      // same exe opens a second wmux window.
+      // remotea's own Electron binary is Node only with this set; without it the
+      // same exe opens a second remotea window.
       if (runtime.electron) opts.env = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
       return spawn(runtime.file, [cli, ...args], opts, done);
     } catch {
@@ -375,7 +375,7 @@ export default function remoteaExtension(pi) {
 }
 
 /**
- * Reachable by wmux's own test suite.
+ * Reachable by remotea's own test suite.
  *
  * A property on the factory rather than extra exports. pi imports only the
  * default (`jiti.import(path, { default: true })`) so extra exports would in

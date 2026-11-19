@@ -29,7 +29,7 @@ const aliases: Partial<Record<SettingsSection, string>> = {
   Agents: 'eridani integration consent hooks detection readiness manual status agent',
   Profiles: 'quick launch profiles commands shell location',
   Prompts: 'prompt history sticky outline',
-  General: 'appearance theme language wmux transparency',
+  General: 'appearance theme language remotea transparency',
   Workspace: 'files explorer snapshots restore resume layouts shell directory keep awake',
 };
 /** AND matching, including translated labels, stable field IDs and compatibility aliases. */

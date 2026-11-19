@@ -16,13 +16,13 @@
      `--color-scheme` override matches itself. Unset until the theme resolves,
      and identical to today's rendering for opaque themes. */
   background: var(--remotea-term-bg, transparent);
-  /* Touch pan → wheel (issue #243). wmux owns the vertical pan gesture here and
+  /* Touch pan → wheel (issue #243). remotea owns the vertical pan gesture here and
      translates it into a wheel event, so the platform must not also claim it:
      with anything but `none`, Chromium treats a vertical drag as its own scroll
      gesture, stops the pointermove stream being cancelable, and the translation
      has nothing left to work with. Nothing is given up — the element this sits
      on has no native scroller to pan (xterm 6.0's viewport is a wheel-only
-     overlay, which is the bug), and pinch-zoom over a terminal is not a wmux
+     overlay, which is the bug), and pinch-zoom over a terminal is not a remotea
      gesture. Taps still synthesize their compatibility mouse events, so focus
      and click are unaffected. */
   touch-action: none;
@@ -85,7 +85,7 @@
    over the identical rgba the container above already paints. Two identical
    translucent layers do not composite to their own alpha, they composite to
    1-(1-a)^2: an 80% background renders at 96%, and a 50% one at 75%. That is
-   the whole reason wmux looked stubbornly more opaque than Windows Terminal at
+   the whole reason remotea looked stubbornly more opaque than Windows Terminal at
    the same number. Paint it exactly once, on the container, which is also the
    only layer that reaches the 2px padding. */
 .terminal-pane__container .xterm-scrollable-element {

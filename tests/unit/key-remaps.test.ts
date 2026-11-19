@@ -29,7 +29,7 @@ describe('key-remaps (issue #146)', () => {
     expect(remapKey(keyEvent('k'))).toBeNull();
   });
 
-  // `wmux reload-config` must be able to REMOVE bindings, not just add them —
+  // `remotea reload-config` must be able to REMOVE bindings, not just add them —
   // the same idempotence the [browser] section has.
   it('replaces the whole list, so deleting [keys] really unbinds', () => {
     setKeyRemaps(parseKeyRemaps({ 'ctrl+k': '<Delete>' }));

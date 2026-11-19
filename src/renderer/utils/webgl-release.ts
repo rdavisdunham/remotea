@@ -5,7 +5,7 @@ import type { WebglAddon } from '@xterm/addon-webgl';
  *
  * `WebglAddon.dispose()` (addon-webgl 0.19.0) takes its canvas out of the
  * document and stops there: the WebGL2 context and the full-size drawing
- * buffer behind it live on until the canvas is garbage collected. wmux disposes
+ * buffer behind it live on until the canvas is garbage collected. remotea disposes
  * that renderer on every hide (workspace switch, parked pane) and on every
  * settled width change (#400), so dead contexts pile up between collections. A
  * reporter's heap snapshot held 34 WebGL2 contexts and 509 MB of canvas backing

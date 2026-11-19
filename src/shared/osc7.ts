@@ -23,7 +23,7 @@ const DRIVE = /^[A-Za-z]:(?:\\|$)/;
 
 /**
  * The Windows directory an OSC 7 payload names, or null when it names nothing
- * wmux may act on. `localHostname` is the machine's own name: a URL naming
+ * remotea may act on. `localHostname` is the machine's own name: a URL naming
  * any other host describes a directory on another machine (an ssh session).
  */
 export function parseOsc7Cwd(data: string, localHostname: string): string | null {

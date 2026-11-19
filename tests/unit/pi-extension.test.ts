@@ -28,9 +28,9 @@ const OPENCODE_PLUGIN = path.resolve(__dirname, '../../resources/opencode-plugin
 const load = () => import(/* @vite-ignore */ EXTENSION);
 
 const SURFACE = 'surf-1';
-const CLI = 'C:\\wmux\\resources\\cli\\remotea.js';
+const CLI = 'C:\\remotea\\resources\\cli\\remotea.js';
 
-/** Every wmux CLI invocation the extension made, as flat argv minus the script. */
+/** Every remotea CLI invocation the extension made, as flat argv minus the script. */
 const verbs = () => calls.map((c) => c.argv.slice(1));
 
 type Handler = (event: any, ctx?: any) => any;
@@ -79,10 +79,10 @@ afterEach(() => {
 });
 
 describe('#231 pi extension: activation', () => {
-  it('is completely inert outside wmux', async () => {
+  it('is completely inert outside remotea', async () => {
     // pi loads global extensions for every session on the machine, including
     // ones started from a plain terminal. Registering handlers there would
-    // spawn a CLI process per event for a wmux that is not running.
+    // spawn a CLI process per event for a remotea that is not running.
     const pi = await extensionWith({ REMOTEA: '0', PI_IMAGE_PROTOCOL: undefined });
     expect(pi.handlers.size).toBe(0);
     expect(calls).toEqual([]);
@@ -94,7 +94,7 @@ describe('#231 pi extension: activation', () => {
     expect(pi.handlers.size).toBe(0);
   });
 
-  it('enables iTerm2 images during extension loading inside wmux', async () => {
+  it('enables iTerm2 images during extension loading inside remotea', async () => {
     await extensionWith({ PI_IMAGE_PROTOCOL: undefined });
     expect(process.env.PI_IMAGE_PROTOCOL).toBe('iterm2');
     expect(calls).toEqual([]);
@@ -120,10 +120,16 @@ describe('#231 pi extension: activation', () => {
     expect(calls[0].argv[0]).toBe(CLI);
   });
 
-  it('declares ELECTRON_RUN_AS_NODE when the runtime is wmux itself', async () => {
+  it('declares ELECTRON_RUN_AS_NODE when the runtime is remotea itself', async () => {
     const pi = await extensionWith({ REMOTEA_NODE_ELECTRON: '1' });
     await pi.fire('agent_start');
     expect(calls[0].opts.env.ELECTRON_RUN_AS_NODE).toBe('1');
+  });
+
+  it.skipIf(process.platform === 'win32')('falls back to `remotea` on PATH when REMOTEA_CLI is unset', async () => {
+    const pi = await extensionWith({ REMOTEA_CLI: undefined });
+    await pi.fire('agent_start');
+    expect(calls[0].file).toBe('remotea');
   });
 });
 
@@ -188,7 +194,7 @@ describe('#231 pi extension: parked on a human', () => {
   });
 
   it('declares no choices it cannot know', async () => {
-    // wmux's back-channel relays bytes the AGENT named; pi's ui_prompt_start
+    // remotea's back-channel relays bytes the AGENT named; pi's ui_prompt_start
     // carries a kind and a title but never the options, so a choice invented
     // here would be a button that sends the wrong key.
     const pi = await extensionWith();
@@ -337,7 +343,7 @@ describe('#231 pi extension: shutdown', () => {
     expect(settled).toBe(true);
   });
 
-  it('gives up rather than hanging pi\'s exit on a wedged wmux', async () => {
+  it('gives up rather than hanging pi\'s exit on a wedged remotea', async () => {
     holdCallbacks = true;
     vi.useFakeTimers();
     const pi = await extensionWith();

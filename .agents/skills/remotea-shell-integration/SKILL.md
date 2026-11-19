@@ -1,9 +1,9 @@
 ---
-name: wmux-shell-integration
-description: Rules for editing wmux's shell integration scripts (bash/zsh, PowerShell, cmd) in src/shell-integration/ and their resources/shell-integration/ mirror. Use when changing prompt hooks, OSC 133 prompt marks, or the cwd, git branch, shell-state or port reports those scripts send.
+name: remotea-shell-integration
+description: Rules for editing remotea's shell integration scripts (bash/zsh, PowerShell, cmd) in src/shell-integration/ and their resources/shell-integration/ mirror. Use when changing prompt hooks, OSC 133 prompt marks, or the cwd, git branch, shell-state or port reports those scripts send.
 ---
 
-# wmux shell integration
+# remotea shell integration
 
 Scripts in `src/shell-integration/` (deployed to `resources/shell-integration/`):
 
@@ -17,7 +17,7 @@ Scripts in `src/shell-integration/` (deployed to `resources/shell-integration/`)
 (#427), so the script's prologue reads the user's rc or login files itself. WSL panes
 only get `REMOTEA_BASH_SCRIPT` for a line in the distro's `~/.bashrc` (#428): wsl.exe
 starts the distro's own shell. Native reports go through Windows node running
-`wmux raw-v1` (bash cannot open the pipe; the old `/mnt/c/.../Temp/wmux/messages`
+`remotea raw-v1` (bash cannot open the pipe; the old `/mnt/c/.../Temp/remotea/messages`
 drop was never read by anything), so in WSL they depend on `WSL_ENV_PASSTHROUGH`
 carrying `REMOTEA_PIPE` and the token back out. Git Bash reports its cwd as a Windows
 path (`pwd -W`): `/c/...` reads as POSIX to `isPosixPath` and is never restored.

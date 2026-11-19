@@ -18,8 +18,8 @@
  * renders as garbage, and a stuck SGR paints the shell's output in the dead
  * app's colours.
  *
- * wmux already tracked the mouse modes for its own purposes (see
- * ./mouse-modes) and cleared that map on exit — but clearing wmux's *record* of
+ * remotea already tracked the mouse modes for its own purposes (see
+ * ./mouse-modes) and cleared that map on exit — but clearing remotea's *record* of
  * the modes never told xterm to leave them. That is the gap this closes.
  *
  * ## Why not `ESC c` (RIS)
@@ -66,7 +66,7 @@
  *
  * ## Most panes never report a shell state (#357)
  *
- * Only wmux's PowerShell integration reports one, so that rule alone left cmd,
+ * Only remotea's PowerShell integration reports one, so that rule alone left cmd,
  * Git Bash, WSL, SSH and nested shells with no way out of a dead program's
  * alternate screen. The decision now reads the pane's own output first (see
  * ./alt-screen-owner): an OSC 133;A drawn on the alternate screen means a shell
@@ -129,7 +129,7 @@ export function terminalResetSequence(onAlternateBuffer: boolean): string {
  * Does the shell-state report alone say the alternate screen is abandoned? Only
  * when the pane's shell has reported it is back at its prompt — then whatever
  * entered the alternate screen is gone (#175). `running` means it is still
- * drawing there, and no report at all means wmux cannot tell (#347), so both
+ * drawing there, and no report at all means remotea cannot tell (#347), so both
  * keep it. The fallback of {@link alternateScreenResetAction}, used when the
  * pane's own output said nothing (#357).
  */
@@ -192,7 +192,7 @@ export interface ResetOptions {
 /**
  * Put `terminal` back into a usable state.
  *
- * Writes into the terminal, never to the PTY — this changes what wmux's own
+ * Writes into the terminal, never to the PTY — this changes what remotea's own
  * emulator believes, and must not be visible to whatever is still running on
  * the other end. A live application's next redraw re-asserts most of the modes
  * it wants; the alternate screen is the exception, see `keepAlternateScreen`.

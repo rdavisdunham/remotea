@@ -8,7 +8,7 @@ let base: string;
 let root: string;
 
 beforeAll(() => {
-  base = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-code-jail-'));
+  base = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-code-jail-'));
   root = path.join(base, 'root');
   fs.mkdirSync(path.join(root, 'src'), { recursive: true });
   fs.mkdirSync(path.join(base, 'outside'), { recursive: true });

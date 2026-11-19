@@ -7,7 +7,7 @@ import { createWorkspaceSlice, WorkspaceSlice } from '../../src/renderer/store/w
 import { DEFAULT_TERMINAL_PREFS, DEFAULT_WORKSPACE_PREFS } from '../../src/renderer/store/settings-slice';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// A workspace wmux named by default follows the window title its terminal's
+// A workspace remotea named by default follows the window title its terminal's
 // program sets, the way a tab has since #221. A name somebody chose never does.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ function titles(map: Record<string, string>): (surfaceId: string) => string | un
 type Labelled = Pick<WorkspaceInfo, 'title' | 'titleIsDefault' | 'splitTree'>;
 
 describe('getWorkspaceLabel', () => {
-  it('shows the program\'s window title on a workspace wmux named', () => {
+  it('shows the program\'s window title on a workspace remotea named', () => {
     const agent = s();
     const ws: Labelled = { title: 'Workspace 4', titleIsDefault: true, splitTree: leaf([agent]) };
     expect(getWorkspaceLabel(ws, titles({ [agent.id]: 'Fix the login bug' }))).toBe('Fix the login bug');
@@ -176,7 +176,7 @@ describe('titleIsDefault — which workspace names may follow the window title',
   }
   const find = (st: ReturnType<typeof store>, id: string) => st.getState().workspaces.find((w) => w.id === id)!;
 
-  it('marks a title wmux picked', () => {
+  it('marks a title remotea picked', () => {
     const st = store();
     expect(find(st, st.getState().createWorkspace()).titleIsDefault).toBe(true);
     expect(find(st, st.getState().createWorkspace({ cwd: 'C:\\src\\api' })).titleIsDefault).toBe(true);

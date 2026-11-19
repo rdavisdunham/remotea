@@ -13,16 +13,16 @@ const DEFAULT_PORT = 9222;
 const MAX_PORT = 9230;
 
 /**
- * The single target and session wmux exposes (issue #237).
+ * The single target and session remotea exposes (issue #237).
  *
  * `TARGET_ID` is `'1'` because `/json/list` has always advertised `id: '1'`
  * and a client that read the target list must find the same target on the
- * socket. The session id is wmux's own invention — Electron's debugger has no
+ * socket. The session id is remotea's own invention — Electron's debugger has no
  * session of its own to borrow, which is the entire reason this translation
  * exists — and is prefixed so it is recognisable in a protocol log.
  */
 const TARGET_ID = '1';
-const PAGE_SESSION_ID = 'wmux-page-1';
+const PAGE_SESSION_ID = 'remotea-page-1';
 
 // DNS-rebinding guard. The proxy binds to loopback only, but a browser on the
 // same machine can still reach it if a malicious page resolves an attacker
@@ -124,7 +124,7 @@ export class CDPProxy {
 
   /**
    * Runs before every command a client forwards to the page. A client attached
-   * here is an agent driving the pane as surely as `wmux browser` is, so this
+   * here is an agent driving the pane as surely as `remotea browser` is, so this
    * is where its lease to keep painting while hidden gets renewed
    * (browser-keep-rendering.ts).
    */
@@ -347,7 +347,7 @@ export class CDPProxy {
     // Safety nets: never let an 'error' event become an uncaught exception.
     // BOTH emitters need one. `ws` forwards the http server's 'error' events
     // onto the WebSocketServer, so without a wss listener the failed listen()
-    // below (port busy — the common case when a second wmux instance starts and
+    // below (port busy — the common case when a second remotea instance starts and
     // the first already holds 9222) is re-emitted on the wss as an unhandled
     // 'error'. That crashes the main process with Electron's modal error dialog,
     // which in turn blocks the event loop and wedges the whole instance.

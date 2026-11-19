@@ -2,7 +2,7 @@
  * Where is `agent-browser` on this machine, and how do we run it?
  *
  * The same lesson as `node-runtime.ts` (#187): do NOT assume the binary is on
- * PATH. wmux hands its panes a curated environment, and npm's global bin
+ * PATH. remotea hands its panes a curated environment, and npm's global bin
  * directory is frequently absent from the PATH the Electron process inherited.
  *
  * A second, sharper lesson, found while wiring this up: `npm i -g agent-browser`
@@ -67,7 +67,7 @@ export function platformBinaryName(platform: string, arch: string): string {
  * winget/system installer uses `%ProgramFiles%\nodejs`, and the per-user
  * installer uses `%LOCALAPPDATA%\Programs\nodejs`. Only the first was ever
  * probed here, so a healthy `npm i -g agent-browser` under nvm or a system
- * Node read as "not installed" however often wmux re-asked — the
+ * Node read as "not installed" however often remotea re-asked — the
  * "installed, still prompting" report. The `.cmd`/`.ps1` shim those prefixes
  * put in their root does not help: `AGENT_BROWSER_NAMES` deliberately never
  * considers it.
@@ -205,7 +205,7 @@ function searchDirs(env: NodeJS.ProcessEnv, platform: string): string[] {
 }
 
 export interface ResolveOptions {
-  /** An explicit path from wmux settings. Wins outright — but only if it exists. */
+  /** An explicit path from remotea settings. Wins outright — but only if it exists. */
   configured?: string;
   env: NodeJS.ProcessEnv;
   platform: string;
@@ -280,7 +280,7 @@ let cachedAt = 0;
  * How long a "not installed" answer may be served from cache.
  *
  * A negative answer is the one that goes stale: `npm i -g agent-browser` runs
- * in a pane WHILE wmux is running, and the setup card polls `status()` every
+ * in a pane WHILE remotea is running, and the setup card polls `status()` every
  * two seconds waiting for exactly that transition. Before this TTL the poll
  * read a memoised `null` forever — it never flipped, gave up after 15 minutes
  * and offered Install again, and only a restart ever detected the binary (the

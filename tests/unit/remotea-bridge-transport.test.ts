@@ -6,12 +6,12 @@ import os from 'os';
 import path from 'path';
 
 // Exercises the real compiled remotea.js (resources/cli/remotea.js) `bridge` command
-// end-to-end. `wmux bridge` is a pure byte relay: it accepts TCP connections and
-// forwards them to the local wmux via connectTransport(). This verifies the two
+// end-to-end. `remotea bridge` is a pure byte relay: it accepts TCP connections and
+// forwards them to the local remotea via connectTransport(). This verifies the two
 // non-TCP transport branches the bridge must pick between:
 //   * REMOTEA_PIPE=/path        → Unix-socket upstream
 //   * inside WSL2            → spawn npiperelay.exe and use its stdio
-// so a `wmux bridge` running inside WSL2 reaches the Windows-host named pipe.
+// so a `remotea bridge` running inside WSL2 reaches the Windows-host named pipe.
 
 const BRIDGE_SCRIPT = path.resolve(__dirname, '../../resources/cli/remotea.js');
 
@@ -67,7 +67,7 @@ function roundTrip(port: number, payload: string): Promise<string> {
   });
 }
 
-describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
+describe('remotea bridge transport selection (WSL2 devcontainer path)', () => {
   const cleanups: Array<() => void> = [];
   const isWslRuntime = Boolean(process.env.WSL_DISTRO_NAME || process.env.WSLENV);
 
@@ -110,7 +110,7 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
 
   it.skipIf(process.platform === 'win32')('relays TCP ↔ a Unix-socket upstream when REMOTEA_PIPE is a /path', async () => {
     // Stand-in for the local pipe: a Unix-socket echo server.
-    const sockPath = path.join(os.tmpdir(), `wmux-bridge-test-${process.pid}.sock`);
+    const sockPath = path.join(os.tmpdir(), `remotea-bridge-test-${process.pid}.sock`);
     try { fs.unlinkSync(sockPath); } catch { /* not present */ }
     const upstream = net.createServer((c) => c.pipe(c)); // echo
     await new Promise<void>((r) => upstream.listen(sockPath, r));
@@ -120,7 +120,7 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
     // REMOTEA_PIPE starting with '/' selects the Unix-socket branch regardless of
     // WSL detection, so this branch needs no fake npiperelay. REMOTEA_REMOTE must
     // be cleared: it takes precedence (TCP) and is set when this suite itself
-    // runs inside a wmux devcontainer.
+    // runs inside a remotea devcontainer.
     const child = await startBridge(port, {
       ...process.env,
       REMOTEA_REMOTE: '',
@@ -134,16 +134,16 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
   });
 
   it.skipIf(!isWslRuntime)('relays TCP ↔ npiperelay.exe stdio when running inside WSL2', async () => {
-    // Fake npiperelay.exe: ignores its args (-ei -s //./pipe/wmux) and echoes
+    // Fake npiperelay.exe: ignores its args (-ei -s //./pipe/remotea) and echoes
     // stdin→stdout, standing in for the Windows named pipe over interop.
-    const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-npiperelay-'));
+    const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-npiperelay-'));
     const fakeBin = path.join(binDir, 'npiperelay.exe');
     fs.writeFileSync(fakeBin, '#!/usr/bin/env node\nprocess.stdin.pipe(process.stdout);\n');
     fs.chmodSync(fakeBin, 0o755);
     cleanups.push(() => fs.rmSync(binDir, { recursive: true, force: true }));
 
     const port = await freePort();
-    // WSL_DISTRO_NAME set + REMOTEA_PIPE cleared (falls back to the \\.\pipe\wmux
+    // WSL_DISTRO_NAME set + REMOTEA_PIPE cleared (falls back to the \\.\pipe\remotea
     // default, which is not a '/path') selects the npiperelay branch;
     // findNpiperelay() picks up our fake via PATH.
     const child = await startBridge(port, {
@@ -175,7 +175,7 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
     // received to a file, so the assertion is "the upstream actually got the
     // bytes" rather than "a reply came back" — pre-fix the relay is killed before
     // either could happen.
-    const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-slowrelay-'));
+    const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-slowrelay-'));
     const fakeBin = path.join(binDir, 'npiperelay.exe');
     const received = path.join(binDir, 'received.txt');
     const RELAY_DELAY_MS = 1500;
@@ -241,7 +241,7 @@ describe('wmux bridge transport selection (WSL2 devcontainer path)', () => {
     // Fake npiperelay that records each spawn to a log file, then echoes. Counting
     // the log is how the test distinguishes "pre-warmed" from "spawned on demand".
     function makeCountingRelay(): { binDir: string; spawnLog: string } {
-      const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-warm-'));
+      const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-warm-'));
       const spawnLog = path.join(binDir, 'spawns.log');
       fs.writeFileSync(
         path.join(binDir, 'npiperelay.exe'),

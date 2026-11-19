@@ -293,7 +293,7 @@ export function CodePane({ surfaceId }: { surfaceId: SurfaceId }): React.JSX.Ele
         // A conflict is the one save failure with an action attached, and the
         // action is destructive in one direction only: reloading discards the
         // user's draft, so it is offered as a button and never taken
-        // automatically. wmux does not get to decide whose edit survives.
+        // automatically. remotea does not get to decide whose edit survives.
         <div className="code-pane__status code-pane__status--error">
           <span>{t(codeErrorKey(saveError), 'Could not save that file')}</span>
           {saveError === 'conflict' && (

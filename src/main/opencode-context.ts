@@ -10,13 +10,13 @@ import { isRemoteaPluginFile, pluginNeedsUpdate } from './agent-plugin-file';
  * Re-exported rather than moved, because the tests target it here and because
  * this is still the file that documents what the marker is for. The
  * implementation went to agent-plugin-file.ts when the pi extension (#231)
- * became the second thing wmux installs into somebody else's config directory —
+ * became the second thing remotea installs into somebody else's config directory —
  * a duplicate with no enforcement is not a duplicate, it is a time bomb (#137).
  */
 export { pluginNeedsUpdate };
 
 /**
- * Pure: insert/replace the wmux block within existing content, preserving the rest.
+ * Pure: insert/replace the remotea block within existing content, preserving the rest.
  *
  * Thin wrapper over the shared splice in agent-instructions.ts, kept as a named
  * export because the existing tests target it here. The implementation moved
@@ -32,7 +32,7 @@ function getAgentsMdPath(): string {
   return path.join(os.homedir(), '.config', 'opencode', 'AGENTS.md');
 }
 
-/** Ensures ~/.config/opencode/AGENTS.md contains the wmux block. */
+/** Ensures ~/.config/opencode/AGENTS.md contains the remotea block. */
 export function ensureOpencodeContext(): void {
   try {
     // Rendered, not read: carries this install's absolute CLI path (#158).
@@ -64,7 +64,7 @@ export function getPluginSrcPath(): string {
   return path.join(__dirname, '../../resources/opencode-plugin/remotea.js');
 }
 
-/** Installs/updates the wmux OpenCode plugin into ~/.config/opencode/plugin/. */
+/** Installs/updates the remotea OpenCode plugin into ~/.config/opencode/plugin/. */
 export function ensureOpencodePlugin(): void {
   try {
     const srcPath = getPluginSrcPath();
@@ -87,7 +87,7 @@ export function ensureOpencodePlugin(): void {
 }
 
 /**
- * Delete wmux's block from ~/.config/opencode/AGENTS.md (issue #132).
+ * Delete remotea's block from ~/.config/opencode/AGENTS.md (issue #132).
  *
  * Mirrors removeClaudeContext: the file goes only when it held nothing but our
  * block, so an AGENTS.md the user wrote survives with just the block excised.
@@ -110,9 +110,9 @@ export function removeOpencodeContext(): void {
 }
 
 /**
- * Remove the wmux OpenCode plugin (issue #132).
+ * Remove the remotea OpenCode plugin (issue #132).
  *
- * Guarded on the version marker wmux stamps into its own plugin source: a
+ * Guarded on the version marker remotea stamps into its own plugin source: a
  * remotea.js the user wrote or vendored themselves has no marker and is left where
  * it is, because uninstalling our integration must not delete their file.
  */

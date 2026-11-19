@@ -9,7 +9,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // Issues #137 / #226 — the taskbar keeps the previous version's icon after a
 // rebrand, because Explorer's icon cache is memory-mapped and only an Explorer
-// restart re-reads it. Two things wmux can do: tell the user once, and offer
+// restart re-reads it. Two things remotea can do: tell the user once, and offer
 // the restart behind a confirm.
 // ─────────────────────────────────────────────────────────────────────────────
 

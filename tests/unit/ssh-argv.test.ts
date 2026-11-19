@@ -181,7 +181,7 @@ describe('parseSshArgv — the shapes that must be refused', () => {
   });
 
   it('refuses -N, the pure port forward', () => {
-    // The shape `wmux bridge` documents. There is no remote shell in this pane,
+    // The shape `remotea bridge` documents. There is no remote shell in this pane,
     // so a paste has no remote destination to be useful at.
     expect(parseSshArgv(['ssh', '-N', '-L', '9787:127.0.0.1:9787', 'me@host'])).toBeNull();
   });

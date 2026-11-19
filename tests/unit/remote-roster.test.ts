@@ -26,7 +26,7 @@ function entry(overrides: Partial<AgentRosterEntry> = {}): AgentRosterEntry {
     paneId: 'pane-1' as PaneId,
     workspaceId: 'ws-1' as WorkspaceId,
     workspaceTitle: 'Session 1',
-    label: 'wmux',
+    label: 'remotea',
     state: 'blocked',
     blockedReason: 'Run the migration?',
     choices: [
@@ -58,7 +58,7 @@ describe('toRemoteRosterSource', () => {
       surfaceId: 'surf-1',
       workspaceId: 'ws-1',
       workspaceTitle: 'Session 1',
-      label: 'wmux',
+      label: 'remotea',
       kind: 'claude',
       state: 'blocked',
       stateSource: 'declared',

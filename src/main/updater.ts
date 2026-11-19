@@ -25,10 +25,10 @@ import {
 //   2. No silent install — autoDownload/autoInstallOnAppQuit are off; the user
 //      must explicitly confirm the install via a dialog.
 //
-// remotea releases are not Authenticode-signed (wmux's SignPath step was
+// remotea releases are not Authenticode-signed (upstream's SignPath step was
 // removed). There is no publisherName pin in electron-builder.json: under
-// wmux, a pin combined with non-chain-trusted artifacts made every client
-// reject every update (which is why wmux withheld latest.yml for 0.26–0.31,
+// upstream, a pin combined with non-chain-trusted artifacts made every client
+// reject every update (which is why upstream withheld latest.yml for 0.26–0.31,
 // stranding all installs). Without the pin, NsisUpdater skips
 // Authenticode verification; download integrity comes from the latest.yml
 // sha512, and the quarantine window + explicit install dialog below are the
@@ -131,7 +131,7 @@ function setState(next: Partial<UpdateState>): void {
 
 // ── Install-root writability (issue #167) ────────────────────────────────────
 // An update is applied by writing over the install root. Whether this process
-// can do that is not something wmux knew: `canSelfUpdate()` answered
+// can do that is not something remotea knew: `canSelfUpdate()` answered
 // "packaged, and not disabled" under a doc comment promising "can actually
 // install an update in place", which is a strictly stronger claim.
 //
@@ -173,7 +173,7 @@ export function isInstallRootWritable(): boolean {
   if (installRootWritable !== null) return installRootWritable;
   try {
     const root = path.dirname(app.getPath('exe'));
-    const probe = path.join(root, `.wmux-write-probe-${process.pid}`);
+    const probe = path.join(root, `.remotea-write-probe-${process.pid}`);
     fs.writeFileSync(probe, '');
     fs.unlinkSync(probe);
     installRootWritable = true;
@@ -226,9 +226,9 @@ export async function requestUpdateNow(): Promise<UpdateTriggerResult> {
   // Already downloaded — this click is the install confirmation. That holds
   // only once the dialog is no longer asking: a finished download sets `ready`
   // and then awaits promptToInstall, and `dialog.showMessageBox` is called with
-  // no parent window, so it is not modal to wmux and the badge stays clickable
+  // no parent window, so it is not modal to remotea and the badge stays clickable
   // underneath it. Without this guard that click scheduled the helper directly,
-  // quitting wmux while the question was still on screen and unanswered — the
+  // quitting remotea while the question was still on screen and unanswered — the
   // same bypass the `error` branch below was fixed for, on the path that gets
   // there first. `installPrompted` is cleared when the user picks 'Later', so
   // the intended case (dialog dismissed, badge clicked later to mean yes) is
@@ -378,7 +378,7 @@ async function promptToInstall(version: string): Promise<void> {
     // 'Later' is the default button (issue #229). This dialog appears over a
     // terminal the user is typing into, and Enter is the most common key
     // there: with 'Install and restart' as the default, a keystroke aimed at
-    // the shell quit wmux and every live session in it. The install now
+    // the shell quit remotea and every live session in it. The install now
     // needs a deliberate click — the same reasoning as the close guard (#227).
     defaultId: 1,
     cancelId: 1,
@@ -395,14 +395,14 @@ async function promptToInstall(version: string): Promise<void> {
   }
 }
 
-// A zip install that fails before wmux quits must leave the app usable and the
+// A zip install that fails before remotea quits must leave the app usable and the
 // badge truthful (#3). The staged payload is kept unless it is the thing that
 // is missing, so a retry costs a click rather than another download, and
 // `installPrompted` is cleared or the next downloaded update would never ask.
 async function applyStagedZipOrReset(staged: StagedZipUpdate): Promise<void> {
   // Applying waits for the helper to start, so a second click in that gap
   // would otherwise write and start a second helper for the same install.
-  // Left set on success: wmux is quitting, and there is nothing to retry.
+  // Left set on success: remotea is quitting, and there is nothing to retry.
   if (applyingZip) return;
   applyingZip = true;
   try {

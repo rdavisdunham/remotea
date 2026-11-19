@@ -27,7 +27,7 @@ describe('registry shape', () => {
 });
 
 describe('command string', () => {
-  const EXE = 'C:\\Users\\a\\OneDrive - Pulsa\\Bureau\\wmux\\wmux.exe';
+  const EXE = 'C:\\Users\\a\\OneDrive - Pulsa\\Bureau\\remotea\\remotea.exe';
 
   it('quotes an exe path containing spaces', () => {
     expect(commandFor(EXE)).toBe(`"${EXE}" "%V"`);
@@ -49,26 +49,26 @@ describe('directoryFromArgv', () => {
   const isDir = (p: string) => p === 'C:\\work\\proj' || p === 'C:\\Program Files\\x';
 
   it('finds the folder Explorer passed', () => {
-    expect(directoryFromArgv(['wmux.exe', 'C:\\work\\proj'], isDir)).toBe('C:\\work\\proj');
+    expect(directoryFromArgv(['remotea.exe', 'C:\\work\\proj'], isDir)).toBe('C:\\work\\proj');
   });
 
   it('handles a path with spaces', () => {
-    expect(directoryFromArgv(['wmux.exe', 'C:\\Program Files\\x'], isDir)).toBe('C:\\Program Files\\x');
+    expect(directoryFromArgv(['remotea.exe', 'C:\\Program Files\\x'], isDir)).toBe('C:\\Program Files\\x');
   });
 
   it('ignores Chromium/Electron switches', () => {
     expect(
-      directoryFromArgv(['wmux.exe', '--no-sandbox', '--user-data-dir=C:\\x'], isDir),
+      directoryFromArgv(['remotea.exe', '--no-sandbox', '--user-data-dir=C:\\x'], isDir),
     ).toBeNull();
   });
 
   it('ignores a path that is not a directory', () => {
-    expect(directoryFromArgv(['wmux.exe', 'C:\\work\\file.txt'], isDir)).toBeNull();
+    expect(directoryFromArgv(['remotea.exe', 'C:\\work\\file.txt'], isDir)).toBeNull();
   });
 
   it('ignores the dev entry script and the packed app', () => {
     expect(directoryFromArgv(['electron.exe', '.', 'C:\\work\\proj'], isDir)).toBe('C:\\work\\proj');
-    expect(directoryFromArgv(['wmux.exe', 'C:\\app\\resources\\app.asar'], isDir)).toBeNull();
+    expect(directoryFromArgv(['remotea.exe', 'C:\\app\\resources\\app.asar'], isDir)).toBeNull();
   });
 
   it('never returns the exe itself', () => {
@@ -78,11 +78,11 @@ describe('directoryFromArgv', () => {
   });
 
   it('ignores relative paths', () => {
-    expect(directoryFromArgv(['wmux.exe', 'proj'], () => true)).toBeNull();
+    expect(directoryFromArgv(['remotea.exe', 'proj'], () => true)).toBeNull();
   });
 
   it('survives a throwing stat', () => {
-    expect(directoryFromArgv(['wmux.exe', 'C:\\denied'], () => { throw new Error('EACCES'); }))
+    expect(directoryFromArgv(['remotea.exe', 'C:\\denied'], () => { throw new Error('EACCES'); }))
       .toBeNull();
   });
 });

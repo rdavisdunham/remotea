@@ -2,7 +2,7 @@ import { PRODUCT } from '../shared/product';
 import { app, BrowserWindow, net } from 'electron';
 import { IPC_CHANNELS } from '../shared/types';
 
-// wmux has two distinct update paths:
+// remotea has two distinct update paths:
 //   1. updater.ts (electron-updater) — actually downloads/installs, now gated by a
 //      quarantine window + an explicit user-confirmed install (see issue #29).
 //   2. this module — a notify-only poll of GitHub /releases/latest that broadcasts

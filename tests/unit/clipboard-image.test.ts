@@ -216,7 +216,7 @@ function fakeImage(width: number, height: number, opts: { badBitmap?: boolean } 
 describe('readClipboardSource + materializeClipboard', () => {
   let dir: string;
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-381-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-381-'));
     clipboardState.text = '';
   });
   afterEach(() => {

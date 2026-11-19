@@ -65,7 +65,7 @@ describe('toChangelogEntries', () => {
   });
 
   it('falls back to the tag when the release has no title', () => {
-    // Most of wmux's releases are published from a bare tag, so `name` is the
+    // Most of remotea's releases are published from a bare tag, so `name` is the
     // empty string rather than absent — which `??` would happily keep.
     expect(toChangelogEntries([release({ name: '' })])[0].name).toBe('v2.7.0');
     expect(toChangelogEntries([release({ name: '   ' })])[0].name).toBe('v2.7.0');
@@ -88,7 +88,7 @@ describe('toChangelogEntries', () => {
 
   it('answers with an empty list for anything that is not an array of releases', () => {
     // The API answers with an OBJECT on an error (`{message, documentation_url}`),
-    // and a rate-limited wmux must show "nothing yet", not throw inside Settings.
+    // and a rate-limited remotea must show "nothing yet", not throw inside Settings.
     expect(toChangelogEntries(null)).toEqual([]);
     expect(toChangelogEntries({ message: 'API rate limit exceeded' })).toEqual([]);
     expect(toChangelogEntries([null, undefined, {}, { tag_name: 5 }])).toEqual([]);

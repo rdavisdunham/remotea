@@ -1,8 +1,8 @@
-// wmux OpenCode CLI-side (TUI) plugin — the parts wmux's test suite can load.
+// remotea OpenCode CLI-side (TUI) plugin — the parts remotea's test suite can load.
 //
 // The installed entry (tui.js) imports @opencode/plugin/tui and solid-js,
 // which only exist inside the TUI host; this module deliberately imports node
-// builtins only, so routing and reporting rules stay unit-testable in wmux's
+// builtins only, so routing and reporting rules stay unit-testable in remotea's
 // own suite. Installed beside the entry as core.js (issue #310).
 //
 // No version marker here: the marker on tui.js is what the installer compares,
@@ -134,10 +134,10 @@ export function makeLogger(file) {
 const CLI_TIMEOUT_MS = 10_000;
 
 /**
- * Run the wmux CLI without ever blocking or throwing into OpenCode.
+ * Run the remotea CLI without ever blocking or throwing into OpenCode.
  *
- * argv is passed through untouched: `params` come from wmux itself and no
- * shell is involved unless the PATH fallback names `wmux`, which on Windows is
+ * argv is passed through untouched: `params` come from remotea itself and no
+ * shell is involved unless the PATH fallback names `remotea`, which on Windows is
  * why the .cmd shim is refused (#154/#187).
  */
 export function callRemotea(runtime, argv, log = () => {}, env = process.env, platform = process.platform, done = () => {}) {
@@ -161,8 +161,8 @@ export function callRemotea(runtime, argv, log = () => {}, env = process.env, pl
     if (cli) {
       file = runtime.file;
       args = [cli, ...argv];
-      // wmux's own Electron binary is Node only with this set; without it the
-      // same exe opens a second wmux window.
+      // remotea's own Electron binary is Node only with this set; without it the
+      // same exe opens a second remotea window.
       if (runtime.electron) opts.env = { ...env, ELECTRON_RUN_AS_NODE: "1" };
     } else if (platform === "win32") {
       // The PATH shim is `remotea.cmd`, which execFile cannot spawn without a
@@ -171,7 +171,7 @@ export function callRemotea(runtime, argv, log = () => {}, env = process.env, pl
       finish();
       return;
     } else {
-      file = "wmux";
+      file = "remotea";
       args = argv;
     }
     log("cli", args);
@@ -185,7 +185,7 @@ export function callRemotea(runtime, argv, log = () => {}, env = process.env, pl
     });
   } catch (err) {
     log("cli: threw", (err && err.message) || String(err));
-    finish(err ?? new Error("wmux CLI threw"));
+    finish(err ?? new Error("remotea CLI threw"));
   }
 }
 
@@ -211,7 +211,7 @@ export function callRemoteaSync(runtime, argv, log = () => {}, env = process.env
       log("cli: sync skipped (no REMOTEA_CLI on win32)", argv);
       return false;
     } else {
-      file = "wmux";
+      file = "remotea";
       args = argv;
     }
     log("cli: sync", args);
@@ -243,7 +243,7 @@ export function planSessionReport(route, rootOf) {
 }
 
 /**
- * Reports the viewed session to wmux, once per session. `releaseOnExit` is the
+ * Reports the viewed session to remotea, once per session. `releaseOnExit` is the
  * synchronous release for `process.once("exit")`; `dispose` remains the async
  * form for a caller that is still alive.
  *
@@ -340,7 +340,7 @@ export function createSessionReporter({
    * Release the last handle. `sync` is for the process-exit hook: an async
    * spawn dies with the process, so only the synchronous CLI can land there.
    * The host's plugin DISPOSE is deliberately NOT treated as an exit — it also
-   * runs on a reload after `wmux opencode-tui` writes new files, and releasing
+   * runs on a reload after `remotea opencode-tui` writes new files, and releasing
    * there made every open pane lose its restore handle.
    */
   const release = (sync) => {

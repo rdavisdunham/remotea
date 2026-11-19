@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # install-npiperelay.sh — Download npiperelay.exe (SHA-256 pinned) into WSL2 so
-# the wmux CLI / `wmux bridge` can reach the Windows \\.\pipe\wmux named pipe via
+# the remotea CLI / `remotea bridge` can reach the Windows \\.\pipe\remotea named pipe via
 # WSL interop (see src/cli/remotea.ts → connectViaNpiperelay).
 #
 # npiperelay.exe is a small open-source Windows binary that forwards a named pipe
@@ -28,7 +28,7 @@ NPIPERELAY_CHECKSUMS_SHA256="313973839744601ae73eb3597f62c9adb5f9e6985e97b4054ed
 INSTALL_DIR="${HOME}/.local/bin"
 NPIPERELAY_BIN="${INSTALL_DIR}/npiperelay.exe"
 
-echo "wmux npiperelay install"
+echo "remotea npiperelay install"
 echo "======================="
 echo "  version : ${NPIPERELAY_VERSION}"
 echo "  target  : ${NPIPERELAY_BIN}"

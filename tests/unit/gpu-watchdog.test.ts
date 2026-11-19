@@ -12,7 +12,7 @@ import { decideGpuRestart, GPU_RESTART_DEFAULTS } from '../../src/main/gpu-watch
 // ─────────────────────────────────────────────────────────────────────────────
 // Issue #229 — after ~2.5 days the GPU process wedged: the window kept its
 // last frame, every PTY stayed alive, and killing ONLY the GPU process brought
-// rendering back with nothing lost. There is no repro. What wmux can own is
+// rendering back with nothing lost. There is no repro. What remotea can own is
 // the remedy: notice that no frame has been produced while the user is
 // demonstrably looking at the window, and restart its own GPU process.
 //

@@ -1,7 +1,7 @@
-// remotea-plugin-version: 11
-// wmux OpenCode plugin — bridges OpenCode hooks/events to the wmux sidebar.
-// Auto-installed by wmux to ~/.config/opencode/plugin/remotea.js.
-// No-ops entirely outside wmux (REMOTEA !== '1').
+// remotea-plugin-version: 12
+// remotea OpenCode plugin — bridges OpenCode hooks/events to the remotea sidebar.
+// Auto-installed by remotea to ~/.config/opencode/plugin/remotea.js.
+// No-ops entirely outside remotea (REMOTEA !== '1').
 import { execFile, execFileSync } from "node:child_process";
 import { appendFileSync, existsSync } from "node:fs";
 import * as os from "node:os";
@@ -19,10 +19,10 @@ const JS_RUNTIME_RE = /^(node|bun)(\.exe)?$/i;
  * `opencode.exe remotea.js agent-activity --active`, which prints OpenCode's help
  * and exits 1 — invisibly, so the sidebar sat on "Running" forever.
  *
- * Order matters. `REMOTEA_NODE` comes first because wmux resolved it in its own
+ * Order matters. `REMOTEA_NODE` comes first because remotea resolved it in its own
  * process, where it could also fall back to its Electron binary — so it is the
  * only link in this chain that cannot come up empty. The rest is for a plugin
- * installed by an older wmux that does not declare it yet.
+ * installed by an older remotea that does not declare it yet.
  *
  * Not exported — see the RemoteaPlugin.__remoteaInternals note at the end of the file.
  */
@@ -131,7 +131,7 @@ function makeLogger(file) {
   return (label, data) => {
     try {
       const suffix = data === undefined ? "" : ` ${summarize(data)}`;
-      appendFileSync(file, `${new Date().toISOString()} [wmux] ${label}${suffix}\n`);
+      appendFileSync(file, `${new Date().toISOString()} [remotea] ${label}${suffix}\n`);
     } catch {}
   };
 }
@@ -164,10 +164,10 @@ function askReason(event) {
     : "Waiting for your answer";
 }
 
-/** Mirrors OPENCODE_SESSION_ID_RE in wmux's src/main/opencode-resume.ts. */
+/** Mirrors OPENCODE_SESSION_ID_RE in remotea's src/main/opencode-resume.ts. */
 const SESSION_ID_RE = /^ses_[A-Za-z0-9_]{8,120}$/;
 
-/** How long one wmux CLI call may run before execFile kills it and reports. */
+/** How long one remotea CLI call may run before execFile kills it and reports. */
 const CLI_TIMEOUT_MS = 10_000;
 
 /**
@@ -201,7 +201,7 @@ function sessionFacts(event) {
 /**
  * A plugin dispose is not necessarily a process exit: OpenCode also reloads
  * plugins when their files change. Releasing immediately there cleared every
- * open private-server handle on `wmux` upgrade. The timer gives a replacement
+ * open private-server handle on `remotea` upgrade. The timer gives a replacement
  * instance time to start and cancel it; a real exit releases synchronously and
  * cancels the timer first.
  */
@@ -273,24 +273,24 @@ export const RemoteaPlugin = async (options = {}) => {
     pid: process.pid,
   });
 
-  /** How to run the wmux CLI with `args`, or null when it cannot be run. */
+  /** How to run the remotea CLI with `args`, or null when it cannot be run. */
   function cliCommand(args) {
     const cli = process.env.REMOTEA_CLI;
     const opts = { windowsHide: true };
     if (cli) {
-      // wmux's own Electron binary is Node only with this set; without it the
-      // same exe opens a second wmux window.
+      // remotea's own Electron binary is Node only with this set; without it the
+      // same exe opens a second remotea window.
       if (runtime.electron) opts.env = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
       return { file: runtime.file, argv: [cli, ...args], opts };
     }
     // The PATH shim is `remotea.cmd`, which execFile cannot spawn without a
     // shell. Nothing to do — REMOTEA_CLI is always set alongside REMOTEA=1.
     if (process.platform === "win32") return null;
-    return { file: "wmux", argv: args, opts };
+    return { file: "remotea", argv: args, opts };
   }
 
   /**
-   * Run one wmux CLI call and resolve its result — never rejects into OpenCode.
+   * Run one remotea CLI call and resolve its result — never rejects into OpenCode.
    *
    * `stdout` is parsed when it is JSON so a caller can tell `accepted: true`
    * from `accepted: false`; the CLI prints that for report-session. The
@@ -373,7 +373,7 @@ export const RemoteaPlugin = async (options = {}) => {
     blocked = false;
     remotea(["report-agent", "--surface", surface, "--unblocked", "--seq", String(nextSeq())]);
   };
-  /** Tell wmux the pane is alive. Says nothing about whether it is blocked. */
+  /** Tell remotea the pane is alive. Says nothing about whether it is blocked. */
   const ping = () => {
     const now = Date.now();
     if (now - lastActivePing < 1000) return;
@@ -417,7 +417,7 @@ export const RemoteaPlugin = async (options = {}) => {
       return;
     }
     // Synchronous on exit: an async spawn would die with the process. Bounded,
-    // because nothing is worth holding OpenCode's exit for. While wmux itself
+    // because nothing is worth holding OpenCode's exit for. While remotea itself
     // is quitting, main refuses this — a killed pane did not choose to leave.
     try {
       const command = cliCommand(args);
@@ -577,7 +577,7 @@ export const RemoteaPlugin = async (options = {}) => {
   const MAX_PROMPT = 4000;
 
   /**
-   * One submitted user prompt, on its way to the wmux prompt log (#304).
+   * One submitted user prompt, on its way to the remotea prompt log (#304).
    *
    * The log's only agent-side producer is a `UserPromptSubmit` hook event, and
    * nothing on the OpenCode side used to send one. The text cannot be
@@ -756,7 +756,7 @@ async function setupV2(ctx) {
   // one, so it must not write the restore handle. It keeps activity, blocked
   // state and prompts for private servers; a shared server returned {} above.
   const hooks = await RemoteaPlugin({ sessionHandles: false });
-  if (!hooks.event) return; // outside wmux — RemoteaPlugin already logged why
+  if (!hooks.event) return; // outside remotea — RemoteaPlugin already logged why
 
   const registrations = [];
   const register = async (domain, name, callback) => {
@@ -822,18 +822,18 @@ async function setupV2(ctx) {
  * OpenCode 1.3.3 and older call every export as a factory, this object
  * included — they cannot load a v2-compatible file at all.
  */
-export default { id: "wmux", server: RemoteaPlugin, setup: setupV2 };
+export default { id: "remotea", server: RemoteaPlugin, setup: setupV2 };
 
 /**
- * The helpers above, reachable by wmux's own test suite (issue #191).
+ * The helpers above, reachable by remotea's own test suite (issue #191).
  *
  * They are a property rather than four exports because OpenCode's
  * auto-discovery loader calls EVERY export of a plugin file as if it were a
  * plugin factory, then invokes a `config` hook on whatever came back. v3 and v4
  * exported these four, so the loader called e.g. `summarize(ctx)`, got a string,
  * and dereferenced `null.config` — taking OpenCode down at startup with
- * "Unexpected server error" for anyone launching it OUTSIDE wmux. Inside wmux it
- * crashed just the same, but the REMOTEA gate meant nobody testing wmux ever saw
+ * "Unexpected server error" for anyone launching it OUTSIDE remotea. Inside remotea it
+ * crashed just the same, but the REMOTEA gate meant nobody testing remotea ever saw
  * the export loop as the cause.
  *
  * `RemoteaPlugin` and the default definition must stay the only exports in this

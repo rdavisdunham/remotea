@@ -126,12 +126,12 @@ export function webviewWindowOpenPolicy(details: {
 
 /**
  * Whether a webContents gets the MAIN-WINDOW navigation lock (`will-navigate`
- * confined to wmux's own UI). A popup the panel opened (#281) is a `window`
+ * confined to remotea's own UI). A popup the panel opened (#281) is a `window`
  * too, and its whole job is navigating — a sign-in hops provider → consent →
  * callback, and each hop is a `will-navigate`, including the first. Locked, it
  * would bounce every hop to the OS browser. Its `opener` is what tells it
  * apart: measured, it is set by the time `web-contents-created` fires, and is
- * null for every window wmux creates itself.
+ * null for every window remotea creates itself.
  */
 export function needsAppWindowNavigationLock(type: string, hasOpener: boolean): boolean {
   return type !== 'webview' && !hasOpener;
@@ -139,7 +139,7 @@ export function needsAppWindowNavigationLock(type: string, hasOpener: boolean): 
 
 /**
  * A popup window has no address bar, so its title has to say whose page it is:
- * a page could otherwise title itself "wmux — Sign in" from any origin. The
+ * a page could otherwise title itself "remotea — Sign in" from any origin. The
  * host is always shown, and first.
  */
 export function popupWindowTitle(url: string, pageTitle: string): string {

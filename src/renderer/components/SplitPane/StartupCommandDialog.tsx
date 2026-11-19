@@ -12,7 +12,7 @@ import type { PaneId, SurfaceId, WorkspaceId } from '../../../shared/types';
  * survives save → restore". They land in `SurfaceRef.startupCommands`, the
  * field quick-launch profiles (#32) and restore (#186) already use, so they
  * run the next time this pane STARTS — on restore, or from a saved session or
- * layout — and are what `wmux workspace save` writes as the pane's `run`.
+ * layout — and are what `remotea workspace save` writes as the pane's `run`.
  * Nothing is typed into the running shell now.
  */
 export default function StartupCommandDialog({ surfaceId, onClose }: { surfaceId: SurfaceId; onClose: () => void }) {

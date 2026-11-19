@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { stripMarkOfTheWeb } from './powershell-shim';
 
-/** Private shims affect only wmux's native Windows shells, never the global PATH. */
+/** Private shims affect only remotea's native Windows shells, never the global PATH. */
 export function codexShimDirs(options: {
   shellType: string;
   executable: string | undefined;
@@ -20,7 +20,7 @@ export function codexShimDirs(options: {
   if (options.shellType === 'powershell') {
     // PowerShell must get the .ps1 or nothing. Handing it codex.cmd puts
     // cmd.exe's parser back between the user and codex — `codex "a > b"`
-    // redirects to a file named b — which is the #154 trap the wmux shim
+    // redirects to a file named b — which is the #154 trap the remotea shim
     // already refuses to fall into. Unverified, codex simply runs unwrapped.
     const ps = path.join(root, 'codex-bin-ps');
     const script = path.join(ps, 'codex.ps1');

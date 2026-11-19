@@ -22,14 +22,14 @@ const { conversationToReport, inRemoteaPane } = require(SCRIPT) as {
 const ID = '46b139cc-e5cf-4c37-887b-188e6274d14a';
 
 let home: string;
-beforeEach(() => { home = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-agy-')); });
+beforeEach(() => { home = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-agy-')); });
 afterEach(() => { fs.rmSync(home, { recursive: true, force: true }); });
 
 const agyInstalled = () => fs.mkdirSync(path.join(home, '.gemini', 'antigravity-cli'), { recursive: true });
 const pluginFile = (name: string) => path.join(getAgyPluginDir(home), name);
 
 describe('agy plugin install', () => {
-  it('is named in the consent prompt, like every other file wmux writes (#132)', () => {
+  it('is named in the consent prompt, like every other file remotea writes (#132)', () => {
     expect(INTEGRATION_CONSENT_DETAIL).toContain('~/.gemini/config/plugins/remotea/');
   });
 
@@ -56,7 +56,7 @@ describe('agy plugin install', () => {
     }
   });
 
-  it('leaves a plugin the user called wmux alone, and never removes it', () => {
+  it('leaves a plugin the user called remotea alone, and never removes it', () => {
     agyInstalled();
     fs.mkdirSync(getAgyPluginDir(home), { recursive: true });
     fs.writeFileSync(pluginFile('plugin.json'), '{"name":"mine"}');
@@ -88,17 +88,17 @@ describe('agy hook script', () => {
     expect(conversationToReport('null', 'SessionStart')).toBeNull();
   });
 
-  it('only acts in a pane of this wmux (#282)', () => {
+  it('only acts in a pane of this remotea (#282)', () => {
     expect(inRemoteaPane({ REMOTEA: '1', REMOTEA_SURFACE_ID: 'surf-1' })).toBe(true);
     expect(inRemoteaPane({ REMOTEA_SURFACE_ID: 'surf-1' })).toBe(false);
     expect(inRemoteaPane({ REMOTEA: '1' })).toBe(false);
   });
 
-  /** Run the script the way agy does, against a stand-in for wmux's pipe. */
+  /** Run the script the way agy does, against a stand-in for remotea's pipe. */
   async function runHook(event: string, payload: object, env: NodeJS.ProcessEnv) {
     const frames: any[] = [];
     const pipe = process.platform === 'win32'
-      ? `\\\\.\\pipe\\wmux-agy-test-${process.pid}-${Date.now()}`
+      ? `\\\\.\\pipe\\remotea-agy-test-${process.pid}-${Date.now()}`
       : path.join(home, 'pipe.sock');
     const server = net.createServer((socket) => {
       socket.on('data', (chunk) => {
@@ -135,7 +135,7 @@ describe('agy hook script', () => {
     }]);
   });
 
-  it('still answers {} outside wmux, without touching any pipe', async () => {
+  it('still answers {} outside remotea, without touching any pipe', async () => {
     const { code, stdout, frames } = await runHook('SessionStart', { conversationId: ID }, {});
     expect(code).toBe(0);
     expect(stdout).toBe('{}');

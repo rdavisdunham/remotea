@@ -30,7 +30,7 @@ export function handleDetectionV2(
    * Two modes, and the offline one is the reason this exists: `--file` replays
    * a captured screen through the same engine with no running detection and no
    * agent installed. That is how a rule regression gets debugged from a
-   * `wmux read-screen` capture committed to a fixture — and it is how the
+   * `remotea read-screen` capture committed to a fixture — and it is how the
    * bundled Codex and OpenCode manifests were written, on a machine where
    * neither agent could reach a working turn.
    */

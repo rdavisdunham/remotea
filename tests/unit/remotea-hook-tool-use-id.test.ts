@@ -7,7 +7,7 @@ import path from 'path';
 /**
  * Issue #399: a permission prompt is retracted once the main thread's tool
  * calls show the agent moved past it, which needs the hook helper to forward
- * Claude Code's `tool_use_id`, and only for calls wmux can attribute.
+ * Claude Code's `tool_use_id`, and only for calls remotea can attribute.
  */
 
 const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/remotea-hook.js');

@@ -22,7 +22,7 @@ export function createLeaf(
  * How the panes of a fresh workspace are arranged (issue #212).
  *
  * The shape was hard-coded twice, differently: the sidebar `+` built a fixed
- * three-pane T and `wmux new-workspace` built a single leaf. A user with a
+ * three-pane T and `remotea new-workspace` built a single leaf. A user with a
  * layout in mind therefore had to rebuild it by hand after every new workspace,
  * and could not tell which entry point they were about to get.
  *
@@ -96,7 +96,7 @@ export function buildWorkspaceTree(panes: number, layout: WorkspaceLayout = 'gri
   }
 }
 
-// wmux's built-in "factory" new-workspace layout: a top row split into two
+// remotea's built-in "factory" new-workspace layout: a top row split into two
 // panes, plus one pane below. Kept as a name because it is what every caller
 // and test already asks for; it is now one point in buildWorkspaceTree's space
 // rather than a separate construction that could drift from it.

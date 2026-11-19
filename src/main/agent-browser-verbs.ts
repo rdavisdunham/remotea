@@ -1,5 +1,5 @@
 /**
- * wmux browser verb → agent-browser argv.
+ * remotea browser verb → agent-browser argv.
  *
  * Deliberately PURE and I/O-free: this is the piece most likely to drift as
  * agent-browser's CLI evolves, so it must be exhaustively testable without a
@@ -13,8 +13,8 @@
  */
 
 /**
- * wmux refs are `e12`; agent-browser wants `@e12`. Anything that is not a bare
- * wmux ref is passed through untouched, because agent-browser accepts CSS and
+ * remotea refs are `e12`; agent-browser wants `@e12`. Anything that is not a bare
+ * remotea ref is passed through untouched, because agent-browser accepts CSS and
  * text selectors in the same position.
  */
 export function normaliseRef(ref: string): string {
@@ -47,7 +47,7 @@ export function toAgentBrowserArgv(method: string, params: any, session: string)
     case 'browser.click':     return [...head, 'click', requireRef(method, p)];
     case 'browser.type':      return [...head, 'type', requireRef(method, p), String(p.text ?? '')];
     case 'browser.fill':      return [...head, 'fill', requireRef(method, p), String(p.value ?? '')];
-    // No ref means "the whole page" in wmux. agent-browser spells that `read`,
+    // No ref means "the whole page" in remotea. agent-browser spells that `read`,
     // which returns agent-readable text rather than a raw innerText dump.
     case 'browser.get_text':  return ref ? [...head, 'get', 'text', ref] : [...head, 'read'];
     case 'browser.screenshot':
@@ -62,7 +62,7 @@ export function toAgentBrowserArgv(method: string, params: any, session: string)
       // and `timeout: 0` is a legitimate ("don't wait") value that must not
       // be treated as falsy.
       //
-      // KNOWN ENGINE DIVERGENCE: `wmux browser wait <ref> [ms]` (see
+      // KNOWN ENGINE DIVERGENCE: `remotea browser wait <ref> [ms]` (see
       // src/cli/remotea.ts) sends ref AND timeout together — the ms bounds how
       // long to wait for that element. In `web` mode both reach
       // cdpBridge.wait(ref, timeout) and the timeout is honoured. agent-browser's

@@ -33,7 +33,7 @@ describe('hardenWebviewPreferences (#287)', () => {
 
   it('is registered on the HOST window — the only contents will-attach-webview fires on', () => {
     // It used to be registered on `type === 'webview'` alone, i.e. on a guest,
-    // where it never fires for a panel wmux draws.
+    // where it never fires for a panel remotea draws.
     const index = read('src/main/index.ts');
     expect(index).toMatch(/if \(type === 'window' \|\| type === 'webview'\) \{\s*contents\.on\('will-attach-webview'/);
     expect(index).toMatch(/hardenWebviewPreferences\(/);
@@ -55,7 +55,7 @@ function runWatchdog(parentScript: string, deadlineMs: number, logPath: string) 
 }
 
 describe('exit watchdog (#289)', () => {
-  const dir = mkdtempSync(join(os.tmpdir(), 'wmux-wd-'));
+  const dir = mkdtempSync(join(os.tmpdir(), 'remotea-wd-'));
 
   it('terminates a parent that outlives the deadline, and says so in main.log', async () => {
     const log = join(dir, 'hung.log');

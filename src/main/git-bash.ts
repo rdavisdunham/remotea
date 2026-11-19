@@ -3,11 +3,11 @@ import * as path from 'path';
 // ─── Git Bash resolution (issue #252) ────────────────────────────────────────
 //
 // Settings → Workspace → Default shell offers "Git Bash" and stores the bare
-// name `bash.exe`. That name was resolved with `where bash.exe` against wmux's
+// name `bash.exe`. That name was resolved with `where bash.exe` against remotea's
 // OWN PATH, and Git for Windows does not put its bash there: the installer's
 // default adds only `<Git>\cmd` (git.exe, no bash). The reporter's shell found
 // `C:\Program Files\Git\usr\bin\bash.exe` because a Git Bash session adds
-// `usr\bin` to its own PATH — wmux, launched from the Start menu, never has it.
+// `usr\bin` to its own PATH — remotea, launched from the Start menu, never has it.
 // So one of two things happened, and neither was Git Bash:
 //
 //   * no WSL: `where` misses, resolveShell falls back to pwsh with a
@@ -16,7 +16,7 @@ import * as path from 'path';
 //     launcher, and the "Git Bash" pane opens a Linux distro.
 //
 // Measured on the machine this was fixed on: with PATH rebuilt from the
-// registry (what an Explorer-launched wmux inherits), `where bash.exe` returns
+// registry (what an Explorer-launched remotea inherits), `where bash.exe` returns
 // System32\bash.exe and the WindowsApps alias, and no Git bash at all.
 //
 // The fix is to treat a bare `bash` / `git-bash` spec as the alias it is: an
@@ -125,7 +125,7 @@ export function isGitBashLauncher(resolved: string): boolean {
 }
 
 /**
- * How a Git Bash pane loads wmux's bash integration (#427), or null to start
+ * How a Git Bash pane loads remotea's bash integration (#427), or null to start
  * the shell as it was asked for.
  *
  * Without it a Git Bash pane reported nothing — no cwd, so a `cd` was never
@@ -134,8 +134,8 @@ export function isGitBashLauncher(resolved: string): boolean {
  * uses for Git Bash too. It replaces ~/.bashrc and is ignored by a login shell,
  * so `--login` is dropped and `login` asks the script to read the login files
  * itself (the prologue of remotea-bash-integration.sh). Only the two argument
- * lists wmux itself would use: none, or GIT_BASH_LOGIN_ARGS. A user's own args
- * (`--norc`, `-c ...`) mean a shell wmux does not get to rearrange.
+ * lists remotea itself would use: none, or GIT_BASH_LOGIN_ARGS. A user's own args
+ * (`--norc`, `-c ...`) mean a shell remotea does not get to rearrange.
  */
 export function gitBashIntegrationArgs(
   resolved: string,

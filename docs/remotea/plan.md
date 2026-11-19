@@ -20,7 +20,7 @@
 | Server restarts that keep processes | declined: like herdr, a restart (even of the PC) respawns sessions in their directories and resumes their agents |
 | Desktop test harness (`scripts/desktop-test/harness.mjs`): a test app instance on the Windows side driven over CDP from WSL, against a test server | **done** |
 | Found with the harness: a remote pane was blank after a window reload (now asks the server for a snapshot); screen reads and agent detection looked at the blank bottom of panes taller than 40 rows (now read up to the last printed line) | **fixed** |
-| UI copy says "remotea" (all 18 languages): product-name uses only. The in-pane `remotea` command, `~/.wmux/config.toml`, `.wmux.json` and other real names are unchanged | **done** |
+| UI copy says "remotea" (all 18 languages): product-name uses only. The in-pane `remotea` command, `~/.remotea/config.toml`, `.remotea.json` and other real names are unchanged | **done** |
 | Pending changes (Settings → Remote hosts): each offline action still waiting for a host, or sent without an answer ("uncertain"), listed with what it would do, its age and attempts, and a Forget action (`rhost:outbox-forget`; each says what forgetting it means, e.g. an uncertain close may already have happened on the host) | **done**: outbox + helper unit tests |
 | Host attention row (sidebar, top): per host, the Eridani runs that need you, terminals that exited non-zero, unconfirmed actions and the connection state; click goes to the first such tab | **done**: helper + render tests |
 | One shortcut table (`src/renderer/shortcuts.ts`): the F1 overlay, Settings → Keyboard, the command palette and every tooltip read their labels and live bindings from it; a test fails when a registered accelerator has no entry, or a tooltip hard-codes a combination | **done**: unit tests. The overlay now also lists the Agents category |
@@ -218,7 +218,7 @@ interface TerminalBackend {
 | `host-client.ts` | one `RemoteHostClient` per host, implementing `TerminalBackend`; checks seq continuity (a gap forces a snapshot re-open); holds output until a listener subscribes; **drops input while offline**, never queues it; `wantSnapshot` handles a renderer reload |
 | `connection-fsm.ts` | pure reducer: `disabled → connecting → handshaking → READY`; backoff `min(15 s, 250 ms·2ⁿ)` with ±20% jitter; `auth-failed` retries every 5 min; `incompatible` stops; `suspended` |
 | `power.ts` | `powerMonitor` `suspend` closes and pauses; `resume` / `unlock-screen` / window focus while in backoff reconnects **immediately** |
-| `pending-intents.ts` | close, groupClose, hide and similar actions issued offline, persisted to `%APPDATA%\wmux\remote-pending.json` and flushed right after `welcome`, before reconcile |
+| `pending-intents.ts` | close, groupClose, hide and similar actions issued offline, persisted to `%APPDATA%\remotea\remote-pending.json` and flushed right after `welcome`, before reconcile |
 | `host-config.ts` | hosts `[{id, name, url, serverId?, tokenEnc}]`; the token is encrypted with Electron `safeStorage`; the renderer never sees it; `serverId` is pinned so the client fails closed if the URL starts pointing at a different server |
 | `registry-mirror.ts`, `reconcile.ts`, `placement.ts` | see section E |
 
@@ -231,7 +231,7 @@ interface TerminalBackend {
 
 **Heartbeat:** `ping` every 10 s; the connection is dead after 25 s with no frame.
 
-**Device id** lives in `%APPDATA%\wmux\remote-device.json`.
+**Device id** lives in `%APPDATA%\remotea\remote-device.json`.
 
 ### 3. Rewire call sites
 
@@ -395,7 +395,7 @@ None of these call `pty.kill`.
 
 - **Phase 1: server plus reliable single-machine reconnect.** Test on the desktop's Windows side first, then the laptop.
   - Server: sessions, gap-free attach, queries, size claim, close and exit, registry with tombstones and lost-on-boot, auth, systemd and install.
-  - wmux: backend extraction, router, host client with state machine, heartbeat, power hooks, pending intents; settings and `safeStorage`; the `remote:` default shell; `useTerminal` changes; detach on quit; overlay and badge.
+  - remotea: backend extraction, router, host client with state machine, heartbeat, power hooks, pending intents; settings and `safeStorage`; the `remote:` default shell; `useTerminal` changes; detach on quit; overlay and badge.
   - Reconcile limited to this device's own surfaces: attach, drop closed, respawn lost.
 - **Phase 2: cross-device registry sync.**
   - Groups and binding, placement, incremental events, rename, recolor, close and move.
@@ -473,7 +473,7 @@ Each of these is a default the user can override when reviewing:
 **Manual checklist (desktop Windows side and laptop):**
 1. Start a long Claude run in a remote pane, close the laptop lid for 10 minutes, open it. The overlay appears, reconnect is immediate, and the screen and scrollback are intact.
 2. Turn off Wi-Fi for 2 minutes. Disconnect is detected within 25 s, input is blocked, and it recovers.
-3. Quit wmux. `ps` in WSL shows the processes still running. Relaunch: every pane is back with its scrollback.
+3. Quit remotea. `ps` in WSL shows the processes still running. Relaunch: every pane is back with its scrollback.
 4. `systemctl --user restart remotea`. Panes show "restarted; session restored", and `claude --resume <id>` relaunches in the right cwd.
 5. Two devices at once:
    - create on the desktop, and it appears on the laptop in the same workspace
@@ -490,7 +490,7 @@ Each of these is a default the user can override when reviewing:
 
 **Gate commands:**
 - WSL: `npm --prefix remote-server test` and `node remote-server/scripts/e2e.mjs`.
-- wmux: `npm run typecheck && npm run lint && npm test`, in WSL where possible.
+- remotea: `npm run typecheck && npm run lint && npm test`, in WSL where possible.
 - Running the app needs Windows. Install Node on the desktop's Windows side (it has git but no Node), clone the fork to a Windows path with no spaces, then `npm ci && npm run build:main && npm run dev`.
 
 ---

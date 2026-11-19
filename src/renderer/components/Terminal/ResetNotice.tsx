@@ -8,7 +8,7 @@ import { RESET_NOTICE_EVENT, type ResetNoticeDetail } from '../../utils/alt-scre
  * "Kept the alternate screen — press again to leave it" (#357), shown when a
  * reset kept it and for as long as a second press would force it.
  *
- * An overlay rather than a `[wmux] …` line written to the terminal: the case it
+ * An overlay rather than a `[remotea] …` line written to the terminal: the case it
  * appears in is the one where a program may still be drawing on that screen,
  * and a line written there would land inside the program's frame and move its
  * cursor. Non-modal and never hit-testable, like the copy-mode indicator.

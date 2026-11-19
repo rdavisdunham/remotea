@@ -1,6 +1,6 @@
 /**
  * `workspace.current` — the caller-scoped "which workspace am I in?" method
- * behind `wmux current-workspace`.
+ * behind `remotea current-workspace`.
  *
  * The two behaviours worth pinning are the ones that make the answer
  * trustworthy: a caller in a NON-focused workspace must get its own workspace
@@ -114,7 +114,7 @@ describe('workspace.current', () => {
     expect(error).toBe('surface not found');
   });
 
-  it('is an explicit miss outside wmux, where there is no caller at all', async () => {
+  it('is an explicit miss outside remotea, where there is no caller at all', async () => {
     const win = new FakeWindow(1, { [CALLER]: WS_BG.id }, { [WS_BG.id]: WS_BG });
     windows.push(win);
     focused = win;

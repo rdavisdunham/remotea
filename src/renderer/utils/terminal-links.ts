@@ -3,7 +3,7 @@ import type { ILinkProviderOptions } from '@xterm/addon-web-links';
 import { openInRemoteaBrowser } from './open-in-browser';
 import { isHttpUrl } from './open-link';
 
-export const FILE_LINK_PREFIX = 'wmux-file:';
+export const FILE_LINK_PREFIX = 'remotea-file:';
 
 export function isFileLinkUri(uri: string | undefined): uri is string {
   return typeof uri === 'string' && uri.startsWith(FILE_LINK_PREFIX) && uri.length > FILE_LINK_PREFIX.length;
@@ -27,7 +27,7 @@ export type MouseTrackingMode = 'none' | 'x10' | 'vt200' | 'drag' | 'any';
  * xterm 6's Linkifier activates on an unmodified mouseup with no regard for
  * that — and a TUI that handles links itself (OpenCode v2 opens them with the
  * `open` package) then opens the same URL a second time, in the system
- * browser, beside the panel wmux just opened. Two openers, neither able to see
+ * browser, beside the panel remotea just opened. Two openers, neither able to see
  * the other. Every mainstream terminal avoids this the same way: a plain click
  * belongs to an app that has captured the mouse, and the terminal's own link
  * handling waits for a modifier (Windows Terminal and VS Code Ctrl+click,
@@ -35,7 +35,7 @@ export type MouseTrackingMode = 'none' | 'x10' | 'vt200' | 'drag' | 'any';
  *
  * And in that pane the modifier OPENS rather than inverts. Under #201 Ctrl
  * inverts `openLinksExternally` because a plain click already reaches the
- * default destination; with tracking on, Ctrl is the only way to reach wmux at
+ * default destination; with tracking on, Ctrl is the only way to reach remotea at
  * all, so if it still inverted, the panel (the default) would be unreachable
  * from every mouse-capturing pane — and in OpenCode, whose plain click already
  * opens the system browser, both gestures would land in the same place.
@@ -51,7 +51,7 @@ export function linkClickTarget(
   return modifier ? { invert: false } : null;
 }
 
-/** Route terminal links through wmux instead of xterm's window.open fallback. */
+/** Route terminal links through remotea instead of xterm's window.open fallback. */
 export function activateTerminalLink(event: MouseEvent, uri: string, mouseTracking: MouseTrackingMode = 'none'): void {
   if (!isHttpUrl(uri)) return;
 
@@ -64,17 +64,17 @@ export function activateTerminalLink(event: MouseEvent, uri: string, mouseTracki
 }
 
 /**
- * Whether a mousedown is a link click wmux takes and the app must never see
+ * Whether a mousedown is a link click remotea takes and the app must never see
  * (#353).
  *
- * `linkClickTarget` gives a modified click in a mouse-tracking pane to wmux,
+ * `linkClickTarget` gives a modified click in a mouse-tracking pane to remotea,
  * but xterm reports that same click to the app anyway: its mousedown reporter
  * holds back only a selection-forcing modifier (Shift, or Alt on macOS), and
  * the report carries the Ctrl bit. An app that opens links on Ctrl+click
  * (reported with Claude Code) then opened the URL itself, in the system
- * browser, beside the panel wmux had just opened — #280 again, on the
+ * browser, beside the panel remotea had just opened — #280 again, on the
  * modified click. So the
- * press is claimed before xterm sees it, but only for exactly the clicks wmux
+ * press is claimed before xterm sees it, but only for exactly the clicks remotea
  * would open: anything not on a link is still the app's.
  */
 export function claimsLinkMouseDown(

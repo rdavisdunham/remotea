@@ -7,7 +7,7 @@ import {
 import { DEFAULT_APPEARANCE_PREFS } from '../../src/renderer/store/settings-slice';
 
 describe('inactivePaneDimAlpha', () => {
-  it('defaults to the overlay strength wmux has always shipped', () => {
+  it('defaults to the overlay strength remotea has always shipped', () => {
     // 0.2 was the hard-coded rgba alpha before this became a setting; anyone
     // who never touches it must see no change.
     expect(DEFAULT_APPEARANCE_PREFS.inactivePaneDim).toBe(DEFAULT_INACTIVE_PANE_DIM_PCT);

@@ -7,7 +7,7 @@ import * as path from 'path';
 // @xterm/addon-webgl 0.19.0 never disposes its cursor-blink manager
 // (xtermjs/xterm.js#5818), so the 600 ms blink interval outlives the addon and
 // keeps the WebGL renderer and the whole Terminal (scrollback included) alive.
-// wmux detaches WebGL on every hide and close, so each one of those leaked a
+// remotea detaches WebGL on every hide and close, so each one of those leaked a
 // Terminal. The release path now stops the blink manager itself.
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -186,7 +186,7 @@ const remoteaRequest = (method, params, timeoutMs) => {
 async function remoteaRequestPatiently(method, params, patience, request = remoteaRequest, now = Date.now) {
     return (0, transport_retry_1.retryTransient)((timeoutMs) => request(method, params, timeoutMs), patience, now);
 }
-/** Whether to record sessions: decides a restored pane's capture, so it waits for wmux. */
+/** Whether to record sessions: decides a restored pane's capture, so it waits for remotea. */
 const CONFIG_PATIENCE = { budgetMs: 45_000, firstAttemptMs: 3_000 };
 /** Session reports run beside the TUI, so they can afford to wait longer. */
 const REPORT_PATIENCE = { budgetMs: 60_000, firstAttemptMs: 3_000 };

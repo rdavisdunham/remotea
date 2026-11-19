@@ -2,14 +2,14 @@
  * Claude Code.
  *
  * Authored from screens captured out of a live Claude Code 2.x pane running in
- * wmux under ConPTY on Windows (`wmux read-screen`), not adapted from anyone
+ * remotea under ConPTY on Windows (`remotea read-screen`), not adapted from anyone
  * else's rule set — see tests/fixtures/detection/claude-*.txt, which are those
  * captures and which pin every rule below.
  *
  * What the UI actually looks like, and what is therefore safe to key on:
  *
  *   ✻ Unravelling… (26s · ↓ 1.4k tokens)          <- working: spinner line
- *   ──────────────────────────────────── wmux ──  <- prompt box top
+ *   ──────────────────────────────────── remotea ──  <- prompt box top
  *   >                                             <- the prompt itself
  *   ──────────────────────────────────────────
  *     ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
@@ -76,7 +76,7 @@ export const claudeManifest: Manifest = {
      * Deliberately narrow. A rule that guessed would be worse than no rule at
      * all here: the engine falls back to `unknown`, which reads honestly, while
      * a false `blocked` would put a pane in the "needs you" queue forever —
-     * wmux's blocked never expires.
+     * remotea's blocked never expires.
      */
     {
       id: 'claude.blocked.permission',

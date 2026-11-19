@@ -2,8 +2,8 @@
  * Screen-manifest detection — the evaluator.
  *
  * Pure: everything it learns is in its return value, and it touches no clock,
- * no filesystem and no globals. That is what lets `wmux detect explain --file`
- * replay a captured screen with no running wmux, which is how a rule regression
+ * no filesystem and no globals. That is what lets `remotea detect explain --file`
+ * replay a captured screen with no running remotea, which is how a rule regression
  * gets debugged.
  */
 import {
@@ -276,8 +276,8 @@ export function detectScreen(
   }
 
   // The divergence that matters. The prior art returns `idle` here and labels
-  // it a fallback; wmux returns `unknown`, because `idle` is a claim and no one
-  // made it. A new prompt shape wmux has not learned reads as "we don't know",
+  // it a fallback; remotea returns `unknown`, because `idle` is a claim and no one
+  // made it. A new prompt shape remotea has not learned reads as "we don't know",
   // never as "nothing is happening" — which is the failure that would hide the
   // one pane that needs the user.
   return {

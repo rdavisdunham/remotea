@@ -49,7 +49,7 @@ describe('workspace label from the store', () => {
     agentStates: before.agentStates,
   }));
 
-  it('gives the window title a workspace wmux named, to a caller outside React', () => {
+  it('gives the window title a workspace remotea named, to a caller outside React', () => {
     announce('Fix login bug');
     expect(getStoredWorkspaceLabel(named)).toBe('Fix login bug');
     expect(selectWorkspaceLabel(useStore.getState(), named)).toBe('Fix login bug');
@@ -155,7 +155,7 @@ describe('workspace label from the store', () => {
       titleBothWithoutIdentity();
       useStore.getState().setAgentState({ surfaceId: agentId, state: 'idle', sessionId });
       // What main broadcasts when it forgets the pane: SessionEnd, the PTY
-      // exiting, `wmux release-agent`.
+      // exiting, `remotea release-agent`.
       useStore.getState().setAgentState({ surfaceId: agentId, state: 'unknown', sessionId: null });
       expect(getStoredWorkspaceLabel(split)).toBe('MINGW64:/c/repo');
     });

@@ -14,6 +14,6 @@
 ────────────────────────────────────────────────────────────────────────────────────
 > Oui, c'est réussi.
 ────────────────────────────────────────────────────────────────────────────────────
-  wmux @ codex/wmux-question-state-20261… ●2 | Haiku 5.5/medium
+  remotea @ codex/remotea-question-state-20261… ●2 | Haiku 5.5/medium
   ctx ░░░░░░ 12/40%
   ⏵⏵ auto mode on (shift+tab to cycle) · gh auth login for PR status · ← 1 agent

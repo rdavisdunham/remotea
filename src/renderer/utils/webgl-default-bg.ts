@@ -62,7 +62,7 @@ export function patchWebglDefaultBackground(addon: WebglAddon): void {
   try {
     const renderer = (addon as unknown as { _renderer?: { _rectangleRenderer?: { value?: RectangleRendererLike } } })._renderer;
     if (!patchRectangleRenderer(renderer?._rectangleRenderer?.value)) {
-      console.warn('[wmux] WebGL default-background patch did not apply (addon internals changed?)');
+      console.warn('[remotea] WebGL default-background patch did not apply (addon internals changed?)');
     }
   } catch { /* never let a cosmetic patch break the renderer */ }
 }

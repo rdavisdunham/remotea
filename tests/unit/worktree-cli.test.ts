@@ -63,7 +63,7 @@ describe('CLI worktree flags and parameter validation', () => {
           branch: 'feat/cli-wt',
           baseBranch: 'main',
           baseSha: '0123456789abcdef0123456789abcdef01234567',
-          worktreePath: 'C:\\Users\\User\\AppData\\Local\\wmux\\wt\\repo\\feat-cli-wt',
+          worktreePath: 'C:\\Users\\User\\AppData\\Local\\remotea\\wt\\repo\\feat-cli-wt',
         },
       });
 
@@ -102,7 +102,7 @@ describe('CLI worktree flags and parameter validation', () => {
 
       const ws = useStore.getState().workspaces.find((w) => w.id === res.workspaceId);
       expect(ws).toBeDefined();
-      expect(ws?.cwd).toBe('C:\\Users\\User\\AppData\\Local\\wmux\\wt\\repo\\feat-cli-wt');
+      expect(ws?.cwd).toBe('C:\\Users\\User\\AppData\\Local\\remotea\\wt\\repo\\feat-cli-wt');
       expect(ws?.worktree?.branch).toBe('feat/cli-wt');
       expect(ws?.title).toBe('feat/cli-wt');
     });

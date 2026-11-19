@@ -91,7 +91,7 @@ describe('remotea-hook.js under Qwen Code (--provider qwen)', () => {
     expect(params.provider).toBe('qwen');
   });
 
-  it('translates Qwen tool ids to the Claude names wmux keys on', async () => {
+  it('translates Qwen tool ids to the Claude names remotea keys on', async () => {
     const params = await send(['--event', 'PreToolUse', '--provider', 'qwen'], {
       session_id: QWEN_ID, hook_event_name: 'PreToolUse', tool_name: 'run_shell_command', tool_input: { command: 'ls' },
     });

@@ -281,7 +281,7 @@ export function useKeyboardShortcuts(
      * because the answer does NOT clear `blocked` (the agent must confirm), so
      * the pane you just dealt with stays top of the queue for a beat and eats
      * every further press. Skipping past the pane already focused sidesteps
-     * that without wmux having to guess whether the answer took.
+     * that without remotea having to guess whether the answer took.
      */
     const jumpToBlocked = () => {
       const state = useStore.getState();

@@ -86,7 +86,7 @@ describe('surface-slice: setMarkdownContent (issue #54)', () => {
     expect(getSurface(surfaceId)?.markdownFilePath).toBe('C:\\repo\\docs\\GUIDE.md');
   });
 
-  // The guard that matters: `wmux markdown set <id> --content …` against a
+  // The guard that matters: `remotea markdown set <id> --content …` against a
   // file-backed surface must not silently re-point or clear where it came from.
   it('leaves the file path untouched when content is pushed without one', () => {
     const surfaceId = useStore.getState().addSurface(workspaceId, paneId, 'markdown');

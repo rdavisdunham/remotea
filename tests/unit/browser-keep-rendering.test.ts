@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 /**
  * A browser surface the user is not looking at is hidden with CSS, and Chromium
- * stops painting a webview it is told is not rendered: `wmux browser
+ * stops painting a webview it is told is not rendered: `remotea browser
  * screenshot` timed out as soon as the user switched workspace. A pane an agent
  * drives now keeps painting on a lease (src/main/browser-keep-rendering.ts has
  * the measurements). vitest runs in node with no React renderer, so the webview

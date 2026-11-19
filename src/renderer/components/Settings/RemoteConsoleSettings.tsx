@@ -234,7 +234,7 @@ export function suggestedPublicUrl(status: Pick<RemoteConsoleStatus, 'lastReject
  * The Public URL row and the Tailscale / SSH recipes are about a proxy in
  * front of the LOOPBACK listener: every recipe targets 127.0.0.1, and main
  * ignores the Public URL for pairing on a LAN bind, where nothing listens
- * there. Showing them under LAN invited a setup that cannot reach wmux.
+ * there. Showing them under LAN invited a setup that cannot reach remotea.
  */
 /**
  * "Turn the remote console on to pair a device" — only when it is OFF. Enabled
@@ -247,7 +247,7 @@ export function pairHintShown(status: Pick<RemoteConsoleStatus, 'config' | 'runn
 }
 
 /**
- * "· N connected" counts DEVICES with a live socket, as `wmux remote status`
+ * "· N connected" counts DEVICES with a live socket, as `remotea remote status`
  * does — not sockets: one phone with two tabs is one connected device.
  */
 export function connectedDevices(status: Pick<RemoteConsoleStatus, 'connected'>): number {
@@ -285,7 +285,7 @@ function StatusLine({ t, status, busy, apply }: RowProps) {
       <div className={`remote-settings__status ${error ? 'remote-settings__status--error' : ''}`} role="status">
         {line}
       </div>
-      {/* The most likely reason a phone gets refused is a proxy address wmux
+      {/* The most likely reason a phone gets refused is a proxy address remotea
           was never told about — `tailscale serve` hands out an https origin
           the user may not have pasted anywhere. Offer the refused origin as
           the fix rather than making them find and retype it. */}
@@ -328,7 +328,7 @@ function Reachability({ t, status, busy, apply }: RowProps) {
   const lanHost = config.lanHost;
   // A saved interface that has since gone (Wi-Fi off, VPN down) stays in the
   // list, marked, rather than vanishing: a dropdown silently showing another
-  // address would read as though wmux had rebound on its own.
+  // address would read as though remotea had rebound on its own.
   const options = lanHost && !lanAddresses.includes(lanHost) ? [...lanAddresses, lanHost] : lanAddresses;
   const firstLan = lanHost ?? lanAddresses[0] ?? null;
 

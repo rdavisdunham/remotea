@@ -69,7 +69,7 @@ describe('default mode', () => {
   });
 
   // The promotion is one-time, so choosing classic afterwards has to stick —
-  // otherwise wmux overrides the user on every launch, which is worse than
+  // otherwise remotea overrides the user on every launch, which is worse than
   // never having changed the default at all.
   it('leaves a post-promotion classic choice alone', async () => {
     const { prefs, writes } = await loadWith({ uiMode: 'classic', uiModeDefaultRev: UI_MODE_DEFAULT_REV });
@@ -156,7 +156,7 @@ describe('reduced motion', () => {
 
 describe('signal honesty', () => {
   // A session that has never emitted a hook event must not render as a
-  // confident idle — wmux shipped a build where the hook script was missing
+  // confident idle — remotea shipped a build where the hook script was missing
   // from the package entirely (issue #81) and it looked exactly like "quiet".
   it('draws a no-telemetry session differently from an idle one', () => {
     expect(trace).toMatch(/data-tr-telemetry='none'[\s\S]*repeating-linear-gradient/);

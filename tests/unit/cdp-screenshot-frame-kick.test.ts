@@ -8,7 +8,7 @@ import {
 } from '../../src/main/cdp-bridge';
 
 // #262: Page.captureScreenshot waits for the NEXT compositor frame, and an
-// occluded wmux window produces none, so the capture hung until the CLI's 10 s
+// occluded remotea window produces none, so the capture hung until the CLI's 10 s
 // deadline. The fix invalidates the guest until a frame lands.
 describe('withFrameKick (#262)', () => {
   beforeEach(() => { vi.useFakeTimers(); });

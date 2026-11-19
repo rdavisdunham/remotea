@@ -286,7 +286,7 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
       gitDirty: options.gitDirty,
       cwd: options.cwd,
       // Seed the WSL fallback from the folder the workspace was opened on
-      // ("Open in wmux" on a \\wsl.localhost path, `wmux new-workspace --cwd`,
+      // ("Open in remotea" on a \\wsl.localhost path, `remotea new-workspace --cwd`,
       // a restored session). Without this seed a workspace whose only reporting
       // pane is pwsh would have no POSIX path at all, and its WSL panes would
       // stay on `--cd ~` for the rest of the session.
@@ -333,7 +333,7 @@ export const createWorkspaceSlice: StateCreator<WorkspaceSlice> = (set, get) => 
 
   closeWorkspace(id: WorkspaceId): void {
     // Reap every shell in the workspace before dropping its subtree (issue #65).
-    // Closing a workspace (Ctrl+Shift+W, sidebar ×, `wmux close-workspace`) used
+    // Closing a workspace (Ctrl+Shift+W, sidebar ×, `remotea close-workspace`) used
     // to discard the entire split tree WITHOUT killing any of its PTYs, orphaning
     // every pane's wrapper shell for the life of the app.
     const closing = get().workspaces.find((w) => w.id === id);

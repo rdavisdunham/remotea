@@ -38,7 +38,7 @@ async function client(relay: CodexRelay) {
     pending.set(id, { resolve, reject });
     socket.send(JSON.stringify({ id, method, params }));
   });
-  await request('initialize', { clientInfo: { name: 'wmux_test', version: '1.0.0' }, capabilities: { experimentalApi: true } });
+  await request('initialize', { clientInfo: { name: 'remotea_test', version: '1.0.0' }, capabilities: { experimentalApi: true } });
   socket.send(JSON.stringify({ method: 'initialized' }));
   return { request, get completed() { return completed; } };
 }
@@ -52,12 +52,12 @@ it.skipIf(process.platform !== 'win32' || !executable)('resumes with full access
   cleanup.push(() => new Promise<void>(resolve => http.close(() => resolve())));
   const port = (http.address() as net.AddressInfo).port;
   const config = `model = "gpt-5.4"
-model_provider = "wmux_test"
+model_provider = "remotea_test"
 approval_policy = "on-request"
 sandbox_mode = "read-only"
 check_for_update_on_startup = false
-[model_providers.wmux_test]
-name = "wmux test"
+[model_providers.remotea_test]
+name = "remotea test"
 base_url = "http://127.0.0.1:${port}/v1"
 wire_api = "responses"
 request_max_retries = 0
@@ -128,7 +128,7 @@ trust_level = "trusted"
   const resumed = await restored.request('thread/resume', { threadId });
   expect(resumed.thread.id).toBe(threadId);
   expect(resumed.approvalPolicy).toBe('never');
-  // The TUI may append its own first-run preferences, but wmux must not persist
+  // The TUI may append its own first-run preferences, but remotea must not persist
   // the launch's permission choices into the user's configuration defaults.
   expect(readFileSync(path.join(dir, 'config.toml'), 'utf8')).toContain(config.trim());
 }, 90000);

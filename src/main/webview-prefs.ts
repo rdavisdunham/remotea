@@ -1,10 +1,10 @@
 // The web preferences every browser-panel <webview> is attached with.
 //
 // Applied from `will-attach-webview`, which Electron emits on the HOST
-// webContents — the wmux window that contains the <webview> tag — and never on
+// webContents — the remotea window that contains the <webview> tag — and never on
 // the guest itself. Until #287 the listener was registered only on contents of
 // type `webview`, i.e. on a guest, where it would fire only for a webview
-// nested inside a web page: for every panel wmux actually draws it never ran.
+// nested inside a web page: for every panel remotea actually draws it never ran.
 // The hardening below was therefore dead code (the renderer happens not to set
 // any of those attributes, which is why nothing broke), and the autoplay rule
 // had nowhere to live.

@@ -152,7 +152,7 @@ export default function remoteaExtension(omp) {
     const blocked = prompts.size > 0;
     const state = blocked ? 'blocked' : busy ? 'working' : 'idle';
     const now = Date.now();
-    // Refresh long tool runs before wmux's declaration trust window expires.
+    // Refresh long tool runs before remotea's declaration trust window expires.
     if (state === lastState && now - lastReportAt < 30_000) return queue;
     lastState = state;
     lastReportAt = now;

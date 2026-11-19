@@ -96,7 +96,7 @@ describe('electron-builder packaging', () => {
    * The CLI files are packaged one by one, not as a directory, so anything they
    * `require` from beside themselves has to be listed too — and unlike the
    * resource lookups above, a miss here is not a silently-absent feature but a
-   * MODULE_NOT_FOUND on the first line of `wmux ping` and of every Claude Code
+   * MODULE_NOT_FOUND on the first line of `remotea ping` and of every Claude Code
    * hook. `npm run dev` cannot see it: the module is right there in dist/.
    *
    * Derived rather than enumerated, for the same reason as the scan above — a

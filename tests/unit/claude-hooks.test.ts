@@ -7,7 +7,7 @@ const remoteaCmds = (entries: any[]): string[] =>
   entries.flatMap((e) => (e.hooks || []).map((h: any) => h.command as string));
 
 describe('applyRemoteaHooks (issue #53)', () => {
-  it('installs PostToolUse, Notification and Stop wmux hooks', () => {
+  it('installs PostToolUse, Notification and Stop remotea hooks', () => {
     const out = applyRemoteaHooks({}, HOOK);
 
     // PostToolUse: one entry per tracked tool.
@@ -50,11 +50,11 @@ describe('applyRemoteaHooks (issue #53)', () => {
 
     expect(remoteaCmds(out.hooks.PostToolUse)).toContain('my-own-script.sh');
     expect(remoteaCmds(out.hooks.Stop)).toContain('notify-send done');
-    // ...and the wmux entries are still added alongside them.
+    // ...and the remotea entries are still added alongside them.
     expect(remoteaCmds(out.hooks.Stop).some((c) => c.includes('--event Stop'))).toBe(true);
   });
 
-  it('is idempotent — re-running replaces wmux entries, never duplicates them', () => {
+  it('is idempotent — re-running replaces remotea entries, never duplicates them', () => {
     const once = applyRemoteaHooks({}, HOOK);
     const twice = applyRemoteaHooks(once, HOOK);
 
@@ -78,13 +78,13 @@ describe('applyRemoteaHooks (issue #53)', () => {
     expect(entries[0].hooks[0].command).toContain('--event SubagentStop');
   });
 
-  it('replaces a prior wmux SubagentStop entry instead of duplicating it', () => {
+  it('replaces a prior remotea SubagentStop entry instead of duplicating it', () => {
     const once = applyRemoteaHooks({}, '/abs/remotea-hook.js');
     const twice = applyRemoteaHooks(once, '/abs/remotea-hook.js');
     expect(twice.hooks.SubagentStop).toHaveLength(1);
   });
 
-  // Every wmux hook is an observer; the per-tool-call ones sat on the critical
+  // Every remotea hook is an observer; the per-tool-call ones sat on the critical
   // path of every tool call for 125-145 ms each. Claude Code only skips the
   // wait when the entry says `async: true`, and a pre-existing install has the
   // field missing, so applyRemoteaHooks must add it on the rewrite it already does.
@@ -103,7 +103,7 @@ describe('applyRemoteaHooks (issue #53)', () => {
     }
   });
 
-  it('upgrades a wmux install that predates the async flag', () => {
+  it('upgrades a remotea install that predates the async flag', () => {
     const legacy = {
       hooks: {
         PreToolUse: [{ hooks: [{ type: 'command', command: `node "${HOOK}" --event PreToolUse 2>/dev/null || true` }] }],

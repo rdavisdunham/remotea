@@ -375,7 +375,7 @@ describe('parseShellSpec (issue #78 — shell command lines with args)', () => {
   });
 
   it('never splits an existing absolute path containing spaces', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux spec '));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea spec '));
     const exe = path.join(dir, 'my shell.exe');
     fs.writeFileSync(exe, '');
     try {
@@ -504,11 +504,11 @@ describe('appExecAliasTarget (issue #299)', () => {
  * looks for an agent on $SSH_AUTH_SOCK instead of the Windows named pipe
  * `\\.\pipe\openssh-ssh-agent`, so on a machine whose keys live only in an
  * agent (1Password, KeePassXC, the ssh-agent service) it sees no keys at all:
- * `wmux ssh user@host` died on "Permission denied (publickey)" while the
+ * `remotea ssh user@host` died on "Permission denied (publickey)" while the
  * user's own `ssh` in the same pane worked.
  *
  * Only shell SPECS come through here — a command typed at a prompt is resolved
- * by the shell inside the PTY — so this changes what wmux launches, never what
+ * by the shell inside the PTY — so this changes what remotea launches, never what
  * the user launches.
  */
 describe('a bare ssh spec resolves to Windows OpenSSH, not PATH', () => {
@@ -595,7 +595,7 @@ describe('shell path resolution is memoized (issue #176)', () => {
     // A stale positive would hand a dead path to pty.spawn, which surfaces as
     // node-pty's opaque "File not found: " and a pane that dies on open. The
     // existsSync re-validation is what keeps the cache from causing that.
-    const tmp = path.join(os.tmpdir(), `wmux-shell-cache-${process.pid}.exe`);
+    const tmp = path.join(os.tmpdir(), `remotea-shell-cache-${process.pid}.exe`);
     fs.writeFileSync(tmp, '');
     try {
       vi.mocked(shellProbe.onPath).mockImplementation((name: string) => {
@@ -622,8 +622,8 @@ describe('shell path resolution is memoized (issue #176)', () => {
   it('re-resolves the "System default" shell when its cached exe disappears (#334)', () => {
     // A Store PowerShell update removes the versioned WindowsApps directory the
     // default shell was memoized as; the next pane must not spawn that path.
-    const before = path.join(os.tmpdir(), `wmux-default-old-${process.pid}.exe`);
-    const after = path.join(os.tmpdir(), `wmux-default-new-${process.pid}.exe`);
+    const before = path.join(os.tmpdir(), `remotea-default-old-${process.pid}.exe`);
+    const after = path.join(os.tmpdir(), `remotea-default-new-${process.pid}.exe`);
     fs.writeFileSync(before, '');
     let current = before;
     try {
@@ -697,7 +697,7 @@ describe('WSL launch cwd', () => {
   });
 
   it('passes a Windows directory that exists', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux wsl-cd '));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea wsl-cd '));
     try {
       expect(buildShellArgs('wsl', {}, '', dir)).toEqual(['--cd', dir]);
     } finally {
@@ -707,7 +707,7 @@ describe('WSL launch cwd', () => {
 
   // wsl.exe exits on a missing Windows-spelled --cd, so the pane would never start.
   it('opens a Windows directory that is gone at the distro home', () => {
-    expect(buildShellArgs('wsl', {}, '', 'C:\\wmux-no-such-dir-397\\x')).toEqual(['--cd', '~']);
+    expect(buildShellArgs('wsl', {}, '', 'C:\\remotea-no-such-dir-397\\x')).toEqual(['--cd', '~']);
   });
 
   it.each([
@@ -765,7 +765,7 @@ describe('resolveSpawnCwd', () => {
   });
 
   it('keeps a cwd that exists', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-cwd-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-cwd-'));
     try {
       expect(resolveSpawnCwd(dir)).toBe(dir);
     } finally {
@@ -774,17 +774,17 @@ describe('resolveSpawnCwd', () => {
   });
 
   it('falls back when the cwd was deleted (the worktree case → error 267)', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-cwd-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-cwd-'));
     fs.rmSync(dir, { recursive: true, force: true });
     expect(resolveSpawnCwd(dir)).toBe(home);
   });
 
   it('falls back when the cwd never existed', () => {
-    expect(resolveSpawnCwd('C:\\definitely\\not\\here\\wmux-test')).toBe(home);
+    expect(resolveSpawnCwd('C:\\definitely\\not\\here\\remotea-test')).toBe(home);
   });
 
   it('falls back when the cwd is a file, not a directory', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-cwd-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-cwd-'));
     const file = path.join(dir, 'not-a-dir.txt');
     fs.writeFileSync(file, 'x');
     try {
@@ -799,9 +799,9 @@ describe('resolveSpawnCwd', () => {
   });
 
   // Deliberately NOT node-pty's default any more (#214). Its default is "inherit
-  // the parent process's cwd", and wmux's own cwd is whatever the launcher gave
+  // the parent process's cwd", and remotea's own cwd is whatever the launcher gave
   // it — C:\Windows\system32 for a Start-menu launch or an OS crash relaunch.
-  it('falls back for no cwd, rather than inheriting wmux\'s own (issue #214)', () => {
+  it('falls back for no cwd, rather than inheriting remotea\'s own (issue #214)', () => {
     expect(resolveSpawnCwd(undefined)).toBe(home);
   });
 });
@@ -844,7 +844,7 @@ describe('resolveShellForCwd (POSIX cwd → WSL shell)', () => {
   });
 
   it('does not hijack a deliberate remote command line (issue #78)', () => {
-    // `wmux ssh user@host` resolves to a shell wmux cannot classify. Replacing
+    // `remotea ssh user@host` resolves to a shell remotea cannot classify. Replacing
     // it with wsl.exe would drop the user somewhere else entirely, which is a
     // worse failure than opening in the wrong directory.
     expect(resolveShellForCwd('ssh', POSIX)).toBe('ssh');

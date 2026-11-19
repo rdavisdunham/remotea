@@ -1,8 +1,8 @@
 /**
  * Which binary on this machine can run a `.js` file (issue #187).
  *
- * Every wmux integration point that is "a JS file plus something to run it"
- * — the `wmux`/`remotea.cmd` CLI shims, the Claude Code hook, the OpenCode plugin
+ * Every remotea integration point that is "a JS file plus something to run it"
+ * — the `remotea`/`remotea.cmd` CLI shims, the Claude Code hook, the OpenCode plugin
  * — has so far assumed `node` is on PATH, or that the host process is itself a
  * JS runtime. Neither holds in general:
  *
@@ -14,9 +14,9 @@
  *   - Node can be installed and still be absent from PATH inside a given
  *     process, which is exactly what #187 reported.
  *
- * So wmux answers the question once, in the process that has the best view of
+ * So remotea answers the question once, in the process that has the best view of
  * the machine, and hands the answer down as `REMOTEA_NODE`. The last resort is
- * wmux's own Electron binary, which runs plain Node when spawned with
+ * remotea's own Electron binary, which runs plain Node when spawned with
  * `ELECTRON_RUN_AS_NODE=1` — meaning the chain never dead-ends, even on a
  * machine with no Node installed at all.
  */
@@ -75,7 +75,7 @@ function pathDirs(env: NodeJS.ProcessEnv): string[] {
 /**
  * Pure core, so the search order is testable without a machine to search.
  *
- * `execPath` is checked FIRST when it is already a JS runtime: a wmux embedded
+ * `execPath` is checked FIRST when it is already a JS runtime: a remotea embedded
  * in a Node host should use that host rather than go hunting, and it also keeps
  * the dev-vs-packaged answer stable.
  */
@@ -104,7 +104,7 @@ let cached: NodeRuntime | null = null;
  * Memoised because `getNodeRuntime()` is read on the pane-create path, which is
  * synchronous on the main loop — #176 was exactly this: a per-pane `where`
  * lookup costing twice what spawning the PTY did. The answer cannot change
- * while wmux is running, so one filesystem walk per launch is the right budget.
+ * while remotea is running, so one filesystem walk per launch is the right budget.
  */
 export function getNodeRuntime(): NodeRuntime {
   if (cached) return cached;
@@ -115,9 +115,9 @@ export function getNodeRuntime(): NodeRuntime {
       return false;
     }
   });
-  // No Node anywhere: fall back to wmux's own Electron binary, which is Node
+  // No Node anywhere: fall back to remotea's own Electron binary, which is Node
   // when ELECTRON_RUN_AS_NODE is set. Consumers must honour `electron` — the
-  // same exe launched WITHOUT that variable opens a second wmux window.
+  // same exe launched WITHOUT that variable opens a second remotea window.
   cached = found ?? { path: process.execPath, electron: true };
   return cached;
 }

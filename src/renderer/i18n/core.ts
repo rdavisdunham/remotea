@@ -1,4 +1,4 @@
-// ─── wmux UI internationalization — pure core (issue #56) ────────────────────
+// ─── remotea UI internationalization — pure core (issue #56) ────────────────────
 // Registry and pure helpers with NO store dependency. The settings slice
 // imports from here (for the default-language detection at store-creation
 // time); keeping this module store-free avoids a circular import between the
@@ -58,7 +58,7 @@ const BUILTIN = [
   { code: 'cs', label: 'Čeština', dict: cs },
 ] as const;
 
-/** The codes wmux ships with. User locales may add more at runtime. */
+/** The codes remotea ships with. User locales may add more at runtime. */
 export type BuiltinLanguage = (typeof BUILTIN)[number]['code'];
 
 /**
@@ -87,7 +87,7 @@ export const SUPPORTED_LANGUAGES: ReadonlyArray<Language> = supported;
 // once ~/.remotea/locales has been merged, so a total Record would be a lie.
 export const DICTIONARIES: Record<string, Translation> = {};
 
-/** What the last ~/.remotea/locales load produced — surfaced by `wmux locales`. */
+/** What the last ~/.remotea/locales load produced — surfaced by `remotea locales`. */
 export interface UserLocaleState {
   /** Codes that came from disk, in load order. */
   codes: Language[];
@@ -107,7 +107,7 @@ export function getUserLocaleState(): UserLocaleState {
 
 /**
  * Bumped whenever the dictionaries change. `useT` folds this into its
- * subscription so a `wmux reload-config` repaints translated UI; without it the
+ * subscription so a `remotea reload-config` repaints translated UI; without it the
  * store never changes and React has no reason to re-render.
  */
 let revision = 0;
@@ -221,7 +221,7 @@ export type Translator = (key: TranslationKey, fallback?: string) => string;
 // and a fresh closure per render invalidates every one of them. That is how the
 // diff pane's 2s poll degenerated into a render-speed loop spawning `git.exe`
 // (issue #141). A locale reload clears the cache on purpose — that is a real
-// content change, and it happens only on an explicit `wmux reload-config`.
+// content change, and it happens only on an explicit `remotea reload-config`.
 const translators = new Map<Language, Translator>();
 
 /** The translator for `lang` — same function object on every call. */

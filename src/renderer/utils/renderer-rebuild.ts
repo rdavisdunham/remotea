@@ -4,7 +4,7 @@
  *
  * The report: a pane drew characters that were not in its buffer (a vertical
  * stripe near the old width, fragments at the left edge) while
- * `wmux read-screen` returned the right text, the damage survived new output,
+ * `remotea read-screen` returned the right text, the damage survived new output,
  * and switching workspace and back repaired it.
  *
  * What the workspace switch does is the useful fact. A hidden terminal gives

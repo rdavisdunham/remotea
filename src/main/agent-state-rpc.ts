@@ -6,7 +6,7 @@
  * ceilings, and routeSpecialV2 exists precisely so method families can be
  * routed off to their own dispatcher.
  *
- * Method names follow the issue's proposal (`pane.report_agent`, …). wmux keys
+ * Method names follow the issue's proposal (`pane.report_agent`, …). remotea keys
  * on surfaces rather than panes — a pane can hold several tabs and the agent
  * runs in exactly one of them — so `surfaceId` is the real parameter, with
  * `paneId` accepted as an alias for clients written against the original
@@ -102,7 +102,7 @@ export async function deliverAnswer(
 ): Promise<{ ok: true } | { ok: false; reason: DeliverAnswerReason }> {
   // The console always NAMES its choice. `answerAgent` reads an empty (or
   // all-blank) id as an UNNAMED answer and resolves it to the declared default
-  // or the only choice — right for `wmux answer-agent` with no --choice, never
+  // or the only choice — right for `remotea answer-agent` with no --choice, never
   // for a remote tap: an empty id reaching here is a bug upstream, and it must
   // not turn into "press the default" on somebody's permission prompt (I4).
   // Same shape the wire validator enforces, so nothing legitimate is refused.
@@ -132,7 +132,7 @@ function targetSurface(params: any): SurfaceId | undefined {
  * Attach WHO to a snapshot of WHAT.
  *
  * Two separate trackers because they have two separate sources of truth — the
- * agent's own reports, and what wmux launched or the shell hook saw. They are
+ * agent's own reports, and what remotea launched or the shell hook saw. They are
  * joined here, at the read, rather than merged in either store, so a caller can
  * still tell "Claude, silent" from "something, blocked".
  */
@@ -170,7 +170,7 @@ export function handleAgentStateV2(
       respond({
         states: listAgentStates().map(withIdentity),
         blocked: listBlocked().map(withIdentity),
-        // Panes wmux identified as agents that have never declared anything —
+        // Panes remotea identified as agents that have never declared anything —
         // exactly the population the identity layer exists to surface, and the
         // one `states` cannot show because it is keyed on having reported.
         identified: agentIdentity.list(),
@@ -234,7 +234,7 @@ const HANDLERS: Record<string, (surfaceId: SurfaceId, p: any) => any> = {
     accepted: !!reportAgentSession(surfaceId, { seq: p.seq, sessionId: p.sessionId ?? null, provider: p.provider }),
   }),
 
-  // Distinct verbs keep the Codex launcher inert against older wmux instances.
+  // Distinct verbs keep the Codex launcher inert against older remotea instances.
   'pane.report_codex_session': (surfaceId, p) => ({
     accepted: !!reportAgentSession(surfaceId, { sessionId: p.sessionId ?? null, provider: 'codex' }),
   }),

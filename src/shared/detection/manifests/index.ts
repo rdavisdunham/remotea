@@ -3,7 +3,7 @@
  *
  * TypeScript modules rather than TOML, deliberately. The prior art ships TOML
  * because it fetches rule updates from a server at runtime and needs a format
- * it can parse; wmux does not do that (see the note on remote fetching in
+ * it can parse; remotea does not do that (see the note on remote fetching in
  * docs and in user-manifests.ts) so the format buys nothing and costs a parser,
  * a schema validator and a class of "the file on disk disagrees with the type"
  * bugs. Authored as TS, `tsc` is the validator.

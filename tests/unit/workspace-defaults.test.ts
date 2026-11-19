@@ -16,7 +16,7 @@ import type { SplitNode } from '../../src/shared/types';
 // Issue #212 — a new workspace's shape is a setting, and one setting.
 //
 // It was hard-coded in two places that disagreed: the sidebar `+` built a
-// three-pane T, `wmux new-workspace` built a single leaf, and neither Settings
+// three-pane T, `remotea new-workspace` built a single leaf, and neither Settings
 // nor config.toml could change either. The reporter had to rebuild their layout
 // by hand after every new workspace.
 // ─────────────────────────────────────────────────────────────────────────────

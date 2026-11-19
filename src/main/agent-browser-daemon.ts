@@ -5,10 +5,10 @@
  * it, last release stops it.
  *
  * ── Adopt, never fight ────────────────────────────────────────────────────
- * If :4848 already answers when we go to start, a human (or another wmux)
+ * If :4848 already answers when we go to start, a human (or another remotea)
  * started it. We use it and record `adopted`. An adopted dashboard is NEVER
- * stopped — not on the last release, not on shutdown. wmux did not start it, so
- * stopping it is not wmux's to do, and killing a dashboard the user is watching
+ * stopped — not on the last release, not on shutdown. remotea did not start it, so
+ * stopping it is not remotea's to do, and killing a dashboard the user is watching
  * in their own Chrome would be a genuinely baffling bug to report.
  *
  * Process control is injected so this is testable with no child processes.
@@ -20,7 +20,7 @@
  * that registry tracks only the ports it has itself allocated. Bindability of
  * those is `SessionRegistry.ensureBindable`'s job — it probes each candidate
  * with a real `listen` before committing, because a squatting process (including
- * an orphan from a previous wmux) can hold a port the registry believes is free.
+ * an orphan from a previous remotea) can hold a port the registry believes is free.
  * Do not assume `probe()` here covers any of that; it answers about 4848 only.
  */
 
@@ -127,7 +127,7 @@ export class DashboardDaemon {
    * to do" — and then the attempt settles a moment later with ZERO live
    * refs, having started a dashboard nothing will ever stop. Via
    * `shutdown()` specifically this is a leaked child process that outlives
-   * wmux entirely: shutdown runs at app quit, and there is no later
+   * remotea entirely: shutdown runs at app quit, and there is no later
    * opportunity to notice.
    *
    * A rejected attempt (failed start) is swallowed here, not rethrown: a
@@ -184,7 +184,7 @@ export class DashboardDaemon {
 
 // (c) `adopted` is exposed only via the getter above. There is deliberately no
 // setter: anything holding this daemon that could write `d.adopted = false`
-// could then make `release()`/`shutdown()` stop a dashboard wmux does not
+// could then make `release()`/`shutdown()` stop a dashboard remotea does not
 // own — exactly the outcome the "adopt, never fight" rule exists to prevent.
 // TypeScript already refuses `d.adopted = x` at compile time (no setter in
 // the type); the class field being private additionally means a `(d as

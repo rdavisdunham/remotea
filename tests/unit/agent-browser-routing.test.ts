@@ -37,7 +37,7 @@ vi.mock('../../src/main/agent-browser-runtime', () => ({
   sessionRegistry: {
     ensure: (surfaceId: string) => ({
       surfaceId,
-      sessionName: `wmux-${surfaceId}`,
+      sessionName: `remotea-${surfaceId}`,
       streamPort: 9300,
       dashboardUrl: `http://127.0.0.1:4848/?port=9300`,
     }),
@@ -106,7 +106,7 @@ function deps(bridge: any, runAgent: any = vi.fn()): BrowserDeps {
 
 const SESSION = {
   surfaceId: 'surf-a',
-  sessionName: 'wmux-surf-a',
+  sessionName: 'remotea-surf-a',
   streamPort: 9300,
   dashboardUrl: 'http://127.0.0.1:4848/?port=9300',
 } as any;
@@ -114,7 +114,7 @@ const SESSION = {
 const web = (wcId = 7): BrowserTarget => ({ kind: 'web', wcId });
 const agent = (): BrowserTarget => ({ kind: 'agent', session: SESSION });
 
-/** Every verb wmux exposes, with params good enough to build an argv. */
+/** Every verb remotea exposes, with params good enough to build an argv. */
 const ALL_VERBS: Array<[string, any]> = [
   ['browser.navigate', { url: 'https://a' }],
   ['browser.snapshot', {}],
@@ -174,7 +174,7 @@ describe('runBrowserCommandForTarget — engine dispatch', () => {
     const runAgent = vi.fn(async () => ok({ url: 'https://a' }));
     await runBrowserCommandForTarget('browser.navigate', { url: 'https://a' }, agent(), deps(bridge, runAgent));
 
-    expect(runAgent).toHaveBeenCalledWith(['--session', 'wmux-surf-a', 'open', 'https://a'], expect.any(Number));
+    expect(runAgent).toHaveBeenCalledWith(['--session', 'remotea-surf-a', 'open', 'https://a'], expect.any(Number));
     expect(bridge.navigate).not.toHaveBeenCalled();
   });
 
@@ -222,7 +222,7 @@ describe('runBrowserCommandForTarget — agent failures', () => {
     ).rejects.toThrow(/no such session/);
   });
 
-  // spawnFailed and a non-zero exit are opposite problems: one is a wmux/install
+  // spawnFailed and a non-zero exit are opposite problems: one is a remotea/install
   // fault (the resolved binary went stale), the other is the CLI reporting on a
   // page. Echoing an empty stderr for the first reads like a broken install with
   // no explanation, which is exactly what it must not do.
@@ -261,7 +261,7 @@ describe('the two engines are indistinguishable to a caller', () => {
     expect(fromAgent.rpcCode).toBe(-32601);
   });
 
-  it('maps every verb wmux exposes onto the agent engine', async () => {
+  it('maps every verb remotea exposes onto the agent engine', async () => {
     // The guard that catches a 13th verb being added to the web switch and
     // forgotten in the translation table: it would throw -32601 here.
     const runAgent = vi.fn(async () => ok({}));
@@ -278,7 +278,7 @@ describe('the two engines are indistinguishable to a caller', () => {
    * machine, not invented shapes — the previous versions of these tests
    * asserted parity against a payload this file made up, which made them
    * circular. `--json` wraps every verb in `{success, data, error}`; without it
-   * the same verbs print bare text. wmux's argv only passes `--json` for
+   * the same verbs print bare text. remotea's argv only passes `--json` for
    * screenshot today, so BOTH forms are live and both are pinned here.
    */
   const REAL_TREE =
@@ -302,7 +302,7 @@ describe('the two engines are indistinguishable to a caller', () => {
   it('returns the same result shape from both engines for snapshot (bare stdout)', async () => {
     const bridge = makeBridge();
     const fromWeb = await runBrowserCommandForTarget('browser.snapshot', {}, web(), deps(bridge));
-    // No --json in wmux's argv, so this is what actually arrives.
+    // No --json in remotea's argv, so this is what actually arrives.
     const fromAgent = await runBrowserCommandForTarget(
       'browser.snapshot', {}, agent(), deps(bridge, vi.fn(async () => ok(null, REAL_TREE))),
     );
@@ -333,7 +333,7 @@ describe('the two engines are indistinguishable to a caller', () => {
   });
 
   // The bug: the envelope was passed through verbatim, so an agent calling
-  // `wmux browser snapshot` got {success,data:{lifecycle,origin,refs,snapshot}}
+  // `remotea browser snapshot` got {success,data:{lifecycle,origin,refs,snapshot}}
   // on one engine and {tree,refCount} on the other.
   it('never hands the caller agent-browser\'s envelope for a snapshot', async () => {
     const fromAgent: any = await runBrowserCommandForTarget(
@@ -386,7 +386,7 @@ describe('the two engines are indistinguishable to a caller', () => {
     const fromWeb = await runBrowserCommandForTarget('browser.screenshot', {}, web(), deps(bridge));
     expect(fromWeb).toEqual({ data: 'BASE64' });
 
-    const png = path.join(os.tmpdir(), `wmux-shot-${process.pid}.png`);
+    const png = path.join(os.tmpdir(), `remotea-shot-${process.pid}.png`);
     const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0x02]);
     fs.writeFileSync(png, bytes);
     try {
@@ -402,7 +402,7 @@ describe('the two engines are indistinguishable to a caller', () => {
   });
 
   it('does not fail the command when the screenshot file cannot be read', async () => {
-    const envelope = { success: true, data: { path: path.join(os.tmpdir(), 'wmux-no-such-shot.png') }, error: null };
+    const envelope = { success: true, data: { path: path.join(os.tmpdir(), 'remotea-no-such-shot.png') }, error: null };
     const fromAgent = await runBrowserCommandForTarget(
       'browser.screenshot', {}, agent(), deps(makeBridge(), vi.fn(async () => ok(envelope, ''))),
     );
@@ -545,7 +545,7 @@ describe('resolveBrowserTarget — which engine a command lands on', () => {
     const target = await resolveBrowserTarget(caller);
 
     expect(target?.kind).toBe('agent');
-    expect((target as any).session.sessionName).toBe('wmux-surf-toggled');
+    expect((target as any).session.sessionName).toBe('remotea-surf-toggled');
   });
 
   it('still routes an ordinary web surface to the bridge, wcId intact', async () => {
@@ -652,7 +652,7 @@ describe('resolveBrowserTarget — which engine a command lands on', () => {
   });
 
   /**
-   * `wmux browser <verb> --surface <browser-surface>` — the browser's own id as
+   * `remotea browser <verb> --surface <browser-surface>` — the browser's own id as
    * the caller. It used to be read as a new terminal: the workspace's browser
    * was already bound to the agent's terminal, so a fresh pane was split for
    * it, and targeting THAT pane split another, one per command.
@@ -668,7 +668,7 @@ describe('resolveBrowserTarget — which engine a command lands on', () => {
     env.wcIdBySurface.set('surf-named', 21);
 
     // The terminal binds the workspace's browser first, as an agent's plain
-    // `wmux browser open` does…
+    // `remotea browser open` does…
     expect(await resolveBrowserTarget(terminal)).toEqual({ kind: 'web', wcId: 21 });
     // …then the same browser is named explicitly, twice.
     expect(await resolveBrowserTarget('surf-named')).toEqual({ kind: 'web', wcId: 21 });
@@ -687,7 +687,7 @@ describe('resolveBrowserTarget — which engine a command lands on', () => {
 
     const target = await resolveBrowserTarget('surf-named-agent');
     expect(target?.kind).toBe('agent');
-    expect((target as any).session.sessionName).toBe('wmux-surf-named-agent');
+    expect((target as any).session.sessionName).toBe('remotea-surf-named-agent');
   });
 
   // Naming a pane is not owning it: a terminal agent arriving later must still

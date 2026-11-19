@@ -131,7 +131,7 @@ describe('surface-slice', () => {
 
   // Issue #4 (continued): closing the pane/tab that reported a PR used to
   // leave its badge on the sidebar row forever. A killed PTY never runs a
-  // shell-side exit trap, so `clear_pr` never arrives for a Ctrl+W or `wmux
+  // shell-side exit trap, so `clear_pr` never arrives for a Ctrl+W or `remotea
   // close-pane` — the store has to notice the loss itself, at the same state
   // transition that already reaps the PTY (see pty-teardown.ts).
   describe('PR badge teardown on close', () => {

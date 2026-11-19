@@ -3,12 +3,12 @@ import { SessionRegistry, sessionNameFor, DASHBOARD_PORT } from '../../src/main/
 
 describe('sessionNameFor', () => {
   it('derives a stable name from the surface id', () => {
-    expect(sessionNameFor('surf-abc123' as any)).toBe('wmux-surf-abc123');
-    expect(sessionNameFor('surf-abc123' as any)).toBe('wmux-surf-abc123');
+    expect(sessionNameFor('surf-abc123' as any)).toBe('remotea-surf-abc123');
+    expect(sessionNameFor('surf-abc123' as any)).toBe('remotea-surf-abc123');
   });
 
-  it('namespaces wmux sessions so the reaper can recognise its own', () => {
-    expect(sessionNameFor('surf-x' as any).startsWith('wmux-')).toBe(true);
+  it('namespaces remotea sessions so the reaper can recognise its own', () => {
+    expect(sessionNameFor('surf-x' as any).startsWith('remotea-')).toBe(true);
   });
 
   it('throws on a surface id starting with a dash (would parse as a flag)', () => {
@@ -71,7 +71,7 @@ describe('SessionRegistry', () => {
     const r = new SessionRegistry(9300);
     r.ensure('surf-a' as any);
     r.ensure('surf-b' as any);
-    expect(r.all().map((s) => s.sessionName).sort()).toEqual(['wmux-surf-a', 'wmux-surf-b']);
+    expect(r.all().map((s) => s.sessionName).sort()).toEqual(['remotea-surf-a', 'remotea-surf-b']);
   });
 
   it('tracks size across ensure and release', () => {

@@ -202,7 +202,7 @@ describe('the plan', () => {
 });
 
 describe('surface env at spawn', () => {
-  it('resolves ${env:NAME} from wmux\'s environment and only that syntax', () => {
+  it('resolves ${env:NAME} from remotea\'s environment and only that syntax', () => {
     expect(expandEnvRefs('a ${env:HOME_X} $HOME_X %HOME_X%', { HOME_X: 'h' })).toBe('a h $HOME_X %HOME_X%');
     expect(expandEnvRefs('${env:UNSET_ONE}', {})).toBe('');
   });
@@ -213,7 +213,7 @@ describe('surface env at spawn', () => {
   });
 });
 
-describe('manifestFromWorkspace (`wmux workspace save`)', () => {
+describe('manifestFromWorkspace (`remotea workspace save`)', () => {
   it('writes folders relative to the repo, commands as run, and round-trips through the parser', async () => {
     const { manifestFromWorkspace } = await import('../../src/main/workspace-manifest');
     const { manifest, warnings } = manifestFromWorkspace({

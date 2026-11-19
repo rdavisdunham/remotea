@@ -94,7 +94,7 @@ function prMessage(args: {
     '',
   ].join('\n');
 
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-pr-')), 'probe.ps1');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-pr-')), 'probe.ps1');
   fs.writeFileSync(file, script, 'utf8');
   try {
     return execFileSync(host as string, ['-NoProfile', '-NonInteractive', '-File', file], {
@@ -175,7 +175,7 @@ describe.skipIf(!host)('the integration script itself', () => {
     // function out of the file, and the ones below read it as text. A shell
     // integration that fails to parse takes the whole pane's prompt, git
     // branch and shell state down with it, silently.
-    const probe = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-parse-')), 'parse.ps1');
+    const probe = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-parse-')), 'parse.ps1');
     fs.writeFileSync(
       probe,
       [
@@ -205,7 +205,7 @@ describe.skipIf(!host)('the integration script itself', () => {
 function resolvePaneCwd(cwdFile: string | null): string {
   const quoted = cwdFile ? "'" + cwdFile.replace(/'/g, "''") + "'" : "''";
   const script = [extractFunction('Resolve-RemoteaPaneCwd'), '', `$r = Resolve-RemoteaPaneCwd -CwdFile ${quoted}`, 'if ($null -eq $r) { "<null>" } else { $r }', ''].join('\n');
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-resolve-')), 'probe.ps1');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-resolve-')), 'probe.ps1');
   fs.writeFileSync(file, script, 'utf8');
   try {
     return execFileSync(host as string, ['-NoProfile', '-NonInteractive', '-File', file], {
@@ -218,33 +218,33 @@ function resolvePaneCwd(cwdFile: string | null): string {
 
 describe.skipIf(!host)('Resolve-RemoteaPaneCwd — what the job trusts as "the pane is here"', () => {
   it('resolves a file that names a real directory', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-realdir-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-realdir-'));
     const cwdFile = path.join(dir, 'cwd.txt');
     fs.writeFileSync(cwdFile, dir, 'utf8');
     expect(resolvePaneCwd(cwdFile)).toBe(dir);
   });
 
   it('returns nothing when the hand-off file does not exist', () => {
-    const missing = path.join(os.tmpdir(), 'wmux-does-not-exist', 'cwd.txt');
+    const missing = path.join(os.tmpdir(), 'remotea-does-not-exist', 'cwd.txt');
     expect(resolvePaneCwd(missing)).toBe('<null>');
   });
 
   it('returns nothing when the hand-off file is empty', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-empty-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-empty-'));
     const cwdFile = path.join(dir, 'cwd.txt');
     fs.writeFileSync(cwdFile, '', 'utf8');
     expect(resolvePaneCwd(cwdFile)).toBe('<null>');
   });
 
   it('returns nothing when the hand-off file is whitespace only', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-ws-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-ws-'));
     const cwdFile = path.join(dir, 'cwd.txt');
     fs.writeFileSync(cwdFile, '   \n', 'utf8');
     expect(resolvePaneCwd(cwdFile)).toBe('<null>');
   });
 
   it('returns nothing when the named path no longer exists (deleted since the write)', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-stale-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-stale-'));
     const cwdFile = path.join(dir, 'cwd.txt');
     const goneDir = path.join(dir, 'gone');
     fs.mkdirSync(goneDir);
@@ -270,7 +270,7 @@ function invokeTick(args: {
   currentlyReported: boolean;
   sendSucceeds: boolean;
 }): { reported: boolean; sendCalledWith: string | null } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-tick-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-tick-'));
   const marker = path.join(dir, 'sent.txt').replace(/\\/g, '\\\\');
   const ps = (s: string) => `'${s.replace(/'/g, "''")}'`;
   const script = [
@@ -355,7 +355,7 @@ describe.skipIf(!host)('Invoke-RemoteaPrTick — the flag only advances on a sen
  * be exercised without a real process exit.
  */
 function invokeExitCleanup(cwdFile: string | null): { cwdFileRemoved: boolean } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-exit-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-exit-'));
   const ps = (v: string | null) => (v === null ? '$null' : `'${v.replace(/'/g, "''")}'`);
   const script = [extractFunction('Invoke-RemoteaExitCleanup'), '', `Invoke-RemoteaExitCleanup -CwdFile ${ps(cwdFile)}`, ''].join('\n');
   const file = path.join(dir, 'probe.ps1');
@@ -373,7 +373,7 @@ function invokeExitCleanup(cwdFile: string | null): { cwdFileRemoved: boolean } 
 // a shell that was killed just as well as one that left on its own.
 describe.skipIf(!host)('Invoke-RemoteaExitCleanup — what a shell owes on the way out', () => {
   it('removes the cwd hand-off file when one was configured', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-exit-cwd-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-exit-cwd-'));
     const cwdFile = path.join(dir, 'cwd.txt');
     fs.writeFileSync(cwdFile, dir, 'utf8');
     try {
@@ -388,7 +388,7 @@ describe.skipIf(!host)('Invoke-RemoteaExitCleanup — what a shell owes on the w
   });
 
   it('does not throw when the file is already gone', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-exit-missing-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-exit-missing-'));
     const cwdFile = path.join(dir, 'never-written.txt');
     try {
       expect(invokeExitCleanup(cwdFile).cwdFileRemoved).toBe(true);
@@ -403,7 +403,7 @@ describe.skipIf(!host)('Invoke-RemoteaExitCleanup — what a shell owes on the w
  * Returns the file names still standing afterwards.
  */
 function pruneCwdFiles(dir: string, olderThanDays: number): string[] {
-  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-prune-'));
+  const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-prune-'));
   const script = [
     extractFunction('Remove-StaleRemoteaCwdFiles'),
     '',
@@ -430,7 +430,7 @@ describe.skipIf(!host)('Remove-StaleRemoteaCwdFiles — the sweep for panes that
   };
 
   it('drops a hand-off file nothing has touched for longer than the cutoff', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-stale-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-stale-'));
     try {
       const stale = path.join(dir, 'cwd-surf-old.txt');
       fs.writeFileSync(stale, dir, 'utf8');
@@ -442,7 +442,7 @@ describe.skipIf(!host)('Remove-StaleRemoteaCwdFiles — the sweep for panes that
   });
 
   it('leaves a live pane alone — its file is rewritten on every prompt', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-live-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-live-'));
     try {
       const live = path.join(dir, 'cwd-surf-live.txt');
       const stale = path.join(dir, 'cwd-surf-dead.txt');
@@ -456,7 +456,7 @@ describe.skipIf(!host)('Remove-StaleRemoteaCwdFiles — the sweep for panes that
   });
 
   it('touches nothing else in the directory, however old', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-other-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-other-'));
     try {
       const other = path.join(dir, 'screenshot-1.png');
       fs.writeFileSync(other, 'x', 'utf8');
@@ -468,7 +468,7 @@ describe.skipIf(!host)('Remove-StaleRemoteaCwdFiles — the sweep for panes that
   });
 
   it('says nothing about a directory that does not exist', () => {
-    const dir = path.join(os.tmpdir(), 'wmux-absent-dir-that-was-never-made');
+    const dir = path.join(os.tmpdir(), 'remotea-absent-dir-that-was-never-made');
     expect(() => pruneCwdFiles(dir, 1)).not.toThrow();
   });
 });
@@ -483,7 +483,7 @@ describe.skipIf(!host)('the poller job', () => {
     const initLine = source.split('\n').find((l) => l.includes('[scriptblock]::Create('));
     expect(initLine, 'no initialization script built for the job').toBeTruthy();
 
-    const probe = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-job-')), 'job.ps1');
+    const probe = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-job-')), 'job.ps1');
     fs.writeFileSync(
       probe,
       [
@@ -518,7 +518,7 @@ describe.skipIf(!host)('the poller job', () => {
     const initLine = source.split('\n').find((l) => l.includes('[scriptblock]::Create('));
     expect(initLine, 'no initialization script built for the job').toBeTruthy();
 
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-job2-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-job2-'));
     const cwdFile = path.join(dir, 'cwd.txt');
     fs.writeFileSync(cwdFile, dir, 'utf8');
     const probe = path.join(dir, 'job.ps1');
@@ -611,7 +611,7 @@ describe('PR poller wiring', () => {
   });
 
   it('keeps the cwd hand-off in the temp directory the integrations already use', () => {
-    // <temp>\wmux is wmux's scratch directory (remote-insert.ts uses it too);
+    // <temp>\remotea is remotea's scratch directory (remote-insert.ts uses it too);
     // sharing it keeps this from becoming a second scratch location, and makes
     // the leftovers easy to find if the exit handler ever misses one.
     expect(source).toMatch(/Join-Path \(\[System\.IO\.Path\]::GetTempPath\(\)\) "remotea"/);

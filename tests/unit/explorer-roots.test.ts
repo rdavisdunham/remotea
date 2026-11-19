@@ -6,7 +6,7 @@ import {
   reportExplorerCwd, getExplorerRoot, forgetExplorerRoot, resetExplorerRoots,
 } from '../../src/main/explorer-roots';
 
-const base = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-roots-'));
+const base = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-roots-'));
 const real = path.join(base, 'project');
 fs.mkdirSync(real, { recursive: true });
 

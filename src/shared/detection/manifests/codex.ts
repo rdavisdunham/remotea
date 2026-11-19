@@ -1,7 +1,7 @@
 /**
  * OpenAI Codex CLI.
  *
- * Authored from screens captured out of live `codex` panes in wmux
+ * Authored from screens captured out of live `codex` panes in remotea
  * (tests/fixtures/detection/codex-*.txt): v0.98 for the update menu and the
  * idle composer, v0.159.3 for the working screen. That last capture keeps
  * every line of Codex chrome byte-for-byte; its transcript, working directory

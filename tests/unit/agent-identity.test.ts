@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 describe('layer 1 — shell spec', () => {
-  it('names a pane wmux launched as an agent', () => {
+  it('names a pane remotea launched as an agent', () => {
     tracker.setSurfaceShell(surf, 'claude --resume', NOW);
     expect(tracker.identify(surf)).toEqual({ kind: 'claude', source: 'shell-spec', at: NOW });
   });

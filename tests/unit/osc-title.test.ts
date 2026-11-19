@@ -155,7 +155,7 @@ describe('stripStatusGlyph', () => {
   });
 
   it('leaves a title that starts with a letter or a digit alone', () => {
-    for (const title of ['MINGW64:/c/repo', 'user@host: ~', '(1) Inbox', '~/dev/wmux', 'Fix issue #221', '1. step']) {
+    for (const title of ['MINGW64:/c/repo', 'user@host: ~', '(1) Inbox', '~/dev/remotea', 'Fix issue #221', '1. step']) {
       expect(stripStatusGlyph(title)).toBe(title);
     }
   });

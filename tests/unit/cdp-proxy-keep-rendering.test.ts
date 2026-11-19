@@ -3,7 +3,7 @@ import WebSocket from 'ws';
 
 /**
  * A CDP client attached through the proxy (chrome-devtools-mcp, Playwright) is
- * an agent driving the pane as surely as `wmux browser` is. While the user was
+ * an agent driving the pane as surely as `remotea browser` is. While the user was
  * on another workspace its commands hung on a pane that had stopped painting;
  * the proxy now renews the pane's lease to keep painting before each command
  * it forwards (browser-keep-rendering.ts).

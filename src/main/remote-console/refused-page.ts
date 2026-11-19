@@ -1,5 +1,5 @@
 /**
- * The page a phone gets for an address wmux does not recognise (#254) — most
+ * The page a phone gets for an address remotea does not recognise (#254) — most
  * often a Tailscale URL not yet saved as the Public URL, so it is the FIRST
  * thing a new user's phone shows. It names desktop menus, so it names them the
  * way the desktop does in that language: a French user told to open

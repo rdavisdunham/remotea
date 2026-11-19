@@ -28,7 +28,7 @@ vi.mock('../../src/main/agent-browser-runtime', () => ({
   sessionRegistry: {
     ensure: (surfaceId: string) => ({
       surfaceId,
-      sessionName: `wmux-${surfaceId}`,
+      sessionName: `remotea-${surfaceId}`,
       streamPort: 9300,
       dashboardUrl: 'http://127.0.0.1:4848/?port=9300',
     }),
@@ -43,7 +43,7 @@ import {
 
 const SESSION = {
   surfaceId: 'surf-a',
-  sessionName: 'wmux-surf-a',
+  sessionName: 'remotea-surf-a',
   streamPort: 9300,
   dashboardUrl: 'http://127.0.0.1:4848/?port=9300',
 } as any;
@@ -84,7 +84,7 @@ describe('agent-browser wait: unrepresentable per-call timeout warning', () => {
 
     // The warning is a diagnostic only: argv, result and deadline are unchanged.
     // With a ref present the translator drops the timeout, so argv is ref-only.
-    expect(runAgent).toHaveBeenCalledWith(['--session', 'wmux-surf-a', 'wait', '@e1'], expect.any(Number));
+    expect(runAgent).toHaveBeenCalledWith(['--session', 'remotea-surf-a', 'wait', '@e1'], expect.any(Number));
   });
 
   it('does not warn for a ref-only wait (no timeout to lose)', async () => {
@@ -97,7 +97,7 @@ describe('agent-browser wait: unrepresentable per-call timeout warning', () => {
     await runBrowserCommandForTarget('browser.wait', { timeout: 500 }, agent(), deps(runAgent));
 
     expect(warn).not.toHaveBeenCalled();
-    expect(runAgent).toHaveBeenCalledWith(['--session', 'wmux-surf-a', 'wait', '500'], expect.any(Number));
+    expect(runAgent).toHaveBeenCalledWith(['--session', 'remotea-surf-a', 'wait', '500'], expect.any(Number));
   });
 
   it('warns for timeout 0 alongside a ref, reporting 0ms', async () => {
@@ -127,7 +127,7 @@ describe('agent-browser wait: unrepresentable per-call timeout warning', () => {
 });
 
 /**
- * The console is only half of it. `wmux browser wait e1 5000` is a SEPARATE
+ * The console is only half of it. `remotea browser wait e1 5000` is a SEPARATE
  * process whose entire view of the command is the JSON reply it prints, so a
  * warning that exists only on main's stdout is invisible in every packaged
  * build — it showed up under `npm run dev` and nowhere else. The same sentence
@@ -153,9 +153,9 @@ describe('agent-browser wait: the warning reaches the caller, not just the log',
     expect(out.ok).toBe(true);
     expect(String(out.warning)).toContain('5000ms');
     expect(String(out.warning)).toContain('e1');
-    // Unprefixed on the wire: '[wmux] agent-browser:' is a log-line marker, and
+    // Unprefixed on the wire: '[remotea] agent-browser:' is a log-line marker, and
     // the reply already says which engine answered.
-    expect(String(out.warning)).not.toContain('[wmux]');
+    expect(String(out.warning)).not.toContain('[remotea]');
   });
 
   it('says the same thing in both channels', async () => {

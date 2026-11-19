@@ -2,7 +2,7 @@
  * A key pressed inside a browser pane's page, as main hands it to the desktop.
  *
  * A focused <webview> guest gets its keys before the desktop renderer ever
- * does, so wmux's document-level shortcut listeners never see them: Ctrl+W in
+ * does, so remotea's document-level shortcut listeners never see them: Ctrl+W in
  * a page closed nothing, and before #431 it fell through to Electron's default
  * menu and closed the whole window. Main watches the guest's
  * before-input-event and forwards the keys that could be a shortcut. The page
@@ -33,7 +33,7 @@ export interface GuestInputLike {
 }
 
 /**
- * The key to forward, or null for one that cannot be a wmux shortcut.
+ * The key to forward, or null for one that cannot be a remotea shortcut.
  *
  * Only key-downs with Ctrl, Alt or Meta held, and function keys, are
  * forwarded. Plain typing never leaves the page, and IME composition is the

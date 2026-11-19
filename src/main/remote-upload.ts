@@ -54,7 +54,7 @@ const UNSAFE_FOR_TRANSFER = new Set([
 
 // Re-exported so the scp/rollback tests can reach it from the module whose
 // argv they are pinning. The rule itself lives in system32.ts, because the
-// pane wmux spawns has to reach the same host as the scp it uploads with.
+// pane remotea spawns has to reach the same host as the scp it uploads with.
 export { opensshPath };
 
 /**
@@ -148,7 +148,7 @@ function commonArgs(session: DetectedSsh, portFlag: '-P' | '-p'): string[] {
     // A file copy has no business replaying the user's port forwards. Measured
     // at ~150ms of every upload on a config with a RemoteForward in it, since
     // ssh sets the forwards up during the handshake — and when the port is
-    // already bound (a live `wmux bridge` tunnel) it also prints a warning onto
+    // already bound (a live `remotea bridge` tunnel) it also prints a warning onto
     // stderr that has nothing to do with the transfer.
     '-o', 'ClearAllForwardings=yes',
   ];
@@ -250,7 +250,7 @@ function bestErrorLine(stderr: string, stdout: string): string | null {
       .map((line) => line.trim())
       .filter(Boolean)
       // ssh emits this whenever the user's ssh_config carries a RemoteForward
-      // that is already bound (a live `wmux bridge` tunnel does exactly that).
+      // that is already bound (a live `remotea bridge` tunnel does exactly that).
       // It is not why the copy failed, and it would mask the line that is.
       .filter((line) => !/^Warning: remote port forwarding failed/i.test(line));
     if (lines.length === 0) continue;

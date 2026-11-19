@@ -2,11 +2,11 @@ import { reportIntegrationFailure } from './integration-failures';
 /**
  * Grok Build (xAI's `grok` CLI) integration.
  *
- * Grok needs less from wmux than any agent before it, because it already reads
+ * Grok needs less from remotea than any agent before it, because it already reads
  * Claude Code's files: with its Claude compatibility on (every `[compat.claude]`
  * cell defaults to true) it loads ~/.claude/CLAUDE.md and runs the hooks in
  * ~/.claude/settings.json. So a machine with the Claude integration granted was
- * already teaching Grok about wmux. This module covers the two places that
+ * already teaching Grok about remotea. This module covers the two places that
  * falls short.
  *
  * ── Hooks: $GROK_HOME/hooks/remotea.json ────────────────────────────────────────
@@ -27,7 +27,7 @@ import { reportIntegrationFailure } from './integration-failures';
  * ── Instructions: $GROK_HOME/rules/remotea.md, only when Grok would miss them ───
  *
  * Grok loads every `*.md` in its home rules dir, so like Kiro this is a file of
- * wmux's own. But it is written only when Grok will NOT already read the wmux
+ * remotea's own. But it is written only when Grok will NOT already read the remotea
  * block out of ~/.claude/CLAUDE.md — otherwise every Grok session would load the
  * same ~5 KB of instructions twice.
  *
@@ -60,11 +60,11 @@ function defaultGrokHome(): string {
 /**
  * `$GROK_HOME`, default ~/.grok — the root of both the rules and hooks dirs.
  *
- * The override is read only from wmux's OWN environment (one exported per-shell
+ * The override is read only from remotea's OWN environment (one exported per-shell
  * after launch is unknowable here — a miss, never a write to the wrong place),
  * and only when it is ABSOLUTE. A relative value means "relative to wherever
  * grok is started", which is a different directory for every pane and not the
- * one wmux happens to be running in; resolving it against wmux's cwd would
+ * one remotea happens to be running in; resolving it against remotea's cwd would
  * write hooks into a folder nobody named.
  */
 export function getGrokHome(): string {
@@ -73,7 +73,7 @@ export function getGrokHome(): string {
 }
 
 /**
- * Every home wmux may have written into: the current one, and the default. They
+ * Every home remotea may have written into: the current one, and the default. They
  * differ only while GROK_HOME is set, and removal sweeps both — an uninstall
  * that only looks where it would write TODAY leaves behind the file it wrote
  * before the variable was set, which is an inverse that cannot undo (#132).
@@ -124,7 +124,7 @@ function readOrEmpty(filePath: string): string {
  * fully dotted key at the top level.
  * ponytail: line scan, not a TOML parser — an inline table
  * (`claude = { agents = false }`) reads as "on". The miss costs a Grok session
- * the wmux instructions, which is where things stood before; add a parser if
+ * the remotea instructions, which is where things stood before; add a parser if
  * anyone writes it that way.
  */
 export function claudeAgentsCompatOff(toml: string): boolean {
@@ -144,10 +144,10 @@ export function claudeAgentsCompatOff(toml: string): boolean {
 }
 
 /**
- * Will Grok already see the wmux block in ~/.claude/CLAUDE.md?
+ * Will Grok already see the remotea block in ~/.claude/CLAUDE.md?
  *
  * Resolved the way Grok resolves the cell — env var over config.toml over the
- * default (on). The env var read is wmux's own, which every pane inherits; one
+ * default (on). The env var read is remotea's own, which every pane inherits; one
  * exported per-shell after launch is unknowable here, and the worst case is the
  * instructions loading twice.
  */
@@ -169,7 +169,7 @@ export function buildGrokHooks(hookScript: string): { hooks: Record<string, unkn
 }
 
 /**
- * Write `content` to a file wmux owns inside Grok's home, or leave a same-named
+ * Write `content` to a file remotea owns inside Grok's home, or leave a same-named
  * file of the user's alone. No-op when Grok has never run here.
  */
 function writeOwnedFile(filePath: string, content: string, isOurs: (s: string) => boolean): void {
@@ -202,7 +202,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** `node "<anything>remotea-hook.js" <arg>` — the only command shape wmux registers. */
+/** `node "<anything>remotea-hook.js" <arg>` — the only command shape remotea registers. */
 const REMOTEA_HOOK_COMMAND_RE = /^node "[^"]*remotea-hook\.js" \S/;
 
 function isRemoteaHandler(handler: unknown): boolean {
@@ -224,12 +224,12 @@ function handlersOf(groups: unknown): unknown[] | null {
 }
 
 /**
- * Pure: is this hooks file ENTIRELY wmux's?
+ * Pure: is this hooks file ENTIRELY remotea's?
  *
  * JSON has no comment to carry a marker, and "contains the string remotea-hook" is
  * not ownership: `remotea.json` is the obvious name for a file a user writes by
- * hand to wire Grok into wmux, and the moment they add one hook of their own to
- * it a substring test has wmux overwrite that hook on the next launch and delete
+ * hand to wire Grok into remotea, and the moment they add one hook of their own to
+ * it a substring test has remotea overwrite that hook on the next launch and delete
  * it when the toggle goes off. So the test is structural — nothing but a `hooks`
  * object, and every handler in it a remotea-hook.js command. One foreign handler,
  * one extra top-level key, or a file that does not parse, and it is the user's.

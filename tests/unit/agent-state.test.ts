@@ -267,7 +267,7 @@ describe('session handle and queries', () => {
   });
 
   // SessionEnd calls releaseAgent, and that is what makes "exit Claude,
-  // restart wmux, get a plain shell" true. If a release left the handle
+  // restart remotea, get a plain shell" true. If a release left the handle
   // behind, the next restore would resume a conversation the user quit.
   it('forgets the handle when the agent is released', () => {
     reportAgentSession(surf, { sessionId: 'sess-abc' });

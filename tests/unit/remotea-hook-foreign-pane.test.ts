@@ -4,14 +4,14 @@ import net from 'net';
 import path from 'path';
 
 /**
- * #282: openwong2kim/wmux — a different app with the same name — exports
+ * #282: openwong2kim/wmux — a different app with remotea's old name — exports
  * `REMOTEA_SURFACE_ID` into its panes too, and this hook runs from the global
  * ~/.claude/settings.json in EVERY Claude session on the machine. So a Claude
- * session in one of its panes reported every tool call to this wmux, under a
- * surface id this wmux never issued.
+ * session in one of its panes reported every tool call to this remotea, under a
+ * surface id this remotea never issued.
  *
  * Run against the shipped resources/cli/remotea-hook.js over a real named pipe,
- * isolated with REMOTEA_INSTANCE so the test never talks to a live wmux.
+ * isolated with REMOTEA_INSTANCE so the test never talks to a live remotea.
  */
 
 const HOOK_SCRIPT = path.resolve(__dirname, '../../resources/cli/remotea-hook.js');
@@ -32,11 +32,11 @@ async function framesFor(
     });
     socket.on('error', () => {});
   });
-  // The hook's default pipe (shared/instance.ts getPipePath): remotea, not wmux, since the rename.
+  // The hook's default pipe (shared/instance.ts getPipePath): remotea, not the old name, since the rename.
   const pipe = `\\\\.\\pipe\\remotea-${instance}`;
   const env = typeof envFor === 'function' ? envFor(pipe) : envFor;
   await new Promise<void>((r) => server.listen(pipe, r));
-  // A clean slate: nothing from the developer's own wmux pane may leak in.
+  // A clean slate: nothing from the developer's own remotea pane may leak in.
   const base = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('REMOTEA')));
   try {
     await new Promise<void>((resolve, reject) => {
@@ -60,7 +60,7 @@ describe.skipIf(process.platform !== 'win32')('remotea-hook.js in another app\'s
     expect(await framesFor({ REMOTEA_SURFACE_ID: '7b1c9e0e-their-format' })).toEqual([]);
   });
 
-  it('a pane this wmux spawned (REMOTEA=1) is reported, surface and all', async () => {
+  it('a pane this remotea spawned (REMOTEA=1) is reported, surface and all', async () => {
     const frames = await framesFor({ REMOTEA: '1', REMOTEA_SURFACE_ID: 'surf-ours' });
     expect(frames).toHaveLength(1);
     expect(frames[0].method).toBe('hook.event');

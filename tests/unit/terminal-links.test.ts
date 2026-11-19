@@ -65,7 +65,7 @@ describe('terminal link handling', () => {
   });
 });
 
-// #280: OpenCode v2 opens a plainly-clicked link itself, so wmux opening it
+// #280: OpenCode v2 opens a plainly-clicked link itself, so remotea opening it
 // too meant two browsers for one click.
 describe('a pane whose app has captured the mouse (#280)', () => {
   beforeEach(() => {
@@ -74,14 +74,14 @@ describe('a pane whose app has captured the mouse (#280)', () => {
 
   const TRACKING: MouseTrackingMode[] = ['x10', 'vt200', 'drag', 'any'];
 
-  it.each(TRACKING)('a plain click is the app\'s (%s): wmux opens nothing', mode => {
+  it.each(TRACKING)('a plain click is the app\'s (%s): remotea opens nothing', mode => {
     activateTerminalLink(mouseEvent(), 'https://example.com', mode);
     expect(openInRemoteaBrowser).not.toHaveBeenCalled();
   });
 
-  it.each(TRACKING)('Ctrl+click reaches wmux and opens the DEFAULT destination (%s)', mode => {
+  it.each(TRACKING)('Ctrl+click reaches remotea and opens the DEFAULT destination (%s)', mode => {
     // Not an inversion: with tracking on, the modifier is the only way to
-    // reach wmux at all, so inverting would make the default destination —
+    // reach remotea at all, so inverting would make the default destination —
     // the panel, out of the box — unreachable from every such pane.
     activateTerminalLink(mouseEvent({ ctrlKey: true }), 'https://example.com', mode);
     expect(openInRemoteaBrowser).toHaveBeenCalledWith('https://example.com', { invert: false });
@@ -137,8 +137,8 @@ describe('createTerminalLinkActivation', () => {
 
 // #353: with mouse tracking on, xterm reports a Ctrl+click to the app as well
 // as firing the link handler, so an app that opens links on Ctrl+click opened
-// the URL a second time, in the system browser, beside the wmux panel.
-describe('a Ctrl+click wmux takes is not reported to the app (#353)', () => {
+// the URL a second time, in the system browser, beside the remotea panel.
+describe('a Ctrl+click remotea takes is not reported to the app (#353)', () => {
   beforeEach(() => {
     openInRemoteaBrowser.mockReset();
   });
@@ -164,7 +164,7 @@ describe('a Ctrl+click wmux takes is not reported to the app (#353)', () => {
     expect(claimsLinkMouseDown(ctrl, 'vt200', undefined)).toBe(false);
     // Only the primary button activates a link.
     expect(claimsLinkMouseDown(mouseEvent({ ctrlKey: true, button: 2 }), 'vt200', URL_A)).toBe(false);
-    // wmux would refuse to open it, so the app keeps the click.
+    // remotea would refuse to open it, so the app keeps the click.
     expect(claimsLinkMouseDown(ctrl, 'vt200', 'file:///C:/Windows/win.ini')).toBe(false);
   });
 

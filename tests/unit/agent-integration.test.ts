@@ -18,7 +18,7 @@ import {
 
 const HOOK = '/res/cli/remotea-hook.js';
 
-// Issue #132: wmux wrote into ~/.claude on every launch with no prompt and no
+// Issue #132: remotea wrote into ~/.claude on every launch with no prompt and no
 // record of a decision, so deleting any of it was futile — the next launch put
 // it straight back. These cover the two halves of the fix: an inverse for every
 // write, and a consent record that fails toward asking rather than assuming.
@@ -26,8 +26,8 @@ const HOOK = '/res/cli/remotea-hook.js';
 describe('removeRemoteaHooks (issue #132)', () => {
   it('takes back exactly what applyRemoteaHooks installed', () => {
     const restored = removeRemoteaHooks(applyRemoteaHooks({}, HOOK));
-    // Not merely "no wmux entries" — an empty `hooks: {}` left behind is still a
-    // footprint in a file wmux was asked to stay out of.
+    // Not merely "no remotea entries" — an empty `hooks: {}` left behind is still a
+    // footprint in a file remotea was asked to stay out of.
     expect(restored.hooks).toBeUndefined();
   });
 
@@ -45,7 +45,7 @@ describe('removeRemoteaHooks (issue #132)', () => {
     expect(restored.env).toEqual({ FOO: '1' });
   });
 
-  it('is a no-op on settings that never had wmux hooks', () => {
+  it('is a no-op on settings that never had remotea hooks', () => {
     const settings = { hooks: { Stop: [{ hooks: [{ type: 'command', command: 'mine.sh' }] }] } };
     expect(removeRemoteaHooks(settings)).toEqual(settings);
   });
@@ -71,14 +71,14 @@ describe('removeRemoteaHooks (issue #132)', () => {
 describe('stripRemoteaBlock (issue #132)', () => {
   const BLOCK = '<!-- remotea:start -->\ninstructions here\n<!-- remotea:end -->';
 
-  it('reports nothing to do when the document has no wmux block', () => {
+  it('reports nothing to do when the document has no remotea block', () => {
     // null, not '' — the caller skips the write entirely rather than rewriting
     // a file it did not change.
     expect(stripRemoteaBlock('# My notes\n')).toBeNull();
   });
 
-  it('empties a document that was nothing but the wmux block', () => {
-    // '' is the signal to delete the file: wmux created it, so leaving an empty
+  it('empties a document that was nothing but the remotea block', () => {
+    // '' is the signal to delete the file: remotea created it, so leaving an empty
     // CLAUDE.md behind is still a file the user never asked for.
     expect(stripRemoteaBlock(BLOCK)).toBe('');
   });
@@ -87,7 +87,7 @@ describe('stripRemoteaBlock (issue #132)', () => {
     const out = stripRemoteaBlock(`# Mine\n\n${BLOCK}\n\n## Also mine\n`);
     expect(out).toContain('# Mine');
     expect(out).toContain('## Also mine');
-    expect(out).not.toContain('wmux:start');
+    expect(out).not.toContain('remotea:start');
     expect(out).not.toContain('instructions here');
   });
 
@@ -115,7 +115,7 @@ describe('parseConsent (issue #132)', () => {
   });
 
   it('falls back to asking — never to granting — on a corrupt record', () => {
-    // The whole complaint in #132 is wmux writing without being asked. A
+    // The whole complaint in #132 is remotea writing without being asked. A
     // settings file that fails to parse must not become a silent yes.
     expect(parseConsent('garbage').decision).toBe('unset');
     expect(parseConsent({ decision: 'yes-please' }).decision).toBe('unset');
@@ -170,7 +170,7 @@ describe('safe agent integration defaults', () => {
   });
 
   it("leaves an entry it did not write alone", () => {
-    // A different port is the clearest "this is mine, not yours" signal: wmux
+    // A different port is the clearest "this is mine, not yours" signal: remotea
     // only ever aims at its own proxy.
     expect(isRemoteaAuthoredMcpEntry({
       command: 'npx',

@@ -14,7 +14,7 @@ import {
   type LiveProcess,
 } from '../../src/main/pty-ledger';
 
-// Issue #139: a crashed wmux never reaches will-quit, so killAll() never runs
+// Issue #139: a crashed remotea never reaches will-quit, so killAll() never runs
 // and every pane's shell — plus the agent and MCP servers beneath it — keeps
 // running. The ledger is what lets the next launch find them.
 //
@@ -109,7 +109,7 @@ describe('PtyLedger', () => {
   let file: string;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-ledger-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-ledger-'));
     file = path.join(dir, 'pty-ledger.json');
   });
 

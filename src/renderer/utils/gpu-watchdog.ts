@@ -11,7 +11,7 @@
  * came with no repro — a 4-adapter hybrid + DisplayLink machine, a huge
  * transparent window, and time.
  *
- * wmux cannot fix Chromium's compositor. It CAN notice that it has stopped
+ * remotea cannot fix Chromium's compositor. It CAN notice that it has stopped
  * producing frames and apply the remedy the reporter proved safe.
  *
  * ## How the probe knows

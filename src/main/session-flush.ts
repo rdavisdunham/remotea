@@ -2,7 +2,7 @@
 //
 // session.json used to be written only by the 30-second auto-save tick and by a
 // `session:request` broadcast in `before-quit`. Neither covers the way most
-// people quit wmux — the caption × on the LAST window: Electron runs `close`,
+// people quit remotea — the caption × on the LAST window: Electron runs `close`,
 // `closed`, then `window-all-closed` → `app.quit()` → `before-quit`, and by then
 // there is no window left to answer the broadcast. So anything changed since
 // the last tick (up to 30 s of it) never reached disk. The reporter set a

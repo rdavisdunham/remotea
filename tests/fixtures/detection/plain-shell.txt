@@ -1,4 +1,4 @@
-PS C:Usersmedevwmux> git status
+PS C:Usersmedevremotea> git status
 On branch master
 nothing to commit, working tree clean
-PS C:Usersmedevwmux> 
+PS C:Usersmedevremotea> 

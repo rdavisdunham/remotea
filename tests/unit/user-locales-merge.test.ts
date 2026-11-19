@@ -203,7 +203,7 @@ describe('user locales: loader → merge seam (issue #147)', () => {
   });
 
   it('turns a file on disk into a selectable language', () => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-seam-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-seam-'));
     fs.writeFileSync(
       path.join(dir, 'tt.json'),
       JSON.stringify({ label: 'Татарча', strings: { 'settings.title': 'Көйләүләр' } }),
@@ -219,7 +219,7 @@ describe('user locales: loader → merge seam (issue #147)', () => {
   });
 
   it('applies an override to a bundled language from disk', () => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-seam-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-seam-'));
     fs.writeFileSync(
       path.join(dir, 'ko.json'),
       JSON.stringify({ 'settings.title': '환경설정' }),

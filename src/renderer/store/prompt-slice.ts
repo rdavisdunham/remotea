@@ -14,11 +14,11 @@ import { StateCreator } from 'zustand';
  *   'agent' — Claude Code's UserPromptSubmit hook. Carries the prompt TEXT
  *             verbatim, which no amount of screen reading can recover once the
  *             agent's TUI has repainted over it. Authoritative.
- *   'shell' — OSC 133 semantic marks from wmux's shell integration. Carries a
+ *   'shell' — OSC 133 semantic marks from remotea's shell integration. Carries a
  *             boundary but no text; the text is read back out of the terminal
  *             buffer between the B and C marks, locally, in the renderer.
  *
- * There is deliberately no third, heuristic source. wmux stopped guessing agent
+ * There is deliberately no third, heuristic source. remotea stopped guessing agent
  * state from screen scraping in 0.39.0 (issue #128) and this feature does not
  * reintroduce it: with neither source present the log stays empty and every
  * view is inert, which is the honest outcome — a mis-detected prompt boundary

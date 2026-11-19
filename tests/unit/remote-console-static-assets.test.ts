@@ -5,7 +5,7 @@ import path from 'path';
 import { allowedAssets, contentTypeOf, loadAllowedAssets } from '../../src/main/remote-console/static-assets';
 import { REMOTE_ENTRY_KEY, REMOTE_MANIFEST_FILE } from '../../src/shared/remote-console-config';
 
-const ROOT = path.join(os.tmpdir(), 'wmux-rc-root');
+const ROOT = path.join(os.tmpdir(), 'remotea-rc-root');
 
 /** A trimmed-down real Vite manifest: two HTML entries sharing a chunk. */
 const MANIFEST = {
@@ -88,7 +88,7 @@ describe('allowedAssets (#254)', () => {
 describe('loadAllowedAssets', () => {
   let dir: string;
   beforeAll(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-rc-assets-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-rc-assets-'));
   });
   afterAll(() => {
     fs.rmSync(dir, { recursive: true, force: true });

@@ -20,7 +20,7 @@ import {
 // theme/font/shortcut customizations (issue #15) feel broken.
 //
 // Settings used to live in renderer localStorage, but localStorage is scoped to
-// the page origin. wmux ships as a portable zip extracted to a new folder per
+// the page origin. remotea ships as a portable zip extracted to a new folder per
 // version, so the production `file://` origin changes between versions and
 // Chromium buckets storage by that path — font/theme customizations appeared to
 // reset on every update (issue #19). We now persist through the main process to
@@ -280,7 +280,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, ShortcutBinding> = {
   toggleMarkdownSource:   { key: 'e', ctrl: true, shift: true },
   // ─── issue #175 ─────────────────────────────────────────────────────────────
   // Ctrl+Shift+R was unbound. Shift-modified like the #64 batch, so
-  // isSafeToIntercept forwards bare Ctrl+R (reverse-search in every shell wmux
+  // isSafeToIntercept forwards bare Ctrl+R (reverse-search in every shell remotea
   // spawns) to the terminal untouched — which matters more here than usual,
   // since the users who need this binding are the ones already fighting their
   // shell.
@@ -313,7 +313,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, ShortcutBinding> = {
   //
   // Shift-modified like every batch above, which is what keeps the bare Ctrl
   // combos the terminal actually wants: Ctrl+L (clear screen in every shell
-  // wmux spawns), Ctrl+K (kill-to-end-of-line in readline) and Ctrl+End
+  // remotea spawns), Ctrl+K (kill-to-end-of-line in readline) and Ctrl+End
   // (scroll-to-bottom in xterm) all still reach the pane untouched, so
   // isSafeToIntercept needs no SAFE_CTRL_KEYS edit.
   //
@@ -325,7 +325,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutAction, ShortcutBinding> = {
   togglePromptOutline:    { key: 'l', ctrl: true, shift: true },
   togglePinnedPrompt:     { key: 'k', ctrl: true, shift: true },
   followOutput:           { key: 'End', ctrl: true, shift: true },
-  // Not bare F5, as wmux ships it: a bare F5 would never reach the terminal,
+  // Not bare F5, as remotea ships it: a bare F5 would never reach the terminal,
   // where TUIs use it (Midnight Commander's copy, among others).
   refreshSurface:         { key: 'F5', ctrl: true, shift: true },
 };
@@ -355,7 +355,7 @@ export interface ShortcutDefaultsState {
 /**
  * 0 — every release through 2.13.x. No promotion has ever run.
  * 1 — #249: nextSurface/prevSurface Ctrl+Shift+] / [ → Ctrl+Tab / Ctrl+Shift+Tab.
- * 2 — refreshSurface bare F5 (as ported from wmux) → Ctrl+Shift+F5.
+ * 2 — refreshSurface bare F5 (as ported from upstream) → Ctrl+Shift+F5.
  */
 export const SHORTCUT_DEFAULT_REV = 2;
 
@@ -393,7 +393,7 @@ interface ShortcutPromotion {
   apply: (shortcuts: Record<ShortcutAction, ShortcutBinding>) => void;
 }
 
-/** refreshSurface's bare F5 from the wmux port, which the rev-2 promotion replaces. */
+/** refreshSurface's bare F5 from the upstream port, which the rev-2 promotion replaces. */
 export const BARE_F5_REFRESH: Readonly<Partial<Record<ShortcutAction, ShortcutBinding>>> = {
   refreshSurface: { key: 'F5' },
 };
@@ -502,9 +502,9 @@ export interface WorkspacePrefs {
   /**
    * Directory new terminals start in when nothing else has said where (issue
    * #205). A FALLBACK, never an override: a split inherits its parent's
-   * directory, "Open in wmux" and `--cwd` name one outright, and a restored
+   * directory, "Open in remotea" and `--cwd` name one outright, and a restored
    * session carries the one it was frozen at — all of those still win. This
-   * only fills the hole that was previously filled by wherever wmux.exe itself
+   * only fills the hole that was previously filled by wherever remotea.exe itself
    * was launched from, which for a taskbar/Start-menu launch is
    * C:\Windows\system32.
    *
@@ -544,7 +544,7 @@ export interface WorkspacePrefs {
    * above. Decided in MAIN (`close-guard.ts`), which reads this off
    * settings.json at close time — the renderer may be the unresponsive part.
    * Programmatic quits (update install, relaunch, Windows shutdown) and
-   * `wmux close-window` never prompt.
+   * `remotea close-window` never prompt.
    */
   confirmAppClose: boolean;
   /**
@@ -579,7 +579,7 @@ export interface WorkspacePrefs {
    * `claude --resume <id>` on workspace restore (issue #186).
    *
    * Opt-in, and the default must stay `false`: README has always promised that
-   * wmux does not restore live process state, and flipping this on for everyone
+   * remotea does not restore live process state, and flipping this on for everyone
    * would have every restored pane start an agent at once on the next launch —
    * a startup that spends real tokens without being asked. A pane only resumes
    * if it was running Claude when the session was saved AND the transcript is
@@ -722,7 +722,7 @@ export interface TerminalPrefs {
   oscTitleTabs: boolean;
   /**
    * Name a workspace after the window title its terminal's program sets, while
-   * the workspace still has a name wmux picked (`titleIsDefault`). A name the
+   * the workspace still has a name remotea picked (`titleIsDefault`). A name the
    * user or a caller chose is never replaced. Its own switch rather than
    * `oscTitleTabs`, so the tabs can follow the title while the sidebar keeps
    * the names it had. New field, so no promotion needed (see oscTitleTabs).
@@ -811,7 +811,7 @@ export interface BrowserPrefs {
    * the system browser, and the panel's entry points (its split and toggle
    * shortcuts, the new-tab menu entry, the palette entries, the Quick launch
    * type, dev-server auto-open and open-on-startup) stay out of the way. Browser
-   * tabs already in a saved layout still load. Agents' `wmux browser` verbs are
+   * tabs already in a saved layout still load. Agents' `remotea browser` verbs are
    * not gated by this.
    *
    * A new field, so every stored prefs block picks up the default.
@@ -823,7 +823,7 @@ export interface BrowserPrefs {
   openOnStartup: boolean;
   /**
    * Send clicked terminal/markdown links to the system default browser instead
-   * of the wmux panel (issue #201). Ctrl/Cmd+click inverts whichever way this
+   * of the remotea panel (issue #201). Ctrl/Cmd+click inverts whichever way this
    * is set, so the other destination is always one modifier away.
    *
    * Only consulted while `inAppBrowser` is on; with the panel off every link
@@ -835,7 +835,7 @@ export interface BrowserPrefs {
    * been anywhere yet (issue #212). Distinct from `searchEngine`, which decides
    * where a TYPED non-URL goes; this is the start page.
    *
-   * Empty means "wmux's own" — the repo page BrowserPane already falls back to.
+   * Empty means "remotea's own" — the repo page BrowserPane already falls back to.
    * That fallback existed all along and a restored workspace never reached it:
    * the panel is handed `workspace.browserUrl`, the save path writes `|| ''`
    * for a workspace whose browser was never opened, and `''` is not `undefined`
@@ -952,7 +952,7 @@ export interface PromptPrefs {
    * One preference rather than two commands because they are two answers to the
    * same request, and a user wants one of them habitually — an overlay for a
    * glance, a panel to keep open. Both remain reachable regardless: the tab
-   * bar's + menu and `wmux new-surface --type prompts` always make a pane.
+   * bar's + menu and `remotea new-surface --type prompts` always make a pane.
    *
    * `outlineSide` only means anything to the overlay; a pane is placed by the
    * split tree, which the user already controls.
@@ -982,7 +982,7 @@ export const PROMPT_DEFAULT_REV = 0;
 export const DEFAULT_PROMPT_PREFS: PromptPrefs = {
   enabled: true,
   highlight: true,
-  // A wmux blue, but deliberately NOT the accent (#0091ff / --ui-accent), for
+  // A remotea blue, but deliberately NOT the accent (#0091ff / --ui-accent), for
   // two reasons that happen to agree.
   //
   // Design: the accent already means "focused" in this app — the pane ring, the
@@ -1237,7 +1237,7 @@ export interface AppearancePrefs {
    */
   uiModeDefaultRev: number;
   /**
-   * The agent office. Off by default in remotea (HUB_DEFAULT_REV 2). wmux
+   * The agent office. Off by default in remotea (HUB_DEFAULT_REV 2). Upstream
    * shipped it in 2.2.0 as a quiet easter egg (no titlebar button, inert
    * shortcut until the toggle was found) and turned it on for everyone in
    * 2.3.0. Off restores exactly that quiet state, so the toggle is still the whole feature flag: titlebar
@@ -1288,7 +1288,7 @@ export const UI_MODE_DEFAULT_REV = 1;
 export const HUB_DEFAULT_REV = 2;
 
 export const DEFAULT_APPEARANCE_PREFS: AppearancePrefs = {
-  // Defaults to 'dark' rather than 'system' — wmux shipped dark-only up to
+  // Defaults to 'dark' rather than 'system' — upstream shipped dark-only up to
   // 0.14.0, so existing users' chrome must not change color on first launch
   // after upgrading. New users can switch to 'system'/'light' in Settings.
   uiTheme: 'dark',

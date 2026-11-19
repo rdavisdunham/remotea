@@ -13,8 +13,8 @@
  * default and the only thing that existed before) or by vercel-labs
  * agent-browser driving a real Chrome (`agent`). The engine is a property of
  * the SURFACE, resolved here — never of the command. That is the whole design
- * goal: the global CLAUDE.md wmux writes to every machine keeps saying
- * `wmux browser open <url>`, so no agent anywhere has to be re-educated, and
+ * goal: the global CLAUDE.md remotea writes to every machine keeps saying
+ * `remotea browser open <url>`, so no agent anywhere has to be re-educated, and
  * only what happens underneath changes. Consequently the two engines must be
  * indistinguishable to a caller in everything it can observe — verb names,
  * result shapes, and the error for a verb neither supports.
@@ -285,7 +285,7 @@ const field = (data: unknown, key: string): any =>
  * How many refs a snapshot tree exposes, counted from the tree itself.
  *
  * The `--json` payload carries a `refs` map and this is unnecessary — but the
- * argv wmux sends for `snapshot` does not pass `--json`, so what actually
+ * argv remotea sends for `snapshot` does not pass `--json`, so what actually
  * arrives is the bare tree text, in which every ref appears as `[ref=e1]` /
  * `[level=1, ref=e2]`. Counting DISTINCT ids rather than matches, because a
  * ref can legitimately be mentioned more than once.
@@ -382,7 +382,7 @@ async function screenshotBase64(data: unknown, res: RunResult): Promise<string> 
  * the CLI reporting on the page — its `stderr` is the useful thing and belongs
  * verbatim in front of the agent. A spawn failure means the process never ran:
  * `stderr` is empty, so echoing it would surface a blank error for what is
- * really a wmux/install fault, and the actionable advice ("re-resolve the
+ * really a remotea/install fault, and the actionable advice ("re-resolve the
  * binary") is something no page-level message could convey. The thrown error
  * carries `spawnFailed` as a property too, so a caller can react rather than
  * having to pattern-match English.
@@ -415,9 +415,9 @@ function agentFailure(method: string, res: RunResult): Error {
  *
  * Pure, and returns the message rather than printing it, because the diagnostic
  * has TWO destinations and they are not interchangeable. `console.warn` reaches
- * main's log, which is what a maintainer reads after the fact (`wmux
+ * main's log, which is what a maintainer reads after the fact (`remotea
  * crash-report` tails it); the V2 reply reaches the caller, which is the only
- * place the person who actually typed the timeout is looking. `wmux browser
+ * place the person who actually typed the timeout is looking. `remotea browser
  * wait e1 5000` is a separate process that prints the JSON reply and nothing
  * else, so a console-only warning is invisible in every packaged build — it
  * only ever showed up under `npm run dev`.

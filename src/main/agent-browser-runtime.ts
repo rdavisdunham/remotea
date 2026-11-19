@@ -132,7 +132,7 @@ export async function waitForDashboard(
  * of those clear up in seconds, so retrying faster only burns a child process
  * per command; and none of them take longer than a minute to FIX once noticed,
  * so a user who installs agent-browser or frees the port sees it recover
- * without restarting wmux. It bounds the cost of a persistent outage to one
+ * without restarting remotea. It bounds the cost of a persistent outage to one
  * attempt per minute instead of one per command.
  */
 export const DASHBOARD_RETRY_COOLDOWN_MS = 60_000;
@@ -141,7 +141,7 @@ export const DASHBOARD_RETRY_COOLDOWN_MS = 60_000;
  * The observability dashboard, refcounted by live agent-mode surfaces.
  *
  * `start`/`stop` resolve the binary at call time rather than closing over one:
- * the user may install agent-browser while wmux is running (that is the whole
+ * the user may install agent-browser while remotea is running (that is the whole
  * point of the in-app setup flow), and `agentBrowserPath()` is memoised, so
  * asking it again is cheap and can only ever get *more* correct.
  */
@@ -167,7 +167,7 @@ export const dashboardDaemon = new DashboardDaemon({
 //
 // SINGLE OWNER, on purpose. Two call paths take a dashboard reference for a
 // surface — the renderer enabling agent mode on a pane (`ipc-handlers.ts`) and
-// a `wmux browser` verb arriving for that pane (`v2-browser.ts`) — and they
+// a `remotea browser` verb arriving for that pane (`v2-browser.ts`) — and they
 // happen in either order, or both, for the SAME surface. When each kept its own
 // Set, a surface enabled from the UI and then driven by the CLI took two
 // references and gave back one, so the refcount never reached zero and the
@@ -304,7 +304,7 @@ export function probeBindablePort(port: number, host = '127.0.0.1'): Promise<boo
 //
 // Sessions are EPHEMERAL (see agent-browser-session.ts): a session's process
 // lifetime equals its surface's lifetime, nothing is persisted, and therefore
-// any `wmux-` session with no live surface is garbage by construction. That
+// any `remotea-` session with no live surface is garbage by construction. That
 // invariant is only worth anything if every exit path actually closes what it
 // opened, which is what this section is. The paths are:
 //
@@ -316,7 +316,7 @@ export function probeBindablePort(port: number, host = '127.0.0.1'): Promise<boo
 //     none of the above            NEXT startup
 //
 // Issue #139 is the reason the last one exists at all: Windows reparents a
-// dead process's descendants instead of killing them, so a crashed wmux leaves
+// dead process's descendants instead of killing them, so a crashed remotea leaves
 // every Chrome it started resident, and a crash-loop multiplies them.
 
 /**
@@ -342,7 +342,7 @@ export const SESSION_LIST_TIMEOUT_MS = 5_000;
  * `dashboardDaemon.shutdown()` deliberately waits out an in-flight
  * `dashboard start`, which can be a 30s Chrome download, and the closes above
  * each carry their own deadline — so without an aggregate bound the worst case
- * is a wmux the user cannot quit. Past this point the process exits regardless
+ * is a remotea the user cannot quit. Past this point the process exits regardless
  * and whatever survived becomes the next startup's reconciliation problem,
  * which is exactly what that pass is for.
  */
@@ -403,10 +403,10 @@ export function sessionListArgv(): string[] {
  * deliberate refusal rather than an omission:
  *
  *   • agent-browser exposes no per-session PID. `session list` returns bare
- *     names (verified against 0.35.0: `{"sessions":["wmux-surf-…"]}`), and
+ *     names (verified against 0.35.0: `{"sessions":["remotea-surf-…"]}`), and
  *     there is no pid file under its state directory. The only process-level
  *     handle available is "everything named agent-browser", which would kill
- *     sessions the user created by hand — the exact boundary the `wmux-`
+ *     sessions the user created by hand — the exact boundary the `remotea-`
  *     prefix rule exists to protect.
  *   • The daemon is SHARED. The live hang was triggered by a daemon version
  *     mismatch restart, i.e. by the process that fronts several sessions at
@@ -503,7 +503,7 @@ export async function teardownAgentBrowser(
  *
  * Everything returned here is UNTRUSTED input — a machine-global namespace any
  * tool can write into — so this deliberately does no filtering of its own.
- * Deciding what is wmux's to close is `isRemoteaSessionName`'s single job.
+ * Deciding what is remotea's to close is `isRemoteaSessionName`'s single job.
  */
 export function parseSessionList(res: Pick<RunResult, 'data' | 'stdout'>): string[] {
   const payload = unwrapAgentData(res as RunResult) as { sessions?: unknown } | null;
@@ -521,17 +521,17 @@ export function parseSessionList(res: Pick<RunResult, 'data' | 'stdout'>): strin
 }
 
 /**
- * Close everything a previous wmux left behind. Runs at startup.
+ * Close everything a previous remotea left behind. Runs at startup.
  *
  * Ground truth is `agent-browser session list`, never the registry: the
  * registry is in-memory and starts EMPTY after a crash, so the sessions that
- * actually survived are precisely the ones it cannot see. Every `wmux-` session
- * found is garbage by the ephemeral invariant — a wmux session with no live
+ * actually survived are precisely the ones it cannot see. Every `remotea-` session
+ * found is garbage by the ephemeral invariant — a remotea session with no live
  * surface cannot legitimately exist — and everything else is untouchable.
  *
  * The `hasSession` check is not redundant with "the registry starts empty":
  * this runs unawaited alongside session restore, so a pane restored in agent
- * mode can mint `wmux-surf-X` while the list is still in flight. Re-asking the
+ * mode can mint `remotea-surf-X` while the list is still in flight. Re-asking the
  * registry immediately before each close is what keeps reconciliation from
  * closing a session this run just created.
  */
@@ -552,8 +552,8 @@ export async function reconcileOrphanSessions(
 
   const closed: string[] = [];
   for (const name of parseSessionList(listed)) {
-    // THE security boundary. A session without the wmux prefix belongs to a
-    // human or another tool and is never wmux's to close, whatever else is
+    // THE security boundary. A session without the remotea prefix belongs to a
+    // human or another tool and is never remotea's to close, whatever else is
     // true about it.
     if (!isRemoteaSessionName(name)) continue;
     const surfaceId = surfaceIdFromSessionName(name);

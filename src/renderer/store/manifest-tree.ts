@@ -58,7 +58,7 @@ export function buildManifestTree(spec: ManifestWorkspaceSpec): { tree: SplitNod
   return { tree, surfaces };
 }
 
-/** A live pane as `wmux workspace save` sees it. */
+/** A live pane as `remotea workspace save` sees it. */
 export interface DescribedPane {
   title?: string;
   cwd?: string;

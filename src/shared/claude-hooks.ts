@@ -13,7 +13,7 @@ const HOOK_MARKER = 'remotea-hook.js';
 // background, and its PostToolUse is where that is reported (issue #276).
 const TRACKED_TOOLS = ['Bash', 'PowerShell', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'Agent', 'WebSearch', 'WebFetch', 'Skill'];
 
-/** Drop any wmux entry from one hook array, preserving the user's own hooks. */
+/** Drop any remotea entry from one hook array, preserving the user's own hooks. */
 const stripRemotea = (entries: any): any[] =>
   (Array.isArray(entries) ? entries : []).filter((e: any) => {
     if (!Array.isArray(e.hooks)) return true;
@@ -21,11 +21,11 @@ const stripRemotea = (entries: any): any[] =>
   });
 
 /**
- * The hook arrays wmux installs into, and therefore the ones it may remove from.
+ * The hook arrays remotea installs into, and therefore the ones it may remove from.
  *
  * The first four are the original set (issue #128). The four added for issue
  * #151 are the *opening* half of the lifecycle: without them the only thing
- * wmux ever heard was work ending, so a turn spent thinking, or one spent inside
+ * remotea ever heard was work ending, so a turn spent thinking, or one spent inside
  * a single long command, read as `idle` from start to finish.
  *
  * Anything added here must also be added to removeRemoteaHooks' reach — which is
@@ -39,12 +39,12 @@ export const REMOTEA_HOOK_EVENTS = [
 ] as const;
 
 /**
- * Inverse of {@link applyRemoteaHooks}: returns a settings object with every wmux
+ * Inverse of {@link applyRemoteaHooks}: returns a settings object with every remotea
  * hook entry removed and every user hook left alone (issue #132).
  *
  * A hook array that ends up empty is deleted rather than left as `[]`, and a
  * `hooks` object with nothing left in it goes too — so declining the
- * integration restores the file to something indistinguishable from one wmux
+ * integration restores the file to something indistinguishable from one remotea
  * had never touched, instead of leaving its footprints behind as empty shells.
  */
 export function removeRemoteaHooks(settings: any): any {
@@ -63,10 +63,10 @@ export function removeRemoteaHooks(settings: any): any {
 }
 
 /**
- * Pure builder for the wmux hook blocks. Given the parsed settings object and
+ * Pure builder for the remotea hook blocks. Given the parsed settings object and
  * the absolute path to remotea-hook.js, returns a new settings object whose
- * `hooks` contains fresh wmux PostToolUse/Notification/Stop/SubagentStop
- * entries, with any prior wmux entries replaced and all non-wmux (user) hooks
+ * `hooks` contains fresh remotea PostToolUse/Notification/Stop/SubagentStop
+ * entries, with any prior remotea entries replaced and all non-remotea (user) hooks
  * preserved. Extracted so the merge logic is unit-testable without touching
  * the fs (issue #53).
  */
@@ -103,7 +103,7 @@ export function applyRemoteaHooks(settings: any, hookScript: string, opts: Remot
   // pass an --event flag so the helper reports an event type instead.
   //
   // Bare `node …` — not `2>/dev/null || true`. The helper already exits 0
-  // when the pipe is absent, so the shell wrapper never kept a downed wmux
+  // when the pipe is absent, so the shell wrapper never kept a downed remotea
   // from blocking the agent. It DID break every consumer that is not bash:
   // Grok (and anything else that honours ~/.claude/settings.json) runs these
   // commands in PowerShell on Windows, where `>/dev/null` is Out-File of
@@ -113,7 +113,7 @@ export function applyRemoteaHooks(settings: any, hookScript: string, opts: Remot
   const makeToolCmd = (tool: string) => `node "${hookScript}" ${tool}`;
   const makeEventCmd = (event: string) => remoteaEventHookCommand(hookScript, event);
 
-  // The per-tool-call hooks run in the BACKGROUND. Every wmux hook is a pure
+  // The per-tool-call hooks run in the BACKGROUND. Every remotea hook is a pure
   // observer: it reports to the pipe and never blocks a tool or injects
   // context, so there is nothing for Claude Code to wait on — and it did wait,
   // a measured 125-145 ms per hook process (Git Bash wrapper + node boot + the

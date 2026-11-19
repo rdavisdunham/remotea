@@ -9,7 +9,7 @@ import type { AgentRosterEntry } from '../../store/agent-rollup';
 /**
  * "Who needs me?", answered above the workspace list.
  *
- * wmux already knew this per workspace — `claudeSessionsForWorkspace` counts
+ * remotea already knew this per workspace — `claudeSessionsForWorkspace` counts
  * blocked and working panes, and the row renders "Needs you · N" from it — but
  * the count died inside that row's render. With ten workspaces the user still
  * had to read ten rows to find the one that had stopped, which is the exact

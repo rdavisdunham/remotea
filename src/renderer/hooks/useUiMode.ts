@@ -22,7 +22,7 @@ export function useUiMode(): void {
   }, [uiMode]);
 
   // One app-wide listener, not one per row: pause every TRACE animation while
-  // the window is hidden so a minimised wmux costs nothing.
+  // the window is hidden so a minimised remotea costs nothing.
   //
   // Honest caveat — in Electron `visibilitychange` fires on minimise/hide but
   // NOT reliably when another window merely covers ours, so this is a real win

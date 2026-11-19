@@ -104,7 +104,7 @@ export const SOURCE_VIRTUALIZE_THRESHOLD = 5000;
 
 /**
  * Compare-normalized form of a path: forward slashes, no trailing separator,
- * lowercased. Windows paths are case-insensitive and wmux accepts either
+ * lowercased. Windows paths are case-insensitive and remotea accepts either
  * separator, so `C:\Users\me` and `c:/users/me/` must compare equal.
  *
  * Length-preserving apart from the trailing-separator strip, which is what lets

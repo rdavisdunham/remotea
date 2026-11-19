@@ -3,7 +3,7 @@
 // explorer-state.ts and explorer-keynav.ts are, and testable with none of the
 // three.
 //
-// The numbers themselves come from main/diff-provider.ts, which wmux already
+// The numbers themselves come from main/diff-provider.ts, which remotea already
 // had. Nothing here computes a diff; it only decides where the numbers belong
 // in a tree and which of them the user is looking at.
 
@@ -121,11 +121,11 @@ export function totalStat(files: readonly ExplorerDiffEntry[]): DiffStat {
 // baseline. Two different questions: a file you edited by hand and a file
 // Claude rewrote both show numbers, and only the second gets a dot.
 //
-// The source is the Claude Code hook stream wmux already receives — PostToolUse
+// The source is the Claude Code hook stream remotea already receives — PostToolUse
 // carries `tool_input.file_path`, which remotea-hook.js already extracts. Nothing
 // new is installed, sent or parsed, and with no hooks (or no agent) there are
 // simply no dots while every number still works. Same rule the prompt log
-// follows: wmux does not guess at agent state, it reports what was declared or
+// follows: remotea does not guess at agent state, it reports what was declared or
 // nothing at all.
 
 /**

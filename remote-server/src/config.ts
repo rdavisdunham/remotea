@@ -21,7 +21,7 @@ export interface ServerConfig {
   tombstoneDays: number;
   /**
    * Loopback port for the hook bridge: agents' hooks (remotea-hook.js and the
-   * wmux plugins) report status here, and the server relays it to the apps.
+   * remotea plugins) report status here, and the server relays it to the apps.
    * 0 turns the bridge off.
    */
   hookPort: number;

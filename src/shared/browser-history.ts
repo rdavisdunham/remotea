@@ -39,7 +39,7 @@ const MAX_URL_LENGTH = 2048;
 const MAX_TITLE_LENGTH = 200;
 
 /** The src a pane mounts on to ask main for a history restore. */
-export const HISTORY_RESTORE_PREFIX = 'about:blank#wmux-history=';
+export const HISTORY_RESTORE_PREFIX = 'about:blank#remotea-history=';
 
 /**
  * Only pages a user navigated to on the web. `file:`, `data:`, `javascript:`,
@@ -58,7 +58,7 @@ function isRestorableUrl(url: unknown): url is string {
 }
 
 /**
- * A history wmux is willing to restore, or null. Unrestorable entries are
+ * A history remotea is willing to restore, or null. Unrestorable entries are
  * dropped and the active index follows its entry; if the active entry itself
  * goes, the nearest older one becomes active. A stack longer than the cap keeps
  * the active entry and as much of Back as fits, then Forward — Back is the

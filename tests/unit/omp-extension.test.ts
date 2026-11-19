@@ -9,7 +9,7 @@ vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }));
 import { getAgentState, reportAgent, reportAgentSession, releaseAgent, resetAgentState } from '../../src/main/agent-state';
 import { reportSubagent, getActivity, clearActivity, endDeclaredSubagents } from '../../src/main/claude-observer';
 
-// Replace only process creation; keep wmux's real state resolver as the consumer.
+// Replace only process creation; keep remotea's real state resolver as the consumer.
 let failNextExec = false;
 vi.mock('node:child_process', () => ({
   execFile: (_file: string, args: string[], _opts: unknown, done: Function) => {

@@ -2,8 +2,8 @@ import { PRODUCT } from '../shared/product';
 /**
  * Release notes, in the app (issue #211).
  *
- * "I have to google wmux, select the right gh repo and find the notes there."
- * wmux already fetches a release from GitHub — `update-checker.ts` polls
+ * "I have to google remotea, select the right gh repo and find the notes there."
+ * remotea already fetches a release from GitHub — `update-checker.ts` polls
  * `/releases/latest` to raise the update badge — so the app knows what the
  * newest version is and has never been able to say what changed in it.
  *
@@ -12,12 +12,12 @@ import { PRODUCT } from '../shared/product';
  * The fetch is a plain `net.request` to the public releases API. It needs no
  * token, so it is also rate-limited by IP (60/hour unauthenticated), and it is
  * the kind of thing a user opens on a plane. So every successful fetch is
- * written to wmux's own data directory and every failure falls back to it:
+ * written to remotea's own data directory and every failure falls back to it:
  * opening the panel a second time is free, and opening it with no network
  * shows what was there last time rather than an error.
  *
  * The cache is inside `%APPDATA%\remotea`, so it needs no part of the #132 consent
- * gate — that gate is about writes OUTSIDE wmux's own directory.
+ * gate — that gate is about writes OUTSIDE remotea's own directory.
  *
  * ## What is deliberately not here
  *
@@ -41,7 +41,7 @@ const REPO_OWNER = PRODUCT.repositoryOwner;
 const REPO_NAME = PRODUCT.repositoryName;
 
 /**
- * How many releases to show. wmux ships often; a changelog is for "what changed
+ * How many releases to show. remotea ships often; a changelog is for "what changed
  * recently", and someone who wants the full history has the repo.
  */
 export const CHANGELOG_LIMIT = 20;
@@ -93,7 +93,7 @@ export function toChangelogEntries(releases: unknown, limit = CHANGELOG_LIMIT): 
       version: r.tag_name.replace(/^v/, ''),
       tag: r.tag_name,
       // `name` is optional and is empty on a release published from a tag with
-      // no title, which is most of wmux's. The tag is always something.
+      // no title, which is most of remotea's. The tag is always something.
       name: (r as { name?: string }).name?.trim() || r.tag_name,
       publishedAt: r.published_at ?? null,
       url: r.html_url,

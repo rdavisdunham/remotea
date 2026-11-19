@@ -28,7 +28,7 @@ describe('grok context', () => {
   const KEYS = ['USERPROFILE', 'HOME', 'GROK_HOME', 'GROK_CLAUDE_AGENTS_ENABLED'];
 
   beforeEach(() => {
-    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-grok-'));
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-grok-'));
     saved = Object.fromEntries(KEYS.map(k => [k, process.env[k]]));
     process.env.USERPROFILE = tmp;
     process.env.HOME = tmp;
@@ -58,7 +58,7 @@ describe('grok context', () => {
   });
 
   it('hook entries match the Claude ones exactly, plus the Grok-only turn endings', () => {
-    const script = 'C:/wmux/resources/cli/remotea-hook.js';
+    const script = 'C:/remotea/resources/cli/remotea-hook.js';
     const { hooks } = buildGrokHooks(script);
     // Grok dedupes on (event, command, matcher): any drift here runs every hook twice.
     for (const [event, entries] of Object.entries(applyRemoteaHooks({}, script).hooks)) {
@@ -86,8 +86,8 @@ describe('grok context', () => {
   it('the shared command builder spells exactly what Claude Code has always been given', () => {
     // Extracted from applyRemoteaHooks so Grok's file carries the same bytes. A
     // change here rewrites every ~/.claude/settings.json on the next launch.
-    expect(remoteaEventHookCommand('C:/wmux/resources/cli/remotea-hook.js', 'Stop'))
-      .toBe('node "C:/wmux/resources/cli/remotea-hook.js" --event Stop');
+    expect(remoteaEventHookCommand('C:/remotea/resources/cli/remotea-hook.js', 'Stop'))
+      .toBe('node "C:/remotea/resources/cli/remotea-hook.js" --event Stop');
     const { hooks } = applyRemoteaHooks({}, 'C:/w/remotea-hook.js');
     const flags = (event: string) => hooks[event].flatMap((g: any) => g.hooks.map((h: any) => h.async));
     for (const event of ['PreToolUse', 'PostToolUse', 'UserPromptSubmit']) {
@@ -99,7 +99,7 @@ describe('grok context', () => {
   });
 
   it('owns a hooks file only when every handler in it is a remotea-hook command', () => {
-    const ours = JSON.stringify(buildGrokHooks('C:/Program Files/wmux/resources/cli/remotea-hook.js'));
+    const ours = JSON.stringify(buildGrokHooks('C:/Program Files/remotea/resources/cli/remotea-hook.js'));
     expect(isRemoteaHooksFile(ours)).toBe(true);
     // Written by an install that has since moved: still ours, so it is refreshed.
     expect(isRemoteaHooksFile(JSON.stringify(buildGrokHooks('D:/old/remotea-hook.js')))).toBe(true);
@@ -116,14 +116,14 @@ describe('grok context', () => {
   });
 
   it('never overwrites or deletes a hand-written remotea.json that also calls remotea-hook.js', () => {
-    // The obvious name for a file someone writes to wire Grok into wmux by
-    // hand. A substring test for "remotea-hook" called it wmux's and destroyed the
+    // The obvious name for a file someone writes to wire Grok into remotea by
+    // hand. A substring test for "remotea-hook" called it remotea's and destroyed the
     // user's own hook beside it, on the next launch and again on toggle-off.
     fs.mkdirSync(path.dirname(getGrokHooksPath()), { recursive: true });
     const theirs = JSON.stringify({
       hooks: {
         Stop: [{ hooks: [
-          { type: 'command', command: 'node "C:/wmux/resources/cli/remotea-hook.js" --event Stop' },
+          { type: 'command', command: 'node "C:/remotea/resources/cli/remotea-hook.js" --event Stop' },
           { type: 'command', command: 'bin/ring-the-bell.sh' },
         ] }],
       },
@@ -150,7 +150,7 @@ describe('grok context', () => {
     expect(fs.readFileSync(grokHome(), 'utf-8')).toBe('not a directory');
   });
 
-  it('ignores a relative GROK_HOME rather than resolving it against wmux\'s cwd', () => {
+  it('ignores a relative GROK_HOME rather than resolving it against remotea\'s cwd', () => {
     process.env.GROK_HOME = 'grok-here';
     expect(getGrokHome()).toBe(grokHome());
     fs.mkdirSync(grokHome());
@@ -159,7 +159,7 @@ describe('grok context', () => {
     expect(fs.existsSync(path.resolve('grok-here'))).toBe(false);
   });
 
-  it('removal also sweeps the default home, where wmux wrote before GROK_HOME was set', () => {
+  it('removal also sweeps the default home, where remotea wrote before GROK_HOME was set', () => {
     fs.mkdirSync(grokHome());
     ensureGrokHooks();
     ensureGrokContext();

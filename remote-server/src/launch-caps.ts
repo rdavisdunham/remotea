@@ -195,7 +195,7 @@ function supported(harness: SpawnHarness, version: string | null, hooks: Adapter
 }
 
 /**
- * OpenCode (1.17.20 checked): the wmux plugin reports its status (observe),
+ * OpenCode (1.17.20 checked): the remotea plugin reports its status (observe),
  * nothing else is wired. No final-response capture (the plugin sends no Stop
  * text), no context, no questions (its question/permission events reach the
  * plugin, but no session of it is ever bound to a run), no resume, no spawn.

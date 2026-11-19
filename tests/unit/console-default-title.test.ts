@@ -4,7 +4,7 @@ import { join } from 'path';
 import { isConsoleDefaultTitle } from '../../src/renderer/store/osc-title-slice';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Issue #286 — in an elevated wmux every pwsh tab was captioned
+// Issue #286 — in an elevated remotea every pwsh tab was captioned
 // "Administrator: C:\Program Files\WindowsApps\Microsoft.PowerShell_…\pwsh.exe".
 // That is the console's DEFAULT title (exe path, localised admin prefix), which
 // ConPTY forwards as OSC 0 and #221 then ranked above the cwd label.

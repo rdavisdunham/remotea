@@ -4,7 +4,7 @@
  *
  * Pure: no I/O, no process spawning, no platform calls. Every caller in
  * `ssh-detect.ts` funnels an argv through here, so the detection sources (a
- * `wmux ssh` surface, a shell-integration preexec report, a process-tree probe)
+ * `remotea ssh` surface, a shell-integration preexec report, a process-tree probe)
  * cannot disagree about what a given command line means.
  *
  * Ported from cmux's `TerminalSSHSessionDetector.parseSSHCommandLine` and
@@ -60,7 +60,7 @@ const VALUE_ARG_FLAGS = new Set('BbcDEeFIiJLlmOopQRSWw');
  * `n` (stdin from /dev/null), `T` (no pty), `G` (dump config) and `V` (version)
  * are cmux's set. `N` (no remote command) is added here: it is the flag on a
  * pure port forward — the `ssh -N -L 9787:127.0.0.1:9787` shape that
- * `wmux bridge` documents — which has no remote shell to paste into at all.
+ * `remotea bridge` documents — which has no remote shell to paste into at all.
  */
 const NON_INTERACTIVE_FLAGS = new Set('nTGVN');
 

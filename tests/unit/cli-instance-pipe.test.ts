@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { cliPipePath, sendKeyParams } from '../../src/cli/remotea';
 
-// A CLI run outside a wmux pane against a side-by-side instance
+// A CLI run outside a remotea pane against a side-by-side instance
 // (`REMOTEA_INSTANCE=dev`) read that instance's token but dialled the INSTALLED
-// wmux's pipe, so every privileged verb failed authentication there. The hook
+// remotea's pipe, so every privileged verb failed authentication there. The hook
 // (remotea-hook.ts) already followed the instance; the CLI now does too.
 describe('cliPipePath', () => {
   it('follows REMOTEA_INSTANCE the way shared/instance.ts names the pipe', () => {
     expect(cliPipePath({ REMOTEA_INSTANCE: 'dev' })).toBe('\\\\.\\pipe\\remotea-dev');
   });
 
-  it('lets an explicit REMOTEA_PIPE win, as a pane spawned by wmux sets it', () => {
+  it('lets an explicit REMOTEA_PIPE win, as a pane spawned by remotea sets it', () => {
     expect(cliPipePath({ REMOTEA_PIPE: '\\\\.\\pipe\\custom', REMOTEA_INSTANCE: 'dev' })).toBe('\\\\.\\pipe\\custom');
   });
 

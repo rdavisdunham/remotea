@@ -5,7 +5,7 @@ import type { SurfaceId } from '../shared/types';
 
 // ─── Restore Claude Code sessions on workspace restore (issue #186) ──────────
 //
-// wmux restored workspaces, tabs, per-tab shell and per-tab cwd, and then
+// remotea restored workspaces, tabs, per-tab shell and per-tab cwd, and then
 // respawned every terminal as a bare shell — so the one piece of state that
 // matters for a tool whose premise is "a pane per agent" was the piece that did
 // not come back. The user re-ran `claude --resume` in each pane and picked the
@@ -27,7 +27,7 @@ import type { SurfaceId } from '../shared/types';
 // into the store purely so the store could write it back out would add a
 // synchronised copy of main-process state for no reader.
 //
-// SECURITY: the id arrives over the named pipe — from a hook wmux registered,
+// SECURITY: the id arrives over the named pipe — from a hook remotea registered,
 // but the pipe is a public interface — and ends up on a command line. Anything
 // that is not a bare session handle is refused at the door, so a crafted
 // `report-session` cannot smuggle `; rm -rf` into a pane's startup.
@@ -47,7 +47,7 @@ export function isValidClaudeSessionId(id: unknown): id is string {
 /** The command a restored pane runs to pick its conversation back up. */
 export function buildResumeCommand(sessionId: string): string {
   // Not quoted on purpose: the regex above already guarantees a bare token, and
-  // quoting styles differ across the four shells wmux spawns (pwsh, cmd, bash,
+  // quoting styles differ across the four shells remotea spawns (pwsh, cmd, bash,
   // WSL). A value that would NEED quoting never gets this far.
   return `claude --resume ${sessionId}`;
 }
@@ -112,7 +112,7 @@ type SessionIdLookup = (surfaceId: SurfaceId) => string | null | undefined;
  * A surface whose agent was released (Claude exited cleanly — `SessionEnd`
  * calls `releaseAgent`) looks up to `null` and has any previously stamped id
  * REMOVED rather than left behind. That is what makes "exit Claude, restart
- * wmux, get a plain shell" work, and it is why the delete branch is not an
+ * remotea, get a plain shell" work, and it is why the delete branch is not an
  * optimisation that can be skipped.
  *
  * `undefined` is the other answer and means "no opinion": a restored pane
@@ -148,7 +148,7 @@ export function stampClaudeSessionIds<T>(tree: T, lookup: SessionIdLookup): T {
  * Returns null when the projects directory cannot be read at all (Claude not
  * installed, no permission). Null means "cannot tell", which the caller must
  * treat as "keep everything" — pruning on an unreadable directory would throw
- * away every id the first time wmux ran without Claude present.
+ * away every id the first time remotea ran without Claude present.
  */
 export function listKnownTranscriptIds(home = os.homedir()): Set<string> | null {
   const root = path.join(home, '.claude', 'projects');

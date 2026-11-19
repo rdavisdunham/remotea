@@ -384,7 +384,7 @@ export default function SurfaceTabBar({
         setInsertIndex(null);
         setDraggingSurfaceId(null);
         document.body.classList.remove('remotea-dragging');
-        const data = e.dataTransfer.getData('application/wmux-surface');
+        const data = e.dataTransfer.getData('application/remotea-surface');
         if (!data) {
           onSurfaceDragEnd?.();
           return;
@@ -478,7 +478,7 @@ export default function SurfaceTabBar({
               draggable={!isRenaming}
               onDragStart={(e) => {
                 e.dataTransfer.setData(
-                  'application/wmux-surface',
+                  'application/remotea-surface',
                   JSON.stringify({ sourcePaneId: paneId, surfaceId: surface.id })
                 );
                 e.dataTransfer.effectAllowed = 'move';

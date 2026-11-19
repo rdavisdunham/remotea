@@ -25,7 +25,7 @@ describe('writeMarkdownFile (issue #116, F3)', () => {
   let file: string;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-md-'));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remotea-md-'));
     file = path.join(dir, 'notes.md');
     fs.writeFileSync(file, 'original\n', 'utf-8');
   });
@@ -220,7 +220,7 @@ describe('markdownContentPatch', () => {
     });
   });
 
-  // `wmux markdown set --content` against a file-backed surface leaves the
+  // `remotea markdown set --content` against a file-backed surface leaves the
   // buffer differing from disk. That is a user edit in every way that matters:
   // keep the path, mark it dirty, do NOT auto-write.
   it('a content-only push into a file-backed surface goes dirty', () => {

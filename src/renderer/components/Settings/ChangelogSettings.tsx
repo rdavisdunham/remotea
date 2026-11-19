@@ -14,12 +14,12 @@ import { openInRemoteaBrowser } from '../../utils/open-in-browser';
  *
  * **The notes go through `renderMarkdown`, the same one MarkdownPane uses.**
  * That function is the security boundary — it is where DOMPurify runs — and
- * this content comes off the network, so it is the one place in wmux where
+ * this content comes off the network, so it is the one place in remotea where
  * that matters most. Rendering it any other way, including "it's just our own
  * release notes", would be reintroducing the hole that function exists to
  * close.
  *
- * **Links open in wmux's own browser panel**, not by injecting an anchor that
+ * **Links open in remotea's own browser panel**, not by injecting an anchor that
  * navigates the settings window. A renderer that navigates away from the app
  * shell does not come back.
  */

@@ -133,12 +133,12 @@ function applyUserConfigTerminal(state: ReturnType<typeof useStore.getState>, te
 // (via the renderer → main NOTIFICATION_FIRE chokepoint).
 
 // Effective runtime values — seeded from the built-in defaults, then widened/
-// toggled by ~/.remotea/config.toml at startup and on `wmux reload-config`.
+// toggled by ~/.remotea/config.toml at startup and on `remotea reload-config`.
 let activeDevPorts: number[] = DEFAULT_DEV_PORTS;
 
 /**
  * Apply `~/.remotea/config.toml`'s `[browser]` section: dev-port detection + auto-open.
- * Resets to the built-in defaults first so `wmux reload-config` is idempotent —
+ * Resets to the built-in defaults first so `remotea reload-config` is idempotent —
  * deleting a key (or the whole section) from the file reverts its effect instead
  * of leaving the previous run's values sticky until restart.
  */
@@ -162,7 +162,7 @@ function applyUserConfigBrowser(state: any, browser: any): void {
  * Apply `[workspace]` (issue #212): how many panes a new workspace opens with
  * and how they sit. Same file-wins-at-startup contract as the sections above —
  * written into the pref every entry point already reads, so the sidebar `+`,
- * Ctrl+N, first launch and `wmux new-workspace` cannot diverge again.
+ * Ctrl+N, first launch and `remotea new-workspace` cannot diverge again.
  */
 function applyUserConfigWorkspace(state: any, workspace: any): void {
   if (!workspace) return;
@@ -331,7 +331,7 @@ function handlePortsUpdate(cmd: any, updateWorkspaceMetadata: StoreAction): void
   } catch { /* a malformed ports report: keep the last known ports */ }
 }
 
-/** `wmux notify <text>` — works even outside a pane (falls back to active workspace). */
+/** `remotea notify <text>` — works even outside a pane (falls back to active workspace). */
 function handleNotifyCommand(cmd: any, addNotification: NotificationSlice['addNotification'], t: T): void {
   const text = (cmd.args || []).join(' ').trim() || t('app.notificationDefault', 'Notification');
   const ws = workspaceForSurface(cmd.surfaceId);
@@ -448,7 +448,7 @@ function handleSurfaceMetadata(cmd: any, ws: WorkspaceInfo, deps: MetaDeps): voi
 /**
  * Claude Code UserPromptSubmit → the pane's prompt log (issue #207); since
  * #304 the same event arrives from OpenCode v2's prompt-admission hook via
- * `wmux hook --prompt`, which spells the pane `caller` rather than `surfaceId`
+ * `remotea hook --prompt`, which spells the pane `caller` rather than `surfaceId`
  * — `hookEventSurface` resolves both.
  *
  * Needs the surface's live terminal, because a prompt boundary is only useful
@@ -753,7 +753,7 @@ export default function App() {
     return inAppBrowser && openOnStartup;
   });
   // Subscribed rather than read once: the start page (#212) can change under a
-  // `wmux reload-config`, and a panel already mounted for a workspace that has
+  // `remotea reload-config`, and a panel already mounted for a workspace that has
   // been nowhere should pick it up.
   const browserPrefs = useStore((s) => s.browserPrefs);
   const [browserWidth, setBrowserWidth] = useState(420);
@@ -912,7 +912,7 @@ export default function App() {
     };
   }, []);
 
-  // Load ~/.remotea/config.toml on startup and listen for `wmux reload-config`.
+  // Load ~/.remotea/config.toml on startup and listen for `remotea reload-config`.
   // File-wins-at-startup, app-wins-at-runtime: file values are applied over
   // persisted Zustand state, then in-app edits take over until reload/restart.
   useEffect(() => {
@@ -939,7 +939,7 @@ export default function App() {
       if (typeof wrapTitles === 'boolean') state.setSidebarPrefs({ wrapTitles });
 
       // Community translations from ~/.remotea/locales (issue #147) ride the same
-      // reload so `wmux reload-config` refreshes everything under ~/.remotea, not
+      // reload so `remotea reload-config` refreshes everything under ~/.remotea, not
       // just config.toml. Absent on the startup read — the registry already
       // loaded them synchronously before the store existed.
       if (result?.locales) state.reloadUserLocales(result.locales);
@@ -975,7 +975,7 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // Settings or ~/.wmux still under the old names and the move not run yet:
+  // Settings or the config folder still under the old names and the move not run yet:
   // the app runs on the new names regardless, so say why things look reset.
   // Shown each launch until the move writes its marker (old-state-notice.ts).
   useEffect(() => {
@@ -1073,7 +1073,7 @@ export default function App() {
       if (cmd.command === 'notify') { handleNotifyCommand(cmd, addNotification, t); return; }
       if (cmd.command === 'remote_notice') { handleRemoteNotice(cmd, addNotification, t); return; }
       // set_workspace_status is keyed on workspaceId (not surfaceId) — a
-      // coordinator setting a named workspace's status via `wmux set-status
+      // coordinator setting a named workspace's status via `remotea set-status
       // --workspace`. Handle before the surfaceId guard below.
       if (cmd.command === 'set_workspace_status') {
         const [state, text] = cmd.args || [];
@@ -1100,7 +1100,7 @@ export default function App() {
   // very much open, and dropping its prompts there would empty the outline
   // whenever the user closed an ADJACENT pane.
   //
-  // Without this the log outlived the pane for the life of the window: `wmux
+  // Without this the log outlived the pane for the life of the window: `remotea
   // prompts` reported closed panes as live ones, and the user's prompt text
   // stayed queryable by any other pane's agent long after they closed the tab it
   // belonged to.
@@ -2101,7 +2101,7 @@ export default function App() {
                     // and what gives `defaultUrl` somewhere to apply.
                     //
                     // `rememberedStartPage` drops a remembered URL that is
-                    // wmux's OWN GitHub repo (#232). Nobody chose that value —
+                    // remotea's OWN GitHub repo (#232). Nobody chose that value —
                     // it is the old hardcoded default, written back here by
                     // `onUrlChange` firing for the initial load, which is how
                     // the panel ended up reopening github.com/amirlehmam/wmux

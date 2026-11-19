@@ -14,7 +14,7 @@
  *
  * Since #281 the webview DOES carry `allowpopups`, for one case only: a sized
  * popup, which popup sign-in needs as a real window that keeps its opener.
- * Main decides (webviewWindowOpenPolicy) and contains it — a child of the wmux
+ * Main decides (webviewWindowOpenPolicy) and contains it — a child of the remotea
  * window, hardened, closed with its opener. Everything else still opens in
  * place, here and, for the requests this bridge never sees, in main.
  *

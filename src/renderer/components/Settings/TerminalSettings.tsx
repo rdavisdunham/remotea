@@ -297,7 +297,7 @@ export default function TerminalSettings() {
         </div>
       </div>
       <p className="settings-hint">
-        {t('settings.terminalPanel.schemeHintPart1', 'Applied to new panes. Override per pane via ')}<code>wmux split --color-scheme NAME</code>{t('settings.terminalPanel.schemeHintPart2', ' or ')}<code>wmux set-color-scheme NAME</code>{t('settings.terminalPanel.schemeHintPart3', '.')}
+        {t('settings.terminalPanel.schemeHintPart1', 'Applied to new panes. Override per pane via ')}<code>remotea split --color-scheme NAME</code>{t('settings.terminalPanel.schemeHintPart2', ' or ')}<code>remotea set-color-scheme NAME</code>{t('settings.terminalPanel.schemeHintPart3', '.')}
       </p>
 
       <div className="settings-divider" />

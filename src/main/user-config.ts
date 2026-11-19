@@ -11,7 +11,7 @@
  *   cursor-blink    = true
  *   scrollback-lines = 10000
  *   osc-title-tabs  = true        # label a tab with the program's window title (#221)
- *   osc-title-workspaces = true   # same for a workspace wmux named by default
+ *   osc-title-workspaces = true   # same for a workspace remotea named by default
  *
  *   [terminal.colors]
  *   default = "Dracula"
@@ -60,7 +60,7 @@
  *
  * File-wins-at-startup, app-wins-at-runtime: this data seeds the store
  * on boot; users can still tweak via the Settings UI afterwards.
- * A `wmux reload-config` command re-applies the file over runtime state.
+ * A `remotea reload-config` command re-applies the file over runtime state.
  */
 import * as fs from 'fs';
 import * as os from 'os';
@@ -193,7 +193,7 @@ export function resetConfigWarnings(): void {
 
 // A read or parse failure discards the WHOLE file: every [terminal], [keys],
 // [browser] and [appearance] section silently reverts to its default. The errors
-// were always returned to the caller and printed by `wmux config show`, but
+// were always returned to the caller and printed by `remotea config show`, but
 // nothing ever told you to go and look — so a typo presented as "my setting has
 // no effect", with no way to tell a mis-set value from an unread file.
 function warnConfig(filePath: string, problem: string): void {
@@ -255,7 +255,7 @@ export function loadUserConfig(filePath: string = getConfigPath()): UserConfig {
   }
 
   // Per-key mapping errors are survivable: the rest of the file still applies.
-  // Still worth one line, or a skipped key looks like a wmux bug.
+  // Still worth one line, or a skipped key looks like a remotea bug.
   const mapped = mapToConfig(parsed, errors);
   for (const err of errors) warnConfig(filePath, err);
 
@@ -581,7 +581,7 @@ function mapDefaultUrl(raw: TomlValue | undefined, errors: string[]): string | u
     return undefined;
   }
   // Explicitly empty is a valid answer — "no start page of my own". Carried
-  // rather than dropped so `wmux reload-config` can UNSET it; dropping it would
+  // rather than dropped so `remotea reload-config` can UNSET it; dropping it would
   // leave the previous value in place until restart.
   if (url === '') return '';
   // A bare `localhost:3000` or `example.com` is the likeliest thing to type

@@ -27,7 +27,7 @@ export interface AgentActivity {
   done: boolean;
   /**
    * Set only on a DECLARED subagent (issue #272): one an agent named itself,
-   * through a Claude Code hook's `agent_id` or `wmux report-subagent`. A
+   * through a Claude Code hook's `agent_id` or `remotea report-subagent`. A
    * declared subagent's lifecycle is its own — only its own stop, or the
    * session ending, finishes it. The parent's `Stop` does not: a BACKGROUND
    * subagent outlives the turn that launched it, which is exactly the #272

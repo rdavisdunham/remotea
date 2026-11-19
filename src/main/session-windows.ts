@@ -131,7 +131,7 @@ export type RestoreAnswer =
  * That is right at launch, and wrong for a window opened during the run — which
  * came up as a clone of that named session, re-using its workspace, pane and
  * surface ids (issue #143). Duplicated surface ids are not cosmetic here: PTY id
- * IS surface id in wmux, so the clone's terminals attach to the original
+ * IS surface id in remotea, so the clone's terminals attach to the original
  * window's PTYs, and every id-based CLI lookup has two equally valid answers.
  *
  * So a mid-run window gets an explicit `{ fresh: true }` instead — the same

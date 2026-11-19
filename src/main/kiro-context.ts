@@ -2,14 +2,14 @@ import { reportIntegrationFailure } from './integration-failures';
 /**
  * Kiro CLI integration (issue #148).
  *
- * Kiro is the third agent wmux teaches about itself, after Claude Code and
+ * Kiro is the third agent remotea teaches about itself, after Claude Code and
  * OpenCode, and it is the one that needs the least machinery — because Kiro's
  * global *steering* directory is designed for exactly this.
  *
  * ── Why a whole file, and not a block in a shared one ────────────────────────
  *
  * Claude Code and OpenCode each read a single global context file
- * (~/.claude/CLAUDE.md, ~/.config/opencode/AGENTS.md). wmux does not own those
+ * (~/.claude/CLAUDE.md, ~/.config/opencode/AGENTS.md). remotea does not own those
  * files, so it splices its section between markers and leaves everything else
  * alone — that is what `injectRemoteaBlock` / `stripRemoteaBlock` exist for.
  *
@@ -32,7 +32,7 @@ import { reportIntegrationFailure } from './integration-failures';
  * writing into every repository the user opens. That is precisely the complaint
  * in #132, and it is not worth a status indicator. Kiro reports state the same
  * way any agent can without a plugin: the instructions block documents
- * `wmux report-agent`, and the declared-state protocol (#128) takes it from
+ * `remotea report-agent`, and the declared-state protocol (#128) takes it from
  * there.
  *
  * Inclusion modes are also skipped: Kiro CLI ignores them and loads every
@@ -47,7 +47,7 @@ import { isLegacyRemoteaBlockFile } from '../shared/legacy-cleanup';
 import { LEGACY_PLUGIN_FILES } from '../shared/legacy-names';
 import { desktopOwnershipContext } from './ownership-context';
 
-/** Identifies a file as wmux-managed. Shared with the other two agent paths. */
+/** Identifies a file as remotea-managed. Shared with the other two agent paths. */
 const START_MARKER = '<!-- remotea:start';
 
 /**
@@ -63,7 +63,7 @@ export function isRemoteaManaged(content: string): boolean {
   return content.includes(START_MARKER);
 }
 
-/** Writes the wmux steering file into ~/.kiro/steering/. */
+/** Writes the remotea steering file into ~/.kiro/steering/. */
 export function ensureKiroContext(): void {
   try {
     // Rendered, not read: carries this install's absolute CLI path (#158).
@@ -100,8 +100,8 @@ export function ensureKiroContext(): void {
 }
 
 /**
- * Delete the wmux steering file (issue #132's inverse requirement: every write
- * wmux makes outside its own directory must be undoable).
+ * Delete the remotea steering file (issue #132's inverse requirement: every write
+ * remotea makes outside its own directory must be undoable).
  *
  * Guarded on the marker, so a remotea.md the user happens to have written under
  * that name survives switching the integration off.

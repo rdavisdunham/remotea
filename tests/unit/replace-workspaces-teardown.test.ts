@@ -9,7 +9,7 @@ import type { PaneId, SplitNode, SurfaceId, SurfaceRef } from '../../src/shared/
 // #361: Load session replaced every workspace without reaping the ones it
 // dropped, so each terminal whose surface id was not in the loaded session kept
 // its shell (and whatever it had started — a dev server, an agent) running in
-// main with no xterm attached until wmux quit. Every other close path has gone
+// main with no xterm attached until remotea quit. Every other close path has gone
 // through pty-teardown since #65; this one did not.
 //
 // A surface the incoming session ALSO holds is not dropped: since #346 the

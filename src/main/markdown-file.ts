@@ -183,7 +183,7 @@ export function writeMarkdownFile(
   // is what makes it atomic.
   const tmpPath = path.join(
     path.dirname(filePath),
-    `.${path.basename(filePath)}.wmux-tmp-${crypto.randomBytes(6).toString('hex')}`,
+    `.${path.basename(filePath)}.remotea-tmp-${crypto.randomBytes(6).toString('hex')}`,
   );
   try {
     fs.writeFileSync(tmpPath, content, 'utf-8');

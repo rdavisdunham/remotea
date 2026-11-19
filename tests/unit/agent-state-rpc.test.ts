@@ -93,7 +93,7 @@ describe('pane.answer_agent routing (issue #128)', () => {
   });
 
   it('surfaces a writer failure instead of claiming the answer landed', async () => {
-    // An agent can declare a key wmux cannot translate; saying "ok" would leave
+    // An agent can declare a key remotea cannot translate; saying "ok" would leave
     // the user believing they answered a prompt that never saw a keystroke.
     setAnswerWriter(() => { throw new Error('the agent declared an unknown key name: "wat"'); });
     await block();

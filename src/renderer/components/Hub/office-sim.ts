@@ -9,7 +9,7 @@
  * The handoff walk is a HEURISTIC and allowed to be wrong (spec §5): a
  * character that just stopped working visits a same-workspace character that
  * just started, chats briefly, then heads to the break room. It is cosmetic —
- * wmux has no real handoff signal.
+ * remotea has no real handoff signal.
  */
 import { OfficeLayout, Point, isBlocked, nearestWalkable, pathCrossesBlocked, planPath } from './office-layout';
 

@@ -27,7 +27,7 @@ import type { PaneId, SplitNode } from '../../src/shared/types';
  *      written into `workspace.browserUrl` as if a human had chosen it. Two
  *      workspaces on the test machine carried it; nobody had typed it.
  *   3. GitHub puts "Issues" one click from the repo page, and that click
- *      rewrote the stored value — after which wmux opened its own issue tracker
+ *      rewrote the stored value — after which remotea opened its own issue tracker
  *      on every launch and every workspace switch.
  *
  * "Random times" is steps 1 and 3 seen from outside: app restarts and workspace
@@ -61,7 +61,7 @@ describe('#232 the browser start page is never the vendor’s own page', () => {
   });
 });
 
-describe('#232 recognising the page wmux used to open by itself', () => {
+describe('#232 recognising the page remotea used to open by itself', () => {
   // Built by swapping the scheme rather than written out, so the file carries no
   // clear-text http:// literal. The case is real: an old session file can hold
   // the pre-TLS-redirect spelling, and it is the same page.
@@ -104,14 +104,14 @@ describe('#232 recognising the page wmux used to open by itself', () => {
 });
 
 describe('#232 what the panel remembers', () => {
-  it('forgets a remembered URL that is only wmux’s own default coming back', () => {
+  it('forgets a remembered URL that is only remotea’s own default coming back', () => {
     expect(rememberedPanelUrl('https://github.com/amirlehmam/wmux')).toBe('');
     expect(rememberedPanelUrl('https://github.com/amirlehmam/wmux/issues')).toBe('');
   });
 
   it('keeps a page the user actually went to', () => {
     expect(rememberedPanelUrl('http://localhost:3000')).toBe('http://localhost:3000');
-    expect(rememberedPanelUrl('https://wmux.org')).toBe('https://wmux.org');
+    expect(rememberedPanelUrl('https://remotea.org')).toBe('https://remotea.org');
   });
 
   it('returns empty string, not undefined, so `||` still reaches the Start page', () => {
@@ -128,7 +128,7 @@ describe('#232 what the panel remembers', () => {
     expect(shouldRememberPanelUrl('https://github.com/amirlehmam/wmux/issues')).toBe(false);
     expect(shouldRememberPanelUrl(BROWSER_BLANK_PAGE)).toBe(false);
     expect(shouldRememberPanelUrl('')).toBe(false);
-    expect(shouldRememberPanelUrl('https://wmux.org')).toBe(true);
+    expect(shouldRememberPanelUrl('https://remotea.org')).toBe(true);
   });
 
   /**
@@ -136,7 +136,7 @@ describe('#232 what the panel remembers', () => {
    *
    * A browser TAB's url is written directly by openInRemoteaBrowser when the user
    * clicks a link. Filtering there would blank a pane deliberately opened on
-   * wmux's own issue tracker — turning a fix for an unwanted page into a bug
+   * remotea's own issue tracker — turning a fix for an unwanted page into a bug
    * that swallows a wanted one.
    */
   it('leaves a surface the user made free to hold any page, vendor included', () => {
@@ -153,14 +153,14 @@ describe('#232 a split-opened browser pane mounts on its target', () => {
     // Replaces a 600 ms timer that dispatched a navigate event and hoped the
     // webview had mounted. When the guess was wrong the pane kept showing
     // BrowserPane's default page — which is how an unrequested tab ended up on
-    // wmux's GitHub repo.
+    // remotea's GitHub repo.
     const base = buildWorkspaceTree(1, 'single');
     const target = paneOf(base, findFirstPaneId(base))!;
     const newPaneId = 'pane-new' as PaneId;
     const split = splitNode(base, target.paneId, newPaneId, 'browser', 'horizontal');
 
-    const withUrl = withLeafSurfaceUrl(split, newPaneId, 'https://wmux.org');
-    expect(paneOf(withUrl, newPaneId)!.surfaces[0].url).toBe('https://wmux.org');
+    const withUrl = withLeafSurfaceUrl(split, newPaneId, 'https://remotea.org');
+    expect(paneOf(withUrl, newPaneId)!.surfaces[0].url).toBe('https://remotea.org');
     // The pane that was split is untouched.
     expect(paneOf(withUrl, target.paneId)!.surfaces[0].url).toBeUndefined();
   });
@@ -171,7 +171,7 @@ describe('#232 a split-opened browser pane mounts on its target', () => {
     const base = buildWorkspaceTree(1, 'single');
     const newPaneId = 'pane-new' as PaneId;
     const split = splitNode(base, findFirstPaneId(base), newPaneId, 'browser', 'horizontal');
-    const withUrl = withLeafSurfaceUrl(split, newPaneId, 'https://wmux.org');
+    const withUrl = withLeafSurfaceUrl(split, newPaneId, 'https://remotea.org');
 
     expect(withUrl).not.toBe(split);
     expect(paneOf(split, newPaneId)!.surfaces[0].url).toBeUndefined();
@@ -179,7 +179,7 @@ describe('#232 a split-opened browser pane mounts on its target', () => {
 
   it('returns the same tree when the pane is not there', () => {
     const base = buildWorkspaceTree(2, 'columns');
-    expect(withLeafSurfaceUrl(base, 'pane-absent' as PaneId, 'https://wmux.org')).toBe(base);
+    expect(withLeafSurfaceUrl(base, 'pane-absent' as PaneId, 'https://remotea.org')).toBe(base);
   });
 });
 

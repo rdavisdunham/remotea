@@ -13,7 +13,7 @@
  * local feedback only (the `bellStyle` pref), off-screen it is the #53
  * notification (gated by `bellNotify`). `visible` is the prop PaneWrapper
  * already computes — active tab AND active workspace — so a background tab and
- * an inactive workspace are both off-screen; `windowFocused` covers wmux being
+ * an inactive workspace are both off-screen; `windowFocused` covers remotea being
  * minimised or behind another app. A visible pane WITHOUT keyboard focus (the
  * other half of a split) counts as on-screen on purpose: the user can see it,
  * and the default visual flash is the cue an agent ringing there needs.

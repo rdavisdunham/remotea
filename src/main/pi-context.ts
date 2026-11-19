@@ -2,7 +2,7 @@ import { reportIntegrationFailure } from './integration-failures';
 /**
  * pi (@earendil-works/pi-coding-agent) integration — issue #231.
  *
- * The fifth agent wmux teaches about itself, after Claude Code, OpenCode, Kiro
+ * The fifth agent remotea teaches about itself, after Claude Code, OpenCode, Kiro
  * and omp. #165 was filed as "support for omp/pi" and closed once omp worked;
  * the reporter of #231 is right that this left pi out. They are separate
  * harnesses with separate config roots, and a pi pane sat on "Running" for the
@@ -20,7 +20,7 @@ import { reportIntegrationFailure } from './integration-failures';
  * rest are never read. So the obvious implementation — always write
  * `AGENTS.md`, as the omp integration does — is silently a no-op on a machine
  * that already has `AGENTS.override.md`, which is exactly the file a pi user
- * who cares about their context is most likely to have. wmux would create a
+ * who cares about their context is most likely to have. remotea would create a
  * second file, report success, and reach nobody.
  *
  * Hence `getPiContextFilePath()`: splice into the file pi will ACTUALLY read,
@@ -68,15 +68,15 @@ export const PI_CONTEXT_FILE_NAMES = [
   'CLAUDE.MD',
 ] as const;
 
-/** What wmux creates when the directory holds none of the above. */
+/** What remotea creates when the directory holds none of the above. */
 const PI_DEFAULT_CONTEXT_FILE = 'AGENTS.md';
 
 /**
  * `~/.pi/agent`, honouring the same env override pi itself honours.
  *
- * `PI_CODING_AGENT_DIR` is read here only when it is set in wmux's OWN
+ * `PI_CODING_AGENT_DIR` is read here only when it is set in remotea's OWN
  * environment — a user who exports it machine-wide, which is the case worth
- * covering. A value set per-shell, after wmux launched, is unknowable from here
+ * covering. A value set per-shell, after remotea launched, is unknowable from here
  * and falls back to the default; that is a miss (no block, no extension), never
  * a write to the wrong place.
  */
@@ -111,7 +111,7 @@ export function getPiContextFilePath(agentDir = getPiAgentDir()): string {
   return path.join(agentDir, PI_DEFAULT_CONTEXT_FILE);
 }
 
-/** Ensures pi's user-scope context file contains the wmux block. */
+/** Ensures pi's user-scope context file contains the remotea block. */
 export function ensurePiContext(): void {
   try {
     // Rendered, not read: carries this install's absolute CLI path (#158).
@@ -133,10 +133,10 @@ export function ensurePiContext(): void {
 }
 
 /**
- * Remove the wmux block (#132's inverse requirement).
+ * Remove the remotea block (#132's inverse requirement).
  *
  * Sweeps EVERY candidate name rather than only the one currently being written.
- * A user who adds an `AGENTS.override.md` after wmux has already written
+ * A user who adds an `AGENTS.override.md` after remotea has already written
  * `AGENTS.md` would otherwise be left with an orphaned block in a file nothing
  * reads and nothing can ever clean up — an uninstall that does not uninstall is
  * the shape of the original complaint.
@@ -148,7 +148,7 @@ export function removePiContext(): void {
     try {
       if (!fs.existsSync(contextPath)) continue;
       const existing = fs.readFileSync(contextPath, 'utf-8');
-      // null means there is no wmux block in there at all — a file the user
+      // null means there is no remotea block in there at all — a file the user
       // wrote themselves, which is not ours to touch.
       const next = stripRemoteaBlock(existing);
       if (next === null || next === existing) continue;
@@ -186,7 +186,7 @@ export function getPiExtensionSrcPath(): string {
   return path.join(__dirname, '../../resources/pi-extension/remotea.js');
 }
 
-/** Installs/updates the wmux pi extension into `<agentDir>/extensions/`. */
+/** Installs/updates the remotea pi extension into `<agentDir>/extensions/`. */
 export function ensurePiExtension(): void {
   try {
     const srcPath = getPiExtensionSrcPath();
@@ -208,11 +208,11 @@ export function ensurePiExtension(): void {
 }
 
 /**
- * Remove the wmux pi extension (#132).
+ * Remove the remotea pi extension (#132).
  *
  * Guarded on the version marker, exactly as the OpenCode plugin is: a
  * `remotea.js` the user wrote or vendored themselves has no marker and stays where
- * it is. Uninstalling wmux's integration must never delete somebody else's file
+ * it is. Uninstalling remotea's integration must never delete somebody else's file
  * that happens to share a name.
  */
 export function removePiExtension(): void {

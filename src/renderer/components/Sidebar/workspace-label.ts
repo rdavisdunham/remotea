@@ -12,7 +12,7 @@ import { stripStatusGlyph } from '../../store/osc-title-slice';
  * `[bash | claude]` workspace the shell's own `MINGW64:/c/repo` would otherwise
  * beat the conversation title Claude sets in the pane beside it.
  *
- * "Has an agent" is `hasAgentLookup`: an identity wmux holds for the surface,
+ * "Has an agent" is `hasAgentLookup`: an identity remotea holds for the surface,
  * or an agent session its hooks reported there — never the agent's declared or
  * detected STATE, which changes every turn. Both last from the agent's start
  * until it exits or ends its session, so the name does not flip back to the
@@ -46,7 +46,7 @@ function pickTerminalTitle(
 
 /**
  * What the sidebar calls a workspace. A name somebody chose always wins; a name
- * wmux picked gives way to the window title the workspace's program sets, the
+ * remotea picked gives way to the window title the workspace's program sets, the
  * same rank the tab label gives it (#221).
  *
  * @param oscTitleFor Returns undefined when the feature is off or the surface

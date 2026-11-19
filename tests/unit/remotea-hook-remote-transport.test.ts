@@ -5,7 +5,7 @@ import path from 'path';
 
 // Exercises the real compiled remotea-hook.js (resources/cli/remotea-hook.js) over
 // its TCP remote-mode transport (REMOTEA_REMOTE, issue #19/#78) against a raw
-// TCP server standing in for `wmux bridge`. Unlike the named-pipe path, this
+// TCP server standing in for `remotea bridge`. Unlike the named-pipe path, this
 // script has no exported functions to unit test directly (it's a
 // fire-and-forget CLI leaf), so we verify its actual process behavior
 // end-to-end instead.
@@ -68,7 +68,7 @@ describe('remotea-hook.js TCP remote-mode transport (issue #19)', () => {
     const req = await server.requests;
     expect(req.method).toBe('hook.event');
     expect(req.token).toBe('secret-token');
-    // Same frame the pipe path sends, including the `at` fire stamp wmux orders
+    // Same frame the pipe path sends, including the `at` fire stamp remotea orders
     // racing hook processes by (issue #151) — the transport is all that differs.
     expect(req.params).toEqual({ tool: 'Bash', surfaceId: 'pane-1', at: expect.any(Number) });
     expect(req.params.at).toBeGreaterThan(0);

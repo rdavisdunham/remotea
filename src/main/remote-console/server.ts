@@ -85,7 +85,7 @@ export const WS_MAX_PAYLOAD = 65536;
 export type ListenError = 'port-busy' | 'bind-failed';
 
 /**
- * What a phone sees when it opens an address wmux does not recognise, most
+ * What a phone sees when it opens an address remotea does not recognise, most
  * often a Tailscale URL not yet saved as the Public URL — in English. The
  * served page picks the phone's language (refused-page.ts). Static on
  * purpose: nothing from the request is echoed back.

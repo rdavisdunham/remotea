@@ -1,7 +1,7 @@
 /**
  * Declared agent state per surface (issue #128).
  *
- * wmux already infers "is this agent busy?" two ways, and both are guesses:
+ * remotea already infers "is this agent busy?" two ways, and both are guesses:
  *   - claude-observer.ts scrapes the Claude Code TUI with regexes
  *   - claude-session-view.ts calls a surface `working` while a hook/observer
  *     signal is younger than 5s, and `idle` once it goes quiet
@@ -12,8 +12,8 @@
  * ten panes open, the pane that needs you looks exactly like the nine that don't.
  *
  * This module holds *declared* state instead: the agent (or a hook acting for
- * it) states what it is doing, and wmux stores it verbatim. No screen scraping,
- * no timing heuristic. The transport is the existing V2 pipe — wmux already
+ * it) states what it is doing, and remotea stores it verbatim. No screen scraping,
+ * no timing heuristic. The transport is the existing V2 pipe — remotea already
  * injects REMOTEA=1 / REMOTEA_SURFACE_ID / REMOTEA_PIPE / REMOTEA_PIPE_TOKEN into every
  * spawned shell, which is herdr's three-env-var activation plus authentication.
  *
@@ -47,10 +47,10 @@ export type AgentRunState = 'blocked' | 'working' | 'idle' | 'unknown';
  * One answer a blocked agent will accept (issue #128, the back-channel).
  *
  * The agent declares BOTH the human-readable label and the exact bytes that
- * pick it. wmux deliberately does not know how to answer a Claude Code
+ * pick it. remotea deliberately does not know how to answer a Claude Code
  * permission prompt, an OpenCode menu, or anyone's custom TUI — it is a relay,
  * not an interpreter. That is the same reasoning that made `blocked` a declared
- * fact rather than a scraped one: the moment wmux guesses at another program's
+ * fact rather than a scraped one: the moment remotea guesses at another program's
  * interface, it acquires a dependency on that interface not changing, and the
  * failure lands silently on the user.
  *
@@ -92,7 +92,7 @@ export interface AgentStateRecord {
   blockedReason: string | null;
   /**
    * The answers the agent will accept, when it declared them (issue #128).
-   * Empty means "blocked, but wmux has no way to answer from outside" — still
+   * Empty means "blocked, but remotea has no way to answer from outside" — still
    * a useful signal, just not an actionable one.
    */
   choices: AgentChoice[];
@@ -117,7 +117,7 @@ export interface AgentStateRecord {
    * Wall-clock of the newest hook-sourced report accepted for this surface.
    *
    * Separate from `lastSeq` on purpose: `seq` is a public CLI concept a reporter
-   * chooses for itself (`wmux report-agent --seq N`), typically a small counter.
+   * chooses for itself (`remotea report-agent --seq N`), typically a small counter.
    * Feeding epoch-millisecond stamps into the same gate would permanently starve
    * any reporter using 1, 2, 3 on the same pane.
    */
@@ -145,9 +145,9 @@ export interface AgentStateRecord {
   /** What the current prompt's answers were declared as, to tell a re-declaration from a new question. */
   choicesSig: string;
   /**
-   * Who raised the current block (#399): `hook` when wmux inferred it from a
+   * Who raised the current block (#399): `hook` when remotea inferred it from a
    * Claude Code `Notification`, `declared` when the agent said so itself
-   * (`wmux report-agent --blocked`), null when not blocked.
+   * (`remotea report-agent --blocked`), null when not blocked.
    *
    * Only a `hook` block may be retracted by hook evidence that the agent moved
    * past its prompt (`clearHookBlock`). A declared block is the agent's own
@@ -254,7 +254,7 @@ function getOrCreate(surfaceId: SurfaceId): AgentStateRecord {
 
 /**
  * Monotonic sequence gate. Reporters stamp every message with an increasing
- * `seq`; wmux drops anything it has already seen. Without this a retried
+ * `seq`; remotea drops anything it has already seen. Without this a retried
  * message replays a stale state — the classic "agent finished but the pane
  * still says working" ghost, caused by a re-delivered older frame landing
  * after the newer one.
@@ -338,7 +338,7 @@ export interface ReportAgentParams {
   /** Absolute refcount, for reporters that track it themselves. */
   runDepth?: number;
   /**
-   * The answers wmux may offer for this block (issue #128). Omitted leaves any
+   * The answers remotea may offer for this block (issue #128). Omitted leaves any
    * previously declared set alone; an empty array clears it.
    */
   choices?: AgentChoice[];
@@ -356,7 +356,7 @@ export interface ReportAgentParams {
 }
 
 /**
- * Keep only the choices wmux can actually deliver.
+ * Keep only the choices remotea can actually deliver.
  *
  * A choice with no `key` and no `text` cannot be relayed, and rendering it as a
  * button would produce the worst outcome available: the user clicks "Allow",
@@ -381,7 +381,7 @@ export function sanitizeChoices(raw: unknown): AgentChoice[] {
   return out;
 }
 
-/** One raw entry → a deliverable choice, or null if wmux could not act on it. */
+/** One raw entry → a deliverable choice, or null if remotea could not act on it. */
 function toChoice(item: unknown): AgentChoice | null {
   if (!item || typeof item !== 'object') return null;
   const c = item as Record<string, unknown>;
@@ -404,7 +404,7 @@ function toChoice(item: unknown): AgentChoice | null {
   };
 }
 
-/** A prompt with more buttons than this is a menu, not a question wmux can usefully mirror. */
+/** A prompt with more buttons than this is a menu, not a question remotea can usefully mirror. */
 const MAX_CHOICES = 12;
 
 /**
@@ -514,7 +514,7 @@ export function reportAgent(surfaceId: SurfaceId, params: ReportAgentParams): Ag
 }
 
 /**
- * The blocked half of a hook-sourced report, adjusted for what wmux knows that
+ * The blocked half of a hook-sourced report, adjusted for what remotea knows that
  * the hook did not (#399).
  *
  * - `clearHookBlock` becomes a real unblock, but only for a block a hook raised.
@@ -688,7 +688,7 @@ export type AnswerResult =
  *    a button the UI has not repainted yet must not push characters into their
  *    shell. `not-blocked` is a refusal, not a no-op.
  *
- * 2. **Only the agent's own declared payloads are sent** for a choice. wmux
+ * 2. **Only the agent's own declared payloads are sent** for a choice. remotea
  *    never invents a keystroke for someone else's prompt. (Free-form text is a
  *    separate, explicit call — it is `surface.send_text`, which has always
  *    existed and grants nothing new.)
@@ -742,9 +742,9 @@ export function answerAgent(
  * reading.
  *
  * This is deliberately NOT a relaxation of answerAgent's rule 3. That rule says
- * *wmux* may not declare a prompt answered on its own say-so, because wmux
+ * *remotea* may not declare a prompt answered on its own say-so, because remotea
  * guessing at another program's UI fails silently. This is the opposite
- * situation: the fact is wmux's own — it owns the PTY, so it knows with
+ * situation: the fact is remotea's own — it owns the PTY, so it knows with
  * certainty that a human pressed Enter in that pane, which is what answering a
  * terminal prompt IS. Nothing is being inferred about Claude Code's interface.
  *
@@ -763,7 +763,7 @@ export function answerAgent(
  * after, so it is not a stale report but no report. The pane therefore keeps
  * asserting `working` for a turn the user cancelled, until the next prompt or
  * the 15-minute trust window. Handled here rather than by reading the TUI for an
- * "Interrupted" line, because a keystroke wmux owns cannot break the day Claude
+ * "Interrupted" line, because a keystroke remotea owns cannot break the day Claude
  * Code rewords its output — the failure this module exists to avoid.
  *
  * The Escape test is exact-match rather than isAnsweringInput's "contains a bare
@@ -832,7 +832,7 @@ export function releaseAgent(surfaceId: SurfaceId, params: { seq?: number } = {}
  * The pane's shell is back at its prompt: an agy that was running there has
  * exited, and with it the conversation the user chose to leave.
  *
- * agy has no session-end hook, so this is how wmux learns of the exit — the
+ * agy has no session-end hook, so this is how remotea learns of the exit — the
  * same signal that ends the pane's agent identity. Only an agy handle is
  * released: any other provider's is that agent's own business, and arrives
  * with its own release. `ranAgy` covers the agy that exited before it ever
@@ -842,7 +842,7 @@ export function releaseAgent(surfaceId: SurfaceId, params: { seq?: number } = {}
  * it runs (bash, WSL); the PowerShell integration reports ssh alone, so there
  * such an agy keeps its id — the safe direction, a conversation reopened.
  *
- * The caller refuses this while wmux quits, as for every other release.
+ * The caller refuses this while remotea quits, as for every other release.
  */
 export function releaseAgyAtPrompt(surfaceId: SurfaceId, ranAgy: boolean): boolean {
   const record = records.get(surfaceId);

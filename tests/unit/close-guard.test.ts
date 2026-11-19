@@ -73,12 +73,12 @@ describe('decideClose — close to tray', () => {
   });
 
   it('never hides a real quit — tray Quit, update, relaunch, Windows shutdown', () => {
-    // Tray "Quit wmux" is app.quit(), which before-quit turns into `bypass`.
+    // Tray "Quit remotea" is app.quit(), which before-quit turns into `bypass`.
     expect(decideClose({ ...tray, bypass: true })).toBe('allow');
     expect(decideClose({ ...tray, enabled: true, bypass: true })).toBe('allow');
   });
 
-  it('never hides a programmatic close (wmux close-window, another window)', () => {
+  it('never hides a programmatic close (remotea close-window, another window)', () => {
     expect(decideClose({ ...tray, confirmed: true })).toBe('allow');
   });
 

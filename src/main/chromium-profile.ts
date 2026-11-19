@@ -7,23 +7,23 @@
 // instance lock on the userData directory, so with both installed whichever
 // started first owned the lock and the other quit on launch — handing its
 // command line to the WRONG app as a `second-instance`. They also shared one
-// Chromium profile: one Local Storage (where wmux keeps most of its settings),
+// Chromium profile: one Local Storage (where remotea keeps most of its settings),
 // one cookie jar for both browser panels.
 //
-// wmux's own files (settings.json, sessions, pipe-token, logs…) stay exactly
-// where they are, in getAppDataDir() — the CLI, the hooks and `wmux
-// crash-report` all read them there, and so may an older wmux after a
+// remotea's own files (settings.json, sessions, pipe-token, logs…) stay exactly
+// where they are, in getAppDataDir() — the CLI, the hooks and `remotea
+// crash-report` all read them there, and so may an older remotea after a
 // downgrade. Only Electron's profile moves, to a subdirectory: a different
 // directory is a different lock, and a profile nobody else opens.
 //
-// The state worth keeping is COPIED, never moved: an older wmux (a downgrade)
+// The state worth keeping is COPIED, never moved: an older remotea (a downgrade)
 // and the other app may both still be reading the old location, and a copy
 // that fails half way leaves nothing broken behind it.
 
 import * as fs from 'fs';
 import * as path from 'path';
 
-/** Electron's userData for this instance: a subdirectory of wmux's own data dir. */
+/** Electron's userData for this instance: a subdirectory of remotea's own data dir. */
 export function chromiumDataDir(appDataDir: string): string {
   return path.join(appDataDir, 'chromium');
 }

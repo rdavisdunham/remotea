@@ -4,7 +4,7 @@
  * Reset terminal state must not leave the alternate screen under a program that
  * is still drawing there (#347), and must leave it when that program died and
  * left the pane stuck (#175). The shell-state report can tell the two apart only
- * where wmux's PowerShell integration runs. The output stream can tell them
+ * where remotea's PowerShell integration runs. The output stream can tell them
  * apart almost everywhere, and in-band, so the order of events is exact:
  *
  * - `program` — a DECSET 47/1047/1049 arrived. Something entered the alternate
@@ -13,7 +13,7 @@
  *   change for a re-entry, which is why this is a CSI hook and not
  *   `onBufferChange`.
  * - `shell` — an OSC 133;A arrived while the active buffer was the alternate
- *   one. A shell is prompting there, so whatever entered it is gone. wmux's
+ *   one. A shell is prompting there, so whatever entered it is gone. remotea's
  *   PowerShell, cmd and bash integrations emit these marks, and so do Starship,
  *   oh-my-posh and bash-preexec setups, including on a remote host. An OSC
  *   133;D (command finished) there ends a `command` the same way.

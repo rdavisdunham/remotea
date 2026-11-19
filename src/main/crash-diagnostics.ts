@@ -8,7 +8,7 @@
  * `Napi::Error` from `conpty.node`, always the same signature. The reporter has
  * done forensics on nine minidumps, and the question that finally mattered —
  * "was the crash guard actually installed in the process that died?" — could
- * not be answered by either of us, because wmux wrote **no log at all**. The
+ * not be answered by either of us, because remotea wrote **no log at all**. The
  * guard reports through `console.warn`, which in a packaged Electron build goes
  * to a console nobody is attached to.
  *
@@ -19,7 +19,7 @@
  * ## What it deliberately is not
  *
  * Not a logging framework, and not telemetry. Nothing leaves the machine. It
- * writes a handful of lines per run to wmux's OWN data directory — never
+ * writes a handful of lines per run to remotea's OWN data directory — never
  * outside it, so it needs no part of the #132 consent gate — and it is capped,
  * because a diagnostic that fills a disk is worse than no diagnostic.
  *

@@ -126,7 +126,7 @@ observeAgentState((r) => {
 });
 const notificationManager = new NotificationManager();
 const cdpBridge = new CDPBridge();
-// `wmux agent spawn` panes are always local (they need a synchronous spawn).
+// `remotea agent spawn` panes are always local (they need a synchronous spawn).
 const agentManager = new AgentManager(localPty);
 const insertionQueue = new SurfaceInsertionQueue();
 const surfaceOwners = new Map<SurfaceId, number>();
@@ -231,7 +231,7 @@ function ownSurface(surfaceId: SurfaceId, webContents: Electron.WebContents): vo
  * A session is a real Chrome. Sessions are ephemeral by design (see
  * agent-browser-session.ts), which is exactly what makes NOT closing one here a
  * leak rather than a cache: nothing will ever legitimately reattach to it, and
- * on Windows it does not die with wmux either (issue #139).
+ * on Windows it does not die with remotea either (issue #139).
  */
 export function closeAgentBrowserSession(surfaceId: SurfaceId): void {
   closeSessionFor(surfaceId, agentBrowserTeardownDeps).catch(() => {
@@ -309,7 +309,7 @@ export const sshDetector = new SshDetector(
  *
  * Fed from the same two report paths as sshDetector, and for the same reason:
  * Windows has no tty foreground process group, so the authoritative answer has
- * to come from what wmux launched or what the shell hook says was submitted.
+ * to come from what remotea launched or what the shell hook says was submitted.
  *
  * Re-exported rather than constructed here — see the note on the singleton in
  * agent-identity.ts for why it cannot live in this module.
@@ -319,7 +319,7 @@ export { agentIdentity };
 
 
 /**
- * Tree-kill the PTY subtrees a previously crashed wmux left running (issue
+ * Tree-kill the PTY subtrees a previously crashed remotea left running (issue
  * #139). Best-effort and unawaited by design — see reapOrphans().
  */
 export function reapOrphanedPtys(): void {
@@ -359,7 +359,7 @@ export function agentBrowserOpenArgv(sessionName: string, currentUrl?: string): 
 }
 
 /**
- * The environment that pins a session's stream to the port wmux allocated.
+ * The environment that pins a session's stream to the port remotea allocated.
  *
  * Load-bearing for the pane, not optional telemetry: the dashboard deep-link in
  * `AgentSession.dashboardUrl` is `?port=<streamPort>`, so a session streaming
@@ -407,7 +407,7 @@ const READBACK_SCHEMES = /^(https?|file|about):/i;
  * The url from a `get url` invocation, or undefined.
  *
  * Reads through `unwrapAgentData` rather than off `res.data` directly. The argv
- * wmux sends carries no `--json`, so what arrives today is the bare line
+ * remotea sends carries no `--json`, so what arrives today is the bare line
  * `https://example.com/` and stdout is the whole answer — but with `--json` the
  * url sits at `data.url` INSIDE a `{success, data, error}` envelope, where a
  * direct `res.data.url` finds nothing and the stdout fallback then hands the
@@ -471,7 +471,7 @@ const OPEN_SCHEMES = /^(https?|file|about):/i;
  * Where the session's Chrome actually is right now.
  *
  * The pane cannot answer this itself: in agent mode its webview shows the
- * dashboard, while the page lives in a Chrome outside wmux that the AGENT
+ * dashboard, while the page lives in a Chrome outside remotea that the AGENT
  * drives. Without this the address bar can only show the last URL the pane
  * asked for, which stops being true the moment the agent clicks a link.
  *
@@ -600,7 +600,7 @@ export async function disableAgentBrowser(
  * The per-surface dashboard reference is NOT tracked here. It used to be, in a
  * Set local to this module — but `v2-browser.ts` independently kept its own for
  * the same surfaces, and a pane enabled from the UI and then driven by
- * `wmux browser open` took two references and gave back one, so the dashboard
+ * `remotea browser open` took two references and gave back one, so the dashboard
  * outlived every agent pane. `acquireDashboardFor`/`releaseDashboardFor` own
  * that bookkeeping for the whole process; both call paths go through them.
  */
@@ -670,7 +670,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
         || existingOwner === _event.sender.id;
       if (acceptedOwner) {
         ownSurface(id, _event.sender);
-        // `wmux ssh user@host` puts the whole ssh command line in the REQUESTED
+        // `remotea ssh user@host` puts the whole ssh command line in the REQUESTED
         // shell spec, which is the one detection source that is authoritative
         // rather than inferred.
         //
@@ -682,7 +682,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
         // can call idempotent PTY_CREATE with a known id, but must not rewrite
         // where the legitimate owner's next file upload will go.
         if (!remote) sshDetector.setSurfaceShell(id, resolvedOptions.shell, created.shell, resolvedOptions.cwd);
-        // Same spec, same reason: `wmux agent spawn --cmd claude` and
+        // Same spec, same reason: `remotea agent spawn --cmd claude` and
         // `--shell "claude --resume"` put the agent's own command line here, so
         // this pane IS that agent for as long as it lives. Pure string work —
         // nothing added to the synchronous create path's budget (issue #176).
@@ -766,7 +766,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   ipcMain.on(IPC_CHANNELS.PTY_WRITE, (_event, id: SurfaceId, data: string) => {
     // This channel is the HUMAN's keyboard, and only that: it originates in the
-    // terminal component. wmux's own relayed answers (pane.answer_agent) go
+    // terminal component. remotea's own relayed answers (pane.answer_agent) go
     // straight to ptyManager.write in main, so they cannot reach here — which is
     // what keeps answerAgent's "answering never clears blocked" rule intact
     // while still letting a human who typed the answer themselves clear it
@@ -903,7 +903,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   // App UI theme (issue #67): report the Windows light/dark setting so the
   // renderer can follow it when appearance mode is "system", and push updates
-  // when the user flips it in Windows Settings while wmux is running.
+  // when the user flips it in Windows Settings while remotea is running.
   ipcMain.handle(IPC_CHANNELS.SYSTEM_GET_SHOULD_USE_DARK_COLORS, () => nativeTheme.shouldUseDarkColors);
   nativeTheme.on('updated', () => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -1146,7 +1146,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
       cdpProxyInstance?.setWebContentsId(null);
     }
   });
-  // A CDP client driving a hidden pane keeps it painting, as `wmux browser`
+  // A CDP client driving a hidden pane keeps it painting, as `remotea browser`
   // does (browser-keep-rendering.ts).
   cdpProxyInstance?.onBeforeCommand((wcId) => keepRenderingLeases.touch(wcId, cdpBridge.surfaceIdFor(wcId)));
 
@@ -1192,7 +1192,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   // The browser toolbar button is also a focus button. Electron's
   // openDevTools() is a no-op when the detached window already exists, so
-  // clicking it again used to leave DevTools behind wmux (#413).
+  // clicking it again used to leave DevTools behind remotea (#413).
   ipcMain.handle(IPC_CHANNELS.BROWSER_FOCUS_DEVTOOLS, (event, webContentsId: unknown) => {
     if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId) || webContentsId <= 0) return false;
     const guest = webContents.fromId(webContentsId);
@@ -1609,7 +1609,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     // actually remote or ambiguous: the nested-ssh disagreement between a
     // managed and a reported destination, and probe-only evidence with no
     // authoritative source. Neither is exploitable today ONLY because no
-    // remote shell runs wmux's report_pwd integration, so no remote cwd ever
+    // remote shell runs remotea's report_pwd integration, so no remote cwd ever
     // reaches explorer-roots' map in the first place — that is a property of
     // today's report_pwd sources, not of this gate. If a future cwd source
     // ever feeds a remote path in here, this check would need to widen past
@@ -1752,7 +1752,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   // #210 wrote this handler, then deleted it on review, on the grounds that
   // "jailed to a pane root" is not consent. It is reinstated deliberately, with
   // the consequence #210 declined, because the alternative is the gap that
-  // reasoning predicted verbatim: "I opened it in wmux, why can't I save it?".
+  // reasoning predicted verbatim: "I opened it in remotea, why can't I save it?".
   // What makes it acceptable now is that it is not the whole answer — the write
   // side adds the grant check AND the mtime guard, so the blast radius is
   // "files the user opened into a pane in this window", not "the project root".
@@ -1860,7 +1860,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     IPC_CHANNELS.TERMINAL_RESOLVE_FILE_LINK,
     async (event, surfaceId: unknown, text: unknown) => {
       // explorerRootFor answers `no_root` BEFORE it asks about ssh, and a
-      // managed `wmux ssh` pane never reports a cwd — so a pane with no root
+      // managed `remotea ssh` pane never reports a cwd — so a pane with no root
       // is checked for ownership and ssh here, or its remote output would be
       // probed as local absolute paths.
       if (!ownsLiveSurface(surfaceId, event.sender)) {
@@ -1986,7 +1986,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
   // Folder picker (issue #64): backs the `openFolder` shortcut (Ctrl+O). Shows a
   // native directory dialog and returns the chosen path; the renderer opens a new
   // workspace rooted there. Previously `openFolder` was a bound-but-no-op stub.
-  // "Open in wmux" Explorer verb (HKCU shell keys — see shell-context-menu.ts).
+  // "Open in remotea" Explorer verb (HKCU shell keys — see shell-context-menu.ts).
   ipcMain.handle(IPC_CHANNELS.SYSTEM_GET_CONTEXT_MENU, () => {
     try {
       return isContextMenuInstalled();
@@ -2053,7 +2053,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 /**
  * Settings → Remote (#254). Every channel here is a HUMAN in the desktop UI —
  * the only place a credential may be minted (I2) — so each one first requires
- * the sender to be one of wmux's own windows (a webview guest is not), and
+ * the sender to be one of remotea's own windows (a webview guest is not), and
  * answers `{error:'unavailable'}` when the runtime did not load rather than
  * throwing into the renderer.
  */
@@ -2099,7 +2099,7 @@ export function registerRemoteConsoleHandlers(): void {
   // The renderer's answer to a snapshot/modes request. The runtime matches it
   // on `reqId` and ignores anything stale or unknown. The same window gate as
   // the invokes: a snapshot reply IS what the phone renders as the pane's
-  // screen, so only one of wmux's own windows may supply one — the runtime's
+  // screen, so only one of remotea's own windows may supply one — the runtime's
   // `handleRendererReply` takes no sender and cannot check this itself.
   ipcMain.on(IPC_CHANNELS.REMOTE_RENDERER_REPLY, (event, reqId: unknown, result: RemoteSnapshotResult | RemoteModesResult) => {
     if (!BrowserWindow.fromWebContents(event.sender)) return;
