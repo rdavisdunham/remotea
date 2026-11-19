@@ -166,8 +166,8 @@ export function CodePane({ surfaceId }: { surfaceId: SurfaceId }): React.JSX.Ele
       const id = (event as CustomEvent<{ surfaceId?: string }>).detail?.surfaceId;
       if (id === surfaceId) setRefreshToken((n) => n + 1);
     };
-    document.addEventListener('wmux:refresh-surface', onRefresh);
-    return () => document.removeEventListener('wmux:refresh-surface', onRefresh);
+    document.addEventListener('remotea:refresh-surface', onRefresh);
+    return () => document.removeEventListener('remotea:refresh-surface', onRefresh);
   }, [surfaceId]);
 
   // Write the buffer and the dirty flag into the store together.

@@ -115,8 +115,8 @@ export default function GitPane({ surfaceId, cwd, surface, onPatch }: Readonly<P
       const id = (event as CustomEvent<{ surfaceId?: string }>).detail?.surfaceId;
       if (id === surfaceId) refresh();
     };
-    document.addEventListener('wmux:refresh-surface', onRefresh);
-    return () => document.removeEventListener('wmux:refresh-surface', onRefresh);
+    document.addEventListener('remotea:refresh-surface', onRefresh);
+    return () => document.removeEventListener('remotea:refresh-surface', onRefresh);
   }, [refresh, surfaceId]);
   const repoQuery = useGitQuery<GitRepoInfo>(cwd ? { op: 'repo', cwd } : null, tick);
   const repo = repoQuery.data;

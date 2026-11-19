@@ -526,8 +526,8 @@ export default function MarkdownPane({
       const id = (event as CustomEvent<{ surfaceId?: string }>).detail?.surfaceId;
       if (id === surfaceId && filePath) void loadFromDisk(filePath);
     };
-    document.addEventListener('wmux:refresh-surface', onRefresh);
-    return () => document.removeEventListener('wmux:refresh-surface', onRefresh);
+    document.addEventListener('remotea:refresh-surface', onRefresh);
+    return () => document.removeEventListener('remotea:refresh-surface', onRefresh);
   }, [filePath, loadFromDisk, surfaceId]);
 
   // Both shell actions are rejected by the main process when the path falls

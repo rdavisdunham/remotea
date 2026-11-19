@@ -26,7 +26,7 @@ describe('agentsForWorkspace', () => {
       ['surf-b' as SurfaceId, { agentId: 'ag-1', label: 'worker-1', status: 'exited' as const }],
     ]);
     const out = agentsForWorkspace(tree, {}, meta, NOW);
-    expect(out.lines).toEqual([{ key: 'wmux:surf-b', name: 'worker-1', detail: '✓', done: true, paneId: 'pane-1' }]);
+    expect(out.lines).toEqual([{ key: 'remotea:surf-b', name: 'worker-1', detail: '✓', done: true, paneId: 'pane-1' }]);
     expect(out).toMatchObject({ total: 1, running: 0 });
   });
 
@@ -99,7 +99,7 @@ describe('agentsForWorkspace', () => {
     ]);
     const out = agentsForWorkspace(tree, { 'surf-a': obs([{ name: 'obs-agent', toolUses: 3, tokens: '2k', done: false }]) }, meta, NOW);
     expect(out.lines).toHaveLength(2);
-    expect(out.lines.map(a => a.key)).toEqual(['surf-a:obs-agent', 'wmux:surf-b']);
+    expect(out.lines.map(a => a.key)).toEqual(['surf-a:obs-agent', 'remotea:surf-b']);
     expect(out.lines[1]).toMatchObject({ name: 'worker-1', done: false, paneId: 'pane-1' });
     expect(out).toMatchObject({ total: 2, running: 2 });
   });

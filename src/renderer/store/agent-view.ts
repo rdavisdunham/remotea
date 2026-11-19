@@ -117,7 +117,7 @@ function observerLines(surfaceId: string, activity: ObserverActivity | undefined
 function wmuxLine(surfaceId: string, paneId: PaneId, meta: AgentMeta | undefined): WorkspaceAgent | null {
   if (!meta) return null;
   const done = meta.status === 'exited';
-  return { key: `wmux:${surfaceId}`, name: meta.label, detail: done ? '✓' : '', done, paneId };
+  return { key: `remotea:${surfaceId}`, name: meta.label, detail: done ? '✓' : '', done, paneId };
 }
 
 function summarize(ordered: WorkspaceAgent[], t: T): WorkspaceAgent[] {

@@ -89,7 +89,7 @@ let frame: number | null = null;
 let selfScrolling = 0;
 
 /** The event the pill listens to. Detail is `AnchorEventDetail`. */
-export const ANCHOR_EVENT = 'wmux:prompt-anchor';
+export const ANCHOR_EVENT = 'remotea:prompt-anchor';
 
 export interface AnchorEventDetail {
   surfaceId: string;

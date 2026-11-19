@@ -281,8 +281,8 @@ export default function SurfaceTabBar({
   useEffect(() => {
     if (!isFocused) return;
     const handler = () => startRename();
-    document.addEventListener('wmux:rename-surface', handler);
-    return () => document.removeEventListener('wmux:rename-surface', handler);
+    document.addEventListener('remotea:rename-surface', handler);
+    return () => document.removeEventListener('remotea:rename-surface', handler);
   }, [isFocused, startRename]);
 
   // Auto-focus rename input

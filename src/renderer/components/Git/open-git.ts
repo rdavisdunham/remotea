@@ -103,7 +103,7 @@ export function toggleGitView(
   return 'opened';
 }
 
-export const FOCUS_SURFACE_EVENT = 'wmux:focus-surface';
+export const FOCUS_SURFACE_EVENT = 'remotea:focus-surface';
 
 /** Ask App to focus a surface (workspace, pane and tab). */
 export function requestFocusSurface(workspaceId: WorkspaceId, surfaceId: SurfaceId): void {
