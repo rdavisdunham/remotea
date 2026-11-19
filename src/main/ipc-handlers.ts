@@ -1225,7 +1225,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win || win.isDestroyed()) return { started: false };
     const created = await win.webContents.executeJavaScript(`
-      window.__wmux_splitPane?.({
+      window.__remotea_splitPane?.({
         direction: 'vertical',
         type: 'terminal',
         startupCommands: ['npm i -g agent-browser', 'agent-browser install'],

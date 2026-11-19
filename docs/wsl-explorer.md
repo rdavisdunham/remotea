@@ -43,7 +43,7 @@ Add to `~/.config/fish/config.fish`:
 
 ```fish
 if set -q WSL_DISTRO_NAME
-    function __wmux_osc7 --on-event fish_prompt
+    function __remotea_osc7 --on-event fish_prompt
         set -l cwd (wslpath -w "$PWD")
         printf '\e]7;file://localhost/%s\a' (string escape --style=url -- "$cwd")
     end

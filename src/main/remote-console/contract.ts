@@ -31,7 +31,7 @@ export interface PromptView {
 export type DeliverAnswerReason ='not-blocked' | 'no-choices' | 'unknown-choice' | 'unknown-surface' | 'write-failed' | 'stale';
 
 export interface ConsoleOps {
-  /** `__wmux_remoteRoster()` on every window; one array per window, merged by the runtime (#143). */
+  /** `__remotea_remoteRoster()` on every window; one array per window, merged by the runtime (#143). */
   listRoster(): Promise<unknown[][]>;
   isLivePty(id: string): boolean;
   /** Declared blocked only: `getAgentState(id)?.state === 'blocked'`. */

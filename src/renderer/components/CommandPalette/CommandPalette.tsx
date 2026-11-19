@@ -170,7 +170,7 @@ export default function CommandPalette({ onClose, onAction }: CommandPaletteProp
           try {
             const res = await (window as any).remotea?.markdown?.openFile?.();
             if (!res || res.canceled || res.error || !res.content) return;
-            const created = (window as any).__wmux_createSurface?.({ type: 'markdown' });
+            const created = (window as any).__remotea_createSurface?.({ type: 'markdown' });
             const surfaceId = created?.surfaceId as string | undefined;
             if (surfaceId) {
               // Derive the basename for the tab label (renderer has no `path`),

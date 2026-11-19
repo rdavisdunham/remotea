@@ -50,7 +50,7 @@ describe('CLI worktree flags and parameter validation', () => {
     });
   });
 
-  describe('pipe-bridge __wmux_createWorkspace', () => {
+  describe('pipe-bridge __remotea_createWorkspace', () => {
     let mockProbe: ReturnType<typeof vi.fn>;
     let mockCreate: ReturnType<typeof vi.fn>;
 
@@ -89,7 +89,7 @@ describe('CLI worktree flags and parameter validation', () => {
     });
 
     it('creates workspace with worktree metadata and worktree path as cwd', async () => {
-      const res = await (window as any).__wmux_createWorkspace({
+      const res = await (window as any).__remotea_createWorkspace({
         worktree: 'feat/cli-wt',
         cwd: 'C:\\repo',
       });
@@ -112,7 +112,7 @@ describe('CLI worktree flags and parameter validation', () => {
         workspaces: [{ id: 'ws-focused', cwd: 'C:\\someone-elses-repo' } as any],
         activeWorkspaceId: 'ws-focused' as any,
       });
-      await expect((window as any).__wmux_createWorkspace({ worktree: 'feat/x' }))
+      await expect((window as any).__remotea_createWorkspace({ worktree: 'feat/x' }))
         .rejects.toThrow(/pass --cwd/);
       expect(mockProbe).not.toHaveBeenCalled();
       expect(mockCreate).not.toHaveBeenCalled();
@@ -121,9 +121,9 @@ describe('CLI worktree flags and parameter validation', () => {
     // #397: a Windows pane never takes a POSIX workspace cwd, so a workspace
     // created on one must name WSL or it would open PowerShell at home.
     it('opens a workspace created on a POSIX folder with WSL panes', async () => {
-      const posix = await (window as any).__wmux_createWorkspace({ cwd: '/home/u/proj' });
-      const named = await (window as any).__wmux_createWorkspace({ cwd: '/home/u/proj', shell: 'pwsh.exe' });
-      const win = await (window as any).__wmux_createWorkspace({ cwd: 'C:\\repo' });
+      const posix = await (window as any).__remotea_createWorkspace({ cwd: '/home/u/proj' });
+      const named = await (window as any).__remotea_createWorkspace({ cwd: '/home/u/proj', shell: 'pwsh.exe' });
+      const win = await (window as any).__remotea_createWorkspace({ cwd: 'C:\\repo' });
       const shellOf = (id: string) => useStore.getState().workspaces.find((w) => w.id === id)?.shell;
       expect(shellOf(posix.workspaceId)).toBe('wsl.exe');
       expect(shellOf(named.workspaceId)).toBe('pwsh.exe');

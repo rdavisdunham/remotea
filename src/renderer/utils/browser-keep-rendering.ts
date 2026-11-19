@@ -2,7 +2,7 @@
  * Which hidden browser surfaces an agent is driving, so they keep painting
  * while the user looks at another workspace or tab.
  *
- * Main grants a lease through `window.__wmux_keepBrowserRendering` each time an
+ * Main grants a lease through `window.__remotea_keepBrowserRendering` each time an
  * agent's command reaches a web pane (src/main/browser-keep-rendering.ts has
  * the why and the measurements). BrowserPane reads it with `useKeepRendering`
  * and, while it runs, keeps a hidden webview on the visible-but-transparent

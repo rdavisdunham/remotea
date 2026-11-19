@@ -7,7 +7,7 @@ remotea is a desktop terminal app for running coding agents, on this computer an
 remotea started as a fork of [wmux](https://github.com/amirlehmam/wmux) (MIT, by Amir Lehmam) at `29c1d52`. It does not merge from wmux.
 
 - **Taking a wmux fix:** cherry-pick it on its own with `git cherry-pick -x`, and add a row to `docs/remotea/upstream-ledger.md` with the ruling and the remotea commit. Rename any wmux name it brings in to the remotea name already used for that thing.
-- **Names:** everything remotea writes on a machine or hands another program is named remotea: the `remotea` command, `REMOTEA_*` variables, hook and plugin files, managed-block markers. Old names live only in `src/shared/legacy-names.ts`, read by the move command, the old-state notice and the path-proven cleanup of old hook entries (`src/shared/legacy-cleanup.ts`). Code-only names still say wmux: `__wmux_*` test hooks, IPC channels, CSS classes. The cleanup renames these one kind per change. Until a kind is renamed, keep using its existing name where code has to match it, and add no new wmux names. Text people see says remotea.
+- **Names:** everything remotea writes on a machine or hands another program is named remotea: the `remotea` command, `REMOTEA_*` variables, hook and plugin files, managed-block markers. Old names live only in `src/shared/legacy-names.ts`, read by the move command, the old-state notice and the path-proven cleanup of old hook entries (`src/shared/legacy-cleanup.ts`). Code-only names still say wmux: `wmux:*` DOM events, CSS classes, code symbols and some file names. The cleanup renames these one kind per change. Until a kind is renamed, keep using its existing name where code has to match it, and add no new wmux names. Text people see says remotea.
 - **Identity:** the pipe, the APPDATA folder and the AppUserModelId use the base name `remotea` (`src/shared/instance.ts`), so remotea runs beside a stock wmux install.
 
 ## Where things are
@@ -44,7 +44,7 @@ npm --prefix remote-server test                # session server, from WSL
 
 Testing in the real app (from WSL, on the PC that runs the server): `node scripts/desktop-test/harness.mjs up` runs a **test copy** of the app on this PC's Windows side, against a **test server** (port 7719), and drives it over the Chrome DevTools Protocol.
 - `eval`, `shot`, `type`, `key` and `screen` drive the app; `diag` reads its diagnostics; `down` stops both.
-- The renderer's `window.__wmux_*` automation hooks (`src/renderer/pipe-bridge.ts`) do most of the work.
+- The renderer's `window.__remotea_*` automation hooks (`src/renderer/pipe-bridge.ts`) do most of the work.
 - It never touches the real server, its sessions, or `~/.claude`.
 
 Debugging the real setup: `remotea logs` shows what each app reported (no content), and `remotea screen <id>` shows a pane's screen.

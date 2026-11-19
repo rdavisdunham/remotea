@@ -871,7 +871,7 @@ export default function App() {
 
   // Expose helpers for main process queries + pipe bridge
   useEffect(() => {
-    (window as any).__wmux_getActiveWorkspaceId = () => useStore.getState().activeWorkspaceId;
+    (window as any).__remotea_getActiveWorkspaceId = () => useStore.getState().activeWorkspaceId;
     // Pane loads for one workspace — the ACTIVE one only when none is named.
     //
     // It used to read the active workspace unconditionally, which is half of
@@ -880,7 +880,7 @@ export default function App() {
     // landed in the active workspace's panes while being filed under the other.
     // A named workspace this window does not have answers `[]`, so main can ask
     // the next one — a workspace is not a window (#143).
-    (window as any).__wmux_getPaneLoads = (workspaceId?: string) => {
+    (window as any).__remotea_getPaneLoads = (workspaceId?: string) => {
       const state = useStore.getState();
       const wsId = workspaceId || state.activeWorkspaceId;
       const ws = state.workspaces.find((w) => w.id === wsId);
@@ -892,11 +892,11 @@ export default function App() {
     };
     // Which workspace owns this pane (#242). The split tree lives here and main
     // has no copy, so this is the only thing that can answer it — the same
-    // reason `__wmux_getBrowserEngine` exists. Returns null rather than the
+    // reason `__remotea_getBrowserEngine` exists. Returns null rather than the
     // active workspace when the pane is unknown: "I don't have it" and "it's
     // this one" must stay distinguishable, or main cannot tell a pane in
     // another window from a stale id.
-    (window as any).__wmux_getWorkspaceIdForPane = (paneId: string) => {
+    (window as any).__remotea_getWorkspaceIdForPane = (paneId: string) => {
       if (!paneId) return null;
       for (const ws of useStore.getState().workspaces) {
         if (getAllPaneIds(ws.splitTree).includes(paneId as any)) return ws.id;
@@ -906,9 +906,9 @@ export default function App() {
     // Initialize pipe bridge — exposes store operations for V2 pipe handlers
     initPipeBridge();
     return () => {
-      delete (window as any).__wmux_getActiveWorkspaceId;
-      delete (window as any).__wmux_getPaneLoads;
-      delete (window as any).__wmux_getWorkspaceIdForPane;
+      delete (window as any).__remotea_getActiveWorkspaceId;
+      delete (window as any).__remotea_getPaneLoads;
+      delete (window as any).__remotea_getWorkspaceIdForPane;
     };
   }, []);
 

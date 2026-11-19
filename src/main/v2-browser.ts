@@ -74,7 +74,7 @@ async function ensureBrowserPanel(): Promise<boolean> {
   const win = firstWindow();
   if (!win) return false;
   await win.webContents.executeJavaScript(
-    `window.__wmux_splitPane?.({ direction: 'horizontal', type: 'browser' })`,
+    `window.__remotea_splitPane?.({ direction: 'horizontal', type: 'browser' })`,
   );
   const deadline = Date.now() + 5000;
   while (!cdpBridge.isAttached && Date.now() < deadline) {
@@ -125,14 +125,14 @@ async function resolveBrowserWcId(caller?: string): Promise<number | null> {
   }
 
   const workspaceId: string | null = await win.webContents.executeJavaScript(
-    `window.__wmux_getWorkspaceIdForSurface?.(${JSON.stringify(caller)}) ?? null`,
+    `window.__remotea_getWorkspaceIdForSurface?.(${JSON.stringify(caller)}) ?? null`,
   );
   if (!workspaceId) return legacyWcId();
 
   // Adopt an existing unowned browser surface in the workspace (e.g. one the user
   // opened manually); otherwise spawn a fresh browser pane in that workspace.
   const existing: string[] = await win.webContents.executeJavaScript(
-    `window.__wmux_listBrowserSurfaces?.(${JSON.stringify(workspaceId)}) ?? []`,
+    `window.__remotea_listBrowserSurfaces?.(${JSON.stringify(workspaceId)}) ?? []`,
   );
 
   // `--surface <id>` may name a BROWSER surface — the documented meaning of the
@@ -154,7 +154,7 @@ async function resolveBrowserWcId(caller?: string): Promise<number | null> {
   let browserSurfaceId = existing.find((id) => !boundBrowserSurfaces.has(id)) ?? null;
   if (!browserSurfaceId) {
     const created = await win.webContents.executeJavaScript(
-      `window.__wmux_splitPane?.({ direction: 'horizontal', type: 'browser', workspaceId: ${JSON.stringify(workspaceId)} }) ?? null`,
+      `window.__remotea_splitPane?.({ direction: 'horizontal', type: 'browser', workspaceId: ${JSON.stringify(workspaceId)} }) ?? null`,
     );
     browserSurfaceId = created?.surfaceId ?? null;
   }
@@ -184,7 +184,7 @@ async function resolveBrowserWcId(caller?: string): Promise<number | null> {
  *    its wrong answer is a benign fall-back to the shared browser, whereas a
  *    wrong answer HERE dispatches to the wrong engine silently.
  *  - `?.` and `?? 'web'` let this ship before the renderer half exists: a
- *    renderer that has never heard of `__wmux_getBrowserEngine` degrades to
+ *    renderer that has never heard of `__remotea_getBrowserEngine` degrades to
  *    exactly today's behaviour instead of throwing on every browser command.
  *  - a rejected `executeJavaScript` (renderer reloading, webContents destroyed
  *    mid-flight) is 'web', not a failure. This runs on the hot path of every
@@ -195,7 +195,7 @@ async function engineForSurface(surfaceId: string): Promise<BrowserEngine> {
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue;
     const engine = await win.webContents
-      .executeJavaScript(`window.__wmux_getBrowserEngine?.(${JSON.stringify(surfaceId)}) ?? 'web'`)
+      .executeJavaScript(`window.__remotea_getBrowserEngine?.(${JSON.stringify(surfaceId)}) ?? 'web'`)
       .catch(() => 'web');
     if (engine === 'agent') return 'agent';
   }

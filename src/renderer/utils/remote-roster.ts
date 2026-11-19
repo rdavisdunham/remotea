@@ -1,7 +1,7 @@
 /**
  * The roster the remote console is allowed to see (#254).
  *
- * `window.__wmux_remoteRoster()` hands main the sidebar's own agent rollup, so
+ * `window.__remotea_remoteRoster()` hands main the sidebar's own agent rollup, so
  * the phone inherits every rule already settled there (#235, #253) instead of
  * re-deriving agent state a second way. But the roster entry carries more than
  * a phone should: `metadata` (model, token counts), `detectedState`, `paneId`,

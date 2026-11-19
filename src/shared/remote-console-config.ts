@@ -227,7 +227,7 @@ export type RemoteSnapshotResult = { data: string; cols: number; rows: number } 
 export type RemoteModesResult = { bracketedPaste: boolean } | { error: 'no-terminal' };
 
 /**
- * One entry of `window.__wmux_remoteRoster()`. An explicit mapping of the
+ * One entry of `window.__remotea_remoteRoster()`. An explicit mapping of the
  * renderer's roster, NOT the roster itself: no metadata, no detectedState, no
  * paneId, and choices reduced to `{id,label,isDefault}` so a declared choice's
  * `key`/`text` never leaves the renderer for the wire. Main still validates it

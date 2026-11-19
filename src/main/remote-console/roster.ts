@@ -1,7 +1,7 @@
 /**
  * The agent roster as the phone sees it (#254, spec §9).
  *
- * Pure. Input is what `__wmux_remoteRoster()` answered in each window, which
+ * Pure. Input is what `__remotea_remoteRoster()` answered in each window, which
  * arrives through `executeJavaScript` and is therefore trusted no further than
  * its shape can be checked: every field is validated here, a malformed entry
  * is dropped rather than half-forwarded, and a malformed CHOICE is dropped
