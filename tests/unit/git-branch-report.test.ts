@@ -91,10 +91,10 @@ function psBranchMessage(lines: string[], exitCode: number): string {
   const ps = (s: string) => `'${s.replace(/'/g, "''")}'`;
   const array = lines.length ? `@(${lines.map(ps).join(', ')})` : '$null';
   const script = [
-    extractFunction('Get-WmuxGitBranchMessage'),
+    extractFunction('Get-RemoteaGitBranchMessage'),
     '',
     // Bracketed so a trailing space in the answer is visible to the assertion.
-    `"[" + (Get-WmuxGitBranchMessage -SurfaceId ${ps(SURFACE)} -Lines ${array} -ExitCode ${exitCode}) + "]"`,
+    `"[" + (Get-RemoteaGitBranchMessage -SurfaceId ${ps(SURFACE)} -Lines ${array} -ExitCode ${exitCode}) + "]"`,
     '',
   ].join('\n');
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-gitbranch-')), 'probe.ps1');
@@ -106,7 +106,7 @@ function psBranchMessage(lines: string[], exitCode: number): string {
   }
 }
 
-describe.skipIf(!host)('Get-WmuxGitBranchMessage — one git spawn, the old wire tokens', () => {
+describe.skipIf(!host)('Get-RemoteaGitBranchMessage — one git spawn, the old wire tokens', () => {
   it.each(CASES)('%s', (_name, lines, exit, wire) => {
     expect(psBranchMessage(lines, exit)).toBe(`[${wire}]`);
   });
@@ -119,14 +119,14 @@ describe.skipIf(!host)('Get-WmuxGitBranchMessage — one git spawn, the old wire
 /**
  * Everything above tests what the worker would SAY. This tests that it is
  * heard. The worker runs in its own runspace, and a runspace has a session
- * state of its own — `$global:_wmux_pipe_name`, which Send-WmuxMessage
+ * state of its own — `$global:_remotea_pipe_name`, which Send-RemoteaMessage
  * connects to, did not exist there, so from 2.9.0 every worker report opened
  * a pipe named $null and was swallowed by the catch. Only the first prompt
  * (synchronous, before the runspace opens) ever reached wmux, so the sidebar
  * showed the branch a pane STARTED in and never followed a `cd`.
  *
  * So: a real named pipe, the real script dot-sourced, the worker path forced
- * (the runspace waited open, `Request-WmuxGitReport` required to take the
+ * (the runspace waited open, `Request-RemoteaGitReport` required to take the
  * cwd), and the report required to arrive.
  */
 async function workerReports(shell: string, cwd: string): Promise<{ taken: string; messages: string[] }> {
@@ -146,12 +146,12 @@ async function workerReports(shell: string, cwd: string): Promise<{ taken: strin
     `. ${ps(PS1)}`,
     // OpenAsync: wait for it, so the request below can only go to the worker.
     `$deadline = [DateTime]::UtcNow.AddSeconds(10)`,
-    `while ($global:_wmux_git_runspace.RunspaceStateInfo.State -ne 'Opened' -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 20 }`,
+    `while ($global:_remotea_git_runspace.RunspaceStateInfo.State -ne 'Opened' -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 20 }`,
     `Set-Location -LiteralPath ${ps(cwd)}`,
-    `$taken = Request-WmuxGitReport -Cwd $ExecutionContext.SessionState.Path.CurrentFileSystemLocation.ProviderPath`,
+    `$taken = Request-RemoteaGitReport -Cwd $ExecutionContext.SessionState.Path.CurrentFileSystemLocation.ProviderPath`,
     `[Console]::Out.Write("taken=$taken")`,
     `$deadline = [DateTime]::UtcNow.AddSeconds(10)`,
-    `while ($global:_wmux_git_shared.running -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 20 }`,
+    `while ($global:_remotea_git_shared.running -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 20 }`,
   ].join('\n');
   try {
     const taken = await new Promise<string>((resolve, reject) => {
@@ -231,14 +231,14 @@ function shBranchMessage(lines: string[], exitCode: number): string {
     ...lines.map((l) => `  printf '%s\\n' ${sq(l)}`),
     `  return ${exitCode}`,
     `}`,
-    `_wmux_report() { printf '[%s]\\n' "$1"; }`,
+    `_remotea_report() { printf '[%s]\\n' "$1"; }`,
     `export REMOTEA_SURFACE_ID=${sq(SURFACE)}`,
-    `_wmux_report_git`,
+    `_remotea_report_git`,
   ].join('\n');
   return execFileSync(bash as string, ['-c', script], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
-describe.skipIf(!bash)('_wmux_report_git — one git spawn, the old wire tokens', () => {
+describe.skipIf(!bash)('_remotea_report_git — one git spawn, the old wire tokens', () => {
   it.each(CASES)('%s', (_name, lines, exit, wire) => {
     expect(shBranchMessage(lines, exit)).toBe(`[${wire}]`);
   });
@@ -265,20 +265,20 @@ describe('the branch report spawns git once, and never takes the index lock', ()
   it('PowerShell resolves git once at init, ahead of the Git\\cmd launcher', () => {
     // The launcher re-execs the real binary and costs ~8 ms per spawn doing
     // so — on a call made on every prompt.
-    expect(psSource).toMatch(/\$global:_wmux_git = if \(Test-Path -LiteralPath "\$env:ProgramFiles\\Git\\mingw64\\bin\\git\.exe"/);
+    expect(psSource).toMatch(/\$global:_remotea_git = if \(Test-Path -LiteralPath "\$env:ProgramFiles\\Git\\mingw64\\bin\\git\.exe"/);
   });
 
   it('PowerShell hands the worker the FILESYSTEM location, not $PWD', () => {
     // `cd Env:` leaves $PWD.ProviderPath empty while git — started from this
     // thread — would still have answered for the last filesystem directory.
     expect(psSource).toContain('$ExecutionContext.SessionState.Path.CurrentFileSystemLocation.ProviderPath');
-    expect(psSource).not.toMatch(/Request-WmuxGitReport -Cwd \$PWD\b/);
+    expect(psSource).not.toMatch(/Request-RemoteaGitReport -Cwd \$PWD\b/);
   });
 
   it('PowerShell disposes the worker runspace on the way out', () => {
     const exiting = psSource.indexOf('[System.Management.Automation.PSEngineEvent]::Exiting');
     expect(exiting).toBeGreaterThan(-1);
     const handler = psSource.slice(exiting, psSource.indexOf('\n}\n', exiting));
-    expect(handler).toContain('Stop-WmuxGitWorker');
+    expect(handler).toContain('Stop-RemoteaGitWorker');
   });
 });

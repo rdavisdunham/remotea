@@ -127,7 +127,7 @@ function resolvedTransport(setup: string[]): string {
     'unset REMOTEA_SURFACE_ID REMOTEA_REMOTE',
     `source ${sq(SH.replace(/\\/g, '/'))}`,
     'trap - DEBUG',
-    'printf "%s|%s|%s" "$_wmux_windows" "$_wmux_cli_node" "$_wmux_cli_script"',
+    'printf "%s|%s|%s" "$_remotea_windows" "$_remotea_cli_node" "$_remotea_cli_script"',
   ].join('\n');
   return execFileSync(GIT_BASH, ['-c', script], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }

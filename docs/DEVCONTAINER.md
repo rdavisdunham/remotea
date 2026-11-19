@@ -239,7 +239,7 @@ it once, from inside the container, and remotea stores it on that surface and
 replays it into the pane it restores:
 
 ```bash
-_wmux_report "report_startup_command ${REMOTEA_SURFACE_ID} cd '/home/me/project' && ./relaunch.sh"
+_remotea_report "report_startup_command ${REMOTEA_SURFACE_ID} cd '/home/me/project' && ./relaunch.sh"
 ```
 
 Or from anywhere with a CLI:

@@ -71,7 +71,7 @@ function findPowerShell(): string | null {
 const host = findPowerShell();
 
 /**
- * Run `Get-WmuxPrMessage` in a real host. Written to a temp .ps1 and invoked
+ * Run `Get-RemoteaPrMessage` in a real host. Written to a temp .ps1 and invoked
  * with -File: the arguments carry JSON and quotes, and -Command would have them
  * re-parsed by the host's own command-line splitter on the way in.
  */
@@ -86,9 +86,9 @@ function prMessage(args: {
   // string would have its `"` and `$` re-read by the parser.
   const ps = (s: string) => `'${s.replace(/'/g, "''")}'`;
   const script = [
-    extractFunction('Get-WmuxPrMessage'),
+    extractFunction('Get-RemoteaPrMessage'),
     '',
-    `Get-WmuxPrMessage -SurfaceId ${ps(args.surfaceId)} ` +
+    `Get-RemoteaPrMessage -SurfaceId ${ps(args.surfaceId)} ` +
       `-PrJson ${ps(args.prJson)} -ExitCode ${args.exitCode} ` +
       `-InRepo $${args.inRepo ?? true} -Reported $${args.reported ?? false}`,
     '',
@@ -105,7 +105,7 @@ function prMessage(args: {
   }
 }
 
-describe.skipIf(!host)('Get-WmuxPrMessage — what a poller tick decides to send', () => {
+describe.skipIf(!host)('Get-RemoteaPrMessage — what a poller tick decides to send', () => {
   const surfaceId = 'surf-1111';
 
   it('reports the PR when gh resolved one', () => {
@@ -198,13 +198,13 @@ describe.skipIf(!host)('the integration script itself', () => {
 });
 
 /**
- * Run `Resolve-WmuxPaneCwd` in a real host against a real temp file. This is
+ * Run `Resolve-RemoteaPaneCwd` in a real host against a real temp file. This is
  * genuinely filesystem-shaped behavior (missing file, empty file, a path that
  * no longer exists) so it's exercised with real files rather than mocked.
  */
 function resolvePaneCwd(cwdFile: string | null): string {
   const quoted = cwdFile ? "'" + cwdFile.replace(/'/g, "''") + "'" : "''";
-  const script = [extractFunction('Resolve-WmuxPaneCwd'), '', `$r = Resolve-WmuxPaneCwd -CwdFile ${quoted}`, 'if ($null -eq $r) { "<null>" } else { $r }', ''].join('\n');
+  const script = [extractFunction('Resolve-RemoteaPaneCwd'), '', `$r = Resolve-RemoteaPaneCwd -CwdFile ${quoted}`, 'if ($null -eq $r) { "<null>" } else { $r }', ''].join('\n');
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-resolve-')), 'probe.ps1');
   fs.writeFileSync(file, script, 'utf8');
   try {
@@ -216,7 +216,7 @@ function resolvePaneCwd(cwdFile: string | null): string {
   }
 }
 
-describe.skipIf(!host)('Resolve-WmuxPaneCwd — what the job trusts as "the pane is here"', () => {
+describe.skipIf(!host)('Resolve-RemoteaPaneCwd — what the job trusts as "the pane is here"', () => {
   it('resolves a file that names a real directory', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-realdir-'));
     const cwdFile = path.join(dir, 'cwd.txt');
@@ -259,7 +259,7 @@ describe.skipIf(!host)('Resolve-WmuxPaneCwd — what the job trusts as "the pane
 });
 
 /**
- * Run `Invoke-WmuxPrTick` in a real host with a stubbed `-Send`, so the
+ * Run `Invoke-RemoteaPrTick` in a real host with a stubbed `-Send`, so the
  * send-succeeded/send-failed branches can be driven without a live pipe. The
  * stub records whether it ran (and with what) by writing to a marker file —
  * PowerShell script blocks passed through `Start-Job`-adjacent plumbing can't
@@ -274,10 +274,10 @@ function invokeTick(args: {
   const marker = path.join(dir, 'sent.txt').replace(/\\/g, '\\\\');
   const ps = (s: string) => `'${s.replace(/'/g, "''")}'`;
   const script = [
-    extractFunction('Invoke-WmuxPrTick'),
+    extractFunction('Invoke-RemoteaPrTick'),
     '',
     `$send = { param($m) Set-Content -LiteralPath '${marker}' -Value $m -Encoding UTF8; $${args.sendSucceeds} }`,
-    `$r = Invoke-WmuxPrTick -Message ${ps(args.message)} -CurrentlyReported $${args.currentlyReported} -Send $send`,
+    `$r = Invoke-RemoteaPrTick -Message ${ps(args.message)} -CurrentlyReported $${args.currentlyReported} -Send $send`,
     '"reported=$r"',
     '',
   ].join('\n');
@@ -295,7 +295,7 @@ function invokeTick(args: {
   }
 }
 
-describe.skipIf(!host)('Invoke-WmuxPrTick — the flag only advances on a send that landed', () => {
+describe.skipIf(!host)('Invoke-RemoteaPrTick — the flag only advances on a send that landed', () => {
   it('flips reported to true after a report_pr send that succeeds', () => {
     const { reported, sendCalledWith } = invokeTick({
       message: 'report_pr surf-1 5 OPEN t',
@@ -351,13 +351,13 @@ describe.skipIf(!host)('Invoke-WmuxPrTick — the flag only advances on a send t
 });
 
 /**
- * Run `Invoke-WmuxExitCleanup` in a real host, so the shell's own way out can
+ * Run `Invoke-RemoteaExitCleanup` in a real host, so the shell's own way out can
  * be exercised without a real process exit.
  */
 function invokeExitCleanup(cwdFile: string | null): { cwdFileRemoved: boolean } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-exit-'));
   const ps = (v: string | null) => (v === null ? '$null' : `'${v.replace(/'/g, "''")}'`);
-  const script = [extractFunction('Invoke-WmuxExitCleanup'), '', `Invoke-WmuxExitCleanup -CwdFile ${ps(cwdFile)}`, ''].join('\n');
+  const script = [extractFunction('Invoke-RemoteaExitCleanup'), '', `Invoke-RemoteaExitCleanup -CwdFile ${ps(cwdFile)}`, ''].join('\n');
   const file = path.join(dir, 'probe.ps1');
   fs.writeFileSync(file, script, 'utf8');
   try {
@@ -371,7 +371,7 @@ function invokeExitCleanup(cwdFile: string | null): { cwdFileRemoved: boolean } 
 // The shell's exit handler owes exactly one thing: its own hand-off file. The
 // badge is dropped from the renderer's `pty:exit` handler instead, which sees
 // a shell that was killed just as well as one that left on its own.
-describe.skipIf(!host)('Invoke-WmuxExitCleanup — what a shell owes on the way out', () => {
+describe.skipIf(!host)('Invoke-RemoteaExitCleanup — what a shell owes on the way out', () => {
   it('removes the cwd hand-off file when one was configured', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-exit-cwd-'));
     const cwdFile = path.join(dir, 'cwd.txt');
@@ -399,15 +399,15 @@ describe.skipIf(!host)('Invoke-WmuxExitCleanup — what a shell owes on the way 
 });
 
 /**
- * Drive `Remove-StaleWmuxCwdFiles` over a real directory in a real host.
+ * Drive `Remove-StaleRemoteaCwdFiles` over a real directory in a real host.
  * Returns the file names still standing afterwards.
  */
 function pruneCwdFiles(dir: string, olderThanDays: number): string[] {
   const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmux-prune-'));
   const script = [
-    extractFunction('Remove-StaleWmuxCwdFiles'),
+    extractFunction('Remove-StaleRemoteaCwdFiles'),
     '',
-    `Remove-StaleWmuxCwdFiles -Directory '${dir.replace(/'/g, "''")}' -OlderThan (Get-Date).AddDays(-${olderThanDays})`,
+    `Remove-StaleRemoteaCwdFiles -Directory '${dir.replace(/'/g, "''")}' -OlderThan (Get-Date).AddDays(-${olderThanDays})`,
     '',
   ].join('\n');
   const file = path.join(probeDir, 'probe.ps1');
@@ -423,7 +423,7 @@ function pruneCwdFiles(dir: string, olderThanDays: number): string[] {
 // A pane that is killed rather than closed runs no exit handler, so nothing
 // removes its hand-off file — without a sweep the directory grows one small
 // file per pane for the life of the machine.
-describe.skipIf(!host)('Remove-StaleWmuxCwdFiles — the sweep for panes that were killed', () => {
+describe.skipIf(!host)('Remove-StaleRemoteaCwdFiles — the sweep for panes that were killed', () => {
   const age = (file: string, days: number) => {
     const when = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     fs.utimesSync(file, when, when);
@@ -474,7 +474,7 @@ describe.skipIf(!host)('Remove-StaleWmuxCwdFiles — the sweep for panes that we
 });
 
 describe.skipIf(!host)('the poller job', () => {
-  it('can call Get-WmuxPrMessage inside the job runspace', () => {
+  it('can call Get-RemoteaPrMessage inside the job runspace', () => {
     // A job is a separate runspace and inherits none of the session's
     // functions, so the tick's decision function is handed over as the job's
     // initialization script. If that hand-off ever stopped working the tick
@@ -487,11 +487,11 @@ describe.skipIf(!host)('the poller job', () => {
     fs.writeFileSync(
       probe,
       [
-        extractFunction('Get-WmuxPrMessage'),
+        extractFunction('Get-RemoteaPrMessage'),
         '',
         (initLine as string).trim(),
-        '$j = Start-Job -InitializationScript $_wmux_pr_init -ScriptBlock {',
-        "  Get-WmuxPrMessage -SurfaceId 'surf-1' -PrJson '{\"number\":450,\"state\":\"MERGED\",\"title\":\"t\"}' " +
+        '$j = Start-Job -InitializationScript $_remotea_pr_init -ScriptBlock {',
+        "  Get-RemoteaPrMessage -SurfaceId 'surf-1' -PrJson '{\"number\":450,\"state\":\"MERGED\",\"title\":\"t\"}' " +
           '-ExitCode 0 -InRepo $true -Reported $false',
         '}',
         '$null = Wait-Job $j -Timeout 30',
@@ -511,7 +511,7 @@ describe.skipIf(!host)('the poller job', () => {
     }
   });
 
-  it('can call Resolve-WmuxPaneCwd and Invoke-WmuxPrTick inside the job runspace', () => {
+  it('can call Resolve-RemoteaPaneCwd and Invoke-RemoteaPrTick inside the job runspace', () => {
     // Same hand-off mechanism as above, for the two functions added to fix
     // defects #1 and #2 — if either were left out of the initialization
     // script the job would throw the moment it tried to call them.
@@ -525,16 +525,16 @@ describe.skipIf(!host)('the poller job', () => {
     fs.writeFileSync(
       probe,
       [
-        extractFunction('Get-WmuxPrMessage'),
-        extractFunction('Resolve-WmuxPaneCwd'),
-        extractFunction('Invoke-WmuxPrTick'),
+        extractFunction('Get-RemoteaPrMessage'),
+        extractFunction('Resolve-RemoteaPaneCwd'),
+        extractFunction('Invoke-RemoteaPrTick'),
         '',
         (initLine as string).trim(),
         `$cwdFile = '${cwdFile.replace(/'/g, "''")}'`,
-        '$j = Start-Job -InitializationScript $_wmux_pr_init -ScriptBlock {',
+        '$j = Start-Job -InitializationScript $_remotea_pr_init -ScriptBlock {',
         '  param($cwdFile)',
-        '  $resolved = Resolve-WmuxPaneCwd -CwdFile $cwdFile',
-        "  $sent = Invoke-WmuxPrTick -Message 'clear_pr surf-1' -CurrentlyReported $true -Send { param($m) $false }",
+        '  $resolved = Resolve-RemoteaPaneCwd -CwdFile $cwdFile',
+        "  $sent = Invoke-RemoteaPrTick -Message 'clear_pr surf-1' -CurrentlyReported $true -Send { param($m) $false }",
         '  "resolved=$resolved sent=$sent"',
         '} -ArgumentList $cwdFile',
         '$null = Wait-Job $j -Timeout 30',
@@ -548,7 +548,7 @@ describe.skipIf(!host)('the poller job', () => {
       const out = execFileSync(host as string, ['-NoProfile', '-NonInteractive', '-File', probe], {
         encoding: 'utf8',
       }).trim();
-      // Resolve-WmuxPaneCwd found the real dir; Invoke-WmuxPrTick kept the
+      // Resolve-RemoteaPaneCwd found the real dir; Invoke-RemoteaPrTick kept the
       // flag true because the stubbed send returned $false (the retry path).
       expect(out).toBe(`resolved=${dir} sent=True`);
     } finally {
@@ -560,7 +560,7 @@ describe.skipIf(!host)('the poller job', () => {
 describe('PR poller wiring', () => {
   it('sends whatever the tick decided, not only the success case', () => {
     const job = pollerJobBlock();
-    expect(job).toContain('Get-WmuxPrMessage');
+    expect(job).toContain('Get-RemoteaPrMessage');
     // The old shape: a lone `if` around the send, with no else.
     expect(job).not.toMatch(/if\s*\(\s*\$LASTEXITCODE\s*-eq\s*0\s*-and\s*\$prJson\s*\)/);
   });
@@ -589,25 +589,25 @@ describe('PR poller wiring', () => {
     expect(pollerJobBlock()).toMatch(/LastWriteTime\s*=\s*Get-Date/);
   });
 
-  it('routes the send through Invoke-WmuxPrTick instead of flipping the flag inline', () => {
+  it('routes the send through Invoke-RemoteaPrTick instead of flipping the flag inline', () => {
     // The bug this guards: `$reported = $msg.StartsWith("report_pr")` executed
     // BEFORE the pipe write, so a failed send still lost the pane's memory of
     // having reported. Send-then-flip has to happen in one place the tests can
-    // drive with a stubbed send (see the Invoke-WmuxPrTick describe block
+    // drive with a stubbed send (see the Invoke-RemoteaPrTick describe block
     // below) rather than inline in the job where only a live pipe reaches it.
     const job = pollerJobBlock();
-    expect(job).toContain('Invoke-WmuxPrTick');
+    expect(job).toContain('Invoke-RemoteaPrTick');
     expect(job).not.toMatch(/\$reported\s*=\s*\$msg\.StartsWith/);
   });
 
   it('treats an unresolvable cwd as no information, not as "stay put"', () => {
     // The old shape skipped Set-Location on a bad hand-off and fell through to
     // probing git/gh from wherever the job runspace last was — reporting a
-    // stale repo's PR as if it were current. Resolve-WmuxPaneCwd centralizes
+    // stale repo's PR as if it were current. Resolve-RemoteaPaneCwd centralizes
     // "can we even tell where the pane is" so the job can skip the probe
     // entirely rather than guess.
     const job = pollerJobBlock();
-    expect(job).toContain('Resolve-WmuxPaneCwd');
+    expect(job).toContain('Resolve-RemoteaPaneCwd');
   });
 
   it('keeps the cwd hand-off in the temp directory the integrations already use', () => {
@@ -621,8 +621,8 @@ describe('PR poller wiring', () => {
   it('publishes the pane cwd from the prompt, which is where it is known', () => {
     // The job is a separate process: an env var set after it started is
     // invisible to it, so the live location has to be handed over out-of-band.
-    expect(source).toContain('Update-WmuxCwdFile');
+    expect(source).toContain('Update-RemoteaCwdFile');
     const prompt = source.slice(source.indexOf('function prompt {'));
-    expect(prompt.slice(0, prompt.indexOf('\n}\n'))).toContain('Update-WmuxCwdFile');
+    expect(prompt.slice(0, prompt.indexOf('\n}\n'))).toContain('Update-RemoteaCwdFile');
   });
 });

@@ -26,16 +26,16 @@ function remotea { node "$env:REMOTEA_CLI" @args }
 # prompt sends three of these per command (Report-Cwd, Report-ShellState,
 # ports_kick), so that mistake costs ~3s of dead time after EVERY command —
 # including `clear` — with nothing logged to explain it.
-$global:_wmux_pipe_name = $(
+$global:_remotea_pipe_name = $(
     $inst = if ($env:REMOTEA_INSTANCE) { $env:REMOTEA_INSTANCE.Trim() } else { '' }
     if ($inst) { "remotea-$inst" } else { 'remotea' }
 )
 
-function Send-WmuxMessage {
+function Send-RemoteaMessage {
     param([string]$Message)
     try {
         if ($env:REMOTEA_PIPE_TOKEN) { $Message = "auth $($env:REMOTEA_PIPE_TOKEN) $Message" }
-        $pipe = New-Object System.IO.Pipes.NamedPipeClientStream(".", $global:_wmux_pipe_name, [System.IO.Pipes.PipeDirection]::InOut)
+        $pipe = New-Object System.IO.Pipes.NamedPipeClientStream(".", $global:_remotea_pipe_name, [System.IO.Pipes.PipeDirection]::InOut)
         $pipe.Connect(1000)
         $writer = New-Object System.IO.StreamWriter($pipe)
         $writer.AutoFlush = $true
@@ -50,7 +50,7 @@ function Send-WmuxMessage {
 function Report-Cwd {
     $surfaceId = $env:REMOTEA_SURFACE_ID
     if ($surfaceId) {
-        Send-WmuxMessage "report_pwd $surfaceId $PWD"
+        Send-RemoteaMessage "report_pwd $surfaceId $PWD"
     }
 }
 
@@ -71,16 +71,16 @@ function Report-Cwd {
 #
 # The directory is remotea's own scratch directory under the user's temp
 # (remote-insert.ts uses it too), rather than a second scratch location.
-$global:_wmux_cwd_file = if ($env:REMOTEA_SURFACE_ID) {
+$global:_remotea_cwd_file = if ($env:REMOTEA_SURFACE_ID) {
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) "remotea"
     try { $null = New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop } catch {}
     Join-Path $dir "cwd-$($env:REMOTEA_SURFACE_ID).txt"
 } else { $null }
 
-function Update-WmuxCwdFile {
-    if (-not $global:_wmux_cwd_file) { return }
+function Update-RemoteaCwdFile {
+    if (-not $global:_remotea_cwd_file) { return }
     try {
-        Set-Content -LiteralPath $global:_wmux_cwd_file -Value $PWD.ProviderPath -Encoding UTF8 -ErrorAction Stop
+        Set-Content -LiteralPath $global:_remotea_cwd_file -Value $PWD.ProviderPath -Encoding UTF8 -ErrorAction Stop
     } catch {
         # Nothing to do — the poller just keeps its last known location.
     }
@@ -98,7 +98,7 @@ function Update-WmuxCwdFile {
 # heals the stuck "Running" badge and the leftover progress indicator for
 # exactly the same reason. That path covers the graceful `exit` too, so there
 # is nothing left here for it to do.
-function Invoke-WmuxExitCleanup {
+function Invoke-RemoteaExitCleanup {
     param([string]$CwdFile)
     if ($CwdFile) {
         Remove-Item -LiteralPath $CwdFile -Force -ErrorAction SilentlyContinue
@@ -114,7 +114,7 @@ function Invoke-WmuxExitCleanup {
 # on every tick — 45 seconds apart, whether or not anyone is typing. So a file
 # nothing has touched for a day belonged to a pane that is gone, and none of
 # this requires asking remotea which surfaces still exist.
-function Remove-StaleWmuxCwdFiles {
+function Remove-StaleRemoteaCwdFiles {
     param(
         [string]$Directory,
         [datetime]$OlderThan
@@ -131,13 +131,13 @@ function Remove-StaleWmuxCwdFiles {
 }
 
 $null = Register-EngineEvent -SourceIdentifier ([System.Management.Automation.PSEngineEvent]::Exiting) -Action {
-    Invoke-WmuxExitCleanup -CwdFile $global:_wmux_cwd_file
-    Stop-WmuxGitWorker -Pipeline $global:_wmux_git_ps -Runspace $global:_wmux_git_runspace
+    Invoke-RemoteaExitCleanup -CwdFile $global:_remotea_cwd_file
+    Stop-RemoteaGitWorker -Pipeline $global:_remotea_git_ps -Runspace $global:_remotea_git_runspace
 }
 
 # What a poller tick should send. Pure so the decision can be tested without a
 # job, a pipe, or a GitHub repo. An empty result means "say nothing".
-function Get-WmuxPrMessage {
+function Get-RemoteaPrMessage {
     param(
         [string]$SurfaceId,
         [string]$PrJson,
@@ -191,7 +191,7 @@ function Get-WmuxPrMessage {
 # repo, which is the frozen-cwd bug this file exists to fix — the exit handler
 # above deletes this same file when the shell closes, so this also stops a job
 # that briefly outlives its shell from reporting on it.
-function Resolve-WmuxPaneCwd {
+function Resolve-RemoteaPaneCwd {
     param([string]$CwdFile)
     if (-not $CwdFile) { return $null }
     if (-not (Test-Path -LiteralPath $CwdFile -PathType Leaf)) { return $null }
@@ -224,7 +224,7 @@ function Resolve-WmuxPaneCwd {
 # unstick would get stuck the same way, just on the send instead of the
 # decision. Leaving the flag where it was makes the next tick recompute the
 # same message and retry it.
-function Invoke-WmuxPrTick {
+function Invoke-RemoteaPrTick {
     param(
         [string]$Message,
         [bool]$CurrentlyReported,
@@ -247,7 +247,7 @@ function Invoke-WmuxPrTick {
 # that runs git on every Enter. Going straight to the real binary skips that;
 # anything else on the machine (scoop, a portable git, none at all) keeps the
 # bare name and whatever PATH resolves it to.
-$global:_wmux_git = if (Test-Path -LiteralPath "$env:ProgramFiles\Git\mingw64\bin\git.exe" -PathType Leaf) {
+$global:_remotea_git = if (Test-Path -LiteralPath "$env:ProgramFiles\Git\mingw64\bin\git.exe" -PathType Leaf) {
     "$env:ProgramFiles\Git\mingw64\bin\git.exe"
 } else {
     'git'
@@ -273,7 +273,7 @@ $global:_wmux_git = if (Test-Path -LiteralPath "$env:ProgramFiles\Git\mingw64\bi
 # Header lines are the only ones that begin `# `; every entry line begins with
 # its own type letter (`1`, `2`, `u`, `?`, `!`), so a path can never be read as
 # a header.
-function Get-WmuxGitBranchMessage {
+function Get-RemoteaGitBranchMessage {
     param(
         [string]$SurfaceId,
         [string[]]$Lines,
@@ -313,46 +313,46 @@ function Get-WmuxGitBranchMessage {
 # startup path. A prompt that arrives before the open completes — or after
 # the runspace failed to be created at all — runs git synchronously instead,
 # so the row is never silently blank.
-$global:_wmux_git_shared = [hashtable]::Synchronized(@{ pending = $null; running = $false })
-$global:_wmux_git_runspace = $null
-$global:_wmux_git_ps = $null
-$global:_wmux_git_handle = $null
-$global:_wmux_git_worker = $null
+$global:_remotea_git_shared = [hashtable]::Synchronized(@{ pending = $null; running = $false })
+$global:_remotea_git_runspace = $null
+$global:_remotea_git_ps = $null
+$global:_remotea_git_handle = $null
+$global:_remotea_git_worker = $null
 try {
-    $_wmux_rs = [runspacefactory]::CreateRunspace()
-    $_wmux_rs.ThreadOptions = [System.Management.Automation.Runspaces.PSThreadOptions]::ReuseThread
-    $_wmux_rs.OpenAsync()
-    $global:_wmux_git_runspace = $_wmux_rs
+    $_remotea_rs = [runspacefactory]::CreateRunspace()
+    $_remotea_rs.ThreadOptions = [System.Management.Automation.Runspaces.PSThreadOptions]::ReuseThread
+    $_remotea_rs.OpenAsync()
+    $global:_remotea_git_runspace = $_remotea_rs
 } catch {
-    $global:_wmux_git_runspace = $null
+    $global:_remotea_git_runspace = $null
 }
 
 # What the worker runs. Built on FIRST use rather than at source time, the way
 # the PR job captures its functions when it starts and not when this file is
 # read: the runspace sees none of this session's functions, so the two it
-# needs travel across as text, and whatever Send-WmuxMessage is by the time
+# needs travel across as text, and whatever Send-RemoteaMessage is by the time
 # the first prompt fires is the one that goes.
 #
 # Nor does it see this session's VARIABLES (#279). A runspace has a session
 # state of its own, so `$global:` inside it is the runspace's global scope,
-# not the shell's — and Send-WmuxMessage connects to `$global:_wmux_pipe_name`.
+# not the shell's — and Send-RemoteaMessage connects to `$global:_remotea_pipe_name`.
 # Copied across as text without it, every report the worker made opened a pipe
-# named $null, threw, and was swallowed by Send-WmuxMessage's catch: from 2.9.0
+# named $null, threw, and was swallowed by Send-RemoteaMessage's catch: from 2.9.0
 # the branch only ever showed what the FIRST prompt saw (that one runs
 # synchronously, before the runspace has opened) and never followed a `cd`.
 # The pipe name travels as an argument, the way the PR job is handed it. The
 # token needs no such help: `$env:` is the process environment, which every
 # runspace shares.
-function Get-WmuxGitWorkerScript {
-    if (-not $global:_wmux_git_worker) {
-        $global:_wmux_git_worker = @"
+function Get-RemoteaGitWorkerScript {
+    if (-not $global:_remotea_git_worker) {
+        $global:_remotea_git_worker = @"
 param(`$shared, `$git, `$surfaceId, `$pipeName)
-`$global:_wmux_pipe_name = `$pipeName
-function Send-WmuxMessage {
-$(${function:Send-WmuxMessage})
+`$global:_remotea_pipe_name = `$pipeName
+function Send-RemoteaMessage {
+$(${function:Send-RemoteaMessage})
 }
-function Get-WmuxGitBranchMessage {
-$(${function:Get-WmuxGitBranchMessage})
+function Get-RemoteaGitBranchMessage {
+$(${function:Get-RemoteaGitBranchMessage})
 }
 while (`$true) {
     [System.Threading.Monitor]::Enter(`$shared.SyncRoot)
@@ -366,26 +366,26 @@ while (`$true) {
     `$msg = "clear_git_branch `$surfaceId"
     try {
         `$out = & `$git -C `$cwd --no-optional-locks status --porcelain=v2 --branch 2>`$null
-        `$msg = Get-WmuxGitBranchMessage -SurfaceId `$surfaceId -Lines `$out -ExitCode `$LASTEXITCODE
+        `$msg = Get-RemoteaGitBranchMessage -SurfaceId `$surfaceId -Lines `$out -ExitCode `$LASTEXITCODE
     } catch {
         # git missing, or the directory went away: the row shows no branch.
     }
-    Send-WmuxMessage `$msg
+    Send-RemoteaMessage `$msg
 }
 "@
     }
-    return $global:_wmux_git_worker
+    return $global:_remotea_git_worker
 }
 
 # Hand a cwd to the worker. True if it was taken; false if the caller has to
 # run git itself this time (runspace not up, or a start that failed — in which
 # case the claim on `running` is given back, or no worker would ever run
 # again).
-function Request-WmuxGitReport {
+function Request-RemoteaGitReport {
     param([string]$Cwd)
-    $rs = $global:_wmux_git_runspace
+    $rs = $global:_remotea_git_runspace
     if ($null -eq $rs -or $rs.RunspaceStateInfo.State -ne 'Opened') { return $false }
-    $shared = $global:_wmux_git_shared
+    $shared = $global:_remotea_git_shared
     [System.Threading.Monitor]::Enter($shared.SyncRoot)
     try {
         $shared.pending = $Cwd
@@ -400,26 +400,26 @@ function Request-WmuxGitReport {
     # by pipeline teardown, well under a millisecond, but a runspace cannot
     # take a new pipeline until it is done, so it is not optional. Reaping is
     # not optional either: a completed PowerShell object per prompt is a leak.
-    $prev = $global:_wmux_git_ps
+    $prev = $global:_remotea_git_ps
     if ($null -ne $prev) {
-        $done = $global:_wmux_git_handle.AsyncWaitHandle.WaitOne(1000)
+        $done = $global:_remotea_git_handle.AsyncWaitHandle.WaitOne(1000)
         if (-not $done) {
             [System.Threading.Monitor]::Enter($shared.SyncRoot)
             try { $shared.running = $false; $shared.pending = $null } finally { [System.Threading.Monitor]::Exit($shared.SyncRoot) }
             return $false
         }
-        try { $null = $prev.EndInvoke($global:_wmux_git_handle) } catch {}
+        try { $null = $prev.EndInvoke($global:_remotea_git_handle) } catch {}
         try { $prev.Dispose() } catch {}
-        $global:_wmux_git_ps = $null
-        $global:_wmux_git_handle = $null
+        $global:_remotea_git_ps = $null
+        $global:_remotea_git_handle = $null
     }
     $ps = $null
     try {
         $ps = [powershell]::Create()
         $ps.Runspace = $rs
-        $null = $ps.AddScript((Get-WmuxGitWorkerScript)).AddArgument($shared).AddArgument($global:_wmux_git).AddArgument($env:REMOTEA_SURFACE_ID).AddArgument($global:_wmux_pipe_name)
-        $global:_wmux_git_handle = $ps.BeginInvoke()
-        $global:_wmux_git_ps = $ps
+        $null = $ps.AddScript((Get-RemoteaGitWorkerScript)).AddArgument($shared).AddArgument($global:_remotea_git).AddArgument($env:REMOTEA_SURFACE_ID).AddArgument($global:_remotea_pipe_name)
+        $global:_remotea_git_handle = $ps.BeginInvoke()
+        $global:_remotea_git_ps = $ps
         return $true
     } catch {
         if ($ps) { try { $ps.Dispose() } catch {} }
@@ -431,7 +431,7 @@ function Request-WmuxGitReport {
 
 # The worker's half of the exit: nothing here may keep the process alive or
 # leave a git behind. Driven from the Exiting handler below.
-function Stop-WmuxGitWorker {
+function Stop-RemoteaGitWorker {
     param($Pipeline, $Runspace)
     if ($null -ne $Pipeline) {
         try { $Pipeline.Stop() } catch {}
@@ -465,24 +465,24 @@ function Report-GitBranch {
     if (-not $surfaceId) { return }
 
     $cwd = $ExecutionContext.SessionState.Path.CurrentFileSystemLocation.ProviderPath
-    if (Request-WmuxGitReport -Cwd $cwd) { return }
+    if (Request-RemoteaGitReport -Cwd $cwd) { return }
 
     try {
-        $out = & $global:_wmux_git --no-optional-locks status --porcelain=v2 --branch 2>$null
-        Send-WmuxMessage (Get-WmuxGitBranchMessage -SurfaceId $surfaceId -Lines $out -ExitCode $LASTEXITCODE)
+        $out = & $global:_remotea_git --no-optional-locks status --porcelain=v2 --branch 2>$null
+        Send-RemoteaMessage (Get-RemoteaGitBranchMessage -SurfaceId $surfaceId -Lines $out -ExitCode $LASTEXITCODE)
     } catch {
-        Send-WmuxMessage "clear_git_branch $surfaceId"
+        Send-RemoteaMessage "clear_git_branch $surfaceId"
     }
 }
 
 # Sequence the reports that define an SSH session's lifetime. PowerShell sends
 # them synchronously today, but using the same wire shape as Bash keeps ordering
 # explicit across every transport and lets the receiver reject late arrivals.
-$script:WmuxSshEventSequence = 0
+$script:RemoteaSshEventSequence = 0
 
-function Get-WmuxSshEventMarker {
-    $script:WmuxSshEventSequence++
-    return "seq=$($script:WmuxSshEventSequence)"
+function Get-RemoteaSshEventMarker {
+    $script:RemoteaSshEventSequence++
+    return "seq=$($script:RemoteaSshEventSequence)"
 }
 
 # Report shell state
@@ -490,8 +490,8 @@ function Report-ShellState {
     param([string]$State)
     $surfaceId = $env:REMOTEA_SURFACE_ID
     if ($surfaceId) {
-        $sequence = Get-WmuxSshEventMarker
-        Send-WmuxMessage "report_shell_state $surfaceId $sequence $State"
+        $sequence = Get-RemoteaSshEventMarker
+        Send-RemoteaMessage "report_shell_state $surfaceId $sequence $State"
     }
 }
 
@@ -522,8 +522,8 @@ function Report-Command {
     if ($line -notmatch '^\s*(?:&\s*"ssh(?:\.exe)?"|(?:&\s*)?"[^"]*[\\/]ssh(?:\.exe)?"|(?:&\s*)?[^\s"]*[\\/]ssh(?:\.exe)?|(?:&\s*)?ssh(?:\.exe)?)(?:\s|$)') { return }
     # The transport is line-based, so a multi-line command must arrive flat.
     $flat = $line -replace '\r?\n', ' '
-    $sequence = Get-WmuxSshEventMarker
-    Send-WmuxMessage "report_command $surfaceId $sequence $flat"
+    $sequence = Get-RemoteaSshEventMarker
+    Send-RemoteaMessage "report_command $surfaceId $sequence $flat"
 }
 
 # ---------------------------------------------------------------------------
@@ -545,7 +545,7 @@ function Report-Command {
 # other half of a C: an empty Enter runs no command but does run the prompt, so
 # an unconditional D would report a command that never existed, carrying the
 # PREVIOUS command's exit status.
-$global:_wmux_command_open = $false
+$global:_remotea_command_open = $false
 
 # The mark bytes themselves, as a string. An empty string when this shell is not
 # in a remotea pane, so callers can splice the result in unconditionally.
@@ -557,7 +557,7 @@ $global:_wmux_command_open = $false
 # [char]0x1b rather than PowerShell 7's `e escape: remotea spawns whichever
 # PowerShell the user configured, and Windows PowerShell 5.1 renders `e as a
 # literal "e".
-function Get-WmuxPromptMark {
+function Get-RemoteaPromptMark {
     param([string]$Payload)
     if (-not $env:REMOTEA_SURFACE_ID) { return '' }
     $esc = [char]0x1b
@@ -568,9 +568,9 @@ function Get-WmuxPromptMark {
 # points in a prompt, so there is no string for them to travel inside — and
 # writing them through the success stream from anywhere reachable by `prompt`
 # would concatenate them into what the host draws.
-function Write-WmuxPromptMark {
+function Write-RemoteaPromptMark {
     param([string]$Payload)
-    $mark = Get-WmuxPromptMark $Payload
+    $mark = Get-RemoteaPromptMark $Payload
     if ($mark) { [Console]::Write($mark) }
 }
 
@@ -589,7 +589,7 @@ function Write-WmuxPromptMark {
 # failure, which is the part every consumer acts on — and a failed cmdlet with a
 # clean $LASTEXITCODE reports 1. Reporting $LASTEXITCODE alone would have been
 # the one unacceptable outcome: it calls every failed cmdlet a success.
-function Get-WmuxExitStatus {
+function Get-RemoteaExitStatus {
     param(
         [bool]$Succeeded,
         $NativeExitCode
@@ -636,17 +636,17 @@ if (Get-Module -Name PSReadLine -ErrorAction SilentlyContinue) {
 # merely a duplicated mark. Guarded with a global flag, the way the PR job is.
 # The capture lives INSIDE the guard for the same reason: doing it outside would
 # re-point the "original" at our own wrapper even with the redefinition skipped.
-if (-not $global:_wmux_readline_hooked -and
+if (-not $global:_remotea_readline_hooked -and
     (Get-Command -Name PSConsoleHostReadLine -CommandType Function -ErrorAction SilentlyContinue)) {
-    $global:_wmux_readline_hooked = $true
-    $_wmux_original_readline = $function:PSConsoleHostReadLine
+    $global:_remotea_readline_hooked = $true
+    $_remotea_original_readline = $function:PSConsoleHostReadLine
     function PSConsoleHostReadLine {
-        $line = & $_wmux_original_readline
+        $line = & $_remotea_original_readline
         # A blank line is submitted without running anything, so it opens no
         # command and must not claim one.
         if (-not [string]::IsNullOrWhiteSpace($line)) {
-            $global:_wmux_command_open = $true
-            Write-WmuxPromptMark 'C'
+            $global:_remotea_command_open = $true
+            Write-RemoteaPromptMark 'C'
         }
         $line
     }
@@ -657,9 +657,9 @@ if (-not $global:_wmux_readline_hooked -and
 # Guarded for the same reason the read-line hook above is: a second wrapper would
 # capture the first as its "original", and calling it would call the name being
 # redefined — infinite recursion on the very next prompt.
-if (-not $global:_wmux_prompt_hooked) {
-    $global:_wmux_prompt_hooked = $true
-    $_wmux_original_prompt = $function:prompt
+if (-not $global:_remotea_prompt_hooked) {
+    $global:_remotea_prompt_hooked = $true
+    $_remotea_original_prompt = $function:prompt
     function prompt {
         # Both of these answer for the command the user just ran, and both are
         # about to be destroyed — so they are read before anything else in this
@@ -673,25 +673,25 @@ if (-not $global:_wmux_prompt_hooked) {
         # below while Report-GitBranch ran git on this thread; it runs git on
         # a worker now, but keeps a synchronous fallback, and the capture is
         # what makes the check correct on either path.
-        $_wmux_ok = $global:?
-        $_wmux_native_exit = $LASTEXITCODE
+        $_remotea_ok = $global:?
+        $_remotea_native_exit = $LASTEXITCODE
 
-        if ($global:_wmux_command_open) {
-            $global:_wmux_command_open = $false
-            $_wmux_status = Get-WmuxExitStatus -Succeeded $_wmux_ok -NativeExitCode $_wmux_native_exit
-            Write-WmuxPromptMark "D;$_wmux_status"
+        if ($global:_remotea_command_open) {
+            $global:_remotea_command_open = $false
+            $_remotea_status = Get-RemoteaExitStatus -Succeeded $_remotea_ok -NativeExitCode $_remotea_native_exit
+            Write-RemoteaPromptMark "D;$_remotea_status"
         }
 
         Report-Cwd
-        Update-WmuxCwdFile
+        Update-RemoteaCwdFile
         Report-GitBranch
         # Detect if last command was interrupted (Ctrl+C → exit code -1073741510 on Windows)
-        if ($_wmux_native_exit -eq -1073741510 -or $_wmux_native_exit -eq 130) {
+        if ($_remotea_native_exit -eq -1073741510 -or $_remotea_native_exit -eq 130) {
             Report-ShellState "interrupted"
         } else {
             Report-ShellState "idle"
         }
-        Send-WmuxMessage "ports_kick $env:REMOTEA_SURFACE_ID"
+        Send-RemoteaMessage "ports_kick $env:REMOTEA_SURFACE_ID"
 
         # A and B are RETURNED, wrapped around the prompt, rather than written to
         # the console from in here. That placement is the fix for the Ctrl+L
@@ -731,14 +731,14 @@ if (-not $global:_wmux_prompt_hooked) {
         # this file — a hand-run `oh-my-posh init pwsh | iex` — replaces this
         # wrapper wholesale and takes the pipe reporting above with it; the marks
         # are no worse off than the rest of the integration.
-        $_wmux_body = if ($_wmux_original_prompt) {
-            & $_wmux_original_prompt
+        $_remotea_body = if ($_remotea_original_prompt) {
+            & $_remotea_original_prompt
         } else {
             "PS $($executionContext.SessionState.Path.CurrentLocation)$('>' * ($nestedPromptLevel + 1)) "
         }
         # A prompt function is free to emit more than one object. The marks have
         # to sit outside all of them, so flatten before wrapping.
-        "$(Get-WmuxPromptMark 'A')$($_wmux_body -join '')$(Get-WmuxPromptMark 'B')"
+        "$(Get-RemoteaPromptMark 'A')$($_remotea_body -join '')$(Get-RemoteaPromptMark 'B')"
     }
 }
 
@@ -748,20 +748,20 @@ if (-not $global:_wmux_prompt_hooked) {
 # instead start it on the shell's first idle (after the prompt is already on
 # screen), so it never sits on the startup critical path. A global guard makes it
 # fire exactly once; PR data isn't needed in the first 45s anyway.
-$global:_wmux_pr_started = $false
+$global:_remotea_pr_started = $false
 $null = Register-EngineEvent -SourceIdentifier ([System.Management.Automation.PSEngineEvent]::OnIdle) -Action {
-    if ($global:_wmux_pr_started) { return }
-    $global:_wmux_pr_started = $true
+    if ($global:_remotea_pr_started) { return }
+    $global:_remotea_pr_started = $true
     # Sweep hand-off files left behind by panes that were killed. Done here
     # rather than during init for the same reason the job is: the first prompt
     # should not wait on it.
-    if ($global:_wmux_cwd_file) {
-        Remove-StaleWmuxCwdFiles -Directory (Split-Path -Parent $global:_wmux_cwd_file) -OlderThan (Get-Date).AddDays(-1)
+    if ($global:_remotea_cwd_file) {
+        Remove-StaleRemoteaCwdFiles -Directory (Split-Path -Parent $global:_remotea_cwd_file) -OlderThan (Get-Date).AddDays(-1)
     }
     # A job runs in its own runspace and sees none of this session's functions,
     # so the tick's decision functions are carried across as its initialization.
-    $_wmux_pr_init = [scriptblock]::Create("function Get-WmuxPrMessage {`n$(${function:Get-WmuxPrMessage})`n}`nfunction Resolve-WmuxPaneCwd {`n$(${function:Resolve-WmuxPaneCwd})`n}`nfunction Invoke-WmuxPrTick {`n$(${function:Invoke-WmuxPrTick})`n}")
-    $global:_wmux_pr_job = Start-Job -InitializationScript $_wmux_pr_init -ScriptBlock {
+    $_remotea_pr_init = [scriptblock]::Create("function Get-RemoteaPrMessage {`n$(${function:Get-RemoteaPrMessage})`n}`nfunction Resolve-RemoteaPaneCwd {`n$(${function:Resolve-RemoteaPaneCwd})`n}`nfunction Invoke-RemoteaPrTick {`n$(${function:Invoke-RemoteaPrTick})`n}")
+    $global:_remotea_pr_job = Start-Job -InitializationScript $_remotea_pr_init -ScriptBlock {
         param($surfaceId, $pipeName, $pipeToken, $cwdFile)
         # Whether the PR currently on the row is this pane's own claim.
         $reported = $false
@@ -776,11 +776,11 @@ $null = Register-EngineEvent -SourceIdentifier ([System.Management.Automation.PS
                 # tick, in which case there is nothing to probe: staying on the
                 # old location and reporting its PR would be answering for a
                 # pane that may have moved on, or closed.
-                $resolvedCwd = Resolve-WmuxPaneCwd -CwdFile $cwdFile
+                $resolvedCwd = Resolve-RemoteaPaneCwd -CwdFile $cwdFile
                 if ($resolvedCwd) {
                     # Vouch for the pane. The prompt rewrites this file, but a
                     # pane can sit at an idle prompt for days, and the sweep in
-                    # Remove-StaleWmuxCwdFiles reads age as "is anyone still
+                    # Remove-StaleRemoteaCwdFiles reads age as "is anyone still
                     # here" — so a tick that just used the file says so, and a
                     # live pane can never be swept out from under itself.
                     try { (Get-Item -LiteralPath $cwdFile).LastWriteTime = Get-Date } catch {}
@@ -793,7 +793,7 @@ $null = Register-EngineEvent -SourceIdentifier ([System.Management.Automation.PS
                         $prJson = (gh pr view --json number,state,title 2>$null) -join "`n"
                         $ghExit = $LASTEXITCODE
                     }
-                    $msg = Get-WmuxPrMessage -SurfaceId $surfaceId -PrJson $prJson -ExitCode $ghExit `
+                    $msg = Get-RemoteaPrMessage -SurfaceId $surfaceId -PrJson $prJson -ExitCode $ghExit `
                         -InRepo $inRepo -Reported $reported
                 }
             } catch {
@@ -802,8 +802,8 @@ $null = Register-EngineEvent -SourceIdentifier ([System.Management.Automation.PS
                 $msg = ""
             }
             # The flag only moves if the send below actually lands — see
-            # Invoke-WmuxPrTick for why that ordering matters.
-            $reported = Invoke-WmuxPrTick -Message $msg -CurrentlyReported $reported -Send {
+            # Invoke-RemoteaPrTick for why that ordering matters.
+            $reported = Invoke-RemoteaPrTick -Message $msg -CurrentlyReported $reported -Send {
                 param($m)
                 try {
                     $line = if ($pipeToken) { "auth $pipeToken $m" } else { $m }
@@ -819,7 +819,7 @@ $null = Register-EngineEvent -SourceIdentifier ([System.Management.Automation.PS
                 }
             }
         }
-    } -ArgumentList $env:REMOTEA_SURFACE_ID, $global:_wmux_pipe_name, $env:REMOTEA_PIPE_TOKEN, $global:_wmux_cwd_file
+    } -ArgumentList $env:REMOTEA_SURFACE_ID, $global:_remotea_pipe_name, $env:REMOTEA_PIPE_TOKEN, $global:_remotea_cwd_file
 }
 
 # Quick-launch profile startup commands (issue #32).
@@ -831,17 +831,17 @@ $null = Register-EngineEvent -SourceIdentifier ([System.Management.Automation.PS
 # merged into a bogus executed line (e.g. "62;4;9;22ccls"). Running here avoids
 # that entirely. Runs last so the prompt override / PSReadLine handlers exist.
 if ($env:REMOTEA_STARTUP_COMMANDS) {
-    $_wmux_startup = $env:REMOTEA_STARTUP_COMMANDS -split "`n"
+    $_remotea_startup = $env:REMOTEA_STARTUP_COMMANDS -split "`n"
     # One-shot, and cleared BEFORE the loop: removing it afterwards meant the
     # startup command's own process inherited it (measured: a baked
     # `cmd /c echo %REMOTEA_STARTUP_COMMANDS%` printed it). A restored
     # `claude --resume <id>` and everything that agent spawned then carried
     # the command line, session id included, in their environment.
     Remove-Item Env:\REMOTEA_STARTUP_COMMANDS -ErrorAction SilentlyContinue
-    foreach ($_wmux_cmd in $_wmux_startup) {
-        $_wmux_cmd = $_wmux_cmd.Trim()
-        if ($_wmux_cmd) {
-            try { Invoke-Expression $_wmux_cmd } catch { Write-Error $_ }
+    foreach ($_remotea_cmd in $_remotea_startup) {
+        $_remotea_cmd = $_remotea_cmd.Trim()
+        if ($_remotea_cmd) {
+            try { Invoke-Expression $_remotea_cmd } catch { Write-Error $_ }
         }
     }
 }

@@ -11,9 +11,9 @@
 # first, so a bash started from this pane, or a ~/.bashrc that sources this file
 # itself, never comes back through here.
 if [ -n "${REMOTEA_BASH_INIT-}" ] && [ -n "${BASH_VERSION-}" ]; then
-    _wmux_login="${REMOTEA_BASH_LOGIN-}"
+    _remotea_login="${REMOTEA_BASH_LOGIN-}"
     unset REMOTEA_BASH_INIT REMOTEA_BASH_LOGIN
-    if [ -n "$_wmux_login" ]; then
+    if [ -n "$_remotea_login" ]; then
         [ -r /etc/profile ] && . /etc/profile
         if [ -r ~/.bash_profile ]; then . ~/.bash_profile
         elif [ -r ~/.bash_login ]; then . ~/.bash_login
@@ -22,7 +22,7 @@ if [ -n "${REMOTEA_BASH_INIT-}" ] && [ -n "${BASH_VERSION-}" ]; then
     else
         [ -r ~/.bashrc ] && . ~/.bashrc
     fi
-    unset _wmux_login
+    unset _remotea_login
 fi
 
 export REMOTEA=1
@@ -32,10 +32,10 @@ export REMOTEA=1
 # process startup can otherwise deliver "back at the prompt" before the ssh
 # command that just finished. The receiver accepts older, unsequenced reports;
 # this counter only lets it discard a late arrival from this integration.
-_wmux_ssh_event_seq=0
+_remotea_ssh_event_seq=0
 
-_wmux_next_ssh_event_seq() {
-    _wmux_ssh_event_seq=$((_wmux_ssh_event_seq + 1))
+_remotea_next_ssh_event_seq() {
+    _remotea_ssh_event_seq=$((_remotea_ssh_event_seq + 1))
 }
 
 # remotea CLI shortcut — Claude Code and users can just type: remotea browser open <url>
@@ -49,7 +49,7 @@ if ! command -v remotea &>/dev/null; then
     [ -n "${BASH_VERSION-}" ] && export -f remotea
 fi
 
-_wmux_report() {
+_remotea_report() {
     local msg="$1"
     # Devcontainer transport (issue #19): a shell inside a Linux container can
     # reach neither the Windows named pipe nor a Windows runtime, so the native
@@ -65,14 +65,14 @@ _wmux_report() {
         return
     fi
     # Native: the same `raw-v1` line, through the Windows-side CLI resolved below.
-    [ -z "$_wmux_cli_script" ] && return
+    [ -z "$_remotea_cli_script" ] && return
     (
         if [ -n "${REMOTEA_NODE_ELECTRON-}" ]; then
             export ELECTRON_RUN_AS_NODE=1
             # Interop hands a Windows process only what WSLENV names.
             [ -n "${WSL_DISTRO_NAME-}" ] && export WSLENV="${WSLENV:+$WSLENV:}ELECTRON_RUN_AS_NODE"
         fi
-        "$_wmux_cli_node" "$_wmux_cli_script" raw-v1 "$msg" >/dev/null 2>&1 &
+        "$_remotea_cli_node" "$_remotea_cli_script" raw-v1 "$msg" >/dev/null 2>&1 &
     )
 }
 
@@ -89,24 +89,24 @@ _wmux_report() {
 #   the cli-bin shim does not pick a Windows runtime up with a /mnt script path;
 #   the script goes back to its Windows spelling, which is all node.exe can
 #   open. WSLENV carries REMOTEA_PIPE and the token back out (pane-browser-env.ts).
-_wmux_windows=""
-_wmux_cli_node=""
-_wmux_cli_script=""
+_remotea_windows=""
+_remotea_cli_node=""
+_remotea_cli_script=""
 case "${OSTYPE-}" in
     msys*|cygwin*)
-        _wmux_windows=1
+        _remotea_windows=1
         if [ -n "${REMOTEA_NODE-}" ] && [ -x "$REMOTEA_NODE" ]; then
-            _wmux_cli_node="$REMOTEA_NODE"
+            _remotea_cli_node="$REMOTEA_NODE"
         elif command -v node &>/dev/null; then
-            _wmux_cli_node=node
+            _remotea_cli_node=node
         fi
-        [ -n "$_wmux_cli_node" ] && _wmux_cli_script="${REMOTEA_CLI-}"
+        [ -n "$_remotea_cli_node" ] && _remotea_cli_script="${REMOTEA_CLI-}"
         ;;
     *)
         if [ -n "${WSL_DISTRO_NAME-}" ] && [ -n "${REMOTEA_CLI-}" ] \
             && [ -n "${REMOTEA_WSL_NODE-}" ] && [ -x "$REMOTEA_WSL_NODE" ]; then
-            _wmux_cli_node="$REMOTEA_WSL_NODE"
-            _wmux_cli_script="$(wslpath -w "$REMOTEA_CLI" 2>/dev/null)"
+            _remotea_cli_node="$REMOTEA_WSL_NODE"
+            _remotea_cli_script="$(wslpath -w "$REMOTEA_CLI" 2>/dev/null)"
         fi
         ;;
 esac
@@ -117,22 +117,22 @@ esac
 # does, C:\Users\me, the directory a restored pane is spawned in. `pwd -W` is
 # MSYS's; Cygwin has only cygpath. Either costs a fork, so the answer is kept
 # until the directory changes. WSL keeps the POSIX path, which `wsl --cd` takes.
-_wmux_cwd_for=""
-_wmux_cwd_win=""
+_remotea_cwd_for=""
+_remotea_cwd_win=""
 
-_wmux_report_cwd() {
+_remotea_report_cwd() {
     local surface_id="${REMOTEA_SURFACE_ID}"
     [ -z "$surface_id" ] && return
     local cwd="$PWD"
-    if [ -n "$_wmux_windows" ]; then
-        if [ "$_wmux_cwd_for" != "$PWD" ]; then
-            _wmux_cwd_win="$(pwd -W 2>/dev/null || cygpath -w "$PWD" 2>/dev/null)"
-            _wmux_cwd_win="${_wmux_cwd_win//\//\\}"
-            _wmux_cwd_for="$PWD"
+    if [ -n "$_remotea_windows" ]; then
+        if [ "$_remotea_cwd_for" != "$PWD" ]; then
+            _remotea_cwd_win="$(pwd -W 2>/dev/null || cygpath -w "$PWD" 2>/dev/null)"
+            _remotea_cwd_win="${_remotea_cwd_win//\//\\}"
+            _remotea_cwd_for="$PWD"
         fi
-        cwd="$_wmux_cwd_win"
+        cwd="$_remotea_cwd_win"
     fi
-    [ -n "$cwd" ] && _wmux_report "report_pwd $surface_id $cwd"
+    [ -n "$cwd" ] && _remotea_report "report_pwd $surface_id $cwd"
 }
 
 # One git spawn per prompt, not two. `status --porcelain=v2 --branch` carries
@@ -148,7 +148,7 @@ _wmux_report_cwd() {
 # --no-optional-locks because this runs unasked on every prompt, and a status
 # that refreshes the index takes .git/index.lock — the lock the `git commit`
 # being typed needs. Parsed with builtins: the whole point is fewer forks.
-_wmux_report_git() {
+_remotea_report_git() {
     local surface_id="${REMOTEA_SURFACE_ID}"
     [ -z "$surface_id" ] && return
     local out line branch="" dirty=""
@@ -164,9 +164,9 @@ _wmux_report_git() {
     fi
     if [ -n "$branch" ]; then
         [ "$branch" = "(detached)" ] && branch="HEAD"
-        _wmux_report "report_git_branch $surface_id $branch $dirty"
+        _remotea_report "report_git_branch $surface_id $branch $dirty"
     else
-        _wmux_report "clear_git_branch $surface_id"
+        _remotea_report "clear_git_branch $surface_id"
     fi
 }
 
@@ -185,7 +185,7 @@ _wmux_report_git() {
 # feeds remotea exactly the boundaries this file does.
 # ---------------------------------------------------------------------------
 
-_wmux_esc=$'\033'
+_remotea_esc=$'\033'
 
 # The non-printing brackets — and the ST spelling that survives the prompt
 # decoder — for the shell we are actually in.
@@ -212,24 +212,24 @@ _wmux_esc=$'\033'
 # leaves `\]` intact. zsh's prompt expansion is `%`-based and passes backslashes
 # through untouched, so there the plain form is the correct one.
 if [ -n "$ZSH_VERSION" ]; then
-    _wmux_np_open='%{'
-    _wmux_np_close='%}'
-    _wmux_ps1_st="${_wmux_esc}\\"
+    _remotea_np_open='%{'
+    _remotea_np_close='%}'
+    _remotea_ps1_st="${_remotea_esc}\\"
 else
-    _wmux_np_open='\['
-    _wmux_np_close='\]'
-    _wmux_ps1_st="${_wmux_esc}\\\\"
+    _remotea_np_open='\['
+    _remotea_np_close='\]'
+    _remotea_ps1_st="${_remotea_esc}\\\\"
 fi
-_wmux_mark_a="${_wmux_esc}]133;A${_wmux_ps1_st}"
-_wmux_mark_b="${_wmux_esc}]133;B${_wmux_ps1_st}"
+_remotea_mark_a="${_remotea_esc}]133;A${_remotea_ps1_st}"
+_remotea_mark_b="${_remotea_esc}]133;B${_remotea_ps1_st}"
 
 # C and D are written straight to the terminal rather than parked in a prompt,
 # because neither one sits in a prompt: C goes out once the user's line has been
 # echoed and before the command's first byte of output, D once the command has
 # finished. printf is a builtin, so this adds no fork to the keypress path
 # between Enter and the command starting — the same cost argument that keeps
-# _wmux_report_command down to ssh.
-_wmux_osc133() {
+# _remotea_report_command down to ssh.
+_remotea_osc133() {
     [ -z "${REMOTEA_SURFACE_ID}" ] && return 0
     printf '\033]133;%s\033\\' "$1"
     return 0
@@ -245,8 +245,8 @@ _wmux_osc133() {
 # consumed it. But a C HAS gone out for that same `source`, and it still owes its
 # D, so clearing the open flag here would strand it and leave every #207 consumer
 # with a command that never ends. Keep whatever the running shell already knew.
-_wmux_prompt_armed=""
-_wmux_command_open="${_wmux_command_open-}"
+_remotea_prompt_armed=""
+_remotea_command_open="${_remotea_command_open-}"
 
 # Wrap A and B around whatever the prompt currently is.
 #
@@ -256,25 +256,25 @@ _wmux_command_open="${_wmux_command_open-}"
 # marks on the floor. The `case` makes re-application a no-op once the marks are
 # in place, so a PS1 nobody rewrites is wrapped exactly once instead of growing
 # a fresh pair of marks per prompt.
-_wmux_apply_prompt_marks() {
+_remotea_apply_prompt_marks() {
     [ -z "${REMOTEA_SURFACE_ID}" ] && return 0
     case "$PS1" in
-        *"${_wmux_mark_a}"*) return 0 ;;
+        *"${_remotea_mark_a}"*) return 0 ;;
     esac
-    PS1="${_wmux_np_open}${_wmux_mark_a}${_wmux_np_close}${PS1}${_wmux_np_open}${_wmux_mark_b}${_wmux_np_close}"
+    PS1="${_remotea_np_open}${_remotea_mark_a}${_remotea_np_close}${PS1}${_remotea_np_open}${_remotea_mark_b}${_remotea_np_close}"
     return 0
 }
 
 # Open a command: the line was submitted, its output starts on this row.
 #
 # EVERY path out must succeed, for the reason spelled out on
-# _wmux_report_command: this runs from the DEBUG trap, where a non-zero return
+# _remotea_report_command: this runs from the DEBUG trap, where a non-zero return
 # under `shopt -s extdebug` tells bash to skip the command the user just typed.
-_wmux_mark_output_start() {
-    [ -z "$_wmux_prompt_armed" ] && return 0
+_remotea_mark_output_start() {
+    [ -z "$_remotea_prompt_armed" ] && return 0
     # bash announces PROMPT_COMMAND's own statements through the very same DEBUG
     # trap it announces the user's command through. The arm is therefore taken
-    # away by _wmux_precmd, the first thing PROMPT_COMMAND runs — but the trap
+    # away by _remotea_precmd, the first thing PROMPT_COMMAND runs — but the trap
     # fires for that call itself while the arm is still in place, and on an empty
     # Enter (nothing ran, so nothing consumed the arm) that would open a command
     # at the prompt and leave every consumer anchored on a row where no output
@@ -282,21 +282,21 @@ _wmux_mark_output_start() {
     # is exact, and far cheaper than bash-preexec's scan of every PROMPT_COMMAND
     # entry on each keypress.
     case "$1" in
-        _wmux_precmd*) return 0 ;;
+        _remotea_precmd*) return 0 ;;
     esac
-    _wmux_prompt_armed=""
-    _wmux_command_open=1
-    _wmux_osc133 "C"
+    _remotea_prompt_armed=""
+    _remotea_command_open=1
+    _remotea_osc133 "C"
     return 0
 }
 
 # Close it. Only ever the other half of a C: an empty Enter runs no command but
 # does run the prompt, so an unconditional D would report a command that never
 # existed, carrying the *previous* command's exit status.
-_wmux_mark_command_end() {
-    [ -z "$_wmux_command_open" ] && return 0
-    _wmux_command_open=""
-    _wmux_osc133 "D;$1"
+_remotea_mark_command_end() {
+    [ -z "$_remotea_command_open" ] && return 0
+    _remotea_command_open=""
+    _remotea_osc133 "D;$1"
     return 0
 }
 
@@ -304,9 +304,9 @@ _wmux_mark_command_end() {
 # drawn. Both halves have to be last, for different reasons: PS1 so that a
 # framework rebuilding it earlier in PROMPT_COMMAND does not win, and the arm so
 # that none of PROMPT_COMMAND's own statements can consume it on the way past.
-_wmux_arm_prompt() {
-    _wmux_apply_prompt_marks
-    _wmux_prompt_armed=1
+_remotea_arm_prompt() {
+    _remotea_apply_prompt_marks
+    _remotea_prompt_armed=1
 }
 
 # Everything bash's PROMPT_COMMAND owes at the tail of the cycle, as ONE
@@ -314,38 +314,38 @@ _wmux_arm_prompt() {
 #
 # Folding is not tidiness. bash announces every TOP-LEVEL PROMPT_COMMAND
 # statement through the very same DEBUG trap it announces the user's command
-# through, and _wmux_preexec runs for it — a fork and a Windows process under
+# through, and _remotea_preexec runs for it — a fork and a Windows process under
 # Git Bash and WSL whenever it reports. So a second top-level statement here is
 # not free bookkeeping: it is one more trip through that trap on every prompt,
 # in every pane, forever. Statements
 # INSIDE a function cost nothing, because bash does not propagate the DEBUG trap
 # into functions unless functrace is on. That is the same cost argument that
-# keeps _wmux_report_command down to ssh, and it is why the arming added for
+# keeps _remotea_report_command down to ssh, and it is why the arming added for
 # #207 lives in here rather than beside the flag reset.
-_wmux_bash_precmd_tail() {
-    _wmux_bash_preexec_active=0
-    _wmux_arm_prompt
+_remotea_bash_precmd_tail() {
+    _remotea_bash_preexec_active=0
+    _remotea_arm_prompt
 }
 
-_wmux_precmd() {
+_remotea_precmd() {
     local exit_code=$?
-    # Shut the gate for the whole of PROMPT_COMMAND — see _wmux_mark_output_start
+    # Shut the gate for the whole of PROMPT_COMMAND — see _remotea_mark_output_start
     # — and settle the command that just finished before anything below runs a
     # subprocess of its own.
-    _wmux_prompt_armed=""
-    _wmux_mark_command_end "$exit_code"
+    _remotea_prompt_armed=""
+    _remotea_mark_command_end "$exit_code"
     # Back at a prompt: re-arm the once-per-cycle command report.
-    _wmux_command_reported=""
-    _wmux_report_cwd
-    _wmux_report_git
+    _remotea_command_reported=""
+    _remotea_report_cwd
+    _remotea_report_git
     # 130 = SIGINT (Ctrl+C), 137 = SIGKILL, 143 = SIGTERM
-    _wmux_next_ssh_event_seq
+    _remotea_next_ssh_event_seq
     if [ $exit_code -eq 130 ] || [ $exit_code -eq 137 ] || [ $exit_code -eq 143 ]; then
-        _wmux_report "report_shell_state ${REMOTEA_SURFACE_ID} seq=${_wmux_ssh_event_seq} interrupted"
+        _remotea_report "report_shell_state ${REMOTEA_SURFACE_ID} seq=${_remotea_ssh_event_seq} interrupted"
     else
-        _wmux_report "report_shell_state ${REMOTEA_SURFACE_ID} seq=${_wmux_ssh_event_seq} idle"
+        _remotea_report "report_shell_state ${REMOTEA_SURFACE_ID} seq=${_remotea_ssh_event_seq} idle"
     fi
-    _wmux_report "ports_kick ${REMOTEA_SURFACE_ID}"
+    _remotea_report "ports_kick ${REMOTEA_SURFACE_ID}"
 }
 
 # Report the command line itself, so remotea can tell that this pane just ssh'd
@@ -363,12 +363,12 @@ _wmux_precmd() {
 # and under `shopt -s extdebug` a non-zero return there tells bash to SKIP the
 # command the user just typed — so a bare `return` after a non-matching test
 # would silently swallow commands in any pane where extdebug is on.
-_wmux_report_command() {
+_remotea_report_command() {
     local surface_id="${REMOTEA_SURFACE_ID}"
     [ -z "$surface_id" ] && return 0
     # Once per prompt cycle: bash drives preexec from a DEBUG trap, which fires
     # for every simple command, including the ones inside PROMPT_COMMAND.
-    [ -n "$_wmux_command_reported" ] && return 0
+    [ -n "$_remotea_command_reported" ] && return 0
     local cmdline="$1"
     [ -z "$cmdline" ] && return 0
 
@@ -376,7 +376,7 @@ _wmux_report_command() {
     # keypress path between Enter and the command starting, so reporting
     # everything would tax every command in
     # every pane to learn something only ssh can tell us. Staleness is handled
-    # by the prompt: _wmux_precmd fires report_shell_state, and that is what
+    # by the prompt: _remotea_precmd fires report_shell_state, and that is what
     # clears the session on the far side.
     #
     # Compare the basename of the first word, so an absolute path in either
@@ -390,10 +390,10 @@ _wmux_report_command() {
         *) return 0 ;;
     esac
 
-    _wmux_command_reported=1
+    _remotea_command_reported=1
     # The transport is line-based, so a multi-line command must arrive flat.
-    _wmux_next_ssh_event_seq
-    _wmux_report "report_command $surface_id seq=${_wmux_ssh_event_seq} ${cmdline//$'\n'/ }"
+    _remotea_next_ssh_event_seq
+    _remotea_report "report_command $surface_id seq=${_remotea_ssh_event_seq} ${cmdline//$'\n'/ }"
     return 0
 }
 
@@ -402,23 +402,23 @@ _wmux_report_command() {
 # Once per prompt cycle, on the same arm as the C mark. The DEBUG trap fires for
 # every simple command, PROMPT_COMMAND's own included, so an unguarded report
 # went out for each `true` in `true; true` and, worse, for the PROMPT_COMMAND
-# statements that run AFTER _wmux_precmd's "idle": every prompt ended on
+# statements that run AFTER _remotea_precmd's "idle": every prompt ended on
 # "running" (measured). That stayed invisible while native reports went to a
 # file nobody read; each one is now a Windows process, and a loop typed at the
-# prompt would start one per iteration. _wmux_report_command keeps seeing every
+# prompt would start one per iteration. _remotea_report_command keeps seeing every
 # command, so `cd x && ssh host` is still caught.
-_wmux_preexec() {
+_remotea_preexec() {
     local surface_id="${REMOTEA_SURFACE_ID}"
     [ -z "$surface_id" ] && return 0
-    if [ -n "$_wmux_prompt_armed" ] && [ "${1#_wmux_precmd}" = "$1" ]; then
+    if [ -n "$_remotea_prompt_armed" ] && [ "${1#_remotea_precmd}" = "$1" ]; then
         # First, and before any reporting: readline has already echoed the
         # newline, so the cursor is sitting exactly where the command's output
         # will land.
-        _wmux_mark_output_start "$1"
-        _wmux_next_ssh_event_seq
-        _wmux_report "report_shell_state $surface_id seq=${_wmux_ssh_event_seq} running"
+        _remotea_mark_output_start "$1"
+        _remotea_next_ssh_event_seq
+        _remotea_report "report_shell_state $surface_id seq=${_remotea_ssh_event_seq} running"
     fi
-    _wmux_report_command "$1"
+    _remotea_report_command "$1"
     return 0
 }
 
@@ -431,26 +431,26 @@ _wmux_preexec() {
 # Any rc that ASSIGNS PROMPT_COMMAND (a prompt theme, or a plain
 # `PROMPT_COMMAND='...'`) wipes the wrapper on the way past, and a "have I ever
 # run" latch would then refuse to put it back. The damage is not a missing mark:
-# the DEBUG trap survives, so _wmux_preexec keeps firing `report_shell_state
-# running` while _wmux_precmd never runs again — the pane sticks on "running"
-# with a frozen cwd and git branch forever, and _wmux_command_reported stays
+# the DEBUG trap survives, so _remotea_preexec keeps firing `report_shell_state
+# running` while _remotea_precmd never runs again — the pane sticks on "running"
+# with a frozen cwd and git branch forever, and _remotea_command_reported stays
 # latched at 1 so ssh command lines stop being reported at all, which is the
 # "reported" layer src/main/ssh-detect.ts relies on for remote paste and drop.
 #
 # Re-checking state keeps the property the latch existed for. Registering
-# _wmux_precmd twice would hang a second precmd off every prompt, and with the
+# _remotea_precmd twice would hang a second precmd off every prompt, and with the
 # OSC 133 marks in the picture (#207) that is no longer merely wasteful — two
 # precmds mean the D for a command goes out twice — so a PROMPT_COMMAND that
-# still names _wmux_precmd is left exactly as it is.
+# still names _remotea_precmd is left exactly as it is.
 if [ -n "$ZSH_VERSION" ]; then
     # Zsh: native preexec + precmd. add-zsh-hook de-duplicates by function name,
     # so it is already idempotent and needs no gate of its own. zsh runs precmd
-    # hooks in registration order, so _wmux_arm_prompt is registered last for the
+    # hooks in registration order, so _remotea_arm_prompt is registered last for the
     # same reason it is the last entry in bash's PROMPT_COMMAND below.
     autoload -Uz add-zsh-hook
-    add-zsh-hook precmd _wmux_precmd
-    add-zsh-hook precmd _wmux_arm_prompt
-    add-zsh-hook preexec _wmux_preexec
+    add-zsh-hook precmd _remotea_precmd
+    add-zsh-hook precmd _remotea_arm_prompt
+    add-zsh-hook preexec _remotea_preexec
 elif [ -n "$BASH_VERSION" ]; then
     # Bash: DEBUG trap as preexec, PROMPT_COMMAND as precmd. The two are checked
     # separately because they are lost separately — an rc assignment takes
@@ -459,18 +459,18 @@ elif [ -n "$BASH_VERSION" ]; then
     # PROMPT_COMMAND. `trap -p` costs one fork, paid once per source rather than
     # once per prompt, which is the budget the rest of this file keeps to.
     case "$(trap -p DEBUG)" in
-        *_wmux_preexec*) ;;
-        *) trap '_wmux_bash_preexec_active=1; _wmux_preexec "$BASH_COMMAND"' DEBUG ;;
+        *_remotea_preexec*) ;;
+        *) trap '_remotea_bash_preexec_active=1; _remotea_preexec "$BASH_COMMAND"' DEBUG ;;
     esac
     case "${PROMPT_COMMAND-}" in
-        *_wmux_precmd*) ;;
+        *_remotea_precmd*) ;;
         *)
-            _wmux_bash_preexec_active=0
+            _remotea_bash_preexec_active=0
             # The tail goes after any PROMPT_COMMAND the user already had, not
-            # before it: see _wmux_bash_precmd_tail and _wmux_arm_prompt for why
+            # before it: see _remotea_bash_precmd_tail and _remotea_arm_prompt for why
             # everything it does has to be the last to happen before the prompt
             # appears.
-            PROMPT_COMMAND="_wmux_precmd${PROMPT_COMMAND:+;$PROMPT_COMMAND};_wmux_bash_precmd_tail"
+            PROMPT_COMMAND="_remotea_precmd${PROMPT_COMMAND:+;$PROMPT_COMMAND};_remotea_bash_precmd_tail"
             ;;
     esac
 fi
