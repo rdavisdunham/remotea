@@ -59,7 +59,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  document.body.classList.remove('wmux-dragging');
+  document.body.classList.remove('remotea-dragging');
   vi.clearAllMocks();
 });
 
@@ -298,7 +298,7 @@ describe('double-click empty tab-strip space', () => {
     drag(element('.surface-tab-bar'), 'drop', data);
     expect(props.onReorderSurface).toHaveBeenCalledWith(surfaces[0].id, 1);
     expect(props.onSurfaceDragEnd).toHaveBeenCalledOnce();
-    expect(document.body.classList.contains('wmux-dragging')).toBe(false);
+    expect(document.body.classList.contains('remotea-dragging')).toBe(false);
     doubleClick(element('.surface-tab-bar__tabs'));
     expect(props.onNew).toHaveBeenCalledOnce();
   });

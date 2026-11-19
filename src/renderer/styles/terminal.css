@@ -15,7 +15,7 @@
      Set per-pane by useTerminal to the colour that pane actually took, so a
      `--color-scheme` override matches itself. Unset until the theme resolves,
      and identical to today's rendering for opaque themes. */
-  background: var(--wmux-term-bg, transparent);
+  background: var(--remotea-term-bg, transparent);
   /* Touch pan → wheel (issue #243). wmux owns the vertical pan gesture here and
      translates it into a wheel event, so the platform must not also claim it:
      with anything but `none`, Chromium treats a vertical drag as its own scroll
@@ -55,23 +55,23 @@
    colours (inline, read off the live theme) with the IME's caret or selected
    clause visible. Underlined like conhost and native text fields, so it still
    reads as "not typed yet". */
-.terminal-pane__container .xterm .composition-view .wmux-ime__text {
+.terminal-pane__container .xterm .composition-view .remotea-ime__text {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.terminal-pane__container .xterm .composition-view .wmux-ime__text--active {
-  background: var(--wmux-ime-selection);
+.terminal-pane__container .xterm .composition-view .remotea-ime__text--active {
+  background: var(--remotea-ime-selection);
   text-decoration-thickness: 2px;
 }
 /* Zero width, so the caret never changes the view's width — xterm sizes the
    hidden textarea off it, and the IME's candidate window is positioned from
    that textarea. */
-.terminal-pane__container .xterm .composition-view .wmux-ime__caret {
+.terminal-pane__container .xterm .composition-view .remotea-ime__caret {
   display: inline-block;
   width: 0;
   height: 1.1em;
   vertical-align: text-bottom;
-  border-left: 2px solid var(--wmux-ime-cursor);
+  border-left: 2px solid var(--remotea-ime-cursor);
   margin-right: -2px;
 }
 

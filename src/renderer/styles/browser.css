@@ -1,8 +1,8 @@
-/* The browser panel's header height, next to splitpane.css's --wmux-tab-bar-h
+/* The browser panel's header height, next to splitpane.css's --remotea-tab-bar-h
    for the same reason: the resize handle beside it has to know where its
    neighbour's opaque chrome ends. */
 :root {
-  --wmux-browser-bar-h: 34px;
+  --remotea-browser-bar-h: 34px;
 }
 
 .browser-pane {
@@ -20,7 +20,7 @@
   padding: 4px 8px;
   /* Declared rather than left to the 26px controls plus padding, so the resize
      handle beside it has a height to match. */
-  min-height: var(--wmux-browser-bar-h);
+  min-height: var(--remotea-browser-bar-h);
   background: var(--ui-bg-3);
   flex-shrink: 0;
 }
@@ -263,11 +263,11 @@
    two, because the two sides disagree and only one of the wrong answers is
    visible: too much chrome reads as the header extending 4px, too little reads
    as a hole punched through the window beside it. */
-html.wmux-transparent .browser-resize-handle {
+html.remotea-transparent .browser-resize-handle {
   background: linear-gradient(
     to bottom,
     var(--ui-bg-2) 0,
-    var(--ui-bg-2) var(--wmux-browser-bar-h),
-    var(--wmux-pane-gutter, var(--ui-bg-2)) var(--wmux-browser-bar-h)
+    var(--ui-bg-2) var(--remotea-browser-bar-h),
+    var(--remotea-pane-gutter, var(--ui-bg-2)) var(--remotea-browser-bar-h)
   );
 }

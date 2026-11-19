@@ -661,7 +661,7 @@ export default function App() {
     try { return localStorage.getItem('remotea-focus-mode') === '1'; } catch { return false; }
   });
   useEffect(() => {
-    document.documentElement.classList.toggle('wmux-focus-mode', focusMode);
+    document.documentElement.classList.toggle('remotea-focus-mode', focusMode);
     try { localStorage.setItem('remotea-focus-mode', focusMode ? '1' : '0'); } catch { /* storage unavailable: keep the in-memory state */ }
   }, [focusMode]);
   // A window without OS focus shows no focused pane, so two windows side by
@@ -671,19 +671,19 @@ export default function App() {
     const api = window.remotea?.window;
     if (!api?.onFocusChange) return;
     const apply = (focused: boolean) =>
-      document.documentElement.classList.toggle('wmux-window-inactive', !focused);
+      document.documentElement.classList.toggle('remotea-window-inactive', !focused);
     const off = api.onFocusChange(apply);
     api.isFocused?.().then(apply, () => { /* keep the default: active */ });
     return () => {
       off?.();
-      document.documentElement.classList.remove('wmux-window-inactive');
+      document.documentElement.classList.remove('remotea-window-inactive');
     };
   }, []);
   // The everyday strength of that same overlay, as a custom property for the
   // same reason: dragging the Settings slider re-renders no pane.
   const inactivePaneDim = useStore((s) => s.appearancePrefs.inactivePaneDim);
   useEffect(() => {
-    document.documentElement.style.setProperty('--wmux-inactive-pane-dim', String(inactivePaneDimAlpha(inactivePaneDim)));
+    document.documentElement.style.setProperty('--remotea-inactive-pane-dim', String(inactivePaneDimAlpha(inactivePaneDim)));
   }, [inactivePaneDim]);
   // Screen detection for agents that report no state of their own. One loop for
   // the whole window; it skips every surface whose agent IS reporting.
@@ -1719,7 +1719,7 @@ export default function App() {
     surfaceDragPreviewRef.current = null;
     setSurfaceDrag(null);
     setSurfaceDragPreview(null);
-    document.body.classList.remove('wmux-dragging');
+    document.body.classList.remove('remotea-dragging');
   }, []);
 
   const handleSurfaceDragPreviewTarget = useCallback((targetPaneId: PaneId, target: SurfaceDragPreviewTarget) => {
@@ -1770,7 +1770,7 @@ export default function App() {
     surfaceDragPreviewRef.current = null;
     setSurfaceDrag(null);
     setSurfaceDragPreview(null);
-    document.body.classList.remove('wmux-dragging');
+    document.body.classList.remove('remotea-dragging');
   }, []);
 
   useEffect(() => {

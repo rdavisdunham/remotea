@@ -1,7 +1,7 @@
 /* The surface tab bar's height. Shared, because a divider runs the full height
    of the panes it separates and has to know where their opaque chrome ends. */
 :root {
-  --wmux-tab-bar-h: 34px;
+  --remotea-tab-bar-h: 34px;
 }
 
 .split-container {
@@ -71,8 +71,8 @@
    `:not(--focused)` keeps the accent border on the focused pane, which would
    otherwise lose to this rule on specificity; the rule below is what that pane
    gets instead. */
-html.wmux-transparent .pane-wrapper:not(.pane-wrapper--focused) {
-  border-color: var(--wmux-pane-gutter, var(--ui-bg-2));
+html.remotea-transparent .pane-wrapper:not(.pane-wrapper--focused) {
+  border-color: var(--remotea-pane-gutter, var(--ui-bg-2));
 }
 /* Which left the focus ring as the only edge still compositing onto the
    desktop. 30% accent over an opaque window resolves against the chrome behind
@@ -85,25 +85,25 @@ html.wmux-transparent .pane-wrapper:not(.pane-wrapper--focused) {
    opaque chrome, so a translucent ring runs as a see-through line between the
    opaque titlebar above it and the opaque tab bar below. No single
    border-color matches opaque chrome on one edge and a translucent terminal on
-   the others. --wmux-pane-ring is therefore the theme colour with 30% accent
+   the others. --remotea-pane-ring is therefore the theme colour with 30% accent
    mixed in at FULL opacity — the focus ring is an indicator, which is chrome,
    and chrome here is opaque. usePaneFill does the mix. The fallback is the
    plain accent rule, which is what a custom background wants anyway — there
    the fill is transparent because that layer is the surface. */
-html.wmux-transparent .pane-wrapper--focused {
-  border-color: var(--wmux-pane-ring, rgba(var(--ui-accent-rgb), 0.3));
+html.remotea-transparent .pane-wrapper--focused {
+  border-color: var(--remotea-pane-ring, rgba(var(--ui-accent-rgb), 0.3));
 }
 /* A window without OS focus (App.tsx sets the class) keeps its focused pane
    but stops showing it: the ring and the active-tab accent fall back to what an
    unfocused pane has, so only the window with the keyboard shows one. */
-html.wmux-window-inactive .pane-wrapper--focused {
+html.remotea-window-inactive .pane-wrapper--focused {
   border-color: var(--ui-border);
 }
-html.wmux-transparent.wmux-window-inactive .pane-wrapper--focused {
-  border-color: var(--wmux-pane-gutter, var(--ui-bg-2));
+html.remotea-transparent.remotea-window-inactive .pane-wrapper--focused {
+  border-color: var(--remotea-pane-gutter, var(--ui-bg-2));
 }
-html.wmux-transparent .split-divider {
-  background: var(--wmux-pane-gutter, var(--ui-bg-2));
+html.remotea-transparent .split-divider {
+  background: var(--remotea-pane-gutter, var(--ui-bg-2));
 }
 /* Except across the tab bars. A divider between two side-by-side panes runs the
    whole pane height, and the top 28px of a pane is its surface tab bar, which is
@@ -116,12 +116,12 @@ html.wmux-transparent .split-divider {
    Vertical dividers need no equivalent: they separate one pane's content from
    the NEXT pane's tab bar, so the fill already matches the surface immediately
    above them, which is the side that would otherwise show a seam. */
-html.wmux-transparent .split-divider--horizontal {
+html.remotea-transparent .split-divider--horizontal {
   background: linear-gradient(
     to bottom,
     var(--ui-bg-2) 0,
-    var(--ui-bg-2) var(--wmux-tab-bar-h),
-    var(--wmux-pane-gutter, var(--ui-bg-2)) var(--wmux-tab-bar-h)
+    var(--ui-bg-2) var(--remotea-tab-bar-h),
+    var(--remotea-pane-gutter, var(--ui-bg-2)) var(--remotea-tab-bar-h)
   );
 }
 .pane-wrapper__content {
@@ -143,18 +143,18 @@ html.wmux-transparent .split-divider--horizontal {
 /* Strength from Settings → General → "Dim unfocused panes" (App.tsx sets the
    property); the fallback is the shipped default. */
 .pane-wrapper__unfocused-overlay {
-  position: absolute; inset: 0; background: rgba(0, 0, 0, var(--wmux-inactive-pane-dim, 0.2));
+  position: absolute; inset: 0; background: rgba(0, 0, 0, var(--remotea-inactive-pane-dim, 0.2));
   pointer-events: none; z-index: 5; transition: opacity 0.15s ease, background-color 0.2s ease;
 }
 /* In a window without OS focus the focused pane dims like the rest, since the
    keyboard is in another window. A stylesheet rule rather than an inline
    style so the window class can override it. */
 .pane-wrapper--focused .pane-wrapper__unfocused-overlay { opacity: 0; }
-html.wmux-window-inactive .pane-wrapper--focused .pane-wrapper__unfocused-overlay { opacity: 1; }
+html.remotea-window-inactive .pane-wrapper--focused .pane-wrapper__unfocused-overlay { opacity: 1; }
 /* Focus mode (titlebar button): the same overlay, much darker, and the
    unfocused panes' tab bars fade with it. Still pointer-events: none, so a
    click on a dimmed pane focuses it and the spotlight follows. */
-.wmux-focus-mode .pane-wrapper__unfocused-overlay {
+.remotea-focus-mode .pane-wrapper__unfocused-overlay {
   background: rgba(0, 0, 0, 0.62);
 }
 .surface-tab-bar { transition: opacity 0.2s ease; }
@@ -167,7 +167,7 @@ html.wmux-window-inactive .pane-wrapper--focused .pane-wrapper__unfocused-overla
 .workspace-drop-edge--down { left: 0; right: 0; bottom: 0; height: 18px; }
 .workspace-drop-edge--up span, .workspace-drop-edge--down span { left: 50%; transform: translateX(-50%); }
 .workspace-drop-edge--left span, .workspace-drop-edge--right span { top: 50%; writing-mode: vertical-rl; }
-.wmux-focus-mode .pane-wrapper:not(.pane-wrapper--focused) .surface-tab-bar {
+.remotea-focus-mode .pane-wrapper:not(.pane-wrapper--focused) .surface-tab-bar {
   opacity: 0.4;
 }
 
@@ -175,8 +175,8 @@ html.wmux-window-inactive .pane-wrapper--focused .pane-wrapper__unfocused-overla
 .surface-tab-bar {
   display: flex;
   align-items: center;
-  height: var(--wmux-tab-bar-h);
-  min-height: var(--wmux-tab-bar-h);
+  height: var(--remotea-tab-bar-h);
+  min-height: var(--remotea-tab-bar-h);
   background: var(--ui-bg-1);
   overflow: visible;
   flex-shrink: 0;
@@ -271,7 +271,7 @@ html.wmux-window-inactive .pane-wrapper--focused .pane-wrapper__unfocused-overla
   pointer-events: none;
 }
 /* An unfocused window shows no focused pane (#459). */
-html.wmux-window-inactive .pane-wrapper--focused .surface-tab--active { box-shadow: none; }
+html.remotea-window-inactive .pane-wrapper--focused .surface-tab--active { box-shadow: none; }
 .surface-tab__label--ephemeral { font-style: italic; }
 .surface-tab__rename-input {
   background: rgba(var(--ui-overlay-rgb), 0.1);
@@ -519,10 +519,10 @@ html.wmux-window-inactive .pane-wrapper--focused .surface-tab--active { box-shad
 .pane-drop-zone--top:hover    { border-bottom-color: var(--ui-accent); }
 .pane-drop-zone--bottom:hover { border-top-color: var(--ui-accent); }
 
-body.wmux-dragging .pane-drop-zone--left:hover,
-body.wmux-dragging .pane-drop-zone--right:hover,
-body.wmux-dragging .pane-drop-zone--top:hover,
-body.wmux-dragging .pane-drop-zone--bottom:hover {
+body.remotea-dragging .pane-drop-zone--left:hover,
+body.remotea-dragging .pane-drop-zone--right:hover,
+body.remotea-dragging .pane-drop-zone--top:hover,
+body.remotea-dragging .pane-drop-zone--bottom:hover {
   background: transparent;
   border-color: transparent;
 }
@@ -532,8 +532,8 @@ body.wmux-dragging .pane-drop-zone--bottom:hover {
   border-color: #a6e3a1;
 }
 
-body.wmux-dragging,
-body.wmux-dragging * {
+body.remotea-dragging,
+body.remotea-dragging * {
   cursor: grabbing !important;
 }
 

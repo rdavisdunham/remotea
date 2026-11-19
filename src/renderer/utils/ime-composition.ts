@@ -112,19 +112,19 @@ export function installCompositionClauses(source: CompositionSource): () => void
     const c = source.colors();
     view.style.color = c.foreground;
     view.style.background = c.background;
-    view.style.setProperty('--wmux-ime-cursor', c.cursor);
-    view.style.setProperty('--wmux-ime-selection', c.selection);
+    view.style.setProperty('--remotea-ime-cursor', c.cursor);
+    view.style.setProperty('--remotea-ime-selection', c.selection);
     if (!segments) {
       // Not a report about the composition: show the text, nothing on it.
       if (view.textContent !== text) view.textContent = text;
       return;
     }
     view.replaceChildren(
-      span('wmux-ime__text', segments.before),
+      span('remotea-ime__text', segments.before),
       segments.caret
-        ? span('wmux-ime__caret', '')
-        : span('wmux-ime__text wmux-ime__text--active', segments.active),
-      span('wmux-ime__text', segments.after),
+        ? span('remotea-ime__caret', '')
+        : span('remotea-ime__text remotea-ime__text--active', segments.active),
+      span('remotea-ime__text', segments.after),
     );
   };
 

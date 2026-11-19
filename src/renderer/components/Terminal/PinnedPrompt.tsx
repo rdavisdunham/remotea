@@ -165,7 +165,7 @@ export default function PinnedPrompt({ surfaceId }: { surfaceId: string }) {
       // The terminal must keep the caret: a header the user clicks to look
       // around is not a request to stop typing into the shell behind it.
       onMouseDown={(e) => e.preventDefault()}
-      style={{ '--wmux-pin-lines': prefs.pinLines } as React.CSSProperties}
+      style={{ '--remotea-pin-lines': prefs.pinLines } as React.CSSProperties}
     >
       <button
         type="button"

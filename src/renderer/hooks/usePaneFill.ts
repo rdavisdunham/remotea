@@ -40,7 +40,7 @@ function useUiThemeTick(): number {
 }
 
 /**
- * Publishes `--wmux-pane-fill`: the global terminal background at the current
+ * Publishes `--remotea-pane-fill`: the global terminal background at the current
  * opacity, for the chrome BETWEEN panes — the 6px split dividers and the 1px
  * pane borders.
  *
@@ -53,7 +53,7 @@ function useUiThemeTick(): number {
  * two panes that may carry different `--color-scheme` overrides, and there is
  * no per-pane answer to which one a shared edge belongs to.
  *
- * Also publishes `--wmux-pane-ring`: the focus accent mixed into that colour at
+ * Also publishes `--remotea-pane-ring`: the focus accent mixed into that colour at
  * FULL opacity, for the focused pane's 1px border.
  *
  * The ring is the one edge that cannot match its neighbours by tracking the
@@ -86,9 +86,9 @@ export function usePaneFill(): void {
         if (cancelled) return;
         const bg = schemeBg || base.background;
         const root = document.documentElement;
-        root.style.setProperty('--wmux-pane-fill', withBgAlpha(bg, alpha));
+        root.style.setProperty('--remotea-pane-fill', withBgAlpha(bg, alpha));
 
-        // --wmux-pane-gutter: the same colour, except it is never nothing.
+        // --remotea-pane-gutter: the same colour, except it is never nothing.
         //
         // With a custom background the fill collapses to alpha 0, because that
         // layer is the surface and a pane's own colour must get out of its way.
@@ -97,8 +97,8 @@ export function usePaneFill(): void {
         // showing the raw desktop between two panes that are showing the custom
         // background. Left unset in that case so the CSS falls back to chrome,
         // which is what a gutter is.
-        if (alpha > 0) root.style.setProperty('--wmux-pane-gutter', withBgAlpha(bg, alpha));
-        else root.style.removeProperty('--wmux-pane-gutter');
+        if (alpha > 0) root.style.setProperty('--remotea-pane-gutter', withBgAlpha(bg, alpha));
+        else root.style.removeProperty('--remotea-pane-gutter');
 
         // Set whenever the colours can be resolved, INCLUDING under a custom
         // background. The earlier `alpha > 0` guard here meant that the one
@@ -113,9 +113,9 @@ export function usePaneFill(): void {
         if (rgb && accent) {
           const mix = rgb.map((c, i) =>
             Math.round(accent[i] * RING_ACCENT + c * (1 - RING_ACCENT)));
-          root.style.setProperty('--wmux-pane-ring', `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`);
+          root.style.setProperty('--remotea-pane-ring', `rgb(${mix[0]}, ${mix[1]}, ${mix[2]})`);
         } else {
-          root.style.removeProperty('--wmux-pane-ring');
+          root.style.removeProperty('--remotea-pane-ring');
         }
       })
       .catch(() => { /* theme unavailable — the gaps stay as they were */ });

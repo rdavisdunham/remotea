@@ -596,7 +596,7 @@ export default function PaneWrapper({
   const handleEdgeDrop = (e: React.DragEvent, direction: 'left' | 'right' | 'up' | 'down') => {
     e.preventDefault();
     setDragActive(false);
-    document.body.classList.remove('wmux-dragging');
+    document.body.classList.remove('remotea-dragging');
     const data = e.dataTransfer.getData('application/wmux-surface');
     if (!data || !activeWorkspaceId) {
       onSurfaceDragEnd();
@@ -637,7 +637,7 @@ export default function PaneWrapper({
   const handleCenterDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
-    document.body.classList.remove('wmux-dragging');
+    document.body.classList.remove('remotea-dragging');
     const data = e.dataTransfer.getData('application/wmux-surface');
     if (!data || !activeWorkspaceId) {
       onSurfaceDragEnd();

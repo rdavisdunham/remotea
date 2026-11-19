@@ -2400,7 +2400,7 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
       // exact colour the terminal just took lets the container fill it, and it
       // is per-pane on purpose: a pane with its own --color-scheme has to match
       // itself, not the global theme.
-      terminalRef.current?.style.setProperty('--wmux-term-bg', theme.background ?? 'transparent');
+      terminalRef.current?.style.setProperty('--remotea-term-bg', theme.background ?? 'transparent');
     });
     // Font + cursor + scrollback can be applied synchronously.
     term.options.fontFamily = prefs.fontFamily || term.options.fontFamily;
