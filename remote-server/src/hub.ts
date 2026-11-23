@@ -6,6 +6,7 @@
  * included. Clients apply these idempotently, so the echo is harmless and the
  * originator never needs a separate "your change landed" path.
  */
+import { isTerminalInteraction } from '../../src/shared/remote-query-swallow';
 import os from 'os';
 import {
   PROTO,
@@ -13,6 +14,7 @@ import {
   type AgentHandle,
   type ClientMsg,
   type DiagEvent,
+  type DeviceId,
   type GroupId,
   type HookAgentStatus,
   type ServerFeature,
@@ -157,6 +159,8 @@ export class Hub {
   private readonly now: () => number;
   private readonly log: (msg: string) => void;
   readonly agentState: AgentStateTracker;
+  private lastInteractedSurface: string | null = null;
+  private lastVisitBroadcastAt = 0;
   readonly chatAttention: ChatAttentionService;
   readonly turns: TurnCapture;
   private sink: HubEventSink | null;
@@ -312,6 +316,11 @@ export class Hub {
         return;
       case 'close': return this.close(conn, msg.rid, msg.id);
       case 'takeover': return void this.takeover(conn, msg);
+      case 'sessionSelected': {
+        const ok = this.noteSelection(msg.id, device);
+        conn.sendJson({ t: 'ack', rid: msg.rid, ok, ...(ok ? {} : { error: 'unavailable' }) });
+        return;
+      }
       case 'chatAttention': {
         const result = this.chatAttention.apply(msg.id, device, msg);
         conn.sendJson({ t: 'ack', rid: msg.rid, ...result });
@@ -350,7 +359,7 @@ export class Hub {
   }
 
   private features(): ServerFeature[] {
-    const f: ServerFeature[] = ['rpc', 'chatAttention'];
+    const f: ServerFeature[] = ['rpc', 'chatAttention', 'sessionRecency'];
     if (this.deps.diag) f.push('diag');
     if (this.deps.hooks) f.push('hooks');
     if (this.deps.fs) f.push('fs');
@@ -555,6 +564,7 @@ export class Hub {
       hiddenBy: rec?.hiddenBy ?? [],
       // A respawn is a new process on the same surface: a new incarnation, the same turn numbering.
       incarnation: (rec?.incarnation ?? 0) + 1,
+      lastInteractedAt: rec?.lastInteractedAt,
       chatAttention: rec?.chatAttention,
       chatReminder: rec?.chatReminder,
       turnSeq: rec?.turnSeq,
@@ -855,10 +865,26 @@ export class Hub {
     conn.sendJson({ t: 'probed', rid: msg.rid, status, last, groupStatus });
   }
 
+  /** Keep the latest human visit on the session record. Emit when the relative
+   * order changes, and occasionally during sustained typing on the same pane. */
+  private noteSelection(id: string, device: DeviceId): boolean {
+    const rec = this.registry.session(id);
+    if (!rec || rec.state !== 'live' || rec.hiddenBy.includes(device)) return false;
+    const now = this.now();
+    this.registry.updateSession(id, { lastInteractedAt: now });
+    if (this.lastInteractedSurface !== id || now - this.lastVisitBroadcastAt >= 1000) {
+      this.broadcast({ t: 'sessionUpdated', session: rec });
+      this.lastInteractedSurface = id;
+      this.lastVisitBroadcastAt = now;
+    }
+    return true;
+  }
+
   handleInput(conn: HubConn, id: string, data: string): void {
     if (!conn.device || this.managedControl(id)) return;
     const s = this.sessions.get(id);
     if (s && s.hasSubscriber(conn.id)) {
+      if (isTerminalInteraction(data)) this.noteSelection(id, conn.device.id);
       s.input(conn.id, data);
       this.agentState.humanInput(id, data);
     }

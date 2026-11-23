@@ -641,6 +641,7 @@ export const hi: Translation = {
   'settings.remote.notice.connected': 'रिमोट कंसोल: {name} जुड़ा',
   'settings.remote.pair.title': 'डिवाइस पेयर करें',
   'settings.remote.pair.name': 'डिवाइस का नाम',
+  'settings.remote.pair.allTerminals': 'सभी टर्मिनल टैब और काम के सारांश साझा करें',
   'settings.remote.pair.defaultName': 'फ़ोन',
   'settings.remote.pair.scope': 'पहुँच',
   'settings.remote.pair.scopeViewer': 'केवल देखें: टर्मिनल और एजेंट देखें',

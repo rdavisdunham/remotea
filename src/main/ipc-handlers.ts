@@ -1,3 +1,4 @@
+import { isTerminalInteraction } from '../shared/remote-query-swallow';
 import { isChatAttentionAction } from '../shared/remote-host-protocol';
 import { readIntegrationStatus } from './integration-status';
 import { ipcMain, BrowserWindow, clipboard, shell, dialog, app, nativeTheme, webContents, safeStorage } from 'electron';
@@ -30,6 +31,8 @@ import {
   uploadEnabled,
   type PasteSource,
 } from './remote-insert';
+import { randomUUID } from 'node:crypto';
+import { TerminalVisits } from './terminal-visits';
 import { getAppDataDir } from '../shared/instance';
 import { NotificationManager } from './notification-manager';
 import { detectShells } from './shell-detector';
@@ -177,14 +180,32 @@ async function customNotificationSoundDataUrl(soundPath: string, extension: type
  * console comes up. A Map set per PTY create is the whole cost with it off.
  */
 const remoteBindings = new Map<string, Electron.WebContents>();
+const terminalInstances = new Map<string, string>();
+export const terminalVisits = new TerminalVisits(path.join(getAppDataDir(), 'terminal-visits.json'));
+
+export function localTerminalIdentity(id: string): string | null {
+  return terminalInstances.get(id) ?? null;
+}
+
+export function selectSharedTerminal(id: string): boolean {
+  if (!ptyManager.has(id as SurfaceId) || !remoteBindings.has(id)) return false;
+  const client = remoteHosts.clientOwning(id);
+  const rec = client?.sessions.get(id);
+  if (client && (!client.ready || rec?.state !== 'live' || rec.hiddenBy.includes(remoteHosts.device.id))) return false;
+  terminalVisits.note(id);
+  client?.selectForReader(id);
+  return true;
+}
 
 function bindRemoteSurface(id: string, wc: Electron.WebContents): void {
+  if (!terminalInstances.has(id)) terminalInstances.set(id, randomUUID());
   remoteBindings.set(id, wc);
   remoteTaps.bindSurface(id, wc);
 }
 
 function unbindRemoteSurface(id: string): void {
   remoteBindings.delete(id);
+  terminalInstances.delete(id);
   remoteTaps.unbindSurface(id);
 }
 
@@ -771,6 +792,7 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
     // what keeps answerAgent's "answering never clears blocked" rule intact
     // while still letting a human who typed the answer themselves clear it
     // (issue #151).
+    if (isTerminalInteraction(data)) terminalVisits.note(id);
     noteHumanInput(id, data);
     // Typing at the desktop is "seen" for the Remote Console's Done marker (#254).
     remoteTaps.noteDesktopInput(id);
@@ -806,6 +828,10 @@ export function registerIpcHandlers(windowManager: WindowManager, cdpProxyInstan
 
   // remotea: the user is looking at (focused) this terminal — on a remote one,
   // this device takes control of its size.
+  ipcMain.on(IPC_CHANNELS.PTY_SELECTED, (event, id: unknown) => {
+    if (ownsLiveSurface(id, event.sender)) selectSharedTerminal(id);
+  });
+
   ipcMain.on(IPC_CHANNELS.PTY_FOCUS, (_event, id: SurfaceId) => {
     ptyManager.claim(id);
   });
@@ -2086,9 +2112,9 @@ export function registerRemoteConsoleHandlers(): void {
     return result;
   });
   handle(IPC_CHANNELS.REMOTE_CONSOLE_PAIR_START, (rt, o) => {
-    const opts = (o ?? {}) as { name?: unknown; scope?: unknown };
+    const opts = (o ?? {}) as { name?: unknown; scope?: unknown; allTerminals?: unknown };
     if (opts.scope !== 'viewer' && opts.scope !== 'operator') return { error: 'bad-scope' };
-    return rt.pairStart({ name: str(opts.name), scope: opts.scope });
+    return rt.pairStart({ name: str(opts.name), scope: opts.scope, allTerminals: opts.allTerminals === true });
   });
   handle(IPC_CHANNELS.REMOTE_CONSOLE_PAIR_CANCEL, rt => rt.pairCancel());
   handle(IPC_CHANNELS.REMOTE_CONSOLE_REVOKE, (rt, id) => rt.revoke(str(id)));

@@ -2505,6 +2505,10 @@ export function useTerminal({ surfaceId, shell, cwd, visible = true, focused = t
     const claim = () => {
       if (remoteRef.current && ptyIdRef.current && document.hasFocus()) window.wmux.pty.focus(ptyIdRef.current);
     };
+    // A keyboard or pointer navigation actually opening this pane counts. A
+    // restored tab or a renderer snapshot coming back online does not.
+    if (ptyIdRef.current && document.hasFocus() && navigator.userActivation?.isActive)
+      window.wmux.pty.selected(ptyIdRef.current);
     claim();
     window.addEventListener('focus', claim);
     return () => window.removeEventListener('focus', claim);

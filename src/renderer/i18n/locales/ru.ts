@@ -641,6 +641,7 @@ export const ru: Translation = {
   'settings.remote.notice.connected': 'Удалённая консоль: {name} подключено',
   'settings.remote.pair.title': 'Сопрячь устройство',
   'settings.remote.pair.name': 'Имя устройства',
+  'settings.remote.pair.allTerminals': 'Поделиться всеми вкладками терминала и сводками о работе',
   'settings.remote.pair.defaultName': 'Телефон',
   'settings.remote.pair.scope': 'Доступ',
   'settings.remote.pair.scopeViewer': 'Только просмотр: следить за терминалами и агентами',

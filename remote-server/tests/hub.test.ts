@@ -231,3 +231,25 @@ describe('Hub', () => {
     expect(registry.session('surf-1')).toMatchObject({ lastCwd: '/work', agent: { sessionId: 'abc' } });
   });
 });
+
+it('orders visits by human activity, independently of host output and passive attach', async () => {
+  const { hub, connect, sp, registry } = setup();
+  const a = connect(DEV_A), b = connect(DEV_B);
+  const id = 'surf-11111111-1111-4111-8111-111111111111';
+  send(hub, a, { t: 'open', rid: 1, id, cols: 110, rows: 32, create: { cwd: '/tmp' } });
+  await waitFor(() => !!a.json('opened').length);
+  send(hub, b, { t: 'open', rid: 1, id, cols: 80, rows: 23 });
+  sp.ptys[0].emit('background progress');
+  expect(registry.session(id)?.lastInteractedAt).toBeUndefined();
+  const dimensions = [...sp.ptys[0].size];
+  send(hub, b, { t: 'sessionSelected', rid: 2, id });
+  expect(b.json('ack').at(-1)).toMatchObject({ rid: 2, ok: true });
+  const visit = registry.session(id)?.lastInteractedAt;
+  expect(visit).toBeGreaterThan(0);
+  expect([...sp.ptys[0].size]).toEqual(dimensions);
+  sp.ptys[0].emit('more background progress');
+  expect(registry.session(id)?.lastInteractedAt).toBe(visit);
+  send(hub, b, { t: 'hide', rid: 3, id });
+  send(hub, b, { t: 'sessionSelected', rid: 4, id });
+  expect(b.json('ack').at(-1)).toMatchObject({ rid: 4, ok: false });
+});

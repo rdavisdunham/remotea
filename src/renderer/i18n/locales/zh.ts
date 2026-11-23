@@ -627,6 +627,7 @@ export const zh: Translation = {
   'settings.remote.notice.connected': '远程控制台：{name} 已连接',
   'settings.remote.pair.title': '配对设备',
   'settings.remote.pair.name': '设备名称',
+  'settings.remote.pair.allTerminals': '共享所有终端标签页和工作摘要',
   'settings.remote.pair.defaultName': '手机',
   'settings.remote.pair.scope': '权限',
   'settings.remote.pair.scopeViewer': '仅查看：查看终端和智能体',

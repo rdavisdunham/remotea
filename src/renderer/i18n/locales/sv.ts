@@ -630,6 +630,7 @@ export const sv: Translation = {
   'settings.remote.notice.connected': 'Fjärrkonsol: {name} ansluten',
   'settings.remote.pair.title': 'Parkoppla en enhet',
   'settings.remote.pair.name': 'Enhetsnamn',
+  'settings.remote.pair.allTerminals': 'Dela alla terminalflikar och arbetssammanfattningar',
   'settings.remote.pair.defaultName': 'Telefon',
   'settings.remote.pair.scope': 'Åtkomst',
   'settings.remote.pair.scopeViewer': 'Endast visning: följ terminaler och agenter',

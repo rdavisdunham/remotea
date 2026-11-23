@@ -1,7 +1,9 @@
 // First: a --smoke run isolates itself before any module reads the instance (smoke-env.ts).
 import './smoke-env';
 import { app, BrowserWindow, ipcMain, powerMonitor, session, shell } from 'electron';
-import { registerIpcHandlers, agentManager, ptyManager, remoteHosts, setupAgentPtyForwarding, reapOrphanedPtys, sshDetector, agentIdentity, replayRemoteBindings } from './ipc-handlers';
+import { buildSharedTerminals } from './remote-console/shared-terminals';
+import { createHash as hashTerminalIdentity } from 'node:crypto';
+import { terminalVisits, localTerminalIdentity, selectSharedTerminal, registerIpcHandlers, agentManager, ptyManager, remoteHosts, setupAgentPtyForwarding, reapOrphanedPtys, sshDetector, agentIdentity, replayRemoteBindings } from './ipc-handlers';
 import { sequenceFrom, splitSequencedReport } from './ssh-detect';
 import { handleDetectionV2 } from './detection-rpc';
 import { isPtyCrashGuardInstalled } from './pty-manager';
@@ -897,8 +899,45 @@ function listRemoteRosters(): Promise<unknown[][]> {
   ));
 }
 
+async function listTerminalWindows(): Promise<unknown[][]> {
+  // A workspace renderer still starting or reloading must not erase its saved rows.
+  return Promise.all(windowManager.getAllWindows().map(async ({ window }) => {
+    const result: unknown = await withDeadline(
+      window.webContents.executeJavaScript('window.__remotea_sharedTerminals()'),
+      REMOTE_ROSTER_WINDOW_MS, null,
+    );
+    if (!Array.isArray(result)) throw new Error('Terminal list temporarily unavailable');
+    return result;
+  }));
+}
+
 const remoteConsoleOps: ConsoleOps = {
   listRoster: listRemoteRosters,
+  selectTerminal: selectSharedTerminal,
+  listTerminals: async () => buildSharedTerminals(await listTerminalWindows(), id => {
+    const client = remoteHosts.clientOwning(id);
+    const rec = client?.sessions.get(id);
+    if (rec?.hiddenBy.includes(remoteHosts.device.id)) return null;
+    const readable = ptyManager.has(id as SurfaceId) && !!localTerminalIdentity(id) &&
+      (!client || (client.ready && rec?.state === 'live'));
+    const source = rec && client?.ready && client.serverId && client.bootId && client.bootId === rec.bootId && client.epoch &&
+      rec.incarnation !== undefined && rec.incarnation > 0
+      ? { serverId: client.serverId, epoch: client.epoch, bootId: client.bootId, surfaceId: id, incarnation: rec.incarnation }
+      : null;
+    const terminalIdentity = source
+      ? hashTerminalIdentity('sha256').update(JSON.stringify([source.serverId, source.epoch, source.bootId,
+        id, rec!.groupId, source.incarnation])).digest('hex')
+      : localTerminalIdentity(id);
+    const a = rec?.chatAttention;
+    const attention = a?.kind === 'finished' || a?.kind === 'needs_you'
+      ? { kind: a.kind, at: a.at, revision: a.revision } : null;
+    const summary = rec && client?.teaState?.config.summaries !== false && (!rec.agent ||
+      rec.tea?.source === rec.agent.provider + ':' + rec.agent.sessionId) ? rec.tea?.summary : undefined;
+    const state = rec?.agentState?.state;
+    return { source, terminalIdentity, readable, lastInteractedAt: Math.max(terminalVisits.get(id) ?? 0, rec?.lastInteractedAt ?? 0) || null,
+      kind: rec?.agent?.provider, summary, ...(rec ? { attention } : {}),
+      state: client && !readable ? 'offline' : state === 'needs_you' || state === 'working' || state === 'idle' ? state : undefined };
+  }),
   isLivePty: id => ptyManager.has(id as SurfaceId),
   // Declared blocked only — the snapshot carries `state`, not the private
   // `awaitingHuman` field. Detected-blocked is guarded client-side only.
@@ -907,7 +946,7 @@ const remoteConsoleOps: ConsoleOps = {
   promptId: id => currentPromptId(id as SurfaceId),
   promptView: id => currentPromptView(id as SurfaceId),
   isAnsweringInput,
-  noteHumanInput: (id, bytes) => { noteHumanInput(id as SurfaceId, bytes); },
+  noteHumanInput: (id, bytes) => { if (bytes.length) terminalVisits.note(id); noteHumanInput(id as SurfaceId, bytes); },
   write: (id, bytes) => ptyManager.write(id as SurfaceId, bytes),
   deliverAnswer,
   // The same METADATA_UPDATE path `wmux notify` takes (a V1 `notify` with no
@@ -2708,6 +2747,7 @@ let agentBrowserTornDown = false;
 let quitDeferred = false;
 
 app.on('will-quit', (event) => {
+  terminalVisits.flush();
   const ptysAtQuit = ptyManager.count();
   logDiagnostic('will-quit', { ptys: ptysAtQuit, guard: isPtyCrashGuardInstalled() });
   // A quit that wedges in native teardown never runs JS again (#289: alive 16 h

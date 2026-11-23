@@ -754,6 +754,7 @@ export const cs: Translation = {
   'settings.remote.notice.connected': 'Vzdálená konzole: {name} je připojeno',
   'settings.remote.pair.title': 'Spárovat zařízení',
   'settings.remote.pair.name': 'Název zařízení',
+  'settings.remote.pair.allTerminals': 'Sdílet všechny karty terminálů a souhrny práce',
   'settings.remote.pair.defaultName': 'Telefon',
   'settings.remote.pair.scope': 'Přístup',
   'settings.remote.pair.scopeViewer': 'Jen zobrazení: sledovat terminály a agenty',

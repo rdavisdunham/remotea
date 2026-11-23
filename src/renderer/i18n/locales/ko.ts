@@ -650,6 +650,7 @@ export const ko: Translation = {
   'settings.remote.notice.connected': '원격 콘솔: {name} 연결됨',
   'settings.remote.pair.title': '기기 페어링',
   'settings.remote.pair.name': '기기 이름',
+  'settings.remote.pair.allTerminals': '모든 터미널 탭과 작업 요약 공유',
   'settings.remote.pair.defaultName': '휴대폰',
   'settings.remote.pair.scope': '권한',
   'settings.remote.pair.scopeViewer': '보기 전용: 터미널과 에이전트 지켜보기',

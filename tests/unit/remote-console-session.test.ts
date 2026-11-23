@@ -675,3 +675,29 @@ describe('session: review fixes, round 3 (#254)', () => {
     expect(h.deps.onAttach).toHaveBeenCalledTimes(5);
   });
 });
+
+describe('all-terminal pairing', () => {
+  it('ordinary paired clients cannot enumerate all tabs or set shared recency', async () => {
+    const h = await greeted();
+    h.ops.listTerminals = vi.fn(async () => []);
+    h.ops.selectTerminal = vi.fn(() => true);
+    await h.frame({ t: 'terminals' });
+    await h.frame({ t: 'selected', s: S });
+    expect(h.sent).toHaveLength(2);
+    expect(h.sent.every(m => m.t === 'error' && m.code === 'forbidden')).toBe(true);
+    expect(h.ops.listTerminals).not.toHaveBeenCalled();
+    expect(h.ops.selectTerminal).not.toHaveBeenCalled();
+  });
+
+  it('an explicitly shared viewer can list and select without attaching, resizing or writing', async () => {
+    const h = await greeted({ scope: 'viewer' });
+    h.deps.device.allTerminals = true;
+    h.ops.listTerminals = vi.fn(async () => []);
+    h.ops.selectTerminal = vi.fn(() => true);
+    await h.frame({ t: 'terminals' });
+    await h.frame({ t: 'selected', s: S });
+    expect(h.sent).toEqual([{ t: 'terminals', list: [], at: 1000000 }, { t: 'selected', s: S, ok: true }]);
+    expect(h.deps.onAttach).not.toHaveBeenCalled();
+    expect(h.calls).toEqual([]);
+  });
+});

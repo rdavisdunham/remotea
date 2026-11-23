@@ -641,6 +641,7 @@ export const pl: Translation = {
   'settings.remote.notice.connected': 'Zdalna konsola: połączono {name}',
   'settings.remote.pair.title': 'Sparuj urządzenie',
   'settings.remote.pair.name': 'Nazwa urządzenia',
+  'settings.remote.pair.allTerminals': 'Udostępnij wszystkie karty terminali i podsumowania pracy',
   'settings.remote.pair.defaultName': 'Telefon',
   'settings.remote.pair.scope': 'Dostęp',
   'settings.remote.pair.scopeViewer': 'Tylko podgląd: obserwuj terminale i agentów',

@@ -33,6 +33,8 @@ export type DeliverAnswerReason ='not-blocked' | 'no-choices' | 'unknown-choice'
 export interface ConsoleOps {
   /** `__wmux_remoteRoster()` on every window; one array per window, merged by the runtime (#143). */
   listRoster(): Promise<unknown[][]>;
+  listTerminals?(): Promise<import('../../shared/remote-console-protocol').SharedTerminal[]>;
+  selectTerminal?(id: string): boolean;
   isLivePty(id: string): boolean;
   /** Declared blocked only: `getAgentState(id)?.state === 'blocked'`. */
   isBlocked(id: string): boolean;
@@ -82,7 +84,7 @@ export interface RemoteConsoleRuntime {
   getStatus(): RemoteConsoleStatus;
   v2Status(): RemoteV2Status;
   setConfig(raw: unknown): Promise<{ ok: true } | { ok: false; error: string }>;
-  pairStart(o: { name: string; scope: RemoteScope }): PairOffer | { error: string };
+  pairStart(o: { name: string; scope: RemoteScope; allTerminals?: boolean }): PairOffer | { error: string };
   pairCancel(): void;
   /** `write-failed`: cut off live, but the file write did not land (retried on the next change or reload). */
   revoke(id: string): { error: 'write-failed' } | undefined;

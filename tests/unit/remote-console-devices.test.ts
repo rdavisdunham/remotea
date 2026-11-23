@@ -309,3 +309,14 @@ describe('DeviceRegistry: page key and re-pairing (#254)', () => {
     expect(reg.verify(`${first.device.id}.${first.token}`)).toBeNull();
   });
 });
+
+it('records all-terminal permission only when granted by the desktop offer', () => {
+  const { reg, saves, deps } = harness();
+  expect(pair(reg).device.allTerminals).toBeUndefined();
+  const offer = reg.mintPairing({ name: 'Glass', scope: 'viewer', allTerminals: true });
+  if ('error' in offer) throw new Error(offer.error);
+  const result = reg.consumePairing(offer.secret, 'viewer');
+  if (!result.ok) throw new Error(result.reason);
+  const restored = new DeviceRegistry({ ...deps, load: () => saves.at(-1) });
+  expect(restored.verify(result.device.id + '.' + result.token)?.allTerminals).toBe(true);
+});

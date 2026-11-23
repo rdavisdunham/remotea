@@ -76,6 +76,8 @@ export type ClientMessage =
   | { t: 'attach'; s: string }
   | { t: 'detach' }
   | { t: 'seen'; s: string }
+  | { t: 'terminals' }
+  | { t: 'selected'; s: string }
   | { t: 'ping' }
   | { t: 'send'; s: string; nonce: string; text: string; submit: boolean; force?: ConfirmKind[]; prompt?: number }
   | { t: 'key'; s: string; nonce: string; key: RemoteKey; force?: ConfirmKind[]; prompt?: number }
@@ -94,6 +96,8 @@ export const SCOPE_OF: Readonly<Record<ClientMessageType, RemoteScope>> = {
   attach: 'viewer',
   detach: 'viewer',
   seen: 'viewer',
+  terminals: 'viewer',
+  selected: 'viewer',
   ping: 'viewer',
   send: 'operator',
   key: 'operator',
@@ -152,7 +156,26 @@ export interface RemoteRosterEntry {
   dwellMs: number;
 }
 
+export interface SharedTerminal {
+  s: string;
+  workspaceId: string;
+  workspaceTitle: string;
+  label: string;
+  kind: string | null;
+  state: 'working' | 'finished' | 'needs_you' | 'idle' | 'unknown' | 'offline';
+  summary: string | null;
+  attention: { kind: 'finished' | 'needs_you'; revision: number; at: number } | null;
+  lastInteractedAt: number | null;
+  terminalIdentity: string | null;
+  source: { serverId: string; epoch: string; bootId: string; surfaceId: string; incarnation: number } | null;
+  readable: boolean;
+  /** Input needs an independently verified foreground agent on its owning host. */
+  writable: false;
+}
+
 export type ServerMessage =
+  | { t: 'terminals'; list: SharedTerminal[]; at: number }
+  | { t: 'selected'; s: string; ok: boolean }
   | {
       t: 'welcome';
       v: number;
@@ -181,7 +204,7 @@ export type ServerMessage =
        */
       submitSkipped?: boolean;
     }
-  | { t: 'error'; code: 'bad-frame' | 'hello-required' | 'forbidden' | 'rate'; message: string }
+  | { t: 'error'; code: 'bad-frame' | 'hello-required' | 'forbidden' | 'rate' | 'unavailable'; message: string }
   /**
    * `replaced`: this browser paired again (another tab scanned a new code), so
    * the record behind this socket was superseded rather than removed. The page
@@ -235,6 +258,8 @@ const ALLOWED_FIELDS: Readonly<Record<ClientMessageType, readonly string[]>> = {
   attach: ['t', 's'],
   detach: ['t'],
   seen: ['t', 's'],
+  terminals: ['t'],
+  selected: ['t', 's'],
   ping: ['t'],
   send: ['t', 's', 'nonce', 'text', 'submit', 'force', 'prompt'],
   key: ['t', 's', 'nonce', 'key', 'force', 'prompt'],
@@ -272,8 +297,10 @@ function fieldsValid(o: Record<string, unknown>, t: ClientMessageType): boolean 
       return Number.isInteger(o.v);
     case 'attach':
     case 'seen':
+    case 'selected':
       return isSurface(o.s);
     case 'detach':
+    case 'terminals':
     case 'ping':
       return true;
     case 'send':

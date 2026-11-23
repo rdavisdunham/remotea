@@ -274,7 +274,7 @@ export type RemoteBridgeError = { error: string };
 export interface RemoteConsoleBridge {
   getState(): Promise<RemoteConsoleStatus | RemoteBridgeError>;
   setConfig(raw: unknown): Promise<{ ok: true } | { ok: false; error: string } | RemoteBridgeError>;
-  pairStart(o: { name: string; scope: RemoteScope }): Promise<PairOffer | RemoteBridgeError>;
+  pairStart(o: { name: string; scope: RemoteScope; allTerminals?: boolean }): Promise<PairOffer | RemoteBridgeError>;
   pairCancel(): Promise<void | RemoteBridgeError>;
   revoke(id: string): Promise<void | RemoteBridgeError>;
   revokeAll(): Promise<void | RemoteBridgeError>;

@@ -7,6 +7,8 @@ import { splitNode, getAllPaneIds, findLeaf, buildGridLayout, buildAgentLayout, 
 import { resolveAnchorPane, resolveLayoutSize } from './store/agent-layout-target';
 import { surfaceTerminalRegistry, showPaneNotice } from './hooks/useTerminal';
 import { rollupAgents } from './store/agent-rollup';
+import { sharedTerminalTabs } from './utils/shared-terminals';
+import { useLocalChatAttention } from './remote-sessions/chat-attention';
 import { toRemoteRosterSource } from './utils/remote-roster';
 import { selectWorkspaceLabels } from './components/SplitPane/use-osc-title';
 import { openLinkFromBridge } from './utils/open-link';
@@ -777,6 +779,12 @@ export function initPipeBridge(): void {
   // subscribes to the store for it. Workspaces carry the sidebar's labels, so
   // the phone names them as the desktop does (#343); the CLI's answers above
   // keep the stored title.
+  w.__remotea_sharedTerminals = () => {
+    const s = useStore.getState();
+    const labels = selectWorkspaceLabels(s, s.workspaces);
+    const { roster } = rollupAgents(s.workspaces, s.agentStates, Date.now(), s.agentIdentities, s.agentDetections, labels);
+    return sharedTerminalTabs(s.workspaces, labels, roster, useLocalChatAttention.getState().entries);
+  };
   w.__wmux_remoteRoster = () => {
     const s = useStore.getState();
     return rollupAgents(

@@ -641,6 +641,7 @@ export const tr: Translation = {
   'settings.remote.notice.connected': 'Uzak konsol: {name} bağlandı',
   'settings.remote.pair.title': 'Cihaz eşleştir',
   'settings.remote.pair.name': 'Cihaz adı',
+  'settings.remote.pair.allTerminals': 'Tüm terminal sekmelerini ve çalışma özetlerini paylaş',
   'settings.remote.pair.defaultName': 'Telefon',
   'settings.remote.pair.scope': 'Erişim',
   'settings.remote.pair.scopeViewer': 'Yalnızca görüntüleme: terminalleri ve ajanları izle',

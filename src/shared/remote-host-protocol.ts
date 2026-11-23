@@ -124,6 +124,8 @@ export interface SessionRecord {
   agent?: AgentHandle;
   /** Last PTY output or input, persisted at most every ~30 s. */
   lastActivityAt?: number;
+  /** Last deliberate selection or human input. Agent output never advances this. */
+  lastInteractedAt?: number;
   /** Devices that chose "Hide on this device" for this session. */
   hiddenBy: DeviceId[];
   /**
@@ -390,6 +392,7 @@ export type ClientMsg =
   | ({ t: 'chatAttention'; rid: number; id: RemoteSurfaceId } & ChatAttentionAction)
   | { t: 'resize'; id: RemoteSurfaceId; cols: number; rows: number }
   | { t: 'claim'; id: RemoteSurfaceId }
+  | { t: 'sessionSelected'; rid: number; id: RemoteSurfaceId }
   | { t: 'deliver'; id: RemoteSurfaceId; commands: string[] }
   | { t: 'probe'; rid: number; ids: RemoteSurfaceId[]; groups?: GroupId[] }
   | { t: 'groupUpsert'; rid: number; group: { id: GroupId; name: string; color?: string } }
@@ -429,7 +432,7 @@ export interface DiagEvent {
  * hook files). A server without it predates the rename: it still connects, but
  * its agents' status hooks won't match this app until it is upgraded.
  */
-export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention' | 'tea' | 'remoteaNames';
+export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention' | 'tea' | 'remoteaNames' | 'sessionRecency';
 
 /**
  * Features an app announces in `hello`. `focus`: it brings a session's tab to
@@ -658,6 +661,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
       return isSurfaceIdList(m.ids) ? (m as unknown as ClientMsg) : null;
     case 'close':
     case 'takeover':
+    case 'sessionSelected':
     case 'hide':
     case 'unhide':
       return isRid(m.rid) && isSurfaceId(m.id) ? (m as unknown as ClientMsg) : null;

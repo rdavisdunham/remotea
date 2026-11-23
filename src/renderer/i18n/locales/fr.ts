@@ -892,6 +892,7 @@ export const fr: Translation = {
   'settings.remote.notice.connected': 'Console distante : {name} connecté',
   'settings.remote.pair.title': 'Associer un appareil',
   'settings.remote.pair.name': 'Nom de l’appareil',
+  'settings.remote.pair.allTerminals': 'Partager tous les onglets de terminal et les résumés de travail',
   'settings.remote.pair.defaultName': 'Téléphone',
   'settings.remote.pair.scope': 'Accès',
   'settings.remote.pair.scopeViewer': 'Lecture seule : suivre les terminaux et les agents',

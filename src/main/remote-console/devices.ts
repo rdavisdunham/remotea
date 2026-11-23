@@ -42,6 +42,7 @@ export interface DeviceRecord {
   id: string;
   name: string;
   scope: RemoteScope;
+  allTerminals?: true;
   tokenHash: string;
   /** Hash of the page key (see the header); null for a record paired before it existed. */
   keyHash: string | null;
@@ -74,6 +75,7 @@ export interface DeviceDeps {
 }
 
 interface Offer {
+  allTerminals?: true;
   hash: string;
   scope: RemoteScope;
   name: string;
@@ -117,6 +119,7 @@ function parseDevice(v: unknown): DeviceRecord | null {
   const key = typeof keyHash === 'string' && /^[0-9a-f]{64}$/.test(keyHash) ? keyHash : null;
   return {
     id, name: cleanDeviceName(name), scope, tokenHash, keyHash: key, createdAt, lastSeenAt,
+    ...(v.allTerminals === true ? { allTerminals: true as const } : {}),
     ...(cleartext === true ? { cleartext: true as const } : {}),
   };
 }
@@ -230,11 +233,11 @@ export class DeviceRegistry {
    * One live offer at a time: a new mint voids the previous one, so a QR code
    * left on a screen stops working the moment the user makes another.
    */
-  mintPairing(o: { scope: RemoteScope; name: string }): { secret: string; expiresAt: number; scope: RemoteScope } | { error: 'device-cap' } {
+  mintPairing(o: { scope: RemoteScope; name: string; allTerminals?: boolean }): { secret: string; expiresAt: number; scope: RemoteScope } | { error: 'device-cap' } {
     if (this.devices.size >= MAX_DEVICES) return { error: 'device-cap' };
     const secret = this.deps.randomBytes(32).toString('base64url');
     const expiresAt = this.deps.now() + PAIR_TTL_MS;
-    this.offer = { hash: this.deps.sha256(secret), scope: o.scope, name: cleanDeviceName(o.name), expiresAt };
+    this.offer = { ...(o.allTerminals === true ? { allTerminals: true } : {}), hash: this.deps.sha256(secret), scope: o.scope, name: cleanDeviceName(o.name), expiresAt };
     return { secret, expiresAt, scope: o.scope };
   }
 
@@ -289,6 +292,7 @@ export class DeviceRegistry {
       id: `dev-${uuidFrom(this.deps.randomBytes(16))}`,
       name: cleanDeviceName(name, offer.name),
       scope: offer.scope,
+      ...(offer.allTerminals ? { allTerminals: true } : {}),
       tokenHash: this.deps.sha256(token),
       keyHash: this.deps.sha256(key),
       createdAt: now,

@@ -455,7 +455,7 @@ export default function SurfaceTabBar({
               title={[tabLabel, `${surface.type === 'browser' ? t('execution.browser') : executionLocationText(t, tabLocation, hostRecords)}${surface.currentCwd || surface.cwd ? ` · ${surface.currentCwd || surface.cwd}` : ''}`].join('\n')}
               role="tab"
               aria-selected={isActive}
-              onClick={() => { markChatRead(surface.id); onSelect(index); }}
+              onClick={() => { if (surface.type === 'terminal') window.wmux.pty.selected(surface.id); markChatRead(surface.id); onSelect(index); }}
               onMouseDown={(e) => {
                 // Autoscroll starts on press, before the middle-button auxclick.
                 if (e.button === 1) e.preventDefault();

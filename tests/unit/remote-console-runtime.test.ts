@@ -125,8 +125,8 @@ function post(port: number, url: string, body: unknown): Promise<{ status: numbe
   });
 }
 
-async function pairViaHttp(rt: ConsoleRuntime, port: number, scope: 'viewer' | 'operator' = 'operator'): Promise<string> {
-  const offer = rt.pairStart({ name: 'Phone', scope });
+async function pairViaHttp(rt: ConsoleRuntime, port: number, scope: 'viewer' | 'operator' = 'operator', allTerminals = false): Promise<string> {
+  const offer = rt.pairStart({ name: 'Phone', scope, allTerminals });
   if ('error' in offer) throw new Error(offer.error);
   const secret = offer.url.split('#pair=')[1];
   const res = await post(port, '/api/pair', { secret, name: 'Pixel' });
@@ -489,6 +489,23 @@ describe('ConsoleRuntime pairing and devices', () => {
 });
 
 describe('ConsoleRuntime sessions, roster, terminal', () => {
+  it('authenticates an all-tabs viewer, reports selection, and keeps a renderer outage distinct from an empty list', async () => {
+    const listTerminals = vi.fn().mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('window reloading'));
+    const selectTerminal = vi.fn(() => true);
+    const { rt, port } = await enabledRuntime(fakeOps({ listTerminals, selectTerminal }));
+    const phone = await openPhone(port, await pairViaHttp(rt, port, 'viewer', true));
+    phone.ws.send(JSON.stringify({ t: 'hello', v: 1 }));
+    expect(await phone.next('welcome')).toMatchObject({ effectiveScope: 'viewer' });
+    phone.ws.send(JSON.stringify({ t: 'terminals' }));
+    expect(await phone.next('terminals')).toMatchObject({ list: [] });
+    phone.ws.send(JSON.stringify({ t: 'selected', s: S }));
+    expect(await phone.next('selected')).toEqual({ t: 'selected', s: S, ok: true });
+    expect(selectTerminal).toHaveBeenCalledWith(S);
+    phone.ws.send(JSON.stringify({ t: 'terminals' }));
+    expect(await phone.next('error')).toMatchObject({ code: 'unavailable' });
+    phone.ws.close();
+  });
+
   it('hello → welcome (host sanitised), roster pushed, first connect notifies once', async () => {
     const { rt, port, ops } = await enabledRuntime();
     const cookie = await pairViaHttp(rt, port);

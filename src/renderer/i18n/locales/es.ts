@@ -631,6 +631,7 @@ export const es: Translation = {
   'settings.remote.notice.connected': 'Consola remota: {name} conectado',
   'settings.remote.pair.title': 'Vincular un dispositivo',
   'settings.remote.pair.name': 'Nombre del dispositivo',
+  'settings.remote.pair.allTerminals': 'Compartir todas las pestañas de terminal y los resúmenes de trabajo',
   'settings.remote.pair.defaultName': 'Teléfono',
   'settings.remote.pair.scope': 'Acceso',
   'settings.remote.pair.scopeViewer': 'Solo lectura: seguir terminales y agentes',

@@ -31,3 +31,14 @@ export function installRemoteQuerySwallow(term: { parser: ParserLike }): void {
   // Colour QUERIES only; a colour SET must still reach xterm.
   for (const code of [10, 11, 12]) p.registerOscHandler(code, (data) => data === '?');
 }
+
+/** Browser xterm sends automatic reports on the same data event as the keyboard.
+ * A daemon querying its cursor or colors must never reorder someone's terminal list. */
+export function isTerminalInteraction(data: string): boolean {
+  if (!data) return false;
+  const esc = String.fromCharCode(27);
+  if (!data.startsWith(esc)) return true;
+  const sequence = data.slice(1);
+  if (sequence.startsWith(']') || sequence.startsWith('P')) return false;
+  return !/^\[(?:[IO]|[?>][\d;]*c|\??\d+;\d+R|\d+n|\??\d+;\d+\$y|\d+(?:;\d+){2}t)$/.test(sequence);
+}

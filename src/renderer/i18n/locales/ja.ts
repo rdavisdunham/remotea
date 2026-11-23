@@ -641,6 +641,7 @@ export const ja: Translation = {
   'settings.remote.notice.connected': 'リモートコンソール: {name} が接続しました',
   'settings.remote.pair.title': '端末をペアリング',
   'settings.remote.pair.name': '端末名',
+  'settings.remote.pair.allTerminals': 'すべてのターミナルタブと作業の要約を共有する',
   'settings.remote.pair.defaultName': 'スマートフォン',
   'settings.remote.pair.scope': 'アクセス',
   'settings.remote.pair.scopeViewer': '閲覧のみ：ターミナルとエージェントを見守る',

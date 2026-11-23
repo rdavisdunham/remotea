@@ -630,6 +630,7 @@ export const nl: Translation = {
   'settings.remote.notice.connected': 'Externe console: {name} verbonden',
   'settings.remote.pair.title': 'Apparaat koppelen',
   'settings.remote.pair.name': 'Apparaatnaam',
+  'settings.remote.pair.allTerminals': 'Alle terminaltabbladen en werksamenvattingen delen',
   'settings.remote.pair.defaultName': 'Telefoon',
   'settings.remote.pair.scope': 'Toegang',
   'settings.remote.pair.scopeViewer': 'Alleen kijken: terminals en agents volgen',

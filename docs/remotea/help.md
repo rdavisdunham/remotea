@@ -114,3 +114,11 @@ Settings search finds controls and their scope. User TOML configuration can over
 Manual workspaces appear in the main list. Eridani task workspaces appear in the collapsible **Eridani runs** section above the sidebar footer. The section starts collapsed and remembers expansion across app restarts. Expand it to select a task workspace and read its run status. Settings → Remote hosts can group these rows under repository headings.
 
 Host registry updates separate Eridani-originated tabs from manual workspaces using their saved run binding. Tab identities and live host sessions carry through the layout move. Manual workspace reordering and **Close others** operate within the manual section, with the corresponding behavior inside the Eridani section.
+
+### Resume a desktop terminal on a wearable
+
+In **Settings → Remote Console**, enable the console and choose **Pair device**. Select **Share all terminal tabs and work summaries** when pairing a client that needs your full desktop list. The setting belongs to this pairing. The phone's regular agent list and its status ordering stay available. The device must reach this desktop’s Remote Console through the configured secure route.
+
+A paired client can request the `terminals` WebSocket message after the ordinary v1 handshake. The response identifies each open terminal tab, its workspace, status, available summary and last deliberate interaction. Opening a terminal on the desktop, through a paired client’s `selected` message, or typing into it records a visit. Background output and repeated snapshots leave the order alone. Remote hosts advertise `sessionRecency` when they can publish visits from other devices too. Terminals with no known visit follow the visited terminals.
+
+The desktop snapshot uses the normal `attach` and `term.reset` messages and retains the pane’s desktop geometry. The catalog exposes a host-backed terminal’s process identity when known, so a wearable can match it to a separately authorized, guarded input route. Desktop-local terminals support reading through the catalog.

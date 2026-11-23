@@ -16,7 +16,7 @@ describe('SCOPE_OF (#254)', () => {
   it('is exhaustive over the client table, and nothing more', () => {
     // Kept in sync with the ClientMessage union by hand: a new message type must
     // be added here AND given a scope, which is the review moment we want.
-    const expected: ClientMessageType[] = ['hello', 'attach', 'detach', 'seen', 'ping', 'send', 'key', 'answer'];
+    const expected: ClientMessageType[] = ['hello', 'attach', 'detach', 'seen', 'terminals', 'selected', 'ping', 'send', 'key', 'answer'];
     expect(Object.keys(SCOPE_OF).sort()).toEqual([...expected].sort());
   });
 
@@ -39,6 +39,8 @@ describe('validateClientMessage', () => {
     ['attach', { t: 'attach', s: S }],
     ['detach', { t: 'detach' }],
     ['seen', { t: 'seen', s: S }],
+    ['terminal catalog', { t: 'terminals' }],
+    ['explicit terminal selection', { t: 'selected', s: S }],
     ['ping', { t: 'ping' }],
     ['send', { t: 'send', s: S, nonce: N, text: 'hi', submit: true }],
     ['send with force', { t: 'send', s: S, nonce: N, text: '', submit: false, force: ['blocked'] }],

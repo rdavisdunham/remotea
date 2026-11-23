@@ -630,6 +630,7 @@ export const de: Translation = {
   'settings.remote.notice.connected': 'Remote-Konsole: {name} verbunden',
   'settings.remote.pair.title': 'Gerät koppeln',
   'settings.remote.pair.name': 'Gerätename',
+  'settings.remote.pair.allTerminals': 'Alle Terminal-Tabs und Arbeitszusammenfassungen freigeben',
   'settings.remote.pair.defaultName': 'Smartphone',
   'settings.remote.pair.scope': 'Zugriff',
   'settings.remote.pair.scopeViewer': 'Nur ansehen: Terminals und Agenten beobachten',

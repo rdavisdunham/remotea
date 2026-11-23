@@ -115,6 +115,7 @@ export interface DeviceSessionState {
    * device can ask for; the frame bucket alone let it ask 50 times a second.
    */
   attach: TokenBucket;
+  catalog: TokenBucket;
 }
 
 export function createDeviceSessionState(now: () => number): DeviceSessionState {
@@ -126,6 +127,7 @@ export function createDeviceSessionState(now: () => number): DeviceSessionState 
     sendBytes: new TokenBucket(LIMITS.sendBytes.rate, LIMITS.sendBytes.burst, now),
     key: new TokenBucket(LIMITS.key.rate, LIMITS.key.burst, now),
     answer: new TokenBucket(LIMITS.answer.rate, LIMITS.answer.burst, now),
+    catalog: new TokenBucket(LIMITS.catalog.rate, LIMITS.catalog.burst, now),
     attach: new TokenBucket(LIMITS.attach.rate, LIMITS.attach.burst, now),
   };
 }
@@ -145,11 +147,11 @@ export function createDeviceSessionState(now: () => number): DeviceSessionState 
 export const REMOTE_ANSWERING_KEYS: ReadonlySet<string> = new Set(['enter', 'y', 'n', 'esc', 'tab', 'shift-tab', 'backspace', 'ctrl-c', 'ctrl-d']);
 
 export type SessionOps = Pick<ConsoleOps,
-  'isLivePty' | 'isBlocked' | 'promptId' | 'runDepth' | 'isAnsweringInput' | 'noteHumanInput' | 'write' | 'deliverAnswer' | 'log'>;
+  'isLivePty' | 'isBlocked' | 'promptId' | 'runDepth' | 'isAnsweringInput' | 'noteHumanInput' | 'write' | 'deliverAnswer' | 'log' | 'listTerminals' | 'selectTerminal'>;
 
 export interface SessionDeps {
   ops: SessionOps;
-  device: { id: string; name: string; scope: RemoteScope };
+  device: { id: string; name: string; scope: RemoteScope; allTerminals?: true };
   effectiveScope: RemoteScope;
   deviceState: DeviceSessionState;
   host: string;
@@ -323,6 +325,28 @@ export class ConsoleSession {
       case 'ping':
         this.d.send({ t: 'pong' });
         return;
+      case 'terminals':
+      case 'selected': {
+        if (!this.d.device.allTerminals || !this.d.ops.listTerminals || !this.d.ops.selectTerminal) {
+          this.d.send({ t: 'error', code: 'forbidden', message: 'Pair with permission to share all terminal tabs.' });
+          return;
+        }
+        if (!this.d.deviceState.catalog.take()) {
+          this.d.send({ t: 'error', code: 'rate', message: 'Too many terminal requests.' });
+          return;
+        }
+        if (msg.t === 'selected') {
+          this.d.send({ t: 'selected', s: msg.s, ok: this.d.ops.selectTerminal(msg.s) });
+        } else {
+          try {
+            const list = await this.d.ops.listTerminals();
+            this.d.send({ t: 'terminals', list, at: this.d.now() });
+          } catch {
+            this.d.send({ t: 'error', code: 'unavailable', message: 'A terminal window is still loading.' });
+          }
+        }
+        return;
+      }
       case 'attach':
         this.handleAttach(msg.s);
         return;

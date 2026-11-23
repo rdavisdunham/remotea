@@ -24,6 +24,7 @@ export const LIMITS = Object.freeze({
   answer: { rate: 2, burst: 2 },
   /** `attach` per device: each one serializes a whole desktop terminal buffer. */
   attach: { rate: 2, burst: 4 },
+  catalog: { rate: 2, burst: 4 },
   /** Limit trips (or forbidden attempts) that close a socket with 4429. */
   trips: { limit: 3, windowMs: 60_000 },
   /** Unauthenticated HTTP, per remote address. */

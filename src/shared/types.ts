@@ -735,6 +735,7 @@ export const IPC_CHANNELS = {
   PTY_SIZE: 'pty:size',
   PTY_REMOTE_SIZE: 'pty:remote-size',
   PTY_FOCUS: 'pty:focus',
+  PTY_SELECTED: 'pty:selected',
   RHOST_LIST: 'rhost:list',
   RHOST_TEA: 'rhost:tea',
   RHOST_SAVE: 'rhost:save',

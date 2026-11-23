@@ -641,6 +641,7 @@ export const uk: Translation = {
   'settings.remote.notice.connected': 'Віддалена консоль: {name} під’єднано',
   'settings.remote.pair.title': 'Спарити пристрій',
   'settings.remote.pair.name': 'Назва пристрою',
+  'settings.remote.pair.allTerminals': 'Поділитися всіма вкладками термінала та підсумками роботи',
   'settings.remote.pair.defaultName': 'Телефон',
   'settings.remote.pair.scope': 'Доступ',
   'settings.remote.pair.scopeViewer': 'Лише перегляд: стежити за терміналами й агентами',

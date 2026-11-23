@@ -117,7 +117,7 @@ export function offerOutcome(
  */
 export async function requestOffer(
   bridge: Pick<RemoteConsoleBridge, 'pairStart' | 'pairCancel'>,
-  request: { name: string; scope: RemoteScope },
+  request: { name: string; scope: RemoteScope; allTerminals?: boolean },
   isClosed: () => boolean,
 ): Promise<PairOffer | RemoteBridgeError | null> {
   const r = await bridge.pairStart(request);
@@ -153,6 +153,7 @@ export default function PairDeviceDialog({ status, onClose }: PairDeviceDialogPr
   // beats a pairing that silently comes out viewer.
   const operatorAllowed = config.bind !== 'lan' || config.allowInsecureControl;
   const [name, setName] = useState(() => t('settings.remote.pair.defaultName'));
+  const [allTerminals, setAllTerminals] = useState(false);
   const [scope, setScope] = useState<RemoteScope>('viewer');
   const effectiveScope: RemoteScope = operatorAllowed ? scope : 'viewer';
   const [offer, setOffer] = useState<LiveOffer | null>(null);
@@ -226,7 +227,7 @@ export default function PairDeviceDialog({ status, onClose }: PairDeviceDialogPr
     try {
       const r = await requestOffer(
         bridge,
-        { name: name.trim() || t('settings.remote.pair.defaultName'), scope: effectiveScope },
+        { name: name.trim() || t('settings.remote.pair.defaultName'), scope: effectiveScope, ...(allTerminals ? { allTerminals: true } : {}) },
         () => closedRef.current,
       );
       if (r === null) return;
@@ -290,6 +291,8 @@ export default function PairDeviceDialog({ status, onClose }: PairDeviceDialogPr
             setName={setName}
             scope={effectiveScope}
             setScope={setScope}
+            allTerminals={allTerminals}
+            setAllTerminals={setAllTerminals}
             operatorAllowed={operatorAllowed}
           />
         )}
@@ -353,10 +356,12 @@ interface PairFormProps {
   setName: (name: string) => void;
   scope: RemoteScope;
   setScope: (scope: RemoteScope) => void;
+  allTerminals: boolean;
+  setAllTerminals: (value: boolean) => void;
   operatorAllowed: boolean;
 }
 
-function PairForm({ name, setName, scope, setScope, operatorAllowed }: PairFormProps) {
+function PairForm({ name, setName, scope, setScope, allTerminals, setAllTerminals, operatorAllowed }: PairFormProps) {
   const t = useT();
   return (
     <>
@@ -371,6 +376,10 @@ function PairForm({ name, setName, scope, setScope, operatorAllowed }: PairFormP
           onChange={(e) => setName(e.target.value)}
         />
       </div>
+      <label className="settings-row">
+        <input type="checkbox" checked={allTerminals} onChange={e => setAllTerminals(e.target.checked)} />
+        {t('settings.remote.pair.allTerminals', 'Share all terminal tabs and work summaries')}
+      </label>
       <div className="settings-row settings-row--column remote-settings__radios" role="radiogroup" aria-label={t('settings.remote.pair.scope')}>
         <span className="settings-label">{t('settings.remote.pair.scope')}</span>
         <label className="remote-settings__radio">

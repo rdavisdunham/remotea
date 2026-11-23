@@ -927,6 +927,7 @@ export const zhTW: Translation = {
   'settings.remote.notice.connected': '遠端主控台：{name} 已連線',
   'settings.remote.pair.title': '配對裝置',
   'settings.remote.pair.name': '裝置名稱',
+  'settings.remote.pair.allTerminals': '分享所有終端機分頁和工作摘要',
   'settings.remote.pair.defaultName': '手機',
   'settings.remote.pair.scope': '權限',
   'settings.remote.pair.scopeViewer': '僅檢視：查看終端機與 agent',

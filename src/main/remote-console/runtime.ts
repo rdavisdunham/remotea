@@ -442,7 +442,7 @@ export class ConsoleRuntime implements RemoteConsoleRuntime {
     return { ok: true };
   }
 
-  pairStart(o: { name: string; scope: RemoteScope }): PairOffer | { error: string } {
+  pairStart(o: { name: string; scope: RemoteScope; allTerminals?: boolean }): PairOffer | { error: string } {
     if (!this.server || !this.listening) return { error: 'not-running' };
     if (o?.scope !== 'viewer' && o?.scope !== 'operator') return { error: 'bad-scope' };
     // Control over a plain-HTTP LAN bind is the user's explicit opt-in; without
@@ -450,7 +450,7 @@ export class ConsoleRuntime implements RemoteConsoleRuntime {
     // the choice out, but that is the renderer's word and this is the rule.
     const insecure = this.config.bind === 'lan' && !this.config.allowInsecureControl;
     const scope: RemoteScope = insecure ? 'viewer' : o.scope;
-    const minted = this.devices.mintPairing({ scope, name: o.name });
+    const minted = this.devices.mintPairing({ scope, name: o.name, allTerminals: o.allTerminals === true });
     if ('error' in minted) return minted;
     const base = pairingBase(this.config, this.listening);
     if (this.pairTimer) clearTimeout(this.pairTimer);
@@ -622,7 +622,7 @@ export class ConsoleRuntime implements RemoteConsoleRuntime {
     const device = client.device;
     const session = new ConsoleSession({
       ops: this.ops,
-      device: { id: device.id, name: device.name, scope: device.scope },
+      device: { id: device.id, name: device.name, scope: device.scope, allTerminals: device.allTerminals },
       effectiveScope: client.effectiveScope,
       deviceState: this.deviceState(device.id),
       host: capText(stripBidi(this.ops.hostname()), 64),

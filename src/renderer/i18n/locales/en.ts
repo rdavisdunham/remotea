@@ -1351,6 +1351,7 @@ export const en = {
   'settings.remote.pair.title': 'Pair a device',
   'settings.remote.pair.name': 'Device name',
   'settings.remote.pair.defaultName': 'Phone',
+  'settings.remote.pair.allTerminals': 'Share all terminal tabs and work summaries',
   'settings.remote.pair.scope': 'Access',
   'settings.remote.pair.scopeViewer': 'View only: watch terminals and agents',
   'settings.remote.pair.scopeOperator': 'Control: also type and answer agents',

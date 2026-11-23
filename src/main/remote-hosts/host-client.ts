@@ -1127,6 +1127,11 @@ export class RemoteHostClient {
     if (s.open) this.sendJson({ t: 'resize', id: s.id, cols, rows });
   }
 
+  selectForReader(id: string): void {
+    if (!this.ready || !this.features.has('sessionRecency')) return;
+    this.sendJson({ t: 'sessionSelected', id: id as RemoteSurfaceId, rid: this.nextRid++ });
+  }
+
   claim(id: string): void {
     const s = this.surfs.get(id);
     if (s?.open) this.sendJson({ t: 'claim', id: s.id });

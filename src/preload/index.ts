@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('wmux', {
     // closed on its server (remotea).
     kill: (id: string, shellSpec?: string) =>
       ipcRenderer.send(IPC_CHANNELS.PTY_KILL, id, shellSpec),
+    selected: (id: string) => ipcRenderer.send(IPC_CHANNELS.PTY_SELECTED, id),
     focus: (id: string) =>
       ipcRenderer.send(IPC_CHANNELS.PTY_FOCUS, id),
     has: (id: string) =>
