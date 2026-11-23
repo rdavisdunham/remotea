@@ -388,6 +388,17 @@ describe('remote-console server: pairing endpoints', () => {
   const json = (r: Rig, body: unknown, extra: Record<string, string> = {}): Promise<Resp> =>
     request(r, 'POST', '/api/pair', { 'Content-Type': 'application/json', Origin: r.origin, ...extra }, JSON.stringify(body));
 
+  it('confirms the all-tabs grant only when the offer included it', async () => {
+    const r = await rig();
+    for (const allTerminals of [false, true]) {
+      const offer = r.devices.mintPairing({ scope: 'viewer', name: 'Glass', allTerminals });
+      if ('error' in offer) throw new Error(offer.error);
+      const response = await json(r, { secret: offer.secret });
+      expect(response.status).toBe(200);
+      expect(JSON.parse(response.body).device.allTerminals).toBe(allTerminals || undefined);
+    }
+  });
+
   it('200 with an HttpOnly SameSite=Strict cookie, then 410 on reuse', async () => {
     const r = await rig();
     const offer = r.devices.mintPairing({ scope: 'operator', name: 'Phone' });

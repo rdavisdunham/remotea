@@ -430,7 +430,8 @@ export function createConsoleServer(deps: ServerDeps): ConsoleServer {
     const secure = isHttpsRequest(header(req, 'host'), lists);
     // The page key goes in the BODY, once: the page keeps it in origin-scoped
     // storage, which is exactly what the cookie is not (devices.ts).
-    send(res, 200, { ok: true, device: { id: r.device.id, name: r.device.name, scope: r.device.scope }, key: r.key }, {
+    send(res, 200, { ok: true, device: { id: r.device.id, name: r.device.name, scope: r.device.scope,
+      ...(r.device.allTerminals ? { allTerminals: true } : {}) }, key: r.key }, {
       'Set-Cookie': cookieHeader(`${r.device.id}.${r.token}`, secure),
     });
     deps.log('remote-paired', { device: r.device.id, scope: r.device.scope });
