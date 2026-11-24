@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { Hub } from '../src/hub';
 import { Registry } from '../src/registry';
@@ -202,6 +205,38 @@ describe('Hub', () => {
     await waitFor(() => b.json('opened').length > 0);
     expect(b.json('opened')[0]).toMatchObject({ created: false });
     expect(b.json('sessionUpdated').at(-1)!.session).toMatchObject({ state: 'live', groupId: 'grp-w' });
+  });
+
+  it.each([
+    { source: 'claude:conversation', sessionId: 'conversation', keep: true },
+    { source: 'claude:previous', sessionId: 'conversation', keep: false },
+    { source: 'codex:conversation', sessionId: 'conversation', keep: false },
+    { source: 'claude:conversation', sessionId: undefined, keep: false },
+    { source: 'claude:invalid id', sessionId: 'invalid id', keep: false },
+  ])('restores Tea from $source only when respawning its conversation ($sessionId)', async ({ source, sessionId, keep }) => {
+    const dir = mkdtempSync(join(tmpdir(), 'remotea-respawn-'));
+    const file = join(dir, 'registry.json');
+    const tea = { source, title: 'Published title', summary: 'Published summary', version: 'v1', sourceAt: 1, generatedAt: 2 };
+    try {
+      const first = setup(Registry.load({ file, bootId: 'boot-1' }));
+      send(first.hub, first.connect(DEV_A), { t: 'open', rid: 1, id: 'surf-1', cols: 80, rows: 24, create: {} });
+      first.registry.updateSession('surf-1', {
+        agent: sessionId ? { provider: 'claude', sessionId, seenAt: 1 } : undefined,
+        tea, teaSourceVersion: 'v2',
+      });
+      await first.hub.shutdown();
+
+      const second = setup(Registry.load({ file, bootId: 'boot-2' }), 'boot-2');
+      const client = second.connect(DEV_A);
+      expect(second.registry.session('surf-1')?.state).toBe('lost');
+      send(second.hub, client, { t: 'open', rid: 2, id: 'surf-1', cols: 80, rows: 24, create: {} });
+      const published = client.json('sessionUpdated').at(-1)!.session;
+      await second.hub.shutdown();
+      expect(published.tea).toEqual(keep ? tea : undefined);
+      expect(published.teaSourceVersion).toBe(keep ? 'v2' : undefined);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('disconnect is a detach: the process keeps running', () => {
