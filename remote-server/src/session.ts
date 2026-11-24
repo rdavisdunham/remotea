@@ -401,6 +401,29 @@ export class TermSession {
 
   // ── Input & size ─────────────────────────────────────────────────────────
 
+  /** Input from any human/device or automation since spawn; query replies do not count. */
+  inputRevision = 0;
+
+  /** Read the current visible screen only once xterm has parsed buffered PTY output. */
+  async composerScreen(): Promise<{ lines: string[]; bracketed: boolean; cursorRow: number; suggestionRow: number | null } | null> {
+    this.flush();
+    const parsed = await new Promise<boolean>(resolve => {
+      const timeout = setTimeout(() => resolve(false), 1000);
+      this.term.write('', () => { clearTimeout(timeout); resolve(true); });
+    });
+    if (!parsed || !this.alive || this.released || this.disposed || this.muted || this.pending || this.parseBacklog) return null;
+    const buf = this.term.buffer.active;
+    const cursorRow = buf.baseY + buf.cursorY - buf.viewportY;
+    const line = buf.getLine(buf.baseY + buf.cursorY);
+    const value = line?.translateToString(true) ?? '';
+    // Claude 2.1.329 places the cursor at the first DIM character of its empty
+    // "Try ..." suggestion. User-entered text with identical wording is not a hint.
+    const suggestion = /^❯[ \u00a0]Try ["“]/u.test(value) && buf.cursorX === 2 && !!line &&
+      Array.from({ length: value.length - 2 }, (_, i) => line.getCell(i + 2)).every(cell => !!cell?.isDim());
+    return { bracketed: this.term.modes.bracketedPasteMode, cursorRow, suggestionRow: suggestion ? cursorRow : null,
+      lines: Array.from({length: this.rows}, (_, i) => buf.getLine(buf.viewportY + i)?.translateToString(true) ?? '') };
+  }
+
   private writePty(data: string): void {
     if (this.alive && this.pty) this.pty.write(data);
   }
@@ -414,6 +437,7 @@ export class TermSession {
   write(data: string): void {
     if (!this.alive) return;
     this.lastActivityAt = Date.now();
+    this.inputRevision++;
     this.writePty(data);
   }
 
@@ -421,6 +445,7 @@ export class TermSession {
     if (!this.alive) return;
     this.lastActivityAt = Date.now();
     this.claim(connId);
+    this.inputRevision++;
     this.writePty(data);
   }
 
@@ -474,7 +499,7 @@ export class TermSession {
         this.dataListeners.add(cb);
         return () => this.dataListeners.delete(cb);
       },
-      write: (d) => this.writePty(d),
+      write: (d) => this.write(d),
       isAlive: () => this.alive,
       setTimeout: (fn, ms) => this.timers.setTimeout(fn, ms),
       clearTimeout: (h) => this.timers.clearTimeout(h),

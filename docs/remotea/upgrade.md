@@ -168,3 +168,14 @@ running, pid, version, proto, owner attached, sessions held and alive) and
 - **Eridani's side** of `draining`: storing it on the host and holding new
   dispatch while it is set. Until Eridani advertises `draining`, it simply
   sees a short disconnect and a reconnect with the same surfaces live.
+
+
+### Activating Google Glass access to ordinary manual host sessions
+
+This host integration is opt-in. Build a separate release against the same Remotea revision as the live host. Keep the running executable, service configuration and rollback artifacts in place until the replacement is tested. Build native dependencies on the target architecture.
+
+Set `REMOTEA_GLASSFACE_DEVICE_ID` to the gateway's device ID and `REMOTEA_GLASSFACE_SCOPE=visible-manual` in the **primary host** service environment. For Claude, set `REMOTEA_GLASSFACE_CLAUDE_BIN` to the versioned native executable used to launch the direct sessions. The gateway authenticates over the normal private host transport and identifies its app as `googleglass`. The server advertises `glassfaceSharedGroups` to that client and checks the foreground native agent before advertising each pane as writable. Hidden panes stay outside its roster. Eridani runs and shells remain view-only. Earlier configured single-group hosts continue to use `REMOTEA_GLASSFACE_GROUP_ID`.
+
+Before activation, run `remotea status --json` using the primary host’s configuration. Check its server identity, health, boot ID, keeper observations and live session records. An idle agent in a PTY owned by the server will still end on restart. Defer activation until every in-process session has actually exited, including Eridani work. The upgrade command has no deferred-until-empty mode. Its drain waits for pending command and write operations. It does not wait for an open terminal to exit.
+
+Arrange a quiet interval for new work. Recheck the live roster and keeper immediately before changing the service's release path. Use the existing `remotea upgrade --unit remotea` against that same configuration, with the actual primary service unit substituted when different. Leave off `--yes` so a newly discovered in-process session stops the upgrade. Compare server identity and keeper session incarnations with the pre-upgrade snapshot. From the authenticated gateway verify `glassfaceSharedGroups`, `sessionRecency`, a normal manual agent, and the read-only status of a shell or managed pane. Keep the old release available for rollback under the same preconditions.

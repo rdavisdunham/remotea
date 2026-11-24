@@ -255,8 +255,8 @@ export function defaultClaudeConfigDir(env: NodeJS.ProcessEnv = process.env): st
  * matched by that prefix. Both the path as given and its real path are tried
  * (Claude records the directory it was started in).
  */
-export function claudeTranscriptExists(configDir: string, cwd: string, sessionId: string): boolean {
-  if (!RESUME_SESSION_ID_RE.test(sessionId)) return false;
+export function claudeTranscriptPath(configDir: string, cwd: string, sessionId: string): string | null {
+  if (!RESUME_SESSION_ID_RE.test(sessionId)) return null;
   const root = path.join(configDir, 'projects');
   const cwds = new Set([cwd]);
   try {
@@ -284,9 +284,16 @@ export function claudeTranscriptExists(configDir: string, cwd: string, sessionId
       }
       folders = listed.filter((f) => f.startsWith(prefix));
     }
-    if (folders.some((f) => isFile(path.join(root, f, `${sessionId}.jsonl`)))) return true;
+    for (const folder of folders) {
+      const candidate = path.join(root, folder, `${sessionId}.jsonl`);
+      if (isFile(candidate)) return candidate;
+    }
   }
-  return false;
+  return null;
+}
+
+export function claudeTranscriptExists(configDir: string, cwd: string, sessionId: string): boolean {
+  return !!claudeTranscriptPath(configDir, cwd, sessionId);
 }
 
 /** A client of the hub that is Eridani: it opens sessions and reads nothing back. */

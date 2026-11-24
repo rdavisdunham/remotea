@@ -136,6 +136,12 @@ export interface SessionRecord {
   incarnation?: number;
   /** The agent's state as the server derives it from hooks and input (remote-server/src/agent-state.ts). */
   agentState?: AgentStateInfo;
+  /** Ephemeral on paired gateway snapshots. */
+  glassfaceInputRevision?: number;
+  /** Fresh foreground identity check for this viewer. Submission checks again. */
+  glassfaceWritable?: boolean;
+  /** Paired Glass welcome only. Opaque identity of one captured root turn. */
+  glassfaceDaniTurn?: GlassfaceTurn;
   /** Agent turns captured in this session so far (turn-capture.ts). */
   turnSeq?: number;
   /** Durable attention and one local, server-scheduled reminder. */
@@ -382,10 +388,19 @@ export function isChatAttentionAction(raw: unknown): raw is ChatAttentionAction 
 
 // ── Messages ───────────────────────────────────────────────────────────────
 
+export interface GlassfaceTurn { id: string; kind: 'question' | 'finished'; endedAt: number }
+type GlassfaceComposerEnvelope = { rid: number; id: RemoteSurfaceId; bootId: string; incarnation: number;
+  provider: 'claude' | 'codex'; conversation: string; operationId: string; text: string; expectedPrompt: string };
+
 export type ClientMsg =
   /** `features`: what this app understands beyond PROTO (absent from older apps; unknown names are ignored). */
   | { t: 'hello'; proto: number; device: { id: DeviceId; name: string }; app: { name: string; version: string }; features?: ClientFeature[] }
   | { t: 'open'; rid: number; id: RemoteSurfaceId; cols: number; rows: number; sinceSeq?: number; bootId?: string; create?: CreateSpec }
+  | { t: 'glassfaceRead'; rid: number; id: RemoteSurfaceId; bootId: string; incarnation: number; conversation: string; maxBytes: number }
+  | { t: 'glassfaceClose'; rid: number; id: RemoteSurfaceId; bootId: string; incarnation: number; groupId: GroupId }
+  | ({ t: 'glassfaceInput' } & GlassfaceComposerEnvelope)
+  | ({ t: 'glassfaceDaniInput'; turn: string } & GlassfaceComposerEnvelope)
+  | { t: 'glassfaceDaniRead'; rid: number; id: RemoteSurfaceId; turn: string }
   | { t: 'detach'; ids: RemoteSurfaceId[] }
   | { t: 'close'; rid: number; id: RemoteSurfaceId }
   | { t: 'takeover'; rid: number; id: RemoteSurfaceId }
@@ -432,7 +447,7 @@ export interface DiagEvent {
  * hook files). A server without it predates the rename: it still connects, but
  * its agents' status hooks won't match this app until it is upgraded.
  */
-export type ServerFeature = 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention' | 'tea' | 'remoteaNames' | 'sessionRecency';
+export type ServerFeature = 'glassfaceDani' | 'glassfaceReader' | 'glassfaceInput' | 'glassfaceClose' | 'rpc' | 'diag' | 'hooks' | 'fs' | 'focus' | 'managedSessions' | 'chatAttention' | 'tea' | 'remoteaNames' | 'sessionRecency' | 'glassfaceSharedGroups';
 
 /**
  * Features an app announces in `hello`. `focus`: it brings a session's tab to
@@ -471,7 +486,17 @@ export const RELAYED_RPC_METHODS: ReadonlySet<string> = new Set([
 
 export type OpenMode = 'fresh' | 'delta' | 'snapshot';
 
+export interface GlassfaceReaderView {
+  replies: Array<{ id: string; text: string }>;
+  model?: string;
+}
+
 export type ServerMsg =
+  | { t: 'glassfaceDaniReadResult'; rid: number; id: RemoteSurfaceId;
+      turn: (GlassfaceTurn & { task: string; reply: string; question: string }) | null }
+  | { t: 'glassfaceReadResult'; rid: number; id: RemoteSurfaceId; reader: GlassfaceReaderView | null }
+  | { t: 'glassfaceReceipt'; rid: number; id: RemoteSurfaceId; operationId: string;
+      status: 'submitted' | 'refused' | 'uncertain' | 'partial' }
   | {
       t: 'welcome'; proto: number; serverId: string; bootId: string; epoch: string;
       hostname: string; you: DeviceId; groups: GroupRecord[]; sessions: SessionRecord[];
@@ -657,6 +682,23 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
         && isOptStr(m.bootId, 64)
         && (m.create === undefined || isCreateSpec(m.create))
         ? (m as unknown as ClientMsg) : null;
+    case 'glassfaceRead':
+      return isRid(m.rid) && isSurfaceId(m.id) && isStr(m.bootId, 128)
+        && isInt(m.incarnation, 1, Number.MAX_SAFE_INTEGER) && isStr(m.conversation, 128) && isInt(m.maxBytes, 512, 384 * 1024)
+        ? (m as unknown as ClientMsg) : null;
+    case 'glassfaceClose':
+      return isRid(m.rid) && isSurfaceId(m.id) && isStr(m.bootId, 128)
+        && isInt(m.incarnation, 1, Number.MAX_SAFE_INTEGER) && isGroupId(m.groupId) ? (m as unknown as ClientMsg) : null;
+    case 'glassfaceDaniRead':
+      return isRid(m.rid) && isSurfaceId(m.id) && typeof m.turn === 'string' && /^[0-9a-f-]{36}$/.test(m.turn)
+        ? (m as unknown as ClientMsg) : null;
+    case 'glassfaceDaniInput':
+    case 'glassfaceInput':
+      return (m.t !== 'glassfaceDaniInput' || (typeof m.turn === 'string' && /^[0-9a-f-]{36}$/.test(m.turn)))
+        && isRid(m.rid) && isSurfaceId(m.id) && isStr(m.bootId, 128)
+        && isInt(m.incarnation, 1, Number.MAX_SAFE_INTEGER) && (m.provider === 'claude' || m.provider === 'codex')
+        && isStr(m.conversation, 128) && isStr(m.operationId, 96) && /^[a-zA-Z0-9_-]{8,96}$/.test(m.operationId)
+        && isStr(m.text, 4000) && isStr(m.expectedPrompt, 512) ? (m as unknown as ClientMsg) : null;
     case 'detach':
       return isSurfaceIdList(m.ids) ? (m as unknown as ClientMsg) : null;
     case 'close':
@@ -715,7 +757,7 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
 }
 
 const SERVER_TYPES = new Set([
-  'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
+  'glassfaceDaniReadResult', 'glassfaceReadResult', 'glassfaceReceipt', 'welcome', 'opened', 'openError', 'probed', 'ack', 'exit', 'size', 'meta',
   'sessionAdded', 'sessionUpdated', 'sessionClosed', 'groupUpserted', 'groupClosed',
   'goingAway', 'pong', 'error', 'rpc', 'hooksStatus', 'fsResult', 'focus', 'teaResult', 'teaChanged', 'teaStream',
 ]);

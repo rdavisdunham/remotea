@@ -58,6 +58,9 @@ async function main(): Promise<void> {
   });
   const hub = new Hub({
     registry,
+    glassfaceDeviceId: process.env.REMOTEA_GLASSFACE_DEVICE_ID,
+    glassfaceGroupId: process.env.REMOTEA_GLASSFACE_GROUP_ID,
+    glassfaceSharedGroups: process.env.REMOTEA_GLASSFACE_SCOPE === 'visible-manual',
     spawn: ptys.spawn,
     bootId,
     serverId,
