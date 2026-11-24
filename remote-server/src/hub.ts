@@ -738,6 +738,11 @@ export class Hub {
       return;
     }
     const resume = custom !== undefined ? custom : wasLost && this.cfg.resumeAgents && rec?.agent ? resumeCommand(rec.agent) : null;
+    // A surface can start a fresh process. Only the resumed conversation owns its saved insight.
+    if (resume !== null && rec?.agent && rec.tea?.source === `${rec.agent.provider}:${rec.agent.sessionId}`) {
+      record.tea = rec.tea;
+      record.teaSourceVersion = rec.teaSourceVersion;
+    }
     const spawnCmd = custom !== undefined ? custom ?? undefined : resume && record.cmd ? resume : record.cmd;
     // A direct resume command already starts the agent. Never type the
     // client's stale startup commands into that restored conversation.
