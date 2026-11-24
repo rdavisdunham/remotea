@@ -8,9 +8,10 @@
  */
 import { isTerminalInteraction } from '../../src/shared/remote-query-swallow';
 import os from 'os';
+import { randomUUID } from 'node:crypto';
 import { GlassfaceTurns } from './glassface-turns';
 import { fitReader, GlassfaceReader } from './glassface-reader';
-import { GlassfaceInput, foregroundAgent, type GlassfaceTarget } from './glassface-input';
+import { GlassfaceInput, firstCodexProcess, foregroundAgent, type GlassfaceTarget } from './glassface-input';
 import {
   PROTO,
   agentResumeCommand,
@@ -92,6 +93,7 @@ export interface HubDeps {
   /** Explicit opt-in for a private primary host; unchanged on dedicated hosts. */
   glassfaceSharedGroups?: boolean;
   glassfaceForeground?: typeof foregroundAgent;
+  glassfaceFirstCodexProcess?: typeof firstCodexProcess;
   registry: Registry;
   spawn: SpawnFn;
   bootId: string;
@@ -164,6 +166,12 @@ export class Hub {
   /** Exited sessions being respawned in place right now (reopenExited). */
   private readonly reopening = new Set<string>();
   private readonly glassface = new GlassfaceInput();
+  private readonly newGlassLaunch = new WeakMap<TermSession, string>();
+  private firstPrompt(rec: SessionRecord, session = this.sessions.get(rec.id)): string | undefined {
+    const token = session && this.newGlassLaunch.get(session);
+    return token && session?.pid && session.inputRevision <= 1 && this.glassMayTarget(rec) &&
+      (this.deps.glassfaceFirstCodexProcess ?? firstCodexProcess)(session.pid, rec) ? token : undefined;
+  }
   private readonly glassTurns = new GlassfaceTurns();
   private readonly glassReader = new GlassfaceReader();
   private theme: ThemeColors = DEFAULT_THEME;
@@ -350,7 +358,7 @@ export class Hub {
         const target = (): GlassfaceTarget | null => {
           const session = this.sessions.get(msg.id);
           const record = this.registry.session(msg.id);
-          return session && record && this.glassMayTarget(record) ? { session, record } : null;
+          return session && record && this.glassMayTarget(record) ? { session, record, firstPrompt: this.firstPrompt(record, session) } : null;
         };
         const result = authorized()
           ? this.glassface.send(msg, this.deps.bootId, authorized, target,
@@ -435,6 +443,13 @@ export class Hub {
     return !!device && !rec.eridani && !rec.hiddenBy.includes(device) && rec.state === 'live' &&
       rec.bootId === this.deps.bootId && (this.deps.glassfaceSharedGroups === true ||
         !this.deps.glassfaceGroupId || rec.groupId === this.deps.glassfaceGroupId);
+  }
+
+  private glassInputState(rec: SessionRecord): Pick<SessionRecord,'glassfaceWritable'|'glassfaceFirstPrompt'> {
+    const s = this.sessions.get(rec.id);
+    const first = s?.inputRevision === 0 && this.firstPrompt(rec, s);
+    if (first) return { glassfaceWritable: true, glassfaceFirstPrompt: first };
+    return { glassfaceWritable: this.glassWritable(rec) };
   }
 
   private glassWritable(rec: SessionRecord): boolean {
@@ -611,7 +626,7 @@ export class Hub {
       groups: this.registry.groups(),
       sessions: this.isGlassGateway(conn)
         ? this.registry.sessions().filter(r => !r.hiddenBy.includes(msg.device.id)).map(r => ({ ...r, glassfaceInputRevision: this.sessions.get(r.id)?.inputRevision ?? 0,
-          glassfaceWritable: this.glassWritable(r), glassfaceDaniTurn: this.daniTurn(conn, r)?.summary }))
+          ...this.glassInputState(r), glassfaceDaniTurn: this.daniTurn(conn, r)?.summary }))
         : this.registry.sessions(),
       features: this.features(msg.device.id, conn.googleGlass),
       hooks: this.hookStatus(),
@@ -733,6 +748,10 @@ export class Hub {
     } catch (err) {
       conn.sendJson({ t: 'openError', rid: msg.rid, id: msg.id, code: 'spawn-failed', message: err instanceof Error ? err.message : String(err) });
       return;
+    }
+    if (!wasLost && this.isGlassGateway(conn) && conn.googleGlass && !spec.env && !spec.startupCommands?.length &&
+        record.cmd && record.createdBy === this.deps.glassfaceDeviceId) {
+      this.newGlassLaunch.set(session, 'new-codex-' + randomUUID());
     }
     this.registry.addSession(record);
     this.broadcast({ t: wasLost ? 'sessionUpdated' : 'sessionAdded', session: record });
