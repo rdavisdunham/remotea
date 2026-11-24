@@ -93,7 +93,7 @@ export function composerShows(provider: string, screen: ComposerScreen, text: st
     const oldFooter = footer.length > 0 && footer.every(s => /\b\d+%\s+(?:context\s+)?left\b/i.test(s));
     const shortcuts = /^(?:← for agents · \? for shortcuts)?(?:\s*⚠ \d+ warnings? · f2 to view)?$/u;
     const codexFooter = footer.length > 0 && footer.length <= 2 &&
-      /^GPT-[\w.-]+(?: (?:none|minimal|low|medium|high|xhigh|max|ultra))? · (?:~|\/)/iu.test(footer[0]) &&
+      /^GPT-[\w.-]+(?: (?:default|none|minimal|low|medium|high|xhigh|max|ultra))? · (?:~|\/)/iu.test(footer[0]) &&
       (footer.length === 1 || shortcuts.test(footer[1]));
     if (!oldFooter && !codexFooter) return false;
     if (!text && marker === screen.cursorRow && screen.suggestionRow === marker) return true;

@@ -196,7 +196,7 @@ export class TermSession {
       this.alive = true;
       this.pty.onData((d) => this.onPtyData(d));
       this.pty.onExit(({ exitCode, signal }) => this.onPtyExit(exitCode, signal));
-      if (opts.startupCommands?.length) this.deliver(opts.startupCommands);
+      if (opts.startupCommands?.length) this.scheduleStartup(opts.startupCommands, true);
     }
   }
 
@@ -403,6 +403,8 @@ export class TermSession {
 
   /** Input from any human/device or automation since spawn; query replies do not count. */
   inputRevision = 0;
+  /** Any PTY input after host startup can replace the TUI's selected conversation. */
+  rawInputSeen = false;
 
   /** Read the current visible screen only once xterm has parsed buffered PTY output. */
   async composerScreen(): Promise<{ lines: string[]; bracketed: boolean; cursorRow: number; suggestionRow: number | null } | null> {
@@ -436,6 +438,11 @@ export class TermSession {
   /** Bytes for the process that come from no client (Eridani's input). */
   write(data: string): void {
     if (!this.alive) return;
+    this.rawInputSeen = true;
+    this.recordWrite(data);
+  }
+
+  private recordWrite(data: string): void {
     this.lastActivityAt = Date.now();
     this.inputRevision++;
     this.writePty(data);
@@ -448,7 +455,7 @@ export class TermSession {
     // A newly attached desktop can report focus before anyone types. Forward
     // the report, but keep the reviewed draft valid if the app requested it.
     const focusReport = this.term.modes.sendFocusMode && (data === '\x1b[I' || data === '\x1b[O');
-    if (!focusReport) this.inputRevision++;
+    if (!focusReport) { this.inputRevision++; this.rawInputSeen = true; }
     this.writePty(data);
   }
 
@@ -495,6 +502,10 @@ export class TermSession {
 
   /** Type commands once the shell looks ready (shared gate with the app, src/main/startup-commands.ts). */
   deliver(commands: string[]): void {
+    this.scheduleStartup(commands, false);
+  }
+
+  private scheduleStartup(commands: string[], initial: boolean): void {
     if (!this.alive || !commands.length) return;
     this.cancelStartup?.();
     this.cancelStartup = deliverStartupCommandsWhenReady({
@@ -502,7 +513,7 @@ export class TermSession {
         this.dataListeners.add(cb);
         return () => this.dataListeners.delete(cb);
       },
-      write: (d) => this.write(d),
+      write: (d) => initial ? this.recordWrite(d) : this.write(d),
       isAlive: () => this.alive,
       setTimeout: (fn, ms) => this.timers.setTimeout(fn, ms),
       clearTimeout: (h) => this.timers.clearTimeout(h),

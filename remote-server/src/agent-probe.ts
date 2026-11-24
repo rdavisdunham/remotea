@@ -182,6 +182,20 @@ function withCodexState<T>(home: string, read: (db: CodexStateDb) => T): T | und
   }
 }
 
+/** Verified exact root rollout for a host-restored conversation; never infer a path from cwd or time. */
+export function codexRootRollout(id: string, home = os.homedir()): string | null {
+  if (!SESSION_ID_RE.test(id)) return null;
+  return withCodexState(home, db => {
+    const row = db.prepare('SELECT rollout_path, source FROM threads WHERE id = ?').get(id) as
+      { rollout_path?: unknown; source?: unknown } | undefined;
+    if (!row || typeof row.rollout_path !== 'string' || typeof row.source !== 'string' || row.source.includes('subagent')) return null;
+    const file = fs.realpathSync(row.rollout_path);
+    if (!file.startsWith(fs.realpathSync(path.join(home, '.codex', 'sessions')) + path.sep) || codexThreadFromPath(file) !== id) return null;
+    const meta = readCodexSessionMeta(file, id);
+    return meta && !meta.child ? file : null;
+  }) ?? null;
+}
+
 export function codexStateQuery(home = os.homedir()): CodexThreadQuery {
   return (cwd, sinceMs) => withCodexState(home, (db) => db.prepare(
     "SELECT id, created_at_ms FROM threads WHERE cwd = ? AND created_at_ms >= ? AND source NOT LIKE '%subagent%' ORDER BY created_at_ms LIMIT 5",

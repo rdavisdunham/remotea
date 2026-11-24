@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { codexThreadFromFds, codexThreadFromPath, codexThreadFromState, codexStateQuery, readClaudeSession, processStartMs, probeSession, resolveCodexResumeThread } from '../src/agent-probe';
+import { codexRootRollout, codexThreadFromFds, codexThreadFromPath, codexThreadFromState, codexStateQuery, readClaudeSession, processStartMs, probeSession, resolveCodexResumeThread } from '../src/agent-probe';
 import { codexFixture } from './codex-fixture';
 
 const ROOT = '01a18b04-f39b-7cc3-a0f8-240c06733e01';
@@ -116,6 +116,17 @@ describe('agent-probe', () => {
     fs.writeFileSync(other, '{ unfinished');
     f.open(other);
     expect(codexThreadFromFds(process.pid)).toBeNull();
+  });
+
+  it('reads a restored session only from the exact verified root rollout in the provider index', () => {
+    const f = fixture();
+    const root = f.thread(ROOT);
+    f.thread(CHILD, guardian);
+    expect(codexRootRollout(ROOT, f.home)).toBe(root);
+    expect(codexRootRollout(CHILD, f.home)).toBeNull();
+    expect(codexRootRollout(OTHER, f.home)).toBeNull();
+    fs.writeFileSync(root, JSON.stringify({type:'session_meta',payload:{id:OTHER,source:'cli'}})+'\n');
+    expect(codexRootRollout(ROOT, f.home)).toBeNull();
   });
 
   it('uses the state fallback only for roots, filtering children before its result limit', () => {
