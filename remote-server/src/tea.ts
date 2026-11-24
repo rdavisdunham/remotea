@@ -135,7 +135,17 @@ export class Tea {
   }
 
   start(): void {
-    for (const id of Object.keys(this.store.data.evidence)) this.queueSummary(id);
+    for (const [id, evidence] of Object.entries(this.store.data.evidence)) {
+      const session = this.deps.registry.session(id);
+      if (!session || (session.agent && evidence.source !== `${session.agent.provider}:${session.agent.sessionId}`))
+        continue;
+      // Registry recovery can preserve the private memory checkpoint while
+      // losing the display projection. Republish it once at startup.
+      const published = session.tea?.source === evidence.source ? session.tea : undefined;
+      const missing = (this.store.data.config.autoName && !published?.title) ||
+        (this.store.data.config.summaries && !published?.summary);
+      this.queueSummary(id, missing);
+    }
     if (this.store.data.config.enabled) void this.hydrate();
     this.schedule();
   }

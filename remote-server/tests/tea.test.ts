@@ -242,6 +242,22 @@ describe('Tea rolling memory', () => {
     expect(summaryContext(summarize.mock.calls[1][0]).previous_memory).toContain('saffron');
   });
 
+  it('restores the display title and summary after registry recovery preserves only the evidence store', async () => {
+    const summarize = vi.fn(async (_request: TeaProviderRequest) => insight());
+    const { tea, registry, create } = setup(undefined, summarize);
+    await ready(tea);
+    tea.capture(capturedExchange(1));
+    await vi.waitFor(() => expect(tea.store.data.evidence['surf-test']?.summarizedExchanges).toBe(1));
+    tea.stop();
+    registry.updateSession('surf-test', { tea: undefined });
+    registry.saveNow();
+    expect(registry.session('surf-test')?.tea).toBeUndefined();
+    create().start();
+    await vi.waitFor(() => expect(registry.session('surf-test')?.tea?.title).toBeTruthy());
+    expect(registry.session('surf-test')?.tea?.summary).toBeTruthy();
+    expect(summarize).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps exchanges arriving during generation in the next batch', async () => {
     const releases: Array<(value: TeaCompletion) => void> = [];
     const summarize = vi.fn((_request: TeaProviderRequest) => new Promise<TeaCompletion>((resolve) => releases.push(resolve)));
