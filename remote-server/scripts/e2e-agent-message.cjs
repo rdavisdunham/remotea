@@ -98,8 +98,12 @@ async function request(conn, m, reply) {
       console.log(sender === glass ? 'Glass' : 'Desktop', 'received one provider receipt and the reply appeared on the original Bash-launched pane');
     }
     const rec = registry.session(id);
-    const read = await request(glass, {t:'glassfaceRead', bootId, incarnation:rec.incarnation, conversation:thread, maxBytes:16384}, 'glassfaceReadResult');
-    assert.ok(read.reader.replies.some(reply => /indigo raven/i.test(reply.text)));
+    const readReply = async (conn, incarnation, words) => {
+      const result = await request(conn, {t:'glassfaceRead', bootId, incarnation, conversation:thread, maxBytes:16384}, 'glassfaceReadResult');
+      return result.reader?.replies.some(reply => reply.text.toLowerCase().includes(words));
+    };
+    // Native TUI output can lead the provider's final JSONL append.
+    await until(() => readReply(glass, rec.incarnation, 'indigo raven'), 'The original transcript did not publish the desktop reply.');
     console.log('Glass read back the desktop follow-up from the original provider conversation.');
     // Exercise normal host shutdown, registry reload and the regular lost-pane open.
     await hub.shutdown();
@@ -126,9 +130,7 @@ async function request(conn, m, reply) {
     const repeated = await request(recoveredGlass, msg, 'agentMessageReceipt');
     assert.ok(delivered.providerMessageId && repeated.providerMessageId === delivered.providerMessageId);
     await until(() => see('amber drift'), 'No same-pane reply after normal restore.');
-    const result = await request(recoveredGlass, {t:'glassfaceRead', bootId, incarnation:target.incarnation,
-      conversation:thread, maxBytes:16384}, 'glassfaceReadResult');
-    assert.ok(result.reader?.replies.some(reply => /amber drift/i.test(reply.text)));
+    await until(() => readReply(recoveredGlass, target.incarnation, 'amber drift'), 'The restored transcript did not publish the Glass reply.');
     assert.equal(readStat(pane.pid).tpgid, leader);
     // A desktop draft can become an in-TUI thread switch. Never infer its destination from resume argv.
     hub.handleInput(recoveredDesktop,id,'unfinished desktop input');
