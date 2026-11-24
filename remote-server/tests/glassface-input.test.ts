@@ -159,6 +159,9 @@ describe('new native Codex first prompt', () => {
   }
   it('requires a recognized footer and distinguishes a DIM suggestion from typed text', () => {
     expect(composerShows('codex',native(),'')).toBe(true);
+    const resumed = native();
+    resumed.lines[2] = resumed.lines[2].replace(' high ·', ' default ·');
+    expect(composerShows('codex',resumed,'')).toBe(true);
     expect(composerShows('codex',native(placeholder,false),'')).toBe(false);
     expect(composerShows('codex',native('a real draft',false),'a real draft')).toBe(true);
     expect(composerShows('codex',{...native(),lines:['› No, exit','Enter to select']},'')).toBe(false);

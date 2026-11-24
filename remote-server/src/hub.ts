@@ -11,7 +11,7 @@ import os from 'os';
 import { randomUUID } from 'node:crypto';
 import { GlassfaceTurns } from './glassface-turns';
 import { fitReader, GlassfaceReader } from './glassface-reader';
-import { codexPane, supportsQueue } from './codex-pane-message';
+import { codexPane, supportsQueue, type HostCodexResume } from './codex-pane-message';
 import { GlassfaceInput, firstCodexProcess, foregroundAgent, promptIdentity, type GlassfaceRequest, type GlassfaceTarget } from './glassface-input';
 import {
   PROTO,
@@ -166,6 +166,7 @@ export class Hub {
   readonly sessions = new Map<string, TermSession>();
   /** Exited sessions being respawned in place right now (reopenExited). */
   private readonly reopening = new Set<string>();
+  private readonly hostCodexResumes = new WeakMap<TermSession, HostCodexResume>();
   private readonly glassface = new GlassfaceInput();
   private readonly newGlassLaunch = new WeakMap<TermSession, string>();
   private firstPrompt(rec: SessionRecord, session = this.sessions.get(rec.id)): string | undefined {
@@ -466,7 +467,8 @@ export class Hub {
   private boundTarget(rec: SessionRecord): GlassfaceTarget | null {
     const session = this.sessions.get(rec.id);
     if (!session?.pid || session.state !== 'live') return null;
-    const pane = rec.agent?.provider === 'codex' && codexPane(session.pid, rec.agent.sessionId);
+    const pane = rec.agent?.provider === 'codex' && codexPane(session.pid, rec.agent.sessionId,
+      session.rawInputSeen ? undefined : this.hostCodexResumes.get(session));
     return {record: rec, session, firstPrompt: this.firstPrompt(rec, session),
       ...(pane && supportsQueue(pane) ? {nativeQueue: pane} : {})};
   }
@@ -494,13 +496,19 @@ export class Hub {
     return !!target && this.canMessageBoundAgent(target);
   }
 
-  private readerPid(pid: number, rec: SessionRecord): number | null {
+  private readerBinding(session: TermSession, rec: SessionRecord): {pid: number; file?: string} | null {
+    const pid = session.pid;
+    if (!pid) return null;
     const agent = rec.agent;
     if (!agent) return null;
-    if ((this.deps.glassfaceForeground ?? foregroundAgent)(pid, agent.provider, agent.sessionId)) return pid;
+    if ((this.deps.glassfaceForeground ?? foregroundAgent)(pid, agent.provider, agent.sessionId)) return {pid};
     // Reading a strongly identified foreground child cannot write to its shell.
     const child = paneForegroundPid(pid);
-    return child && foregroundAgent(child, agent.provider, agent.sessionId) ? child : null;
+    if (child && foregroundAgent(child, agent.provider, agent.sessionId)) return {pid: child};
+    if (agent.provider !== 'codex' || session.rawInputSeen) return null;
+    const restored = this.hostCodexResumes.get(session);
+    const pane = restored && codexPane(pid, agent.sessionId, restored);
+    return pane?.resumeFile ? {pid: pane.pid, file: pane.resumeFile} : null;
   }
 
   private daniTurn(conn: HubConn, rec: SessionRecord, revision?: number) {
@@ -509,7 +517,7 @@ export class Hub {
         this.conns.get(conn.id) !== conn || !this.glassReaderScope() || !this.glassMayTarget(rec) || !session?.pid || session.state !== 'live' ||
         rec.bootId !== this.deps.bootId || !rec.agent) return;
     const turn = this.glassTurns.current(rec, revision ?? session.inputRevision);
-    if (turn && this.readerPid(session.pid, rec)) return turn;
+    if (turn && this.readerBinding(session, rec)) return turn;
   }
 
   private async readForGlass(conn: HubConn, msg: Extract<ClientMsg, { t: 'glassfaceRead' }>): Promise<void> {
@@ -522,14 +530,14 @@ export class Hub {
         !rec || rec.state !== 'live' || rec.bootId !== msg.bootId || !this.glassMayTarget(rec) ||
         rec.incarnation !== msg.incarnation ||
         !rec.agent || rec.agent.sessionId !== msg.conversation) return null;
-      const pid = this.readerPid(session.pid, rec);
-      return pid ? {rec, pid} : null;
+      const owner = this.readerBinding(session, rec);
+      return owner ? {rec, ...owner} : null;
     };
     const bound = matching();
     const group = bound?.rec.groupId;
-    const reader = bound ? await this.glassReader.read(bound.pid, bound.rec) : null;
+    const reader = bound ? await this.glassReader.read(bound.pid, bound.rec, bound.file) : null;
     const after = reader && matching();
-    conn.sendJson({ t: 'glassfaceReadResult', rid: msg.rid, id: msg.id, reader: reader && bound && after?.pid === bound.pid && after.rec.groupId === group ? fitReader(reader, msg.maxBytes) : null });
+    conn.sendJson({ t: 'glassfaceReadResult', rid: msg.rid, id: msg.id, reader: reader && bound && after?.pid === bound.pid && after.file === bound.file && after.rec.groupId === group ? fitReader(reader, msg.maxBytes) : null });
   }
 
   private features(device: string, googleGlass = false): ServerFeature[] {
@@ -797,6 +805,10 @@ export class Hub {
     } catch (err) {
       conn.sendJson({ t: 'openError', rid: msg.rid, id: msg.id, code: 'spawn-failed', message: err instanceof Error ? err.message : String(err) });
       return;
+    }
+    if (wasLost && resume && !record.eridani && record.agent?.provider === 'codex' && custom === undefined &&
+        resume === resumeCommand(record.agent)) {
+      this.hostCodexResumes.set(session, {thread: record.agent.sessionId});
     }
     if (!wasLost && this.isGlassGateway(conn) && conn.googleGlass && !spec.env && !spec.startupCommands?.length &&
         record.cmd && record.createdBy === this.deps.glassfaceDeviceId) {
@@ -1109,7 +1121,12 @@ export class Hub {
         this.registry.updateSession(s.id, { lastActivityAt: s.lastActivityAt });
       }
       const cwdChanged = !!res.cwd && res.cwd !== rec.lastCwd;
-      const agentChanged = !!res.agent && res.agent.sessionId !== rec.agent?.sessionId;
+      let agentChanged = !!res.agent && res.agent.sessionId !== rec.agent?.sessionId;
+      // The generic probe can guess by cwd/time when a restored TUI has no open
+      // rollout. Its verified running resume takes precedence over that guess.
+      const restored = this.hostCodexResumes.get(s);
+      if (agentChanged && restored && !s.rawInputSeen && rec.agent?.sessionId === restored.thread &&
+          codexPane(pid, restored.thread, restored)) agentChanged = false;
       if (!cwdChanged && !agentChanged) continue;
       this.registry.updateSession(s.id, {
         lastCwd: res.cwd ?? rec.lastCwd,

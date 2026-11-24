@@ -94,13 +94,15 @@ export function parseReplies(provider: string, conversation: string, tail: strin
 export class GlassfaceReader {
   private cache = new Map<string, { stamp: string; reader: GlassfaceReaderView }>();
 
-  async read(pid: number, record: SessionRecord): Promise<GlassfaceReaderView | null> {
+  async read(pid: number, record: SessionRecord, resumeFile?: string): Promise<GlassfaceReaderView | null> {
     const agent = record.agent;
     if (!agent) return null;
     try {
       let file: string | null = null;
       if (agent.provider === 'claude') {
         file = claudeTranscriptPath(defaultClaudeConfigDir(), record.cwd, agent.sessionId);
+      } else if (agent.provider === 'codex' && resumeFile && codexThreadFromPath(resumeFile) === agent.sessionId) {
+        file = resumeFile;
       } else if (agent.provider === 'codex') {
         // The caller verifies codexThreadFromFds (one root, excluding subagents).
         for (const fd of await readdir(`/proc/${pid}/fd`)) {
