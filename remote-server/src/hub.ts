@@ -11,7 +11,8 @@ import os from 'os';
 import { randomUUID } from 'node:crypto';
 import { GlassfaceTurns } from './glassface-turns';
 import { fitReader, GlassfaceReader } from './glassface-reader';
-import { GlassfaceInput, firstCodexProcess, foregroundAgent, type GlassfaceTarget } from './glassface-input';
+import { codexPane, supportsQueue } from './codex-pane-message';
+import { GlassfaceInput, firstCodexProcess, foregroundAgent, promptIdentity, type GlassfaceRequest, type GlassfaceTarget } from './glassface-input';
 import {
   PROTO,
   agentResumeCommand,
@@ -35,7 +36,7 @@ import type { PtyLike, SpawnFn, SpawnRequest } from './pty-spawn';
 import { DEFAULT_THEME, type ThemeColors } from './queries';
 import { probeSession, resolveCodexResumeThread, type ProbeResult } from './agent-probe';
 import type { FsRequest } from './remote-fs';
-import { childrenIndex } from './proc';
+import { childrenIndex, paneForegroundPid } from './proc';
 import { AgentStateTracker } from './agent-state';
 import { TurnCapture, type PromptFields, type TurnFields } from './turn-capture';
 import type { Tea } from './tea';
@@ -351,17 +352,26 @@ export class Hub {
         conn.sendJson({ t: 'glassfaceDaniReadResult', rid: msg.rid, id: msg.id, turn });
         return;
       }
+      case 'agentMessageTarget': {
+        const candidate = this.messageTarget(conn, msg.id, true);
+        const rec = candidate?.record;
+        const provider = rec?.agent?.provider;
+        const target = candidate && rec?.agent && (provider === 'codex' || provider === 'claude') &&
+          this.canMessageBoundAgent(candidate) ? {bootId: this.deps.bootId, incarnation: rec.incarnation!,
+            provider, conversation: rec.agent.sessionId, expectedPrompt: promptIdentity(rec, candidate.session.inputRevision)} : null;
+        conn.sendJson({t: 'agentMessageTargetResult', rid: msg.rid, id: msg.id, target});
+        return;
+      }
+      case 'agentMessage':
       case 'glassfaceDaniInput':
       case 'glassfaceInput': {
-        const authorized = () => !this.shuttingDown && this.conns.get(conn.id) === conn
-          && this.isGlassGateway(conn);
-        const target = (): GlassfaceTarget | null => {
-          const session = this.sessions.get(msg.id);
-          const record = this.registry.session(msg.id);
-          return session && record && this.glassMayTarget(record) ? { session, record, firstPrompt: this.firstPrompt(record, session) } : null;
-        };
+        const canonical = msg.t === 'agentMessage';
+        const message: GlassfaceRequest = msg.t !== 'agentMessage' ? msg : msg.turn === undefined
+          ? {...msg, t: 'glassfaceInput'} : {...msg, t: 'glassfaceDaniInput', turn: msg.turn};
+        const authorized = () => !this.shuttingDown && this.conns.get(conn.id) === conn &&
+          (this.isGlassGateway(conn) || (canonical && !conn.googleGlass && !!this.sessions.get(msg.id)?.hasSubscriber(conn.id)));
         const result = authorized()
-          ? this.glassface.send(msg, this.deps.bootId, authorized, target,
+          ? this.glassface.send(message, this.deps.bootId, authorized, () => this.messageTarget(conn, msg.id, canonical),
               this.deps.glassfaceForeground ?? foregroundAgent, data => {
                 this.noteSelection(msg.id, device);
                 this.agentState.humanInput(msg.id, data);
@@ -369,11 +379,12 @@ export class Hub {
               (rec, revision, id) => {
                 const value = this.daniTurn(conn, rec, revision);
                 return value?.summary.id === id && value.summary.kind === 'question';
-              })
+              }, device)
           : Promise.resolve('refused' as const);
         void result.then(status => {
-          if (this.conns.get(conn.id) === conn) conn.sendJson({ t: 'glassfaceReceipt', rid: msg.rid,
-            id: msg.id, operationId: msg.operationId, status });
+          if (this.conns.get(conn.id) === conn) conn.sendJson({ t: canonical ? 'agentMessageReceipt' : 'glassfaceReceipt', rid: msg.rid,
+            id: msg.id, operationId: msg.operationId, status: !canonical && status === 'queued' ? 'submitted' : status,
+            ...(canonical && status === 'queued' ? {providerMessageId: this.glassface.providerReceipt(msg.operationId)} : {}) });
         });
         return;
       }
@@ -452,12 +463,44 @@ export class Hub {
     return { glassfaceWritable: this.glassWritable(rec) };
   }
 
-  private glassWritable(rec: SessionRecord): boolean {
+  private boundTarget(rec: SessionRecord): GlassfaceTarget | null {
     const session = this.sessions.get(rec.id);
-    return this.glassMayTarget(rec) && !!session?.pid && session.state === 'live' &&
-      (!rec.agentState || (rec.agentState.state === 'idle' && !rec.agentState.trouble)) &&
+    if (!session?.pid || session.state !== 'live') return null;
+    const pane = rec.agent?.provider === 'codex' && codexPane(session.pid, rec.agent.sessionId);
+    return {record: rec, session, firstPrompt: this.firstPrompt(rec, session),
+      ...(pane && supportsQueue(pane) ? {nativeQueue: pane} : {})};
+  }
+
+  private messageTarget(conn: HubConn, id: string, canonical: boolean): GlassfaceTarget | null {
+    const rec = this.registry.session(id);
+    if (!conn.device || !rec || rec.state !== 'live' || rec.bootId !== this.deps.bootId || rec.eridani ||
+        rec.hiddenBy.includes(conn.device.id)) return null;
+    if (this.isGlassGateway(conn)) {
+      if (!this.glassMayTarget(rec)) return null;
+    } else if (!canonical || conn.googleGlass || !this.sessions.get(id)?.hasSubscriber(conn.id)) return null;
+    return this.boundTarget(rec);
+  }
+
+  private canMessageBoundAgent(target: GlassfaceTarget): boolean {
+    const {record: rec, session} = target;
+    return !!session.pid && (!rec.agentState || (rec.agentState.state === 'idle' && !rec.agentState.trouble)) &&
       !!rec.agent && (rec.agent.provider === 'claude' || rec.agent.provider === 'codex') &&
-      (this.deps.glassfaceForeground ?? foregroundAgent)(session.pid, rec.agent.provider, rec.agent.sessionId);
+      (!!target.nativeQueue || (this.deps.glassfaceForeground ?? foregroundAgent)(session.pid, rec.agent.provider, rec.agent.sessionId));
+  }
+
+  private glassWritable(rec: SessionRecord): boolean {
+    if (!this.glassMayTarget(rec)) return false;
+    const target = this.boundTarget(rec);
+    return !!target && this.canMessageBoundAgent(target);
+  }
+
+  private readerPid(pid: number, rec: SessionRecord): number | null {
+    const agent = rec.agent;
+    if (!agent) return null;
+    if ((this.deps.glassfaceForeground ?? foregroundAgent)(pid, agent.provider, agent.sessionId)) return pid;
+    // Reading a strongly identified foreground child cannot write to its shell.
+    const child = paneForegroundPid(pid);
+    return child && foregroundAgent(child, agent.provider, agent.sessionId) ? child : null;
   }
 
   private daniTurn(conn: HubConn, rec: SessionRecord, revision?: number) {
@@ -466,7 +509,7 @@ export class Hub {
         this.conns.get(conn.id) !== conn || !this.glassReaderScope() || !this.glassMayTarget(rec) || !session?.pid || session.state !== 'live' ||
         rec.bootId !== this.deps.bootId || !rec.agent) return;
     const turn = this.glassTurns.current(rec, revision ?? session.inputRevision);
-    if (turn && (this.deps.glassfaceForeground ?? foregroundAgent)(session.pid, rec.agent.provider, rec.agent.sessionId)) return turn;
+    if (turn && this.readerPid(session.pid, rec)) return turn;
   }
 
   private async readForGlass(conn: HubConn, msg: Extract<ClientMsg, { t: 'glassfaceRead' }>): Promise<void> {
@@ -478,18 +521,19 @@ export class Hub {
         !session?.pid || session.state !== 'live' || this.sessions.get(msg.id) !== session ||
         !rec || rec.state !== 'live' || rec.bootId !== msg.bootId || !this.glassMayTarget(rec) ||
         rec.incarnation !== msg.incarnation ||
-        !rec.agent || rec.agent.sessionId !== msg.conversation ||
-        !(this.deps.glassfaceForeground ?? foregroundAgent)(session.pid, rec.agent.provider, msg.conversation)) return null;
-      return rec;
+        !rec.agent || rec.agent.sessionId !== msg.conversation) return null;
+      const pid = this.readerPid(session.pid, rec);
+      return pid ? {rec, pid} : null;
     };
-    const rec = matching();
-    const group = rec?.groupId;
-    const reader = rec ? await this.glassReader.read(session!.pid!, rec) : null;
-    conn.sendJson({ t: 'glassfaceReadResult', rid: msg.rid, id: msg.id, reader: reader && matching()?.groupId === group ? fitReader(reader, msg.maxBytes) : null });
+    const bound = matching();
+    const group = bound?.rec.groupId;
+    const reader = bound ? await this.glassReader.read(bound.pid, bound.rec) : null;
+    const after = reader && matching();
+    conn.sendJson({ t: 'glassfaceReadResult', rid: msg.rid, id: msg.id, reader: reader && bound && after?.pid === bound.pid && after.rec.groupId === group ? fitReader(reader, msg.maxBytes) : null });
   }
 
   private features(device: string, googleGlass = false): ServerFeature[] {
-    const f: ServerFeature[] = ['rpc', 'chatAttention', 'sessionRecency'];
+    const f: ServerFeature[] = ['rpc', 'chatAttention', 'sessionRecency', 'agentMessage'];
     if (device === this.deps.glassfaceDeviceId && (!this.deps.glassfaceSharedGroups || googleGlass)) {
       f.push('glassfaceInput', 'glassfaceClose');
       if (googleGlass && this.glassReaderScope()) f.push('glassfaceReader', 'glassfaceDani');

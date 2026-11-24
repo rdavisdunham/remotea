@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import type { ClientMsg, ServerMsg, SessionRecord } from '../../src/shared/remote-host-protocol';
 import { buildComposerWrites, sanitizeComposerText } from '../../src/shared/remote-input';
 import { readClaudeSession, isCodexCli, codexThreadFromFds } from './agent-probe';
+import { queuePaneMessage, type CodexPane } from './codex-pane-message';
 import { readStat } from './proc';
 import type { TermSession } from './session';
 
@@ -15,6 +16,7 @@ export interface GlassfaceTarget {
   session: Pick<TermSession, 'pid' | 'state' | 'composerScreen' | 'write' | 'inputRevision'>;
   record: SessionRecord;
   firstPrompt?: string;
+  nativeQueue?: CodexPane;
 }
 
 /** A shell with an agent descendant is unsafe: the descendant can exit back to a shell. */
@@ -104,16 +106,22 @@ export function composerShows(provider: string, screen: ComposerScreen, text: st
 
 export class GlassfaceInput {
   private readonly busy = new Set<string>();
-  private readonly receipts = new Map<string, { signature: string; status: Status }>();
+  private readonly receipts = new Map<string, { signature: string; status: Status; providerMessageId?: string }>();
+
+  constructor(private readonly enqueue = queuePaneMessage) {}
+
+  providerReceipt(operation: string): string | undefined {
+    return this.receipts.get(operation)?.providerMessageId;
+  }
 
   async send(m: GlassfaceRequest, bootId: string, authorized: () => boolean,
     target: () => GlassfaceTarget | null, foreground: typeof foregroundAgent,
     human: (data: string) => void,
-    questionCurrent?: (rec: SessionRecord, revision: number, turn: string) => boolean): Promise<Status> {
+    questionCurrent?: (rec: SessionRecord, revision: number, turn: string) => boolean, device = ''): Promise<Status> {
     if (!authorized() || m.bootId !== bootId || !m.text.trim() || m.text !== m.text.trim()
       || sanitizeComposerText(m.text) !== m.text || /[\n\t\r]/.test(m.text) || /^[!/]/.test(m.text)
       || Buffer.byteLength(m.text) > 4000) return 'refused';
-    const signature = createHash('sha256').update(JSON.stringify([m.id, m.bootId, m.incarnation,
+    const signature = createHash('sha256').update(JSON.stringify([device, m.id, m.bootId, m.incarnation,
       m.provider, m.conversation, m.expectedPrompt, m.text, m.t, m.t === 'glassfaceDaniInput' ? m.turn : null])).digest('hex');
     const previous = this.receipts.get(m.operationId);
     if (previous) return previous.signature === signature ? previous.status : 'refused';
@@ -124,19 +132,23 @@ export class GlassfaceInput {
     const session = original.session;
     const revision = session.inputRevision;
     const group = original.record.groupId;
+    const queue = original.nativeQueue;
+    const sameProvider = (current: GlassfaceTarget) => queue
+      ? current.nativeQueue?.pid === queue.pid && current.nativeQueue.fileKey === queue.fileKey
+      : !!session.pid && foreground(session.pid, m.provider, m.conversation);
     const valid = (pasted: boolean) => {
       const current = target();
       const rec = current?.record;
       return authorized() && current?.session === session && session.state === 'live' && !!session.pid &&
         rec?.state === 'live' && rec.bootId === bootId && rec.groupId === group && rec.incarnation === m.incarnation && !rec.eridani &&
-        ((rec.agent?.provider === m.provider && rec.agent.sessionId === m.conversation && foreground(session.pid, m.provider, m.conversation))
+        ((rec.agent?.provider === m.provider && rec.agent.sessionId === m.conversation && sameProvider(current))
           || (!rec.agent && m.t === 'glassfaceInput' && m.provider === 'codex' && revision === 0 &&
             !!current.firstPrompt && current.firstPrompt === m.conversation)) &&
         (!rec.agentState || rec.agentState.state === 'idle') && !rec.agentState?.trouble &&
         (m.t !== 'glassfaceDaniInput' || questionCurrent?.(rec, revision, m.turn) === true) &&
         session.inputRevision === revision + Number(pasted) && promptIdentity(rec, revision) === m.expectedPrompt;
     };
-    const receipt: { signature: string; status: Status } = { signature, status: 'uncertain' };
+    const receipt: { signature: string; status: Status; providerMessageId?: string } = { signature, status: 'uncertain' };
     this.receipts.set(m.operationId, receipt);
     this.busy.add(m.id);
     try {
@@ -144,6 +156,17 @@ export class GlassfaceInput {
       const before = await session.composerScreen();
       if (!before?.bracketed || !composerShows(m.provider, before, '') || !valid(false))
         return receipt.status = 'refused';
+      if (queue) {
+        // Reserve the reviewed prompt before the asynchronous provider call. An
+        // ambiguous launch burns this operation; a second request cannot replay it.
+        session.inputRevision++;
+        const ack = await this.enqueue(queue, m.conversation, m.text);
+        if (!ack) return receipt.status;
+        receipt.providerMessageId = ack;
+        receipt.status = 'queued';
+        human('\r');
+        return receipt.status;
+      }
       const [paste, enter] = buildComposerWrites(m.text, { bracketed: true, submit: true });
       human(paste);
       session.write(paste);
