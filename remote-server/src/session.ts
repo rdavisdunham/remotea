@@ -445,7 +445,10 @@ export class TermSession {
     if (!this.alive) return;
     this.lastActivityAt = Date.now();
     this.claim(connId);
-    this.inputRevision++;
+    // A newly attached desktop can report focus before anyone types. Forward
+    // the report, but keep the reviewed draft valid if the app requested it.
+    const focusReport = this.term.modes.sendFocusMode && (data === '\x1b[I' || data === '\x1b[O');
+    if (!focusReport) this.inputRevision++;
     this.writePty(data);
   }
 

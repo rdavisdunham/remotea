@@ -62,6 +62,28 @@ describe('server-side query replies', () => {
     s.dispose();
   });
 
+  it('forwards negotiated focus reports without counting them as changes to reviewed input', async () => {
+    const { s, pty } = session();
+    const client = new FakeConn(1);
+    s.attach(client, { cols: 80, rows: 24, created: true });
+    try {
+      pty.emit('\x1b[?1004h');
+      await s.composerScreen();
+      s.input(client.id, '\x1b[O');
+      s.input(client.id, '\x1b[I');
+      expect(s.inputRevision).toBe(0);
+      expect(pty.written.slice(-2)).toEqual(['\x1b[O', '\x1b[I']);
+      for (const input of ['x', '\x1b[Ochanged', '\x1b[I\r', '\x1b[1;1R']) s.input(client.id, input);
+      expect(s.inputRevision).toBe(4);
+      pty.emit('\x1b[?1004l');
+      await s.composerScreen();
+      s.input(client.id, '\x1b[I');
+      expect(s.inputRevision).toBe(5);
+    } finally {
+      s.dispose();
+    }
+  });
+
   it('uses wmux DA1 and the theme colours', async () => {
     const { s, pty } = session();
     pty.emit(QUERIES.DA1);
