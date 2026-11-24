@@ -140,6 +140,8 @@ export interface SessionRecord {
   glassfaceInputRevision?: number;
   /** Fresh foreground identity check for this viewer. Submission checks again. */
   glassfaceWritable?: boolean;
+  /** Device-scoped first message on a newly spawned native Codex composer, before Codex creates a thread. */
+  glassfaceFirstPrompt?: string;
   /** Paired Glass welcome only. Opaque identity of one captured root turn. */
   glassfaceDaniTurn?: GlassfaceTurn;
   /** Agent turns captured in this session so far (turn-capture.ts). */

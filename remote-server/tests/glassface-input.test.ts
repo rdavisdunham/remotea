@@ -149,3 +149,70 @@ describe('glassface guarded composer', () => {
     await hub.shutdown();
   });
 });
+
+describe('new native Codex first prompt', () => {
+  const placeholder = 'Ask Codex to do anything';
+  const token = 'new-codex-aaaa1111-bbbb-4ccc-8ddd-eeeeffff0001';
+  function native(value = placeholder, suggestion = true) {
+    return {lines:['› '+value,'','  GPT-6.2-Sol high · ~/jarvis','  ← for agents · ? for shortcuts     ⚠ 2 warnings · f2 to view'],
+      cursorRow:0, suggestionRow:suggestion ? 0 : null, bracketed:true};
+  }
+  it('requires a recognized footer and distinguishes a DIM suggestion from typed text', () => {
+    expect(composerShows('codex',native(),'')).toBe(true);
+    expect(composerShows('codex',native(placeholder,false),'')).toBe(false);
+    expect(composerShows('codex',native('a real draft',false),'a real draft')).toBe(true);
+    expect(composerShows('codex',{...native(),lines:['› No, exit','Enter to select']},'')).toBe(false);
+    expect(composerShows('codex',{...native(),lines:['› '+placeholder,'GPT-6.2-Sol high · ~/jarvis','Enter to approve']},'')).toBe(false);
+  });
+  it('consumes only a verified launch and refuses a changed foreground between paste and Enter', async () => {
+    for (const outcome of ['missing','wrong-token','desktop-typed','changed','success']) {
+      const f=fixture(), input=new GlassfaceInput();
+      delete f.record.agent;
+      let verified:string|undefined=outcome==='missing' ? undefined : token;
+      const session={...f.session,inputRevision:outcome==='desktop-typed' ? 1 : 0,
+        async composerScreen() { return f.writes.length ? native(f.msg.text,false) : native(); }};
+      const msg={...f.msg,provider:'codex',conversation:outcome==='wrong-token' ? 'other' : token,expectedPrompt:promptIdentity(f.record,session.inputRevision)};
+      const send=()=>input.send(msg,'boot',()=>true,()=>({session,record:f.record,firstPrompt:verified}),()=>false,()=>{});
+      const result=send();
+      if(outcome==='changed') {await waitFor(()=>f.writes.length===1); verified=undefined;}
+      expect(await result).toBe(outcome==='success' ? 'submitted' : outcome==='changed' ? 'partial' : 'refused');
+      expect(f.writes).toHaveLength(outcome==='success' ? 2 : outcome==='changed' ? 1 : 0);
+      if(outcome==='success'){
+        expect(await send()).toBe('submitted');
+        expect(f.writes).toHaveLength(2);
+      }
+    }
+  });
+});
+
+it('offers the first-prompt lease only for the same untouched, paired wearable launch', async () => {
+  const registry=Registry.load({file:null,bootId:'boot'});
+  let recognized=true, connection=0;
+  const hub=new Hub({registry,spawn:fakeSpawner().spawn,bootId:'boot',serverId:'server',
+    glassfaceDeviceId:'glass-gateway',glassfaceSharedGroups:true,glassfaceFirstCodexProcess:()=>recognized});
+  function connect(device='glass-gateway', app='googleglass') {
+    const c=new FakeConn(++connection);
+    hub.connect(c);
+    hub.handle(c,{t:'hello',proto:1,app:{name:app,version:'1'},device:{id:device,name:device}});
+    return c;
+  }
+  const glass=connect();
+  const desktop=connect('desktop','remotea');
+  const open=(c:FakeConn,id:`surf-${string}`,env?:Record<string,string>)=>hub.handle(c,
+    {t:'open',rid:1,id,cols:80,rows:25,create:{cmd:'exec fixture',env}});
+  try {
+    open(glass,'surf-glass'); open(glass,'surf-env',{EXAMPLE:'1'}); open(desktop,'surf-desk');
+    const rows=()=>connect().json('welcome')[0].sessions;
+    const first=rows();
+    expect(first.find(r=>r.id==='surf-glass')?.glassfaceFirstPrompt).toMatch(/^new-codex-/);
+    expect(first.filter(r=>r.glassfaceWritable).map(r=>r.id)).toEqual(['surf-glass']);
+    expect(connect('glass-gateway','remotea').json('welcome')[0].sessions.every(r=>!r.glassfaceFirstPrompt)).toBe(true);
+    recognized=false;
+    expect(rows().every(r=>!r.glassfaceFirstPrompt)).toBe(true);
+    recognized=true;
+    hub.sessions.get('surf-glass')!.input(desktop.id,'d');
+    expect(rows().every(r=>!r.glassfaceFirstPrompt)).toBe(true);
+  } finally {
+    await hub.shutdown();
+  }
+});

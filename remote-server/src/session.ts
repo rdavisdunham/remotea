@@ -416,9 +416,9 @@ export class TermSession {
     const cursorRow = buf.baseY + buf.cursorY - buf.viewportY;
     const line = buf.getLine(buf.baseY + buf.cursorY);
     const value = line?.translateToString(true) ?? '';
-    // Claude 2.1.329 places the cursor at the first DIM character of its empty
-    // "Try ..." suggestion. User-entered text with identical wording is not a hint.
-    const suggestion = /^❯[ \u00a0]Try ["“]/u.test(value) && buf.cursorX === 2 && !!line &&
+    // These native empty-composer suggestions start at the cursor and have DIM cells.
+    // A user can type the same words, so their styling is part of the check.
+    const suggestion = /^(?:❯[ \u00a0]Try ["“]|› Ask Codex to do anything$)/u.test(value) && buf.cursorX === 2 && !!line &&
       Array.from({ length: value.length - 2 }, (_, i) => line.getCell(i + 2)).every(cell => !!cell?.isDim());
     return { bracketed: this.term.modes.bracketedPasteMode, cursorRow, suggestionRow: suggestion ? cursorRow : null,
       lines: Array.from({length: this.rows}, (_, i) => buf.getLine(buf.viewportY + i)?.translateToString(true) ?? '') };
