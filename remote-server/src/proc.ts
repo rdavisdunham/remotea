@@ -36,6 +36,19 @@ export function readStat(pid: number): ProcStat | null {
   };
 }
 
+/** Foreground process-group leader belonging to this terminal's process tree. */
+export function paneForegroundPid(root: number): number | null {
+  const pid = readStat(root)?.tpgid;
+  if (!pid || pid <= 1) return null;
+  const stat = readStat(pid);
+  if (stat?.pgrp !== pid || stat.tpgid !== pid) return null;
+  let ancestor = pid;
+  for (let depth = 0; depth < 16 && ancestor > 1 && ancestor !== root; depth++) {
+    ancestor = readStat(ancestor)?.ppid ?? 0;
+  }
+  return ancestor === root ? pid : null;
+}
+
 /** Map of ppid → child pids for every process visible right now. */
 export function childrenIndex(): Map<number, number[]> {
   const index = new Map<number, number[]>();
