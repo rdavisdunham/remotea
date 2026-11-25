@@ -168,11 +168,12 @@ export class Hub {
   private readonly reopening = new Set<string>();
   private readonly hostCodexResumes = new WeakMap<TermSession, HostCodexResume>();
   private readonly glassface = new GlassfaceInput();
-  private readonly newGlassLaunch = new WeakMap<TermSession, string>();
+  private readonly newGlassLaunch = new WeakMap<TermSession, { token: string; startupCommand?: string }>();
   private firstPrompt(rec: SessionRecord, session = this.sessions.get(rec.id)): string | undefined {
-    const token = session && this.newGlassLaunch.get(session);
-    return token && session?.pid && session.inputRevision <= 1 && this.glassMayTarget(rec) &&
-      (this.deps.glassfaceFirstCodexProcess ?? firstCodexProcess)(session.pid, rec) ? token : undefined;
+    const launch = session && this.newGlassLaunch.get(session);
+    const maxRev = launch?.startupCommand ? 1 : 0;
+    return launch && session?.pid && !session.rawInputSeen && session.inputRevision <= maxRev && this.glassMayTarget(rec) &&
+      (this.deps.glassfaceFirstCodexProcess ?? firstCodexProcess)(session.pid, rec, launch.startupCommand) ? launch.token : undefined;
   }
   private readonly glassTurns = new GlassfaceTurns();
   private readonly glassReader = new GlassfaceReader();
@@ -459,7 +460,7 @@ export class Hub {
 
   private glassInputState(rec: SessionRecord): Pick<SessionRecord,'glassfaceWritable'|'glassfaceFirstPrompt'> {
     const s = this.sessions.get(rec.id);
-    const first = s?.inputRevision === 0 && this.firstPrompt(rec, s);
+    const first = s && !s.rawInputSeen && this.firstPrompt(rec, s);
     if (first) return { glassfaceWritable: true, glassfaceFirstPrompt: first };
     return { glassfaceWritable: this.glassWritable(rec) };
   }
@@ -469,7 +470,9 @@ export class Hub {
     if (!session?.pid || session.state !== 'live') return null;
     const pane = rec.agent?.provider === 'codex' && codexPane(session.pid, rec.agent.sessionId,
       session.rawInputSeen ? undefined : this.hostCodexResumes.get(session));
+    const launch = this.newGlassLaunch.get(session);
     return {record: rec, session, firstPrompt: this.firstPrompt(rec, session),
+      ...(launch?.startupCommand ? {firstPromptStartup: true} : {}),
       ...(pane && supportsQueue(pane) ? {nativeQueue: pane} : {})};
   }
 
@@ -810,9 +813,11 @@ export class Hub {
         resume === resumeCommand(record.agent)) {
       this.hostCodexResumes.set(session, {thread: record.agent.sessionId});
     }
-    if (!wasLost && this.isGlassGateway(conn) && conn.googleGlass && !spec.env && !spec.startupCommands?.length &&
-        record.cmd && record.createdBy === this.deps.glassfaceDeviceId) {
-      this.newGlassLaunch.set(session, 'new-codex-' + randomUUID());
+    const startupLaunch = !record.cmd && spec.startupCommands?.length === 1 ? spec.startupCommands[0] : undefined;
+    if (!wasLost && this.isGlassGateway(conn) && conn.googleGlass && !spec.env &&
+        ((record.cmd && !spec.startupCommands?.length) || !!startupLaunch) &&
+        record.createdBy === this.deps.glassfaceDeviceId) {
+      this.newGlassLaunch.set(session, { token: 'new-codex-' + randomUUID(), startupCommand: startupLaunch });
     }
     this.registry.addSession(record);
     this.broadcast({ t: wasLost ? 'sessionUpdated' : 'sessionAdded', session: record });
