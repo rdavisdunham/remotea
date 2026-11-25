@@ -215,6 +215,10 @@ it('offers the first-prompt lease only for the same untouched, paired wearable l
     recognized=true;
     hub.sessions.get('surf-glass')!.input(desktop.id,'d');
     expect(rows().every(r=>!r.glassfaceFirstPrompt)).toBe(true);
+    hub.handle(glass, {t:'open',rid:2,id:'surf-bash',cols:80,rows:25,create:{startupCommands:["'/trusted/codex' '--model' 'gpt-6.2-sol'"]}});
+    const bashFirst = rows().find(r=>r.id==='surf-bash');
+    expect(bashFirst?.glassfaceFirstPrompt).toMatch(/^new-codex-/);
+    expect(bashFirst?.glassfaceWritable).toBe(true);
   } finally {
     await hub.shutdown();
   }

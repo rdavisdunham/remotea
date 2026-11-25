@@ -7,53 +7,86 @@ import type { ClientMsg, ServerMsg, SessionRecord } from '../../src/shared/remot
 import { buildComposerWrites, sanitizeComposerText } from '../../src/shared/remote-input';
 import { readClaudeSession, isCodexCli, codexThreadFromFds } from './agent-probe';
 import { queuePaneMessage, type CodexPane } from './codex-pane-message';
-import { readStat } from './proc';
+import { paneForegroundPid, readStat } from './proc';
 import type { TermSession } from './session';
 
 export type GlassfaceRequest = Extract<ClientMsg, { t: 'glassfaceInput' | 'glassfaceDaniInput' }>;
 type Status = Extract<ServerMsg, { t: 'glassfaceReceipt' }>['status'];
 export interface GlassfaceTarget {
-  session: Pick<TermSession, 'pid' | 'state' | 'composerScreen' | 'write' | 'inputRevision'>;
+  session: Pick<TermSession, 'pid' | 'state' | 'composerScreen' | 'write' | 'inputRevision'> & { rawInputSeen?: boolean };
   record: SessionRecord;
   firstPrompt?: string;
+  firstPromptStartup?: boolean;
   nativeQueue?: CodexPane;
 }
 
-/** A shell with an agent descendant is unsafe: the descendant can exit back to a shell. */
+function isTrustedClaudeBinary(pid: number): boolean {
+  const executable = fs.readlinkSync(`/proc/${pid}/exe`);
+  const installed = process.env.REMOTEA_GLASSFACE_CLAUDE_BIN ?? path.join(os.homedir(), '.local/bin/claude');
+  const olderRelease = path.relative(path.join(os.homedir(), '.local/share/claude/versions'), executable);
+  let matched = false;
+  try { matched = executable === fs.realpathSync(installed); } catch { /* symlink may be mid-update */ }
+  if (!matched && !/^[\d.]+(?:-[\w.-]+)?$/.test(olderRelease)) return false;
+  const actual = fs.statSync(executable);
+  const running = fs.statSync(`/proc/${pid}/exe`);
+  return actual.dev === running.dev && actual.ino === running.ino;
+}
+
+function isTrustedCodexBinary(pid: number): boolean {
+  const executable = fs.readlinkSync(`/proc/${pid}/exe`);
+  const installed = process.env.REMOTEA_GLASSFACE_CODEX_BIN ?? path.join(os.homedir(), '.local/bin/codex');
+  const olderRelease = path.relative(path.join(os.homedir(), '.codex/packages/standalone/releases'), executable);
+  let matched = false;
+  try { matched = executable === fs.realpathSync(installed); } catch { /* symlink may be mid-update */ }
+  if (!matched && !/^[\d.]+-[\w-]+\/bin\/codex$/.test(olderRelease)) return false;
+  const actual = fs.statSync(executable);
+  const running = fs.statSync(`/proc/${pid}/exe`);
+  return actual.dev === running.dev && actual.ino === running.ino;
+}
+
+function readStartTicks(pid: number): string | null {
+  try {
+    const raw = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const ticks = raw.slice(raw.lastIndexOf(')') + 2).split(' ')[19];
+    return ticks && /^\d+$/.test(ticks) ? ticks : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Verify either a direct root agent or a foreground agent child inside an interactive login shell. */
 export function foregroundAgent(pid: number, provider: string, conversation: string): boolean {
-  const stat = readStat(pid);
-  if (!stat || stat.pgrp !== pid || stat.tpgid !== pid) return false;
+  const fg = paneForegroundPid(pid) ?? pid;
+  const stat = readStat(fg);
+  if (!stat || stat.pgrp !== fg || stat.tpgid !== fg) return false;
   try {
     if (provider === 'claude') {
-      const bin = process.env.REMOTEA_GLASSFACE_CLAUDE_BIN ?? path.join(os.homedir(), '.local/bin/claude');
-      const expected = fs.statSync(bin);
-      const actual = fs.statSync(`/proc/${pid}/exe`);
-      return actual.dev === expected.dev && actual.ino === expected.ino && readClaudeSession(pid) === conversation;
+      return isTrustedClaudeBinary(fg) && readClaudeSession(fg) === conversation;
     }
-    return provider === 'codex' && isCodexCli(pid) && codexThreadFromFds(pid) === conversation;
+    return provider === 'codex' && isCodexCli(fg) && codexThreadFromFds(fg) === conversation;
   } catch {
     return false;
   }
 }
 
-/** The normal Glass launcher starts one native process, directly, with this finite argument grammar. */
-export function firstCodexProcess(pid: number, rec: SessionRecord): boolean {
+/** The normal Glass launcher starts one native process (either via interactive Bash startupCommands or direct exec) with this finite argument grammar. */
+export function firstCodexProcess(rootPid: number, rec: SessionRecord, startupCommand?: string): boolean {
   try {
+    const pid = paneForegroundPid(rootPid) ?? rootPid;
     const st = readStat(pid);
     if (rec.agent || rec.turnSeq || st?.pgrp !== pid || st.tpgid !== pid || !isCodexCli(pid) ||
       rec.turnCursor || rec.eridani || rec.incarnation !== 1 || fs.realpathSync(rec.cwd) !== fs.readlinkSync(`/proc/${pid}/cwd`)) return false;
+    if (!isTrustedCodexBinary(pid)) return false;
     const bin = process.env.REMOTEA_GLASSFACE_CODEX_BIN ?? path.join(os.homedir(), '.local/bin/codex');
-    const expected = fs.statSync(bin);
-    const actual = fs.statSync(`/proc/${pid}/exe`);
-    if (expected.dev !== actual.dev || expected.ino !== actual.ino) return false;
     const argv = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').slice(0, -1);
-    if (argv[0] !== bin || argv[1] !== '--model' || !/^[a-zA-Z0-9_.-]{1,128}$/.test(argv[2] ?? '') ||
+    if ((argv[0] !== bin && argv[0] !== fs.readlinkSync(`/proc/${pid}/exe`)) || argv[1] !== '--model' || !/^[a-zA-Z0-9_.-]{1,128}$/.test(argv[2] ?? '') ||
         argv[3] !== '-c' || argv[4] !== 'check_for_update_on_startup=false' ||
         !(argv.length === 5 || (argv.length === 7 && argv[5] === '-c' &&
           /^model_reasoning_effort="(?:none|minimal|low|medium|high|xhigh|max|ultra)"$/.test(argv[6])))) return false;
     fs.accessSync(`/proc/${pid}/fd`, fs.constants.R_OK | fs.constants.X_OK);
-    return rec.cmd === 'exec ' + argv.map(s => "'" + s.replaceAll("'", "'\\''") + "'").join(' ') &&
-      codexThreadFromFds(pid) === undefined;
+    const quoted = argv.map(s => "'" + s.replaceAll("'", "'\\''") + "'").join(' ');
+    const matchesLaunch = rec.cmd ? rec.cmd === 'exec ' + quoted : (!!startupCommand && startupCommand === quoted);
+    return matchesLaunch && codexThreadFromFds(pid) === undefined;
   } catch { return false; }
 }
 
@@ -133,16 +166,21 @@ export class GlassfaceInput {
     const revision = session.inputRevision;
     const group = original.record.groupId;
     const queue = original.nativeQueue;
+    const initialFg = session.pid ? (paneForegroundPid(session.pid) ?? session.pid) : null;
+    const initialTicks = initialFg ? readStartTicks(initialFg) : null;
+    const sameFgOwner = () => !initialTicks || (!!session.pid && (paneForegroundPid(session.pid) ?? session.pid) === initialFg &&
+      readStartTicks(initialFg) === initialTicks);
     const sameProvider = (current: GlassfaceTarget) => queue
       ? current.nativeQueue?.pid === queue.pid && current.nativeQueue.fileKey === queue.fileKey
-      : !!session.pid && foreground(session.pid, m.provider, m.conversation);
+      : !!session.pid && sameFgOwner() && foreground(session.pid, m.provider, m.conversation);
+    const validFirstRev = (revision === 0 || (original.firstPromptStartup === true && revision <= 1 && !session.rawInputSeen));
     const valid = (pasted: boolean) => {
       const current = target();
       const rec = current?.record;
       return authorized() && current?.session === session && session.state === 'live' && !!session.pid &&
         rec?.state === 'live' && rec.bootId === bootId && rec.groupId === group && rec.incarnation === m.incarnation && !rec.eridani &&
         ((rec.agent?.provider === m.provider && rec.agent.sessionId === m.conversation && sameProvider(current))
-          || (!rec.agent && m.t === 'glassfaceInput' && m.provider === 'codex' && revision === 0 &&
+          || (!rec.agent && m.t === 'glassfaceInput' && m.provider === 'codex' && validFirstRev && sameFgOwner() &&
             !!current.firstPrompt && current.firstPrompt === m.conversation)) &&
         (!rec.agentState || rec.agentState.state === 'idle') && !rec.agentState?.trouble &&
         (m.t !== 'glassfaceDaniInput' || questionCurrent?.(rec, revision, m.turn) === true) &&
